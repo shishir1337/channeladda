@@ -24,11 +24,16 @@
     "typecheck": "tsc --noEmit",
     "test:repo": "tsx --conditions=react-server scripts/repo-test.ts",
     "test:auth": "tsx --conditions=react-server scripts/verify-auth.ts",
-    "test": "pnpm lint && pnpm typecheck && pnpm test:repo && pnpm test:auth && pnpm test:seller && pnpm test:admin && pnpm test:settings && pnpm test:offers && pnpm e2e",
+    "test": "pnpm lint && pnpm typecheck && pnpm test:repo && pnpm test:auth && pnpm test:seller && pnpm test:admin && pnpm test:settings && pnpm test:offers && pnpm test:redact && pnpm test:messages && pnpm test:users && pnpm e2e:reset && pnpm e2e",
     "test:seller": "tsx --conditions=react-server scripts/verify-seller.ts",
     "test:admin": "tsx --conditions=react-server scripts/verify-admin.ts",
     "test:settings": "tsx --conditions=react-server scripts/verify-settings.ts",
-    "test:offers": "tsx --conditions=react-server scripts/verify-offers.ts"
+    "test:offers": "tsx --conditions=react-server scripts/verify-offers.ts",
+    "test:messages": "tsx --conditions=react-server scripts/verify-messages.ts",
+    "test:users": "tsx --conditions=react-server scripts/verify-admin-users.ts",
+    "test:redact": "tsx --conditions=react-server scripts/verify-redact.ts",
+    "e2e:reset": "tsx --conditions=react-server scripts/reset-fixtures.ts",
+    "create:admin": "tsx --conditions=react-server scripts/create-admin.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.9.1",

@@ -16,6 +16,15 @@ import { config } from "dotenv";
 
 config();
 
+// Never on a server. This exists to start a *developer's* database; on the VPS
+// Postgres is a systemd service and DATABASE_URL points at it. If it were ever
+// down, the Docker fallback below would happily start the dev container with
+// dev credentials on the dev port and the build would target the wrong
+// database without saying so.
+if (process.env.NODE_ENV === "production" || process.env.SKIP_DB_BOOTSTRAP) {
+  process.exit(0);
+}
+
 const url = process.env.DATABASE_URL ?? "";
 const port = Number(url.match(/:(\d+)\//)?.[1] ?? 5434);
 const host = url.match(/@([^:/]+)/)?.[1] ?? "127.0.0.1";
