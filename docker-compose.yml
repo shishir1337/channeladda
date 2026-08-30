@@ -1,0 +1,24 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: channeladda-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: channeladda
+      POSTGRES_PASSWORD: channeladda_dev
+      POSTGRES_DB: channeladda
+    ports:
+      # 5434 on the host: 5432 is usually a native install and 5433 a
+      # neighbouring project. Matching DATABASE_URL means Docker and a native
+      # cluster are interchangeable without editing .env.
+      - "5434:5432"
+    volumes:
+      - channeladda_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U channeladda -d channeladda"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  channeladda_pgdata:

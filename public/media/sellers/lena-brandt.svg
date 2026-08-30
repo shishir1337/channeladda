@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" width="160" height="160" role="presentation">
+<defs><linearGradient id="a-lena-brandt" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#0369a1"/><stop offset="100%" stop-color="#02486e"/></linearGradient></defs>
+<rect width="160" height="160" rx="80" fill="url(#a-lena-brandt)"/>
+<circle cx="115.19999999999999" cy="41.6" r="48" fill="#fff" opacity=".12"/>
+<text x="50%" y="50%" text-anchor="middle" dominant-baseline="central" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="57.599999999999994" font-weight="700" fill="#ffffff" letter-spacing="2.4">LB</text></svg>

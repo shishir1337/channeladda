@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 400" width="640" height="400" role="presentation">
+<defs>
+<linearGradient id="ftelegram1" x1="0" y1="0" x2="0" y2="1">
+<stop offset="0%" stop-color="#1b8fc4" stop-opacity=".55"/><stop offset="100%" stop-color="#1b8fc4" stop-opacity="0"/>
+</linearGradient>
+<filter id="btelegram1"><feGaussianBlur stdDeviation="0.6"/></filter>
+</defs>
+<rect width="640" height="400" fill="#03141d"/>
+<rect x="0" y="0" width="640" height="56" fill="#fff" opacity=".05"/>
+<circle cx="28" cy="28" r="9" fill="#66dcff" opacity=".8"/>
+<rect x="48" y="22" width="140" height="12" rx="6" fill="#fff" opacity=".3"/>
+<rect x="520" y="20" width="80" height="16" rx="8" fill="#1b8fc4" opacity=".6"/>
+<rect x="40" y="92" width="70" height="8" rx="4" fill="#fff" opacity=".22"/>
+<rect x="40" y="110" width="105.0575" height="17" rx="5" fill="#fff" opacity=".55"/><rect x="240" y="92" width="70" height="8" rx="4" fill="#fff" opacity=".22"/>
+<rect x="240" y="110" width="111.4685" height="17" rx="5" fill="#fff" opacity=".55"/><rect x="440" y="92" width="70" height="8" rx="4" fill="#fff" opacity=".22"/>
+<rect x="440" y="110" width="118.941" height="17" rx="5" fill="#fff" opacity=".55"/>
+<line x1="40" y1="180" x2="600" y2="180" stroke="#fff" stroke-width="1" opacity=".07"/><line x1="40" y1="227" x2="600" y2="227" stroke="#fff" stroke-width="1" opacity=".07"/><line x1="40" y1="274" x2="600" y2="274" stroke="#fff" stroke-width="1" opacity=".07"/><line x1="40" y1="321" x2="600" y2="321" stroke="#fff" stroke-width="1" opacity=".07"/>
+<path d="M40 243 L64 160 L89 232 L113 169 L137 127 L162 229 L186 133 L210 240 L235 213 L259 254 L283 186 L308 249 L332 274 L357 232 L381 188 L405 267 L430 252 L454 194 L478 220 L503 178 L527 259 L551 183 L576 201 L600 191 L600 320 L40 320 Z" fill="url(#ftelegram1)"/>
+<path d="M40 243 L64 160 L89 232 L113 169 L137 127 L162 229 L186 133 L210 240 L235 213 L259 254 L283 186 L308 249 L332 274 L357 232 L381 188 L405 267 L430 252 L454 194 L478 220 L503 178 L527 259 L551 183 L576 201 L600 191" fill="none" stroke="#66dcff" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" filter="url(#btelegram1)"/>
+<rect x="40" y="344" width="331.65279999999996" height="10" rx="5" fill="#fff" opacity=".18"/>
+<rect x="40" y="364" width="231.204" height="10" rx="5" fill="#fff" opacity=".12"/>
+</svg>

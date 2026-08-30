@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 400" width="640" height="400" role="presentation">
+<defs>
+<linearGradient id="fyoutube1" x1="0" y1="0" x2="0" y2="1">
+<stop offset="0%" stop-color="#e8002b" stop-opacity=".55"/><stop offset="100%" stop-color="#e8002b" stop-opacity="0"/>
+</linearGradient>
+<filter id="byoutube1"><feGaussianBlur stdDeviation="0.6"/></filter>
+</defs>
+<rect width="640" height="400" fill="#1a0509"/>
+<rect x="0" y="0" width="640" height="56" fill="#fff" opacity=".05"/>
+<circle cx="28" cy="28" r="9" fill="#ff6b6b" opacity=".8"/>
+<rect x="48" y="22" width="140" height="12" rx="6" fill="#fff" opacity=".3"/>
+<rect x="520" y="20" width="80" height="16" rx="8" fill="#e8002b" opacity=".6"/>
+<rect x="40" y="92" width="70" height="8" rx="4" fill="#fff" opacity=".22"/>
+<rect x="40" y="110" width="100.271" height="17" rx="5" fill="#fff" opacity=".55"/><rect x="240" y="92" width="70" height="8" rx="4" fill="#fff" opacity=".22"/>
+<rect x="240" y="110" width="142.8295" height="17" rx="5" fill="#fff" opacity=".55"/><rect x="440" y="92" width="70" height="8" rx="4" fill="#fff" opacity=".22"/>
+<rect x="440" y="110" width="125.17699999999999" height="17" rx="5" fill="#fff" opacity=".55"/>
+<line x1="40" y1="180" x2="600" y2="180" stroke="#fff" stroke-width="1" opacity=".07"/><line x1="40" y1="227" x2="600" y2="227" stroke="#fff" stroke-width="1" opacity=".07"/><line x1="40" y1="274" x2="600" y2="274" stroke="#fff" stroke-width="1" opacity=".07"/><line x1="40" y1="321" x2="600" y2="321" stroke="#fff" stroke-width="1" opacity=".07"/>
+<path d="M40 186 L64 205 L89 182 L113 174 L137 137 L162 123 L186 187 L210 177 L235 142 L259 223 L283 204 L308 219 L332 186 L357 199 L381 235 L405 224 L430 229 L454 269 L478 175 L503 254 L527 225 L551 152 L576 221 L600 170 L600 320 L40 320 Z" fill="url(#fyoutube1)"/>
+<path d="M40 186 L64 205 L89 182 L113 174 L137 137 L162 123 L186 187 L210 177 L235 142 L259 223 L283 204 L308 219 L332 186 L357 199 L381 235 L405 224 L430 229 L454 269 L478 175 L503 254 L527 225 L551 152 L576 221 L600 170" fill="none" stroke="#ff6b6b" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" filter="url(#byoutube1)"/>
+<rect x="40" y="344" width="215.3504" height="10" rx="5" fill="#fff" opacity=".18"/>
+<rect x="40" y="364" width="197.5104" height="10" rx="5" fill="#fff" opacity=".12"/>
+</svg>

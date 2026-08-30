@@ -1,26 +1,390 @@
 @import "tailwindcss";
 
+/* Class-based dark mode so the theme toggle can override the OS preference. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ------------------------------------------------------------------ *
+ * Channel Adda design tokens
+ * Dark-first "trading floor" palette: ink surfaces, signal gold as the
+ * single primary action colour, emerald reserved for trust/verified
+ * states so a green badge always means the same thing.
+ * ------------------------------------------------------------------ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --db-bg: #fbfbfd;
+  --db-bg-subtle: #f4f5f9;
+  --db-surface: #ffffff;
+  --db-surface-2: #f6f7fb;
+  --db-surface-3: #eceff6;
+  --db-border: #e2e6ef;
+  --db-border-strong: #cdd4e2;
+
+  --db-fg: #0b1020;
+  --db-fg-muted: #57617a;
+  --db-fg-subtle: #7d8698;
+
+  --db-primary: #ffb020;
+  --db-primary-hover: #f5a30d;
+  --db-primary-fg: #1a1204;
+  /* Amber is unreadable as small text on light surfaces, so links and
+     numerals use this darkened ramp instead of the fill colour. */
+  --db-primary-text: #96590a;
+  --db-primary-soft: #fff5e0;
+
+  --db-verified: #0f9d63;
+  --db-verified-soft: #e4f7ee;
+  --db-info: #2563eb;
+  --db-info-soft: #e6edfd;
+  --db-danger: #d92d20;
+  --db-danger-soft: #fdeceb;
+
+  --db-ring: #ffb020;
+  --db-shadow-color: 220 45% 12%;
+  --db-glow: 0 0 0 0 transparent;
+
+  /* Platform marks keep their own brand colour, tuned per theme so each
+     one still clears 3:1 against the surface it sits on. */
+  --brand-youtube: #e8002b;
+  --brand-instagram: #d6246e;
+  --brand-facebook: #1877f2;
+  --brand-telegram: #1b8fc4;
+  --brand-website: #0f9d63;
+}
+
+.dark {
+  --db-bg: #07090f;
+  --db-bg-subtle: #0a0d15;
+  --db-surface: #11151f;
+  --db-surface-2: #171d29;
+  --db-surface-3: #1f2634;
+  --db-border: #232a39;
+  --db-border-strong: #333c4f;
+
+  --db-fg: #f2f5fa;
+  --db-fg-muted: #98a2b8;
+  --db-fg-subtle: #6f7a90;
+
+  --db-primary: #ffb020;
+  --db-primary-hover: #ffc04d;
+  --db-primary-fg: #150e02;
+  --db-primary-text: #ffc55c;
+  --db-primary-soft: #2a1f08;
+
+  --db-verified: #23c98a;
+  --db-verified-soft: #0d2a20;
+  --db-info: #5b8dff;
+  --db-info-soft: #101c33;
+  --db-danger: #ff6a5e;
+  --db-danger-soft: #2c1310;
+
+  --db-ring: #ffb020;
+  --db-shadow-color: 220 60% 2%;
+  --db-glow: 0 0 40px -12px rgb(255 176 32 / 0.55);
+
+  --brand-youtube: #ff4062;
+  --brand-instagram: #f4589b;
+  --brand-facebook: #4d94ff;
+  --brand-telegram: #46b6e8;
+  --brand-website: #23c98a;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  --color-bg: var(--db-bg);
+  --color-bg-subtle: var(--db-bg-subtle);
+  --color-surface: var(--db-surface);
+  --color-surface-2: var(--db-surface-2);
+  --color-surface-3: var(--db-surface-3);
+  --color-line: var(--db-border);
+  --color-line-strong: var(--db-border-strong);
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  --color-fg: var(--db-fg);
+  --color-muted: var(--db-fg-muted);
+  --color-subtle: var(--db-fg-subtle);
+
+  --color-primary: var(--db-primary);
+  --color-primary-hover: var(--db-primary-hover);
+  --color-primary-fg: var(--db-primary-fg);
+  --color-primary-text: var(--db-primary-text);
+  --color-primary-soft: var(--db-primary-soft);
+
+  --color-verified: var(--db-verified);
+  --color-verified-soft: var(--db-verified-soft);
+  --color-info: var(--db-info);
+  --color-info-soft: var(--db-info-soft);
+  --color-danger: var(--db-danger);
+  --color-danger-soft: var(--db-danger-soft);
+
+  --color-ring: var(--db-ring);
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-space-grotesk), var(--font-inter), sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
+
+  --radius-card: 1rem;
+  --radius-panel: 1.5rem;
+
+  --shadow-soft:
+    0 1px 2px hsl(var(--db-shadow-color) / 0.06),
+    0 8px 24px -12px hsl(var(--db-shadow-color) / 0.12);
+  --shadow-lift:
+    0 2px 4px hsl(var(--db-shadow-color) / 0.08),
+    0 18px 40px -16px hsl(var(--db-shadow-color) / 0.22);
+
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+
+  --animate-marquee: marquee 44s linear infinite;
+  --animate-rise: rise 0.5s var(--ease-out-soft) both;
+  --animate-pulse-dot: pulse-dot 2.4s ease-in-out infinite;
+
+  @keyframes marquee {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(-50%);
+    }
+  }
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes pulse-dot {
+    0%,
+    100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.45;
+      transform: scale(0.82);
+    }
+  }
+
+  /* Radix-driven: accordion + sheet enter/exit. Exits run ~70% of enter. */
+  @keyframes acc-down {
+    from {
+      height: 0;
+      opacity: 0;
+    }
+    to {
+      height: var(--radix-accordion-content-height);
+      opacity: 1;
+    }
+  }
+  @keyframes acc-up {
+    from {
+      height: var(--radix-accordion-content-height);
+      opacity: 1;
+    }
+    to {
+      height: 0;
+      opacity: 0;
+    }
+  }
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes fade-out {
+    from {
+      opacity: 1;
+    }
+    to {
+      opacity: 0;
+    }
+  }
+  @keyframes slide-in {
+    from {
+      transform: translateX(100%);
+    }
+    to {
+      transform: translateX(0);
+    }
+  }
+  @keyframes slide-out {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(100%);
+    }
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer base {
+  * {
+    border-color: var(--color-line);
+  }
+
+  html {
+    scroll-behavior: smooth;
+    /* Keeps anchored sections clear of the sticky header. */
+    scroll-padding-top: 6rem;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    background-color: var(--color-bg);
+    color: var(--color-fg);
+    font-family: var(--font-sans);
+    font-synthesis-weight: none;
+    text-rendering: optimizeLegibility;
+    /* Guards against any single wide child forcing a sideways scroll. */
+    overflow-x: clip;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  /* Numbers in prices, follower counts and stats stay column-aligned. */
+  .tnum {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-ring);
+    outline-offset: 2px;
+    border-radius: 0.35rem;
+  }
+
+  button,
+  [role="button"],
+  a {
+    touch-action: manipulation;
+  }
+
+  ::selection {
+    background: var(--color-primary);
+    color: var(--color-primary-fg);
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: var(--color-bg-subtle);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-line-strong);
+    border-radius: 999px;
+    border: 2px solid var(--color-bg-subtle);
+  }
+}
+
+@layer utilities {
+  /* Horizontal card rails on mobile: snap, no visible scrollbar. */
+  .no-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .edge-fade-r {
+    -webkit-mask-image: linear-gradient(
+      to right,
+      #000 0,
+      #000 85%,
+      transparent 100%
+    );
+    mask-image: linear-gradient(to right, #000 0, #000 85%, transparent 100%);
+  }
+
+  .glow-primary {
+    box-shadow: var(--db-glow);
+  }
+
+  /* Card lift.
+     Animating box-shadow repaints the blurred shadow on every frame, which is
+     what made the old hover feel gritty. Here the shadow is painted once on a
+     sibling layer and only its opacity is animated, so the whole interaction
+     runs on compositor-friendly properties (transform + opacity). */
+  .lift-card {
+    position: relative;
+    transform: translateZ(0);
+    transition:
+      transform 280ms var(--ease-out-soft),
+      border-color 280ms var(--ease-out-soft);
+  }
+
+  /* Outer shadow only, so it never covers card content. Do not put
+     overflow:hidden on a .lift-card — it would clip this away; clip the
+     cover image on its own inner wrapper instead. */
+  .lift-card::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    opacity: 0;
+    pointer-events: none;
+    box-shadow:
+      0 2px 4px hsl(var(--db-shadow-color) / 0.08),
+      0 18px 40px -16px hsl(var(--db-shadow-color) / 0.28);
+    transition: opacity 280ms var(--ease-out-soft);
+  }
+
+  .lift-card:hover,
+  .lift-card:focus-within {
+    transform: translate3d(0, -4px, 0);
+  }
+
+  .lift-card:hover::after,
+  .lift-card:focus-within::after {
+    opacity: 1;
+  }
+
+  @media (hover: none) {
+    /* No hover on touch — skip the lift so a tap doesn't leave cards stuck. */
+    .lift-card:hover {
+      transform: none;
+    }
+  }
+
+  .grid-backdrop {
+    background-image:
+      linear-gradient(to right, var(--color-line) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--color-line) 1px, transparent 1px);
+    background-size: 64px 64px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  /* biome-ignore-start lint/complexity/noImportantStyles: a reduced-motion
+     opt-out has to beat every utility-level duration, so !important is the
+     only thing that reliably wins the cascade here. */
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  /* biome-ignore-end lint/complexity/noImportantStyles: see above */
 }

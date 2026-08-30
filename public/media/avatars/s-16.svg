@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128" role="presentation">
+<defs><linearGradient id="a-s-16" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#a3155e"/><stop offset="100%" stop-color="#6d0e3f"/></linearGradient></defs>
+<rect width="128" height="128" rx="64" fill="url(#a-s-16)"/>
+<circle cx="92.16" cy="33.28" r="38.4" fill="#fff" opacity=".12"/>
+<text x="50%" y="50%" text-anchor="middle" dominant-baseline="central" font-family="Inter, ui-sans-serif, system-ui, sans-serif" font-size="46.08" font-weight="700" fill="#ffffff" letter-spacing="1.92">SN</text></svg>

@@ -39,3 +39,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+.env
+
+/src/generated/prisma
+
+# runtime uploads (local storage; moves to ImageKit later)
+.data/

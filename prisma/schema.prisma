@@ -1,0 +1,677 @@
+// Channel Adda schema.
+//
+// Two state machines carry the whole product: Listing and Order. Every
+// dashboard is a view onto one of them. Money is stored in integer USD cents
+// and converted to dollars at the repository boundary.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------- enums
+
+enum Platform {
+  YOUTUBE
+  INSTAGRAM
+  FACEBOOK
+  TELEGRAM
+  WEBSITE
+}
+
+enum UserRole {
+  USER // buys and/or sells
+  MODERATOR // listings, KYC, reports
+  FINANCE // withdrawals, refunds, dispute payouts
+  SUPERADMIN // fees, roles, bans
+}
+
+enum KycStatus {
+  NOT_STARTED
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ListingStatus {
+  DRAFT
+  CODE_CHECK // ownership code placed, awaiting verification
+  ADMIN_REVIEW
+  LIVE
+  RESERVED // an offer was accepted, buyer is paying
+  SOLD
+  REJECTED
+  PAUSED
+  REMOVED
+}
+
+enum OfferStatus {
+  OPEN
+  ACCEPTED
+  REJECTED
+  COUNTERED
+  EXPIRED
+  WITHDRAWN
+}
+
+enum CheckoutMode {
+  QUICK // credentials on payment, 24h window
+  ESCROW // full supervised handover
+}
+
+enum OrderStatus {
+  AWAITING_PAYMENT
+  IN_ESCROW
+  TRANSFERRING
+  BUYER_CHECKING
+  COOLING_OFF // buyer confirmed; funds still held
+  COMPLETED
+  PAYMENT_EXPIRED
+  CANCELLED
+  DISPUTED
+  REFUNDED
+}
+
+enum DisputeStatus {
+  OPEN
+  UNDER_REVIEW
+  RESOLVED_RELEASE
+  RESOLVED_REFUND
+  RESOLVED_PARTIAL
+}
+
+enum WithdrawalStatus {
+  REQUESTED
+  APPROVED
+  SENT
+  REJECTED
+}
+
+// Every movement of value is a ledger row, so a balance is always derivable.
+enum LedgerKind {
+  ESCROW_HOLD // buyer funds received, held by the platform
+  ESCROW_RELEASE // released to the seller on completion
+  SELLER_FEE
+  BUYER_FEE
+  REFUND
+  WITHDRAWAL
+  ADJUSTMENT
+}
+
+enum NotificationKind {
+  MESSAGE
+  OFFER
+  ORDER
+  LISTING
+  PAYOUT
+  DISPUTE
+  REVIEW
+}
+
+// ---------------------------------------------------------------- accounts
+
+model User {
+  id String @id @default(cuid())
+
+  // ---- Better Auth owns these four. Names match its defaults, so no field
+  // mapping is needed in the auth config. Passwords live on Account, never here.
+  email         String  @unique
+  emailVerified Boolean @default(false)
+  name          String
+  image         String? // ImageKit URL once uploads land
+
+  emailVerifiedAt DateTime? // when, for the audit trail — Better Auth only tracks whether
+
+  role      UserRole  @default(USER)
+  bannedAt  DateTime?
+  banReason String?
+
+  // Public seller identity. Present on anyone who has listed.
+  slug       String? @unique
+  country    String?
+  avatarSeed String? // drives the generated avatar
+
+  kycStatus  KycStatus @default(NOT_STARTED)
+  // Hash of the identity document, so a banned seller cannot re-register.
+  kycDocHash String?
+
+  /// Median first-reply time in minutes, recomputed from messages.
+  responseMins Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sessions Session[]
+  accounts Account[]
+
+  listings       Listing[]
+  offersMade     Offer[]            @relation("OfferBuyer")
+  ordersBought   Order[]            @relation("OrderBuyer")
+  ordersSold     Order[]            @relation("OrderSeller")
+  messages       Message[]
+  buyerThreads   Conversation[]     @relation("ConversationBuyer")
+  sellerThreads  Conversation[]     @relation("ConversationSeller")
+  staffThreads   Conversation[]     @relation("ConversationStaff")
+  reviewsGiven   Review[]           @relation("ReviewAuthor")
+  reviewsGot     Review[]           @relation("ReviewSubject")
+  favourites     Favourite[]
+  ledger         LedgerEntry[]
+  withdrawals    Withdrawal[]
+  notifications  Notification[]
+  auditEntries   AuditLog[]         @relation("AuditActor")
+  kycSubmission  KycSubmission?
+  payoutAddress  PayoutAddress?
+  settingsEdits  PlatformSettings[] @relation("SettingsEditor")
+  supportSent    SupportTicket[]    @relation("SupportRequester")
+  supportHandled SupportTicket[]    @relation("SupportHandler")
+
+  @@index([slug])
+  @@index([role])
+}
+
+/// A signed-in device. Better Auth writes these; nothing else should.
+model Session {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+/// A way of signing in — the password credential, or a future social login.
+/// `password` is the only place a password hash exists in this database.
+model Account {
+  id         String @id @default(cuid())
+  accountId  String
+  providerId String
+  issuer     String
+  userId     String
+
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([issuer, accountId])
+  @@index([userId])
+}
+
+/// Single-use tokens: email confirmation and password reset.
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+}
+
+model KycSubmission {
+  id          String    @id @default(cuid())
+  userId      String    @unique
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status      KycStatus @default(PENDING)
+  documentUrl String
+  selfieUrl   String
+  fullName    String
+  country     String
+  reviewerId  String?
+  reviewNote  String?
+  submittedAt DateTime  @default(now())
+  reviewedAt  DateTime?
+}
+
+model PayoutAddress {
+  id          String    @id @default(cuid())
+  userId      String    @unique
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  address     String
+  network     String
+  /// Withdrawals are locked until this passes after an address change.
+  lockedUntil DateTime?
+  updatedAt   DateTime  @updatedAt
+}
+
+// ---------------------------------------------------------------- listings
+
+model Listing {
+  id       String   @id @default(cuid())
+  /// Human-readable URL key. Search is the main acquisition channel, so
+  /// listings are addressed by slug rather than by opaque id.
+  slug     String   @unique
+  sellerId String
+  seller   User     @relation(fields: [sellerId], references: [id])
+  platform Platform
+
+  handle  String
+  title   String
+  niche   String
+  /// Main audience country, or "Global".
+  country String
+
+  audience          Int
+  monetized         Boolean @default(false)
+  monthlyRevenueUsd Int     @default(0) // cents
+  /// Percentage times 10, so 7.4% is stored as 74.
+  engagementBp      Int
+  ageYears          Int
+
+  priceUsd    Int // cents
+  wasPriceUsd Int? // cents
+
+  /// Uploaded artwork. Stored as URLs rather than derived from the id, because
+  /// in production these are files the seller supplies.
+  coverUrl  String
+  avatarUrl String
+
+  /// Editorial promotion, set by an admin. The other card badges (new, price
+  /// drop, hot) are derived from the row itself rather than stored.
+  featured Boolean @default(false)
+
+  status              ListingStatus @default(DRAFT)
+  /// One-time code the seller places in their bio or description.
+  ownershipCode       String?
+  ownershipVerifiedAt DateTime?
+  rejectionReason     String?
+
+  /// Platform-specific setup that decides how a transfer runs, e.g. whether a
+  /// YouTube channel sits on a Brand Account.
+  transferProfile String?
+
+  watching  Int      @default(0)
+  listedAt  DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  proofs        ListingProof[]
+  conversations Conversation[]
+  offers        Offer[]
+  orders        Order[]
+  favourites    Favourite[]
+
+  @@index([status, platform])
+  @@index([sellerId])
+  @@index([platform, priceUsd])
+  @@index([listedAt])
+  @@index([slug])
+}
+
+model ListingProof {
+  id         String   @id @default(cuid())
+  listingId  String
+  listing    Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  url        String
+  label      String
+  /// Content hash — a repeat across listings is a scam signal.
+  fileHash   String
+  uploadedAt DateTime @default(now())
+
+  @@index([fileHash])
+}
+
+model Favourite {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  listingId String
+  listing   Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, listingId])
+}
+
+// ---------------------------------------------------------------- deals
+
+model Offer {
+  id          String      @id @default(cuid())
+  listingId   String
+  listing     Listing     @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  buyerId     String
+  buyer       User        @relation("OfferBuyer", fields: [buyerId], references: [id])
+  amountUsd   Int // cents
+  status      OfferStatus @default(OPEN)
+  /// A counter from the seller is still an offer on the same listing by the
+  /// same buyer, so without this there is no way to tell whose turn it is.
+  bySeller    Boolean     @default(false)
+  message     String?
+  /// Offers lapse so listings do not accumulate stale interest.
+  expiresAt   DateTime
+  counterOf   String?
+  createdAt   DateTime    @default(now())
+  respondedAt DateTime?
+
+  @@index([listingId, status])
+  @@index([buyerId])
+}
+
+model Order {
+  id        String  @id @default(cuid())
+  reference String  @unique // human-facing, e.g. CA-40218
+  listingId String
+  listing   Listing @relation(fields: [listingId], references: [id])
+  buyerId   String
+  buyer     User    @relation("OrderBuyer", fields: [buyerId], references: [id])
+  sellerId  String
+  seller    User    @relation("OrderSeller", fields: [sellerId], references: [id])
+
+  mode   CheckoutMode @default(ESCROW)
+  status OrderStatus  @default(AWAITING_PAYMENT)
+
+  priceUsd     Int // cents, agreed price
+  buyerFeeUsd  Int // cents
+  sellerFeeUsd Int // cents
+  /// What the buyer actually pays: price + buyer fee.
+  totalUsd     Int // cents
+
+  /// Cryptomus invoice reference and the asset actually paid in.
+  paymentRef   String?
+  paymentAsset String?
+  paidAt       DateTime?
+
+  /// Buyer acknowledged that ad revenue does not transfer.
+  revenueRiskAcceptedAt DateTime?
+
+  confirmedAt DateTime? // buyer pressed confirm
+  /// Set from the platform's own recovery window when the buyer confirms.
+  holdUntil   DateTime?
+  completedAt DateTime?
+  cancelledAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  steps        TransferStep[]
+  conversation Conversation?
+  dispute      Dispute?
+  ledger       LedgerEntry[]
+  review       Review?
+
+  @@index([buyerId, status])
+  @@index([sellerId, status])
+  @@index([status])
+}
+
+model TransferStep {
+  id          String    @id @default(cuid())
+  orderId     String
+  order       Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  /// Position in the platform's checklist.
+  position    Int
+  label       String
+  /// Which side has to do this one.
+  actor       String
+  completedAt DateTime?
+  proofUrl    String?
+
+  @@unique([orderId, position])
+}
+
+/// One negotiation, between one buyer and one seller, about one listing.
+///
+/// There is no direct buyer-to-seller channel anywhere in this product. Every
+/// message belongs to a conversation, every conversation is tied to a listing,
+/// and staff can read and join any of them. That is deliberate: a private
+/// channel is where a deal walks off the platform and the protection walks
+/// with it.
+model Conversation {
+  id        String  @id @default(cuid())
+  listingId String
+  listing   Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  buyerId   String
+  buyer     User    @relation("ConversationBuyer", fields: [buyerId], references: [id], onDelete: Cascade)
+  sellerId  String
+  seller    User    @relation("ConversationSeller", fields: [sellerId], references: [id], onDelete: Cascade)
+
+  /// Set once a deal exists, so the thread and the order stay together.
+  orderId String? @unique
+  order   Order?  @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  /// The staff member handling it. Any staff can read; this one owns it.
+  staffId String?
+  staff   User?   @relation("ConversationStaff", fields: [staffId], references: [id], onDelete: SetNull)
+
+  /// Raised to staff because someone tried to swap contact details.
+  flaggedAt     DateTime?
+  flagReason    String?
+  lastMessageAt DateTime  @default(now())
+  closedAt      DateTime?
+  createdAt     DateTime  @default(now())
+
+  messages Message[]
+
+  /// One thread per buyer per listing — not one per question.
+  @@unique([listingId, buyerId])
+  @@index([sellerId, lastMessageAt])
+  @@index([buyerId, lastMessageAt])
+  @@index([flaggedAt])
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String
+  sender         User         @relation(fields: [senderId], references: [id])
+
+  /// What everyone sees. Contact details are already stripped out of this.
+  body          String
+  attachmentUrl String?
+
+  /// Set when contact details were removed on the way in. The original is
+  /// never stored: keeping it would recreate the private channel in the
+  /// database.
+  redactedAt    DateTime?
+  /// What was stripped, e.g. "an email address", for staff to act on.
+  redactedKinds String?
+
+  /// True for a note written by staff, which both sides can see.
+  fromStaff Boolean   @default(false)
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([conversationId, createdAt])
+}
+
+model Dispute {
+  id         String        @id @default(cuid())
+  orderId    String        @unique
+  order      Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  openedById String
+  reason     String
+  detail     String
+  status     DisputeStatus @default(OPEN)
+
+  reviewerId String?
+  decision   String?
+  /// On a partial settlement, what the buyer got back.
+  refundUsd  Int?
+
+  openedAt     DateTime  @default(now())
+  firstReplyAt DateTime?
+  resolvedAt   DateTime?
+
+  @@index([status])
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  orderId   String   @unique
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User     @relation("ReviewAuthor", fields: [authorId], references: [id])
+  subjectId String
+  subject   User     @relation("ReviewSubject", fields: [subjectId], references: [id])
+  rating    Int // 1-5
+  body      String
+  createdAt DateTime @default(now())
+
+  @@index([subjectId])
+}
+
+// ---------------------------------------------------------------- money
+
+model LedgerEntry {
+  id        String     @id @default(cuid())
+  userId    String?
+  user      User?      @relation(fields: [userId], references: [id])
+  orderId   String?
+  order     Order?     @relation(fields: [orderId], references: [id])
+  kind      LedgerKind
+  /// Signed cents. Positive credits the user, negative debits them.
+  amountUsd Int
+  note      String?
+  createdAt DateTime   @default(now())
+
+  @@index([userId, createdAt])
+  @@index([orderId])
+  @@index([kind])
+}
+
+model Withdrawal {
+  id          String           @id @default(cuid())
+  userId      String
+  user        User             @relation(fields: [userId], references: [id])
+  amountUsd   Int // cents
+  address     String
+  network     String
+  status      WithdrawalStatus @default(REQUESTED)
+  /// Set by Cryptomus once broadcast.
+  txHash      String?
+  reviewerId  String?
+  rejectNote  String?
+  requestedAt DateTime         @default(now())
+  settledAt   DateTime?
+
+  @@index([status])
+  @@index([userId])
+}
+
+// ---------------------------------------------------------------- ops
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind      NotificationKind
+  title     String
+  body      String
+  href      String?
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+
+  @@index([userId, readAt])
+}
+
+/// Immutable record of every admin action. The only defence when a seller
+/// claims they were not paid, and the only way to catch an inside job.
+model AuditLog {
+  id        String   @id @default(cuid())
+  actorId   String?
+  actor     User?    @relation("AuditActor", fields: [actorId], references: [id])
+  action    String
+  entity    String
+  entityId  String
+  before    Json?
+  after     Json?
+  ip        String?
+  createdAt DateTime @default(now())
+
+  @@index([entity, entityId])
+  @@index([actorId, createdAt])
+}
+
+/// A message from the contact form.
+///
+/// `userId` is nullable because the people who most need support are often the
+/// ones who cannot sign in — a suspended account, a forgotten password, a
+/// hijacked email. Requiring a session here would lock out exactly them.
+model SupportTicket {
+  id     String  @id @default(cuid())
+  userId String?
+  user   User?   @relation("SupportRequester", fields: [userId], references: [id], onDelete: SetNull)
+
+  /// Where the reply goes. Captured even for signed-in people, since they may
+  /// be writing precisely because they have lost access to the account one.
+  email    String
+  topic    String
+  orderRef String?
+  message  String
+
+  status      SupportStatus @default(OPEN)
+  handledById String?
+  handledBy   User?         @relation("SupportHandler", fields: [handledById], references: [id], onDelete: SetNull)
+  handledAt   DateTime?
+  staffNote   String?
+
+  createdAt DateTime @default(now())
+
+  @@index([status, createdAt])
+  @@index([userId])
+}
+
+enum SupportStatus {
+  OPEN
+  ANSWERED
+  CLOSED
+}
+
+model Report {
+  id         String    @id @default(cuid())
+  reporterId String
+  entity     String // "listing" | "user"
+  entityId   String
+  reason     String
+  detail     String?
+  resolvedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([entity, entityId])
+}
+
+/// Platform-wide numbers a superadmin can change without a deploy.
+///
+/// One row, always id "singleton". Rates are basis points — 300 is 3.00% — so
+/// a rate is an integer and can never arrive as 0.030000000000000002.
+///
+/// Changing these never rewrites history: an Order stores the fee it was
+/// charged in cents, so a rate change moves the next sale, not the last one.
+model PlatformSettings {
+  id String @id @default("singleton")
+
+  /// Added on top of the listing price, paid by the buyer.
+  buyerFeeBp  Int @default(300)
+  /// Deducted from the sale price on completion, paid by the seller.
+  sellerFeeBp Int @default(500)
+
+  /// At or above this, a deal must use escrow. Cents.
+  escrowRequiredAboveUsd Int @default(100000)
+
+  /// How long an offer stands before it lapses. Stops listings accumulating
+  /// stale interest that neither side ever closes out.
+  offerExpiryHours Int @default(48)
+
+  updatedAt   DateTime @updatedAt
+  updatedById String?
+  updatedBy   User?    @relation("SettingsEditor", fields: [updatedById], references: [id])
+}

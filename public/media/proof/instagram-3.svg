@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 400" width="640" height="400" role="presentation">
+<defs>
+<linearGradient id="finstagram3" x1="0" y1="0" x2="0" y2="1">
+<stop offset="0%" stop-color="#d6246e" stop-opacity=".55"/><stop offset="100%" stop-color="#d6246e" stop-opacity="0"/>
+</linearGradient>
+<filter id="binstagram3"><feGaussianBlur stdDeviation="0.6"/></filter>
+</defs>
+<rect width="640" height="400" fill="#170520"/>
+<rect x="0" y="0" width="640" height="56" fill="#fff" opacity=".05"/>
+<circle cx="28" cy="28" r="9" fill="#ffa94d" opacity=".8"/>
+<rect x="48" y="22" width="140" height="12" rx="6" fill="#fff" opacity=".3"/>
+<rect x="520" y="20" width="80" height="16" rx="8" fill="#d6246e" opacity=".6"/>
+<rect x="40" y="92" width="70" height="8" rx="4" fill="#fff" opacity=".22"/>
+<rect x="40" y="110" width="142.1845" height="17" rx="5" fill="#fff" opacity=".55"/><rect x="240" y="92" width="70" height="8" rx="4" fill="#fff" opacity=".22"/>
+<rect x="240" y="110" width="128.169" height="17" rx="5" fill="#fff" opacity=".55"/><rect x="440" y="92" width="70" height="8" rx="4" fill="#fff" opacity=".22"/>
+<rect x="440" y="110" width="123.2875" height="17" rx="5" fill="#fff" opacity=".55"/>
+<line x1="40" y1="180" x2="600" y2="180" stroke="#fff" stroke-width="1" opacity=".07"/><line x1="40" y1="227" x2="600" y2="227" stroke="#fff" stroke-width="1" opacity=".07"/><line x1="40" y1="274" x2="600" y2="274" stroke="#fff" stroke-width="1" opacity=".07"/><line x1="40" y1="321" x2="600" y2="321" stroke="#fff" stroke-width="1" opacity=".07"/>
+<path d="M40 170 L64 257 L89 161 L113 176 L137 190 L162 227 L186 130 L210 186 L235 211 L259 208 L283 210 L308 257 L332 270 L357 178 L381 158 L405 231 L430 237 L454 199 L478 175 L503 259 L527 174 L551 192 L576 216 L600 195 L600 320 L40 320 Z" fill="url(#finstagram3)"/>
+<path d="M40 170 L64 257 L89 161 L113 176 L137 190 L162 227 L186 130 L210 186 L235 211 L259 208 L283 210 L308 257 L332 270 L357 178 L381 158 L405 231 L430 237 L454 199 L478 175 L503 259 L527 174 L551 192 L576 216 L600 195" fill="none" stroke="#ffa94d" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" filter="url(#binstagram3)"/>
+<rect x="40" y="344" width="225.09120000000001" height="10" rx="5" fill="#fff" opacity=".18"/>
+<rect x="40" y="364" width="150.36" height="10" rx="5" fill="#fff" opacity=".12"/>
+</svg>
