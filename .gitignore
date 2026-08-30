@@ -34,7 +34,6 @@ yarn-error.log*
 # or nobody can configure a new machine.
 .env*
 !.env.example
-!.env.production.example
 
 # vercel
 .vercel
@@ -48,10 +47,7 @@ next-env.d.ts
 # runtime uploads (local storage; moves to ImageKit later)
 .data/
 
-# Editor and agent tooling. Machine-specific, and regenerated on demand.
+# Editor and agent tooling
 /.agents/
 /.claude/
 /.windsurf/
-
-# Throwaway review screenshots
-/shots*/
