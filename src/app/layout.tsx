@@ -51,6 +51,13 @@ export const metadata: Metadata = {
     siteName: "Channel Adda",
     type: "website",
   },
+  other: {
+    // Proves to Cryptomus that we control this domain. It must be served on
+    // the apex of every page, so it lives on the root layout rather than a
+    // single route — Cryptomus re-checks it, and removing it later can
+    // deactivate the merchant account.
+    cryptomus: "46c80815",
+  },
 };
 
 export const viewport: Viewport = {
