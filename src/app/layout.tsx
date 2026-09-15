@@ -52,11 +52,13 @@ export const metadata: Metadata = {
     type: "website",
   },
   other: {
-    // Proves to Cryptomus that we control this domain. It must be served on
-    // the apex of every page, so it lives on the root layout rather than a
-    // single route — Cryptomus re-checks it, and removing it later can
-    // deactivate the merchant account.
+    // Payment-processor domain verification. Both tags must be served on every
+    // page, so they live on the root layout rather than a single route — the
+    // processor re-checks them, and removing one later can deactivate the
+    // merchant account. The two names are the same provider before and after
+    // its rebrand, so keep both until Cryptomus is confirmed retired.
     cryptomus: "46c80815",
+    heleket: "f583cfad",
   },
 };
 
