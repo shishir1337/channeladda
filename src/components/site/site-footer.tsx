@@ -141,7 +141,19 @@ export function SiteFooter() {
           </ul>
         </div>
 
-        <p className="mt-8 flex items-start gap-2.5 text-xs leading-relaxed text-subtle">
+        {/*
+          Cryptomus domain-ownership verification token. Their checker fetches
+          the homepage and looks for this exact string, so it has to be real
+          rendered text — `sr-only`, `hidden` and comment-only markup all get
+          rejected as an attempt to hide it. Small and unobtrusive is fine;
+          invisible is not. Do not remove without confirming with Cryptomus
+          first: losing it can deactivate the merchant account.
+        */}
+        <p className="mt-8 font-mono text-[0.6875rem] tracking-wide text-subtle">
+          Cryptomus verification: dl-H67v-dBsw
+        </p>
+
+        <p className="mt-6 flex items-start gap-2.5 text-xs leading-relaxed text-subtle">
           <ShieldCheckIcon
             aria-hidden="true"
             className="mt-0.5 size-4 shrink-0 text-verified"
