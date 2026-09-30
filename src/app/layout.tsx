@@ -57,7 +57,7 @@ export const metadata: Metadata = {
     // processor re-checks them, and removing one later can deactivate the
     // merchant account. The two names are the same provider before and after
     // its rebrand, so keep both until Cryptomus is confirmed retired.
-    cryptomus: "46c80815",
+    cryptomus: "012ee0cb",
     heleket: "f583cfad",
   },
 };
