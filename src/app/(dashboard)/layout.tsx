@@ -63,6 +63,17 @@ export default async function DashboardLayout({ children }: LayoutProps<"/">) {
       ],
     },
     {
+      label: "Account",
+      items: [
+        {
+          label: "Security",
+          href: "/dashboard/security",
+          icon: "settings",
+          section: true,
+        },
+      ],
+    },
+    {
       label: "Money",
       items: [
         {

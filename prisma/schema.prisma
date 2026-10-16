@@ -143,6 +143,9 @@ model User {
   country    String?
   avatarSeed String? // drives the generated avatar
 
+  /// Better Auth's two-factor plugin owns this. Name matches its default.
+  twoFactorEnabled Boolean @default(false)
+
   kycStatus  KycStatus @default(NOT_STARTED)
   // Hash of the identity document, so a banned seller cannot re-register.
   kycDocHash String?
@@ -178,6 +181,7 @@ model User {
   supportHandled SupportTicket[]    @relation("SupportHandler")
   ordersAgented  Order[]            @relation("OrderAgent")
   stepsApproved  TransferStep[]     @relation("StepApprover")
+  twoFactors     TwoFactor[]
 
   @@index([slug])
   @@index([role])
@@ -226,6 +230,23 @@ model Account {
 }
 
 /// Single-use tokens: email confirmation and password reset.
+/// A second factor. Better Auth's two-factor plugin writes these; nothing
+/// else should. The secret and the backup codes are never returned to a
+/// client, which is why the plugin marks them `returned: false`.
+model TwoFactor {
+  id                      String    @id @default(cuid())
+  userId                  String
+  user                    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  secret                  String
+  backupCodes             String
+  verified                Boolean   @default(true)
+  failedVerificationCount Int       @default(0)
+  lockedUntil             DateTime?
+
+  @@index([secret])
+  @@index([userId])
+}
+
 model Verification {
   id         String   @id @default(cuid())
   identifier String

@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { SignInForm } from "@/components/auth/auth-forms";
 import { AuthShell } from "@/components/auth/auth-shell";
+import { AuthDivider, GoogleButton } from "@/components/auth/google-button";
+import { isGoogleEnabled } from "@/lib/auth";
 
 export const metadata: Metadata = {
   title: "Sign in",
@@ -13,7 +15,8 @@ export const metadata: Metadata = {
 export default async function SignInPage({
   searchParams,
 }: PageProps<"/signin">) {
-  const { next } = await searchParams;
+  const { next, error } = await searchParams;
+  const target = typeof next === "string" ? next : undefined;
   return (
     <AuthShell
       title="Welcome back"
@@ -30,7 +33,24 @@ export default async function SignInPage({
         </p>
       }
     >
-      <SignInForm next={typeof next === "string" ? next : undefined} />
+      {error === "google" ? (
+        <p
+          role="alert"
+          className="mb-4 rounded-xl border border-danger/30 bg-danger-soft px-4 py-3 text-sm text-fg"
+        >
+          Google did not complete that sign-in. Nothing has changed on your
+          account — try again, or use your email and password below.
+        </p>
+      ) : null}
+
+      {isGoogleEnabled() ? (
+        <>
+          <GoogleButton next={target} />
+          <AuthDivider />
+        </>
+      ) : null}
+
+      <SignInForm next={target} />
     </AuthShell>
   );
 }

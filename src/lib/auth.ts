@@ -1,6 +1,7 @@
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { nextCookies } from "better-auth/next-js";
+import { twoFactor } from "better-auth/plugins";
 import { db } from "@/lib/db";
 import { sendMail } from "@/server/mailer";
 
@@ -20,6 +21,44 @@ function requireSecret() {
   // Development only, and deliberately constant so a restart does not sign
   // everyone out mid-task. Production takes the branch above instead.
   return "channeladda-development-secret-not-for-production";
+}
+
+/**
+ * "Continue with Google", when it is configured.
+ *
+ * Returned empty rather than with placeholder credentials when the id and
+ * secret are absent: Better Auth would otherwise advertise a provider that
+ * cannot complete, and the failure arrives as a redirect loop on Google's
+ * side rather than as anything this app can explain.
+ */
+function socialProviders() {
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  if (!clientId || !clientSecret) return {};
+
+  return {
+    google: {
+      clientId,
+      clientSecret,
+      // Ask for nothing beyond identity. A marketplace has no business
+      // holding a token that can read somebody's YouTube account, and a
+      // seller being asked for channel scopes at sign-in would be right to
+      // close the tab.
+      scope: ["openid", "email", "profile"],
+      // Google verifies the address itself, so a Google sign-in arrives
+      // already verified and should not be sent round the email loop.
+      mapProfileToUser: (profile: { email_verified?: boolean }) => ({
+        emailVerified: profile.email_verified === true,
+      }),
+    },
+  };
+}
+
+/** Whether the Google button should be drawn at all. */
+export function isGoogleEnabled(): boolean {
+  return Boolean(
+    process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET,
+  );
 }
 
 export const auth = betterAuth({
@@ -137,8 +176,32 @@ export const auth = betterAuth({
     },
   },
 
-  // Must stay last: it lets Better Auth set cookies from server actions.
-  plugins: [nextCookies()],
+  socialProviders: socialProviders(),
+
+  plugins: [
+    twoFactor({
+      // What an authenticator app shows next to the code.
+      issuer: "Channel Adda",
+      // A Google-only account has no password to confirm with, and refusing
+      // to let those users protect themselves would be the wrong way round.
+      // A password is still demanded from anyone who has one.
+      allowPasswordless: true,
+      // Ten wrong codes locks the account for fifteen minutes. This is the
+      // control that stops a six-digit code being brute-forced; Better Auth's
+      // per-route rate limit alone is not enough for a 1-in-a-million secret.
+      accountLockout: {
+        enabled: true,
+        maxFailedAttempts: 10,
+        durationSeconds: 900,
+      },
+      // The default. Written down because a shorter window would strand
+      // someone fetching their phone, and a longer one leaves a half-signed-in
+      // session lying around.
+      twoFactorCookieMaxAge: 600,
+    }),
+    // Must stay last: it lets Better Auth set cookies from server actions.
+    nextCookies(),
+  ],
 });
 
 export type AuthSession = typeof auth.$Infer.Session;

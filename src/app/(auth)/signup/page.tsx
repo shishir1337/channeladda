@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { SignUpForm } from "@/components/auth/auth-forms";
 import { AuthShell } from "@/components/auth/auth-shell";
+import { AuthDivider, GoogleButton } from "@/components/auth/google-button";
+import { isGoogleEnabled } from "@/lib/auth";
 
 export const metadata: Metadata = {
   title: "Create an account",
@@ -27,6 +29,12 @@ export default function SignUpPage() {
         </p>
       }
     >
+      {isGoogleEnabled() ? (
+        <>
+          <GoogleButton label="Sign up with Google" />
+          <AuthDivider />
+        </>
+      ) : null}
       <SignUpForm />
     </AuthShell>
   );
