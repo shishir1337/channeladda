@@ -1,10 +1,12 @@
 "use client";
 
-import { CreditCardIcon } from "lucide-react";
+import { CreditCardIcon, WalletIcon } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Price } from "@/components/ui/price";
 import { startPayment } from "@/server/actions/payments";
+import { payDealFromWallet } from "@/server/actions/wallet";
 
 /**
  * The buyer's one payment.
@@ -23,15 +25,21 @@ export function PayNow({
   totalUsd,
   priceUsd,
   mode,
+  availableUsd,
 }: {
   orderId: string;
   totalUsd: number;
   priceUsd: number;
   mode: "SAFEST" | "FASTEST";
+  /** The buyer's spendable balance, so the cheaper route is offered first. */
+  availableUsd: number;
 }) {
+  const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [manual, setManual] = useState(false);
   const [pending, startTransition] = useTransition();
+
+  const canUseBalance = availableUsd >= totalUsd;
 
   return (
     <div className="mt-6 rounded-panel border border-primary/30 bg-primary-soft p-5">
@@ -55,9 +63,33 @@ export function PayNow({
 
       <div className="mt-4 flex flex-wrap items-center gap-4">
         <Price usd={totalUsd / 100} className="text-2xl font-semibold" />
+        {canUseBalance ? (
+          <Button
+            type="button"
+            size="md"
+            disabled={pending}
+            onClick={() => {
+              setError(null);
+              setManual(false);
+              startTransition(async () => {
+                const result = await payDealFromWallet(orderId);
+                if (!result.ok) {
+                  setError(result.error);
+                  return;
+                }
+                router.refresh();
+              });
+            }}
+          >
+            <WalletIcon aria-hidden="true" className="size-4" />
+            {pending ? "Paying…" : "Pay from your balance"}
+          </Button>
+        ) : null}
+
         <Button
           type="button"
           size="md"
+          variant={canUseBalance ? "secondary" : "primary"}
           disabled={pending}
           onClick={() => {
             setError(null);

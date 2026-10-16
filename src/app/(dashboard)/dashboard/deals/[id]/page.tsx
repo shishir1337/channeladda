@@ -7,6 +7,7 @@ import { PayNow } from "@/components/deals/pay-now";
 import { Price } from "@/components/ui/price";
 import { db } from "@/lib/db";
 import { getDealFor } from "@/server/deals";
+import { getWallet } from "@/server/wallet";
 import { requireUser } from "@/server/session";
 
 export const metadata: Metadata = {
@@ -140,6 +141,7 @@ export default async function DealPage({
           totalUsd={deal.totalUsd}
           priceUsd={deal.priceUsd}
           mode={deal.mode}
+          availableUsd={(await getWallet(user.id)).availableUsd}
         />
       ) : null}
 

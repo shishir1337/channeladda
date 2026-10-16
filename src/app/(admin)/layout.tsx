@@ -71,6 +71,17 @@ export default async function AdminLayout({ children }: LayoutProps<"/">) {
       ],
     },
     {
+      label: "Money",
+      items: [
+        {
+          label: "Payouts",
+          href: "/admin/payouts",
+          icon: "money",
+          section: true,
+        },
+      ],
+    },
+    {
       label: "Moderation",
       items: [
         {

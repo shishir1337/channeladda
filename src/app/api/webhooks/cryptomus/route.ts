@@ -8,6 +8,7 @@ import {
   getInvoice,
 } from "@/server/cryptomus";
 import { recordOpeningPayment } from "@/server/deals";
+import { creditDeposit } from "@/server/wallet";
 
 /**
  * Cryptomus payment callbacks.
@@ -71,12 +72,63 @@ export async function POST(request: Request) {
   return Response.json({ ok: true });
 }
 
+/**
+ * A wallet top-up rather than a deal.
+ *
+ * Top-up references carry the person's id, because unlike a deal there is no
+ * row to look the payer up from — the reference is the only link between the
+ * invoice and whose balance it belongs to.
+ */
+async function handleTopUp(
+  reference: string,
+  outcome: ReturnType<typeof classifyStatus>,
+) {
+  if (outcome !== "settled") return;
+
+  const suffix = reference.split("-")[1];
+  if (!suffix) return;
+
+  const user = await db.user.findFirst({
+    where: { id: { endsWith: suffix } },
+    select: { id: true },
+  });
+  if (!user) {
+    console.warn(`[cryptomus] top-up ${reference} matches no user`);
+    return;
+  }
+
+  const confirmed = await getInvoice(reference);
+  if (
+    !confirmed ||
+    classifyStatus(confirmed.status, confirmed.isFinal) !== "settled" ||
+    confirmed.paidAmountUsd === null ||
+    confirmed.paidAmountUsd <= 0
+  ) {
+    console.warn(`[cryptomus] top-up ${reference} did not confirm`);
+    return;
+  }
+
+  // Credited at what actually arrived, not at what was asked for: an
+  // overpayment is still the payer's money.
+  await creditDeposit(
+    user.id,
+    confirmed.paidAmountUsd,
+    reference,
+    confirmed.payerCurrency ?? "USDT",
+  );
+}
+
 async function handle(
   orderId: string,
   status: string,
   outcome: ReturnType<typeof classifyStatus>,
   payload: Record<string, unknown>,
 ) {
+  if (orderId.startsWith("TOPUP-")) {
+    await handleTopUp(orderId, outcome);
+    return;
+  }
+
   const order = await db.order.findUnique({
     where: { reference: orderId },
     select: { id: true, totalUsd: true, paymentRef: true },

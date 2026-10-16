@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import type { UserRole } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
 import { clearSettingsCache } from "@/server/settings";
 
@@ -203,7 +204,7 @@ export async function seedListing(overrides: SeedOverrides = {}) {
 }
 
 /** A second buyer, for the races where two people want the same listing. */
-export async function seedUser(role: "USER" | "AGENT" | "MODERATOR" = "USER") {
+export async function seedUser(role: UserRole = "USER") {
   assertSafeDatabase();
   return db.user.create({
     data: {

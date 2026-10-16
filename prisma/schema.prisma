@@ -565,16 +565,20 @@ model Review {
 // ---------------------------------------------------------------- money
 
 model LedgerEntry {
-  id        String     @id @default(cuid())
-  userId    String?
-  user      User?      @relation(fields: [userId], references: [id])
-  orderId   String?
-  order     Order?     @relation(fields: [orderId], references: [id])
-  kind      LedgerKind
+  id          String     @id @default(cuid())
+  userId      String?
+  user        User?      @relation(fields: [userId], references: [id])
+  orderId     String?
+  order       Order?     @relation(fields: [orderId], references: [id])
+  kind        LedgerKind
   /// Signed cents. Positive credits the user, negative debits them.
-  amountUsd Int
-  note      String?
-  createdAt DateTime   @default(now())
+  amountUsd   Int
+  note        String?
+  /// The processor's own reference for money arriving from outside, unique so
+  /// a retried callback cannot credit the same deposit twice. Null for every
+  /// internal movement, and Postgres treats each null as distinct.
+  externalRef String?    @unique
+  createdAt   DateTime   @default(now())
 
   @@index([userId, createdAt])
   @@index([orderId])
