@@ -12,7 +12,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const fees = await getFeeSettings();
   return {
     title: "Pricing & fees",
-    description: `Buyers pay ${formatRate(fees.buyerFeeBpSafest)}% on top of the listing price. Sellers pay ${formatRate(fees.sellerFeeBp)}% only when a deal completes. No listing fee, no monthly cost, no charge for a deal that falls through.`,
+    description: `Buyers pay ${formatRate(fees.buyerFeeBpSafest)}% on top of the listing price. Sellers pay ${formatRate(fees.sellerFeeBp)}% only when a deal completes. No listing fee and no monthly cost.`,
     alternates: { canonical: "/fees" },
   };
 }
@@ -45,7 +45,7 @@ export default async function FeesPage() {
         crumbs={[{ label: "Home", href: "/" }, { label: "Fees" }]}
         eyebrow="Pricing"
         title="Two fees, both stated up front"
-        description="We only earn when a deal completes. There is no listing fee, no subscription, and nothing to pay if a sale falls through."
+        description="There is no listing fee and no subscription. The buyer's fee is charged when a deal opens and refunded in full if it falls through before our agent takes custody of the account."
       />
 
       <Section>

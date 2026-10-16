@@ -6,7 +6,7 @@ import { useId, useState, useTransition } from "react";
 import { TextField } from "@/components/auth/fields";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { completeStep } from "@/server/actions/deals";
+import { completeStep, endDeal } from "@/server/actions/deals";
 import type { DealStepView, DealView } from "@/server/deals";
 
 /**
@@ -37,30 +37,130 @@ const ACTOR_LABELS = {
   system: "Channel Adda",
 } as const;
 
-export function DealTimeline({ deal }: { deal: DealView }) {
+export function DealTimeline({
+  deal,
+  staffIds,
+}: {
+  deal: DealView;
+  /**
+   * Staff who can second a high-value handover. Resolved on the server: the
+   * agent has to name somebody, and offering a list beats asking them to
+   * paste a user id.
+   */
+  staffIds?: { id: string; name: string }[];
+}) {
   return (
-    <ol className="mt-6 flex flex-col">
-      {deal.steps.map((step, index) => (
-        <Step
-          key={step.position}
-          deal={deal}
-          step={step}
-          isNext={deal.nextStep?.position === step.position}
-          isLast={index === deal.steps.length - 1}
-        />
-      ))}
-    </ol>
+    <>
+      <ol className="mt-6 flex flex-col">
+        {deal.steps.map((step, index) => (
+          <Step
+            key={step.position}
+            deal={deal}
+            step={step}
+            staffIds={staffIds}
+            isNext={deal.nextStep?.position === step.position}
+            isLast={index === deal.steps.length - 1}
+          />
+        ))}
+      </ol>
+      {deal.nextStep ? <RaiseDispute deal={deal} /> : null}
+    </>
+  );
+}
+
+/**
+ * Either side, when something has gone wrong.
+ *
+ * Without this the only way out of a stalled deal was for staff to notice.
+ * A dispute freezes the steps and puts a human on it, which is the whole
+ * point of the fee.
+ */
+function RaiseDispute({ deal }: { deal: DealView }) {
+  const router = useRouter();
+  const noteId = useId();
+  const [open, setOpen] = useState(false);
+  const [note, setNote] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  if (deal.viewerRole !== "buyer" && deal.viewerRole !== "seller") return null;
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="mt-4 cursor-pointer text-xs text-subtle underline transition-colors duration-200 hover:text-fg"
+      >
+        Something is wrong with this deal
+      </button>
+    );
+  }
+
+  return (
+    <div className="mt-5 rounded-card border border-line bg-surface-2 p-4">
+      <p className="text-sm font-semibold text-fg">Raise this with us</p>
+      <p className="mt-1.5 text-xs leading-relaxed text-muted">
+        The deal stops where it is and a moderator reads the whole record,
+        including every step and the payment references on it. Nothing moves
+        again until they decide.
+      </p>
+      <TextField
+        id={noteId}
+        name="note"
+        label="What has gone wrong"
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+        className="mt-3"
+        required
+      />
+      <div className="mt-3 flex flex-wrap gap-2.5">
+        <Button
+          type="button"
+          size="sm"
+          disabled={pending || note.trim() === ""}
+          onClick={() => {
+            setError(null);
+            startTransition(async () => {
+              const result = await endDeal(deal.id, "DISPUTED", note.trim());
+              if (!result.ok) {
+                setError(result.error);
+                return;
+              }
+              router.refresh();
+            });
+          }}
+        >
+          {pending ? "Sending…" : "Raise it"}
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          onClick={() => setOpen(false)}
+        >
+          Never mind
+        </Button>
+      </div>
+      {error ? (
+        <p role="alert" className="mt-2 text-xs text-danger">
+          {error}
+        </p>
+      ) : null}
+    </div>
   );
 }
 
 function Step({
   deal,
   step,
+  staffIds,
   isNext,
   isLast,
 }: {
   deal: DealView;
   step: DealStepView;
+  staffIds?: { id: string; name: string }[];
   isNext: boolean;
   isLast: boolean;
 }) {
@@ -141,7 +241,9 @@ function Step({
           </a>
         ) : null}
 
-        {mine ? <StepAction deal={deal} step={step} /> : null}
+        {mine ? (
+          <StepAction deal={deal} step={step} staffIds={staffIds} />
+        ) : null}
       </div>
     </li>
   );
@@ -152,14 +254,28 @@ function needsPaymentRef(label: string) {
   return label === "Pay the seller directly";
 }
 
-function StepAction({ deal, step }: { deal: DealView; step: DealStepView }) {
+function StepAction({
+  deal,
+  step,
+  staffIds,
+}: {
+  deal: DealView;
+  step: DealStepView;
+  staffIds?: { id: string; name: string }[];
+}) {
   const router = useRouter();
   const refId = useId();
+  const approverId = useId();
   const [paymentRef, setPaymentRef] = useState("");
+  const [approvedById, setApprovedById] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   const wantsRef = needsPaymentRef(step.label);
+  // Offered whenever the server says this step can need a second signature.
+  // The server decides whether it is actually required for this price, so a
+  // blank selection is fine below the threshold.
+  const wantsApprover = Boolean(staffIds && staffIds.length > 0);
   const blocked = wantsRef && paymentRef.trim() === "";
 
   return (
@@ -184,6 +300,35 @@ function StepAction({ deal, step }: { deal: DealView; step: DealStepView }) {
         </>
       ) : null}
 
+      {wantsApprover ? (
+        <div className="mb-3 max-w-sm">
+          <label
+            htmlFor={approverId}
+            className="mb-1.5 block text-sm font-medium text-fg"
+          >
+            Second approval from
+          </label>
+          <select
+            id={approverId}
+            value={approvedById}
+            onChange={(e) => setApprovedById(e.target.value)}
+            className="h-11 w-full cursor-pointer rounded-xl border border-line bg-surface px-3 text-sm text-fg"
+          >
+            <option value="">No second approver</option>
+            {staffIds?.map((person) => (
+              <option key={person.id} value={person.id}>
+                {person.name}
+              </option>
+            ))}
+          </select>
+          <p className="mt-1.5 text-xs leading-relaxed text-subtle">
+            Required above the platform's threshold. Recorded against your name
+            and theirs in the audit trail — only name someone who has actually
+            agreed to it.
+          </p>
+        </div>
+      ) : null}
+
       <Button
         type="button"
         size="md"
@@ -191,11 +336,10 @@ function StepAction({ deal, step }: { deal: DealView; step: DealStepView }) {
         onClick={() => {
           setError(null);
           startTransition(async () => {
-            const result = await completeStep(
-              deal.id,
-              step.position,
-              wantsRef ? { paymentRef: paymentRef.trim() } : undefined,
-            );
+            const result = await completeStep(deal.id, step.position, {
+              ...(wantsRef ? { paymentRef: paymentRef.trim() } : {}),
+              ...(approvedById ? { approvedById } : {}),
+            });
             if (!result.ok) {
               setError(result.error);
               return;

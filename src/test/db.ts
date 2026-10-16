@@ -55,22 +55,35 @@ function assertSafeDatabase() {
     );
   }
 
-  // vitest.config.mts sets DATABASE_URL from DATABASE_URL_TEST, so by the time
-  // the client is built they should be the same string. What must never happen
-  // is the test URL naming the development database.
-  const dev = process.env.DATABASE_URL;
-  if (dev && dev !== test) {
+  // The database's own name has to end in _test. Comparing DATABASE_URL to
+  // DATABASE_URL_TEST looks like a guard but can never fire: vitest.config.mts
+  // sets the former from the latter, so they are equal by construction. A
+  // naming rule is the check that actually stops this truncating something
+  // real, whatever the host.
+  let name: string;
+  let host: string;
+  try {
+    const url = new URL(test);
+    name = url.pathname.replace(/^\//, "");
+    host = url.hostname;
+  } catch {
+    throw new Error(`DATABASE_URL_TEST is not a valid URL: ${test}`);
+  }
+
+  if (!/_test$/.test(name)) {
     throw new Error(
-      "DATABASE_URL does not match DATABASE_URL_TEST. Run the suite through " +
-        "`pnpm test`, which points the client at the test database; running it " +
-        "another way risks truncating development data.",
+      `DATABASE_URL_TEST names the database "${name}". These tests TRUNCATE ` +
+        "every table, so the name must end in _test — that is the only thing " +
+        "standing between a test run and somebody's real data.",
     );
   }
 
-  if (/\/channeladda(\?|$)/.test(test)) {
+  if (
+    !["localhost", "127.0.0.1", "::1", "host.docker.internal"].includes(host)
+  ) {
     throw new Error(
-      "DATABASE_URL_TEST points at the `channeladda` development database. " +
-        "Point it at `channeladda_test` instead.",
+      `DATABASE_URL_TEST points at the remote host "${host}". Refusing to ` +
+        "truncate a database that is not on this machine.",
     );
   }
 

@@ -29,6 +29,11 @@ const MESSAGES: Record<repo.DealFailure, string> = {
   "cap-reached":
     "This agent is holding as many channels as they can. Assign another.",
   "needs-approval": "A second staff member has to approve this handover.",
+  "not-paid": "The opening payment has not cleared yet.",
+  disputed: "This deal is with Channel Adda while the dispute is open.",
+  "already-paid":
+    "The buyer has already paid the seller, so this cannot be undone here.",
+  "bad-proof": "Attach an uploaded file or an https link.",
 };
 
 function fail(reason: repo.DealFailure): DealResult {
@@ -178,7 +183,12 @@ export async function markOpeningPaymentReceived(
  */
 export async function endDeal(
   orderId: string,
-  to: "CANCELLED" | "RETURNED_TO_SELLER" | "REFUNDED" | "DISPUTED",
+  to:
+    | "CANCELLED"
+    | "RETURNED_TO_SELLER"
+    | "REFUNDED"
+    | "DISPUTED"
+    | "COMPLETED",
   note: string,
 ): Promise<DealResult> {
   const user = await requireUser();
@@ -205,6 +215,7 @@ export async function endDeal(
     RETURNED_TO_SELLER: "Channel returned to the seller.",
     REFUNDED: "Buyer refunded.",
     DISPUTED: "Raised with Channel Adda. A moderator will take it from here.",
+    COMPLETED: "Deal completed.",
   } as const;
   return { ok: true, message: messages[to] };
 }

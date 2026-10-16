@@ -1,15 +1,18 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import {
+  AssignAgent,
   ClaimDeal,
   EndDeal,
   RecordPayment,
 } from "@/components/admin/deal-controls";
+import { StuckDeals } from "@/components/admin/stuck-deals";
 import { Badge } from "@/components/ui/badge";
 import { Price } from "@/components/ui/price";
 import { db } from "@/lib/db";
 import {
   listDealActivity,
+  listDealsForAgent,
   listDealsNeedingAgent,
   listDealsNeedingReassignment,
 } from "@/server/deal-feed";
@@ -45,7 +48,8 @@ const ACTION_LABELS: Record<string, string> = {
 export default async function AdminDealsPage({
   searchParams,
 }: PageProps<"/admin/deals">) {
-  await searchParams;
+  const params = await searchParams;
+  const mineOnly = params.agent === "me";
 
   // Staff and agents both belong here, and the role decides what is shown.
   // The guard deliberately does not depend on the query string: an agent
@@ -54,8 +58,9 @@ export default async function AdminDealsPage({
   const viewer = await requireAdminArea();
   const isAgent = viewer.role === "AGENT" || viewer.role === "SUPERADMIN";
   const isFinance = viewer.role === "FINANCE" || viewer.role === "SUPERADMIN";
+  const isStaff = viewer.role !== "AGENT";
 
-  const [activity, needingAgent, needingReassignment, awaitingPayment] =
+  const [activity, needingAgent, needingReassignment, awaitingPayment, mine] =
     await Promise.all([
       listDealActivity(50),
       listDealsNeedingAgent(),
@@ -74,6 +79,7 @@ export default async function AdminDealsPage({
             },
           })
         : Promise.resolve([]),
+      mineOnly ? listDealsForAgent(viewer.id) : Promise.resolve([]),
     ]);
 
   return (
@@ -106,6 +112,8 @@ export default async function AdminDealsPage({
                 <p className="mt-1 text-xs text-subtle">
                   {order.reference} · was {order.agent?.name} ({order.status})
                 </p>
+                {isStaff ? <AssignAgent orderId={order.id} /> : null}
+                <EndDeal orderId={order.id} />
               </li>
             ))}
           </ul>
@@ -141,6 +149,46 @@ export default async function AdminDealsPage({
               </li>
             ))}
           </ul>
+        </section>
+      ) : null}
+
+      {mineOnly ? (
+        <section className="mt-8">
+          <h2 className="font-display text-lg font-bold text-fg">Your deals</h2>
+          {mine.length === 0 ? (
+            <p className="mt-1.5 text-sm text-muted">
+              You are not holding anything right now.
+            </p>
+          ) : (
+            <ul className="mt-4 flex flex-col gap-3">
+              {mine.map((order) => (
+                <li
+                  key={order.id}
+                  className="rounded-card border border-line bg-surface p-4"
+                >
+                  <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                    <p className="text-sm font-semibold text-fg">
+                      {order.listing.title}
+                    </p>
+                    <p className="tnum text-xs text-subtle">
+                      {order.reference}
+                    </p>
+                  </div>
+                  <p className="mt-1 text-xs text-muted">
+                    {order.mode === "SAFEST" ? "Safest" : "Fastest"} ·{" "}
+                    <Price usd={order.priceUsd / 100} className="text-fg" /> ·{" "}
+                    {order.status}
+                  </p>
+                  <Link
+                    href={`/dashboard/deals/${order.id}`}
+                    className="mt-2 inline-flex text-xs text-primary-text underline"
+                  >
+                    Open the deal and work the steps
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
       ) : null}
 
@@ -187,6 +235,8 @@ export default async function AdminDealsPage({
           </ul>
         )}
       </section>
+
+      {isStaff ? <StuckDeals /> : null}
 
       <section className="mt-10">
         <h2 className="font-display text-lg font-bold text-fg">

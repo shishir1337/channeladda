@@ -114,10 +114,16 @@ test(
 
     // sellerFeeBp is 0 by default, so the seller receives the whole price.
     expect(await balanceOf(seller.id)).toBe(10_000);
+    // Two release rows: the seller's credit, and the one that nets the
+    // platform's hold back off its own position.
     const release = await db.ledgerEntry.findFirstOrThrow({
-      where: { orderId, kind: "ESCROW_RELEASE" },
+      where: { orderId, kind: "ESCROW_RELEASE", userId: seller.id },
     });
-    expect(release).toMatchObject({ userId: seller.id, amountUsd: 10_000 });
+    expect(release.amountUsd).toBe(10_000);
+    const netting = await db.ledgerEntry.findFirstOrThrow({
+      where: { orderId, kind: "ESCROW_RELEASE", userId: null },
+    });
+    expect(netting.amountUsd).toBe(-10_300);
     expect(
       await db.ledgerEntry.count({ where: { orderId, kind: "BUYER_FEE" } }),
     ).toBe(1);

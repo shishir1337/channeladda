@@ -78,7 +78,42 @@ export async function listDealActivity(
   });
 }
 
-/** Deals with nobody holding them, oldest first — the agent queue. */
+/**
+ * The agent queue.
+ *
+ * `agentId` picks out one agent's own deals; omitting it lists the ones
+ * nobody has taken yet. Without the filter the "my queue" link in the agent
+ * rail showed every unclaimed deal on the platform, which is not a queue.
+ */
+export async function listDealsForAgent(agentId: string, limit = 50) {
+  return db.order.findMany({
+    where: {
+      agentId,
+      status: {
+        notIn: [
+          "COMPLETED",
+          "PAYMENT_EXPIRED",
+          "CANCELLED",
+          "RETURNED_TO_SELLER",
+          "REFUNDED",
+        ],
+      },
+    },
+    orderBy: { createdAt: "asc" },
+    take: limit,
+    select: {
+      id: true,
+      reference: true,
+      mode: true,
+      status: true,
+      priceUsd: true,
+      createdAt: true,
+      listing: { select: { title: true, slug: true } },
+    },
+  });
+}
+
+/** Deals with nobody holding them, oldest first. */
 export async function listDealsNeedingAgent(limit = 50) {
   return db.order.findMany({
     where: {

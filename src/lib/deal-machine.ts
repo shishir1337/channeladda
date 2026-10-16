@@ -170,7 +170,13 @@ const DISPUTABLE: readonly OrderStatus[] = Object.freeze([
   "AWAITING_RELEASE",
 ]);
 
-/** Where staff may take a dispute once they have decided it. */
+/**
+ * Where staff may take a dispute once they have decided it.
+ *
+ * `COMPLETED` matters as much as the refund routes: by the time most disputes
+ * are raised one side has already performed, and an outcome set that only
+ * ever favours one fixed party is not an adjudication.
+ */
 const DISPUTE_OUTCOMES: Readonly<Record<DealMode, readonly OrderStatus[]>> =
   Object.freeze({
     SAFEST: ["COMPLETED", "RETURNED_TO_SELLER"],

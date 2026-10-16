@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { DealTimeline } from "@/components/deals/deal-timeline";
 import { Price } from "@/components/ui/price";
+import { db } from "@/lib/db";
 import { getDealFor } from "@/server/deals";
 import { requireUser } from "@/server/session";
 
@@ -40,6 +41,22 @@ export default async function DealPage({
   if (!deal) notFound();
 
   const safest = deal.mode === "SAFEST";
+
+  // Only the agent is ever asked to name a second approver, and only on the
+  // step that hands the channel over. Nobody else needs the staff list, and
+  // buyers and sellers must not be shown it.
+  const needsApprover =
+    deal.viewerRole === "agent" && deal.nextStep?.actor === "agent";
+  const staffIds = needsApprover
+    ? await db.user.findMany({
+        where: {
+          role: { in: ["MODERATOR", "FINANCE", "SUPERADMIN"] },
+          bannedAt: null,
+        },
+        orderBy: { name: "asc" },
+        select: { id: true, name: true },
+      })
+    : undefined;
 
   return (
     <>
@@ -119,7 +136,7 @@ export default async function DealPage({
       <h2 className="mt-8 font-display text-lg font-bold text-fg">
         What happens, in order
       </h2>
-      <DealTimeline deal={deal} />
+      <DealTimeline deal={deal} staffIds={staffIds} />
     </>
   );
 }

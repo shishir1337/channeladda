@@ -6,6 +6,7 @@ import { canTransition, type DealActor, isTerminal } from "@/lib/deal-machine";
 import { OPENING_STATUS, templateFor } from "@/lib/deal-templates";
 import { orderAmounts } from "@/lib/fees";
 import { recordAudit } from "@/server/audit";
+import { notifyDealEnded, notifyNextActor } from "@/server/deal-notify";
 import { getSettings } from "@/server/settings";
 
 /**
@@ -32,7 +33,14 @@ export type DealFailure =
   | "wrong-step"
   | "terminal"
   | "cap-reached"
-  | "needs-approval";
+  | "needs-approval"
+  /** The opening payment has not cleared, so nothing may move yet. */
+  | "not-paid"
+  /** Frozen while staff decide a dispute. */
+  | "disputed"
+  /** Too late to undo: the buyer has already paid the seller. */
+  | "already-paid"
+  | "bad-proof";
 
 export type DealOutcome<T = Record<never, never>> =
   | ({ ok: true } & T)
@@ -88,6 +96,36 @@ function isSerializationFailure(error: unknown): boolean {
 }
 
 /**
+ * Proof links are rendered as anchors in the deal timeline, where the other
+ * party clicks them inside their own authenticated session. Only this app's
+ * own upload paths and plain web links are allowed, because `javascript:` and
+ * `data:` in that position are script execution, not a screenshot.
+ */
+function isSafeProofUrl(url: string): boolean {
+  if (url.startsWith("/uploads/")) return true;
+  try {
+    return new URL(url).protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * What the platform itself is holding on one deal, in cents.
+ *
+ * Rows with no `userId` are the platform's own position, so this must net to
+ * the fee on a completed deal and to zero on a refunded one. Anything else
+ * means the books claim to hold money that has been paid away.
+ */
+export async function platformPositionFor(orderId: string): Promise<number> {
+  const { _sum } = await db.ledgerEntry.aggregate({
+    where: { orderId, userId: null },
+    _sum: { amountUsd: true },
+  });
+  return _sum.amountUsd ?? 0;
+}
+
+/**
  * The second pair of eyes on a step that hands value across.
  *
  * Must be someone else, and must be staff: an agent who could nominate
@@ -138,6 +176,23 @@ export async function createDeal(input: {
   if (listing.sellerId === input.buyerId) {
     return { ok: false, reason: "own-listing" };
   }
+
+  // A listing held by somebody's abandoned deal is the one case worth paying
+  // for a write on a read path: without it, opening a deal and walking away
+  // takes a listing off the market for good, and anybody could do that to
+  // every listing on the site for the price of nothing. Checked here, where
+  // the next buyer actually hits it, rather than waiting for a scheduler.
+  if (listing.status === "RESERVED") {
+    const freed = await expireStaleDealsForListing(listing.id);
+    if (freed > 0) {
+      const again = await db.listing.findUnique({
+        where: { id: listing.id },
+        select: { status: true },
+      });
+      if (again?.status === "LIVE") listing.status = "LIVE";
+    }
+  }
+
   if (listing.status !== "LIVE") return { ok: false, reason: "not-live" };
 
   const settings = await getSettings();
@@ -260,9 +315,16 @@ export async function recordOpeningPayment(
       : { kind: "BUYER_FEE" as const, amountUsd: order.buyerFeeUsd };
 
   const now = new Date();
+  let claimed = true;
   await db.$transaction(async (tx) => {
-    await tx.order.update({
-      where: { id: order.id },
+    // The early return above catches a webhook replayed after the first call
+    // finished. It does not catch two deliveries in flight at once, which is
+    // what a retry storm actually looks like: both would read a null
+    // paymentRef and both would write a ledger row, and the books would claim
+    // twice the money held. Claiming the null paymentRef inside the
+    // transaction is what makes the second one a no-op.
+    const took = await tx.order.updateMany({
+      where: { id: order.id, paymentRef: null },
       data: {
         status: target,
         paymentRef: ref,
@@ -271,6 +333,10 @@ export async function recordOpeningPayment(
         feePaidAt: now,
       },
     });
+    if (took.count !== 1) {
+      claimed = false;
+      return;
+    }
 
     await tx.transferStep.updateMany({
       where: { orderId: order.id, position: 1, completedAt: null },
@@ -289,6 +355,11 @@ export async function recordOpeningPayment(
       },
     });
   });
+
+  // Lost the race to an identical delivery. The other one did the work.
+  if (!claimed) return;
+
+  await notifyNextActor(order.id);
 
   // No actor: the platform did this on its own, on a cleared payment.
   await recordAudit({
@@ -471,6 +542,8 @@ export async function assignAgent(input: {
     throw error;
   }
 
+  await notifyNextActor(order.id);
+
   await recordAudit({
     actorId: input.byUserId,
     action: "deal.agent_assigned",
@@ -504,6 +577,7 @@ export async function advanceStep(input: {
       priceUsd: true,
       sellerFeeUsd: true,
       buyerFeeUsd: true,
+      totalUsd: true,
       steps: {
         where: { completedAt: null },
         orderBy: { position: "asc" },
@@ -515,6 +589,26 @@ export async function advanceStep(input: {
 
   if (!order) return { ok: false, reason: "not-found" };
   if (isTerminal(order.status)) return { ok: false, reason: "terminal" };
+
+  // Nothing moves before the money arrives. The whole protection rests on
+  // this: the opening payment is what buys the seller the confidence to hand
+  // a channel to our agent. Step 1 is completed by `recordOpeningPayment` and
+  // by nothing else, so a buyer cannot mark their own payment done and walk
+  // somebody else's channel into custody having paid nothing.
+  if (order.status === "AWAITING_PAYMENT") {
+    return { ok: false, reason: "not-paid" };
+  }
+
+  // A dispute freezes the deal. Without this, steps that carry no status
+  // change still advanced — a seller could promote the buyer to owner during
+  // a dispute and then watch the only reachable outcome refund them.
+  if (order.status === "DISPUTED") {
+    return { ok: false, reason: "disputed" };
+  }
+
+  if (input.proofUrl !== undefined && !isSafeProofUrl(input.proofUrl)) {
+    return { ok: false, reason: "bad-proof" };
+  }
 
   const actor = await roleOnDeal(order, input.userId);
   if (!actor) return { ok: false, reason: "wrong-actor" };
@@ -553,69 +647,45 @@ export async function advanceStep(input: {
   const stamp = STEP_TIMESTAMP[order.mode]?.[input.position];
   const completing = template.entersStatus === "COMPLETED";
 
-  await db.$transaction(async (tx) => {
-    await tx.transferStep.update({
-      where: {
-        orderId_position: { orderId: order.id, position: input.position },
-      },
-      data: {
-        completedAt: now,
-        proofUrl: input.proofUrl ?? undefined,
-        approvedById: approver ?? undefined,
-      },
-    });
-
-    await tx.order.update({
-      where: { id: order.id },
-      data: {
-        ...(template.entersStatus ? { status: template.entersStatus } : {}),
-        ...(stamp ? { [stamp]: now } : {}),
-        ...(input.paymentRef ? { buyerPaymentRef: input.paymentRef } : {}),
-        ...(completing ? { completedAt: now, handoverAt: now } : {}),
-      },
-    });
-
-    if (!completing) return;
-
-    await tx.listing.update({
-      where: { id: order.listingId },
-      data: { status: "SOLD" },
-    });
-
-    // Only Fastest pays anybody: it is the mode where the platform took the
-    // money. A Safest seller was paid directly by the buyer at step 6.
-    if (order.mode === "FASTEST") {
-      await tx.ledgerEntry.create({
-        data: {
+  try {
+    await db.$transaction(async (tx) => {
+      // Compare-and-set, not update: two overlapping clicks on the same step
+      // would otherwise both pass the read above and both run the completion
+      // block, crediting the seller twice. `createDeal` has guarded its race
+      // since the start; these two writes are the ones that move money.
+      const claimed = await tx.transferStep.updateMany({
+        where: {
           orderId: order.id,
-          userId: order.sellerId,
-          kind: "ESCROW_RELEASE",
-          amountUsd: order.priceUsd,
-          note: "Sale released to seller",
+          position: input.position,
+          completedAt: null,
+        },
+        data: {
+          completedAt: now,
+          proofUrl: input.proofUrl ?? undefined,
+          approvedById: approver ?? undefined,
         },
       });
-      if (order.sellerFeeUsd > 0) {
-        await tx.ledgerEntry.create({
-          data: {
-            orderId: order.id,
-            userId: order.sellerId,
-            kind: "SELLER_FEE",
-            amountUsd: -order.sellerFeeUsd,
-            note: "Seller fee",
-          },
-        });
-      }
-      await tx.ledgerEntry.create({
+      if (claimed.count !== 1) throw new DealAbort("wrong-step");
+
+      const moved = await tx.order.updateMany({
+        where: { id: order.id, status: order.status },
         data: {
-          orderId: order.id,
-          userId: null,
-          kind: "BUYER_FEE",
-          amountUsd: order.buyerFeeUsd,
-          note: "Buyer fee",
+          ...(template.entersStatus ? { status: template.entersStatus } : {}),
+          ...(stamp ? { [stamp]: now } : {}),
+          ...(input.paymentRef ? { buyerPaymentRef: input.paymentRef } : {}),
+          ...(completing ? { completedAt: now } : {}),
         },
       });
-    }
-  });
+      if (moved.count !== 1) throw new DealAbort("wrong-step");
+
+      if (completing) await completeOrder(tx, order);
+    });
+  } catch (error) {
+    if (error instanceof DealAbort) return { ok: false, reason: error.reason };
+    throw error;
+  }
+
+  await notifyNextActor(order.id);
 
   await recordAudit({
     actorId: input.userId,
@@ -648,11 +718,160 @@ const RESOLUTION_ACTIONS = {
   RETURNED_TO_SELLER: "deal.returned",
   REFUNDED: "deal.refunded",
   DISPUTED: "deal.disputed",
+  COMPLETED: "deal.completed",
 } as const;
+
+/** What both sides are told the outcome was. */
+const RESOLUTION_LABELS = {
+  CANCELLED: "Deal cancelled",
+  RETURNED_TO_SELLER: "Channel returned to the seller",
+  REFUNDED: "Buyer refunded",
+  DISPUTED: "Dispute raised",
+  COMPLETED: "Deal completed",
+} as const;
+
+type CompletableOrder = {
+  id: string;
+  mode: DealMode;
+  listingId: string;
+  sellerId: string;
+  priceUsd: number;
+  sellerFeeUsd: number;
+  buyerFeeUsd: number;
+  totalUsd: number;
+};
+
+/**
+ * Finishing a deal: the listing is sold and, on Fastest, the money moves.
+ *
+ * Shared by the last step of the happy path and by staff resolving a dispute
+ * in the buyer's favour, so the two cannot drift apart in what they pay out.
+ *
+ * The platform's hold is released in full and its fee re-recorded, rather than
+ * the fee simply being added on top. Adding it left the platform's own
+ * position claiming to hold the price it had just paid away, plus the fee
+ * twice — invisible while nothing read those rows, and about to be wrong in
+ * the wallet phase that does.
+ */
+async function completeOrder(
+  tx: Parameters<Parameters<typeof db.$transaction>[0]>[0],
+  order: CompletableOrder,
+) {
+  await tx.listing.update({
+    where: { id: order.listingId },
+    data: { status: "SOLD" },
+  });
+
+  // Only Fastest pays anybody: it is the mode where the platform took the
+  // money. A Safest seller was paid directly by the buyer at step 6.
+  if (order.mode !== "FASTEST") return;
+
+  await tx.ledgerEntry.createMany({
+    data: [
+      {
+        orderId: order.id,
+        userId: null,
+        kind: "ESCROW_RELEASE",
+        amountUsd: -order.totalUsd,
+        note: "Hold released",
+      },
+      {
+        orderId: order.id,
+        userId: order.sellerId,
+        kind: "ESCROW_RELEASE",
+        amountUsd: order.priceUsd,
+        note: "Sale released to seller",
+      },
+      {
+        orderId: order.id,
+        userId: null,
+        kind: "BUYER_FEE",
+        amountUsd: order.buyerFeeUsd,
+        note: "Buyer fee",
+      },
+      ...(order.sellerFeeUsd > 0
+        ? [
+            {
+              orderId: order.id,
+              userId: order.sellerId,
+              kind: "SELLER_FEE" as const,
+              amountUsd: -order.sellerFeeUsd,
+              note: "Seller fee",
+            },
+          ]
+        : []),
+    ],
+  });
+}
+
+/**
+ * Deals abandoned before the buyer ever paid.
+ *
+ * Creating a deal reserves the listing, so without this an abandoned deal
+ * holds a listing off the market for good — and anyone could do it, for free,
+ * to every listing on the site. Evaluated when something looks rather than on
+ * a timer, the way stale offers already are in `@/server/offers`; the
+ * scheduler that would do it properly is a later phase.
+ */
+const PAYMENT_WINDOW_HOURS = 48;
+
+/** The same sweep, narrowed to one listing someone is trying to buy. */
+export async function expireStaleDealsForListing(
+  listingId: string,
+): Promise<number> {
+  return expireStale({ listingId });
+}
+
+export async function expireStaleDeals(): Promise<number> {
+  return expireStale({});
+}
+
+async function expireStale(scope: { listingId?: string }): Promise<number> {
+  const cutoff = new Date(Date.now() - PAYMENT_WINDOW_HOURS * 60 * 60 * 1000);
+  const stale = await db.order.findMany({
+    where: {
+      status: "AWAITING_PAYMENT",
+      paymentRef: null,
+      createdAt: { lt: cutoff },
+      ...(scope.listingId ? { listingId: scope.listingId } : {}),
+    },
+    select: { id: true, listingId: true, status: true },
+  });
+
+  let expired = 0;
+  for (const order of stale) {
+    const moved = await db.order.updateMany({
+      where: { id: order.id, status: "AWAITING_PAYMENT", paymentRef: null },
+      data: { status: "PAYMENT_EXPIRED", cancelledAt: new Date() },
+    });
+    if (moved.count !== 1) continue;
+
+    await db.listing.updateMany({
+      where: { id: order.listingId, status: "RESERVED" },
+      data: { status: "LIVE" },
+    });
+    await recordAudit({
+      actorId: null,
+      action: "deal.expired",
+      entity: "order",
+      entityId: order.id,
+      before: { status: order.status },
+      after: { status: "PAYMENT_EXPIRED" },
+    });
+    expired += 1;
+  }
+
+  return expired;
+}
 
 export async function resolveDeal(input: {
   orderId: string;
-  to: "CANCELLED" | "RETURNED_TO_SELLER" | "REFUNDED" | "DISPUTED";
+  to:
+    | "CANCELLED"
+    | "RETURNED_TO_SELLER"
+    | "REFUNDED"
+    | "DISPUTED"
+    | "COMPLETED";
   byUserId: string;
   note: string;
 }): Promise<DealOutcome> {
@@ -667,6 +886,12 @@ export async function resolveDeal(input: {
       sellerId: true,
       agentId: true,
       totalUsd: true,
+      priceUsd: true,
+      buyerFeeUsd: true,
+      sellerFeeUsd: true,
+      paymentRef: true,
+      custodyAt: true,
+      sellerConfirmedAt: true,
     },
   });
 
@@ -679,39 +904,92 @@ export async function resolveDeal(input: {
     return { ok: false, reason: "wrong-actor" };
   }
 
+  // There is nothing to give back if nothing was ever taken. Reachable
+  // because a dispute may be raised before payment, and the dispute outcomes
+  // are not restricted to the states where the platform is holding funds.
+  if (input.to === "REFUNDED" && !order.paymentRef) {
+    return { ok: false, reason: "not-paid" };
+  }
+
+  // Once the seller has confirmed the buyer's payment arrived, handing the
+  // channel back would leave them holding both the money and the asset. The
+  // way out of a deal that far along is to finish it or to dispute it.
+  if (input.to === "RETURNED_TO_SELLER" && order.sellerConfirmedAt) {
+    return { ok: false, reason: "already-paid" };
+  }
+
   const now = new Date();
-  await db.$transaction(async (tx) => {
-    await tx.order.update({
-      where: { id: order.id },
-      data: {
-        status: input.to,
-        ...(input.to === "DISPUTED" ? {} : { cancelledAt: now }),
-      },
-    });
-
-    // A dispute is a pause: the listing stays reserved because the deal may
-    // still complete.
-    if (input.to === "DISPUTED") return;
-
-    await tx.listing.updateMany({
-      where: { id: order.listingId, status: "RESERVED" },
-      data: { status: "LIVE" },
-    });
-
-    // Only Fastest has anything to give back. A Safest buyer's fee is kept —
-    // the agent did the work and the channel goes home to the seller.
-    if (input.to === "REFUNDED" && order.mode === "FASTEST") {
-      await tx.ledgerEntry.create({
+  try {
+    await db.$transaction(async (tx) => {
+      const moved = await tx.order.updateMany({
+        where: { id: order.id, status: order.status },
         data: {
-          orderId: order.id,
-          userId: null,
-          kind: "REFUND",
-          amountUsd: -order.totalUsd,
-          note: input.note,
+          status: input.to,
+          ...(input.to === "DISPUTED"
+            ? {}
+            : input.to === "COMPLETED"
+              ? { completedAt: now }
+              : { cancelledAt: now }),
         },
       });
-    }
-  });
+      if (moved.count !== 1) throw new DealAbort("terminal");
+
+      // A dispute is a pause: the listing stays reserved because the deal may
+      // still complete.
+      if (input.to === "DISPUTED") return;
+
+      // Staff deciding a dispute in the buyer's favour finishes the deal, and
+      // has to pay out exactly as the happy path would.
+      if (input.to === "COMPLETED") {
+        await completeOrder(tx, order);
+        return;
+      }
+
+      await tx.listing.updateMany({
+        where: { id: order.listingId, status: "RESERVED" },
+        data: { status: "LIVE" },
+      });
+
+      if (input.to === "REFUNDED") {
+        // Returns the whole hold, so the platform's own position nets to zero.
+        await tx.ledgerEntry.create({
+          data: {
+            orderId: order.id,
+            userId: null,
+            kind: "REFUND",
+            amountUsd: -order.totalUsd,
+            note: input.note,
+          },
+        });
+        return;
+      }
+
+      // The admin fee buys the agent's work. Where the agent never got as far
+      // as holding the channel, it was not earned — the spec says staff may
+      // cancel and refund it, and /fees tells buyers there is no charge for a
+      // deal that falls through. Once custody happened the fee stands.
+      if (!order.custodyAt) {
+        await tx.ledgerEntry.create({
+          data: {
+            orderId: order.id,
+            userId: null,
+            kind: "REFUND",
+            amountUsd: -order.buyerFeeUsd,
+            note: `Fee refunded: ${input.note}`,
+          },
+        });
+      }
+    });
+  } catch (error) {
+    if (error instanceof DealAbort) return { ok: false, reason: error.reason };
+    throw error;
+  }
+
+  if (input.to === "DISPUTED") {
+    await notifyDealEnded(order.id, "Dispute raised");
+  } else {
+    await notifyDealEnded(order.id, RESOLUTION_LABELS[input.to]);
+  }
 
   await recordAudit({
     actorId: input.byUserId,

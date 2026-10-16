@@ -5,6 +5,7 @@ import { useId, useState, useTransition } from "react";
 import { TextField } from "@/components/auth/fields";
 import { Button } from "@/components/ui/button";
 import {
+  assignDealAgent,
   claimDeal,
   endDeal,
   markOpeningPaymentReceived,
@@ -145,10 +146,80 @@ export function RecordPayment({ orderId }: { orderId: string }) {
   );
 }
 
+/**
+ * Staff moving a deal to a different agent.
+ *
+ * The queue's claim button only covers deals nobody holds. This is the other
+ * case: an agent who has been suspended, or has gone quiet, still owns the
+ * channel, and somebody has to be able to take it on.
+ */
+export function AssignAgent({ orderId }: { orderId: string }) {
+  const router = useRouter();
+  const ids = { agent: useId(), email: useId(), brand: useId() };
+  const [agentId, setAgentId] = useState("");
+  const [email, setEmail] = useState("");
+  const [brand, setBrand] = useState("Channel Adda Transfers");
+  const [message, setMessage] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  return (
+    <div className="mt-3 grid gap-3 sm:grid-cols-3 sm:items-end">
+      <TextField
+        id={ids.agent}
+        name="agentId"
+        label="New agent (user id)"
+        value={agentId}
+        onChange={(e) => setAgentId(e.target.value)}
+        required
+      />
+      <TextField
+        id={ids.email}
+        name="agentEmail"
+        label="Google account to invite"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        required
+      />
+      <TextField
+        id={ids.brand}
+        name="agentBrand"
+        label="Shown to the seller as"
+        value={brand}
+        onChange={(e) => setBrand(e.target.value)}
+        required
+      />
+      <div className="sm:col-span-3">
+        <Button
+          type="button"
+          size="sm"
+          disabled={pending || !agentId.trim() || !email.trim()}
+          onClick={() => {
+            setMessage(null);
+            startTransition(async () => {
+              const result = await assignDealAgent(
+                orderId,
+                agentId.trim(),
+                email.trim(),
+                brand.trim(),
+              );
+              setMessage(result.ok ? result.message : result.error);
+              if (result.ok) router.refresh();
+            });
+          }}
+        >
+          {pending ? "Assigning…" : "Reassign this deal"}
+        </Button>
+        <Outcome message={message} />
+      </div>
+    </div>
+  );
+}
+
 const ENDINGS = [
   { to: "RETURNED_TO_SELLER", label: "Return the channel to the seller" },
   { to: "REFUNDED", label: "Refund the buyer" },
   { to: "CANCELLED", label: "Cancel the deal" },
+  { to: "COMPLETED", label: "Complete it anyway" },
 ] as const;
 
 /**
