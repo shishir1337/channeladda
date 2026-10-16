@@ -409,16 +409,23 @@ export async function assignAgent(input: {
   if (!order) return { ok: false, reason: "not-found" };
   if (isTerminal(order.status)) return { ok: false, reason: "terminal" };
 
-  // Assignment is a staff decision. Being the buyer, seller or outgoing agent
-  // is not enough — otherwise a seller could pick who holds their channel.
-  const actor = await roleOnDeal(order, input.byUserId);
-  if (actor !== "staff") return { ok: false, reason: "wrong-actor" };
-
   const assignee = await db.user.findUnique({
     where: { id: input.agentId },
     select: { role: true, bannedAt: true },
   });
   if (!assignee || assignee.role !== "AGENT" || assignee.bannedAt) {
+    return { ok: false, reason: "wrong-actor" };
+  }
+
+  // Staff may place anyone. An agent may take an unclaimed deal for
+  // themselves and nothing else — the queue has to work without a moderator
+  // handing out every job, but an agent must not be able to take a channel
+  // off a colleague or nominate who holds one. Being the buyer or the seller
+  // is never enough: a seller could otherwise pick their own custodian.
+  const actor = await roleOnDeal(order, input.byUserId);
+  const claimingUnheld =
+    order.agentId === null && input.byUserId === input.agentId;
+  if (actor !== "staff" && !claimingUnheld) {
     return { ok: false, reason: "wrong-actor" };
   }
 

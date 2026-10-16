@@ -74,6 +74,28 @@ export async function requireStaff(): Promise<CurrentUser> {
 }
 
 /**
+ * Who may enter the staff area at all.
+ *
+ * Wider than `requireStaff` by exactly one role, and used by the admin layout
+ * and nothing else. `AGENT` deliberately stays out of `STAFF` above: every
+ * other admin page guards with `requireStaff()`, so an agent reaching the
+ * listing queue, user management, messages or support gets the same 404 a
+ * stranger would. The only thing this opens is the shell and the deal pages.
+ */
+export async function requireAdminArea(): Promise<CurrentUser> {
+  const user = await requireUser();
+  if (!STAFF.includes(user.role) && user.role !== "AGENT") notFound();
+  return user;
+}
+
+/** The agent desk: taking custody of channels and running transfers. */
+export async function requireAgent(): Promise<CurrentUser> {
+  const user = await requireUser();
+  if (user.role !== "AGENT" && user.role !== "SUPERADMIN") notFound();
+  return user;
+}
+
+/**
  * A wrong role gets a 404 rather than a "forbidden" page: telling someone that
  * an admin route exists but is closed to them is information they have no use
  * for and an attacker does.

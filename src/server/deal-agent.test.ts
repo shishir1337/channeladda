@@ -319,3 +319,65 @@ test(
     ).toMatchObject({ ok: false, reason: "needs-approval" });
   }),
 );
+
+test(
+  "an agent can claim an unassigned deal themselves",
+  withCleanDb(async () => {
+    // The queue only works if an agent can take the next job without waiting
+    // for a moderator to hand it to them.
+    const { orderId, agent } = await dealFor("SAFEST");
+    expect(
+      await assignAgent({
+        orderId,
+        agentId: agent.id,
+        agentEmail: "transfers@channeladda.test",
+        agentBrand: "Channel Adda Transfers",
+        byUserId: agent.id,
+      }),
+    ).toMatchObject({ ok: true });
+  }),
+);
+
+test(
+  "an agent cannot take a deal off another agent",
+  withCleanDb(async () => {
+    const { orderId, agent } = await dealFor("SAFEST");
+    const staff = await seedUser("MODERATOR");
+    const poacher = await seedUser("AGENT");
+
+    await assignAgent({
+      orderId,
+      agentId: agent.id,
+      agentEmail: "a@b.test",
+      agentBrand: "X",
+      byUserId: staff.id,
+    });
+
+    expect(
+      await assignAgent({
+        orderId,
+        agentId: poacher.id,
+        agentEmail: "c@d.test",
+        agentBrand: "Y",
+        byUserId: poacher.id,
+      }),
+    ).toMatchObject({ ok: false, reason: "wrong-actor" });
+  }),
+);
+
+test(
+  "an agent cannot assign a different agent",
+  withCleanDb(async () => {
+    const { orderId, agent } = await dealFor("SAFEST");
+    const other = await seedUser("AGENT");
+    expect(
+      await assignAgent({
+        orderId,
+        agentId: other.id,
+        agentEmail: "c@d.test",
+        agentBrand: "Y",
+        byUserId: agent.id,
+      }),
+    ).toMatchObject({ ok: false, reason: "wrong-actor" });
+  }),
+);
