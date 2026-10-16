@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url";
 import "dotenv/config";
 import { defineConfig } from "vitest/config";
 
@@ -25,7 +26,16 @@ import { defineConfig } from "vitest/config";
  * interpreted, which is far too wide a blast radius for a test config.
  */
 export default defineConfig({
-  resolve: { tsconfigPaths: true },
+  resolve: {
+    tsconfigPaths: true,
+    // See src/test/server-only-noop.ts for why this is an alias and not a
+    // resolve condition.
+    alias: {
+      "server-only": fileURLToPath(
+        new URL("./src/test/server-only-noop.ts", import.meta.url),
+      ),
+    },
+  },
   test: {
     environment: "node",
     include: ["src/**/*.test.ts"],
