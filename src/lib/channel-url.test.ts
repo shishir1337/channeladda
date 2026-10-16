@@ -1,5 +1,9 @@
 import { expect, test } from "vitest";
-import { newOwnershipCode, parseChannelUrl } from "@/lib/channel-url";
+import {
+  handleFromUrl,
+  newOwnershipCode,
+  parseChannelUrl,
+} from "@/lib/channel-url";
 
 // ---------------------------------------------------- the four YouTube forms
 
@@ -137,4 +141,29 @@ test("the code alphabet excludes characters people mistype", () => {
 test("codes do not repeat in any practical sense", () => {
   const codes = new Set(Array.from({ length: 500 }, () => newOwnershipCode()));
   expect(codes.size).toBe(500);
+});
+
+
+// --------------------------------------------------- the handle for the form
+
+test("a link that carries a handle gives one back", () => {
+  // The seller pastes a link with their handle in it and then has to type the
+  // handle anyway, because the import filled that field from the display
+  // title. A channel called "Daily Tech Brief" is not @dailytechbrief, and the
+  // handle is what the slug and the public URL are built from.
+  expect(handleFromUrl("https://www.youtube.com/@mkbhd")).toBe("mkbhd");
+  expect(handleFromUrl("@mkbhd")).toBe("mkbhd");
+  expect(handleFromUrl("https://instagram.com/natgeo")).toBe("natgeo");
+  expect(handleFromUrl("https://t.me/durov")).toBe("durov");
+});
+
+test("a link with no handle in it gives nothing rather than a guess", () => {
+  // A channel id is not a handle, and neither is a domain. Putting either in
+  // the handle field would publish a listing titled UCBJycsmduvYEL83R_U4JriQ.
+  expect(
+    handleFromUrl("https://www.youtube.com/channel/UCBJycsmduvYEL83R_U4JriQ"),
+  ).toBeNull();
+  expect(handleFromUrl("https://example.com")).toBeNull();
+  expect(handleFromUrl("https://youtube.com/c/TechNestDaily")).toBeNull();
+  expect(handleFromUrl("not a link")).toBeNull();
 });

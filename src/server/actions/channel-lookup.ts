@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import {
   containsOwnershipCode,
+  handleFromUrl,
   newOwnershipCode,
   parseChannelUrl,
 } from "@/lib/channel-url";
@@ -29,6 +30,8 @@ export type LookupResult =
       ok: true;
       platform: string;
       channelId: string | null;
+      /** The @name, when the link or Google gave us one. */
+      handle: string | null;
       title: string;
       description: string;
       avatarUrl: string | null;
@@ -98,6 +101,7 @@ export async function lookupChannel(url: string): Promise<LookupResult> {
       ok: true,
       platform: parsed.platform,
       channelId: parsed.kind === "id" ? parsed.value : null,
+      handle: handleFromUrl(url),
       title: "",
       description: "",
       avatarUrl: null,
@@ -125,6 +129,10 @@ export async function lookupChannel(url: string): Promise<LookupResult> {
       ok: true,
       platform: "YOUTUBE",
       channelId: facts.channelId,
+      // From the canonical URL Google returns, not only from the link the
+      // seller pasted: a /channel/UC… link has no handle in it, but the
+      // channel may still have one.
+      handle: handleFromUrl(facts.canonicalUrl) ?? handleFromUrl(url),
       title: facts.title,
       description: facts.description,
       avatarUrl: facts.avatarUrl,

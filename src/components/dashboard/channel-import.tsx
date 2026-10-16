@@ -21,6 +21,8 @@ import { lookupChannel } from "@/server/actions/channel-lookup";
 export type ImportedChannel = {
   platform: string;
   channelId: string | null;
+  /** The @name, when the link or Google gave us one. */
+  handle: string | null;
   title: string;
   description: string;
   avatarUrl: string | null;

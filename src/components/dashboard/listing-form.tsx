@@ -155,7 +155,9 @@ export function ListingForm({
         current.platform) as Draft["platform"],
       sourceUrl: channel.canonicalUrl || current.sourceUrl,
       title: current.title || channel.title,
-      handle: current.handle || channel.title,
+      // The handle, not the display title: "Daily Tech Brief" is not
+      // @dailytechbrief, and the slug and the public URL are built from this.
+      handle: current.handle || channel.handle || "",
       description: current.description || channel.description,
       avatarUrl: current.avatarUrl ?? channel.avatarUrl,
       audience:

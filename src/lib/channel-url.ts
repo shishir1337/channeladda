@@ -124,6 +124,21 @@ export function parseChannelUrl(input: string): ParsedChannel | null {
 }
 
 /**
+ * The handle a link carries, if it carries one.
+ *
+ * Separate from `parseChannelUrl` because that answers "how do I look this
+ * up" and this answers "what goes in the handle field". They are the same
+ * string for an @name and different for everything else: a channel id is not
+ * a handle, a legacy /c/ name is a search term, and a domain is a domain.
+ * Returning one of those would publish a listing called
+ * UCBJycsmduvYEL83R_U4JriQ.
+ */
+export function handleFromUrl(input: string): string | null {
+  const parsed = parseChannelUrl(input);
+  return parsed?.kind === "handle" ? parsed.value : null;
+}
+
+/**
  * The alphabet for ownership codes.
  *
  * Crockford-style: no I, O, 1 or 0. Somebody is going to read this off a
