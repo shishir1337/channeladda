@@ -97,8 +97,12 @@ export async function getFeeSettings(): Promise<FeeSettings> {
 }
 
 export type SettingsInput = {
-  buyerFeeBp: number;
+  buyerFeeBpSafest: number;
+  buyerFeeBpFastest: number;
   sellerFeeBp: number;
+  maxHoldsPerAgent: number;
+  /** Dollars, as typed into the form. Stored as cents. */
+  secondApprovalAbove: number;
   offerExpiryHours: number;
 };
 
@@ -115,7 +119,8 @@ export function validateSettings(input: SettingsInput): SettingsError[] {
   const errors: SettingsError[] = [];
 
   for (const [field, bp] of [
-    ["buyerFeeBp", input.buyerFeeBp],
+    ["buyerFeeBpSafest", input.buyerFeeBpSafest],
+    ["buyerFeeBpFastest", input.buyerFeeBpFastest],
     ["sellerFeeBp", input.sellerFeeBp],
   ] as const) {
     if (!Number.isFinite(bp)) {
@@ -130,6 +135,25 @@ export function validateSettings(input: SettingsInput): SettingsError[] {
         message: `That is over ${MAX_FEE_BP / 100}%. If that is really intended, it needs a code change.`,
       });
     }
+  }
+
+  // Zero would refuse every assignment and read, from the outside, as the
+  // whole platform being broken rather than as a setting.
+  if (!Number.isInteger(input.maxHoldsPerAgent) || input.maxHoldsPerAgent < 1) {
+    errors.push({
+      field: "maxHoldsPerAgent",
+      message: "At least 1. An agent who can hold nothing blocks every deal.",
+    });
+  }
+
+  if (
+    !Number.isFinite(input.secondApprovalAbove) ||
+    input.secondApprovalAbove < 0
+  ) {
+    errors.push({
+      field: "secondApprovalAbove",
+      message: "Enter an amount, or 0 to require approval on every handover.",
+    });
   }
 
   if (
@@ -156,16 +180,18 @@ export async function updateSettings(input: SettingsInput, actorId: string) {
       buyerFeeBpSafest: true,
       buyerFeeBpFastest: true,
       sellerFeeBp: true,
+      maxHoldsPerAgent: true,
+      secondApprovalAboveUsd: true,
       offerExpiryHours: true,
     },
   });
 
   const data = {
-    // One form input still drives both modes. The per-mode fields and the
-    // agent safeguards get their own controls with the admin surface work.
-    buyerFeeBpSafest: input.buyerFeeBp,
-    buyerFeeBpFastest: input.buyerFeeBp,
+    buyerFeeBpSafest: input.buyerFeeBpSafest,
+    buyerFeeBpFastest: input.buyerFeeBpFastest,
     sellerFeeBp: input.sellerFeeBp,
+    maxHoldsPerAgent: input.maxHoldsPerAgent,
+    secondApprovalAboveUsd: Math.round(input.secondApprovalAbove * 100),
     offerExpiryHours: input.offerExpiryHours,
     updatedById: actorId,
   };

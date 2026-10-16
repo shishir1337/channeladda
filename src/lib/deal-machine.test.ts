@@ -26,24 +26,24 @@ test.each(LEGAL)("%s allows %s to %s by %s", (mode, from, to, actor) => {
 });
 
 test("the wrong actor cannot advance a step", () => {
-  expect(canTransition("SAFEST", "AWAITING_CUSTODY", "IN_CUSTODY", "buyer")).toBe(
-    false,
-  );
+  expect(
+    canTransition("SAFEST", "AWAITING_CUSTODY", "IN_CUSTODY", "buyer"),
+  ).toBe(false);
 });
 
 test("a mode cannot use the other mode's states", () => {
-  expect(canTransition("FASTEST", "AWAITING_CUSTODY", "IN_CUSTODY", "agent")).toBe(
-    false,
-  );
-  expect(canTransition("SAFEST", "AWAITING_RELEASE", "COMPLETED", "agent")).toBe(
-    false,
-  );
+  expect(
+    canTransition("FASTEST", "AWAITING_CUSTODY", "IN_CUSTODY", "agent"),
+  ).toBe(false);
+  expect(
+    canTransition("SAFEST", "AWAITING_RELEASE", "COMPLETED", "agent"),
+  ).toBe(false);
 });
 
 test("states cannot be skipped", () => {
-  expect(canTransition("SAFEST", "AWAITING_PAYMENT", "COMPLETED", "agent")).toBe(
-    false,
-  );
+  expect(
+    canTransition("SAFEST", "AWAITING_PAYMENT", "COMPLETED", "agent"),
+  ).toBe(false);
 });
 
 test("nothing leaves a terminal state", () => {
@@ -57,23 +57,25 @@ test("nothing leaves a terminal state", () => {
 
 test("either side may dispute from any live state", () => {
   expect(canTransition("SAFEST", "IN_CUSTODY", "DISPUTED", "buyer")).toBe(true);
-  expect(canTransition("FASTEST", "AGENT_VERIFYING", "DISPUTED", "seller")).toBe(
-    true,
-  );
+  expect(
+    canTransition("FASTEST", "AGENT_VERIFYING", "DISPUTED", "seller"),
+  ).toBe(true);
 });
 
 test("a dispute is not a dead end — staff resolve it onward", () => {
   expect(isTerminal("DISPUTED")).toBe(false);
   expect(canTransition("SAFEST", "DISPUTED", "COMPLETED", "staff")).toBe(true);
-  expect(canTransition("SAFEST", "DISPUTED", "RETURNED_TO_SELLER", "staff")).toBe(
-    true,
-  );
+  expect(
+    canTransition("SAFEST", "DISPUTED", "RETURNED_TO_SELLER", "staff"),
+  ).toBe(true);
   expect(canTransition("FASTEST", "DISPUTED", "REFUNDED", "staff")).toBe(true);
 });
 
 test("only staff resolve a dispute", () => {
   expect(canTransition("SAFEST", "DISPUTED", "COMPLETED", "buyer")).toBe(false);
-  expect(canTransition("FASTEST", "DISPUTED", "REFUNDED", "seller")).toBe(false);
+  expect(canTransition("FASTEST", "DISPUTED", "REFUNDED", "seller")).toBe(
+    false,
+  );
 });
 
 test("a channel can be returned from every state the agent holds it in", () => {
@@ -91,10 +93,12 @@ test("a channel can be returned from every state the agent holds it in", () => {
 });
 
 test("a deal is only cancellable before anything has moved", () => {
-  expect(canTransition("SAFEST", "AWAITING_PAYMENT", "CANCELLED", "buyer")).toBe(
-    true,
+  expect(
+    canTransition("SAFEST", "AWAITING_PAYMENT", "CANCELLED", "buyer"),
+  ).toBe(true);
+  expect(canTransition("SAFEST", "IN_CUSTODY", "CANCELLED", "buyer")).toBe(
+    false,
   );
-  expect(canTransition("SAFEST", "IN_CUSTODY", "CANCELLED", "buyer")).toBe(false);
 });
 
 test("a fastest deal is refundable wherever the platform still holds the money", () => {
@@ -106,5 +110,7 @@ test("a fastest deal is refundable wherever the platform still holds the money",
     expect(canTransition("FASTEST", from, "REFUNDED", "staff")).toBe(true);
   }
   // A Safest deal has nothing to refund: the price never reached the platform.
-  expect(canTransition("SAFEST", "IN_CUSTODY", "REFUNDED", "staff")).toBe(false);
+  expect(canTransition("SAFEST", "IN_CUSTODY", "REFUNDED", "staff")).toBe(
+    false,
+  );
 });

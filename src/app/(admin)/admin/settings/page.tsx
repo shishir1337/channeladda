@@ -34,7 +34,10 @@ export default async function AdminSettingsPage() {
       <div className="mt-8">
         <SettingsForm
           current={{
-            buyerFeeBp: settings.buyerFeeBpSafest,
+            buyerFeeBpSafest: settings.buyerFeeBpSafest,
+            buyerFeeBpFastest: settings.buyerFeeBpFastest,
+            maxHoldsPerAgent: settings.maxHoldsPerAgent,
+            secondApprovalAboveUsd: settings.secondApprovalAboveUsd,
             sellerFeeBp: settings.sellerFeeBp,
             offerExpiryHours: settings.offerExpiryHours,
           }}

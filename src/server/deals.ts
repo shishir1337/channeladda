@@ -1,14 +1,11 @@
 import "server-only";
 
-import type {
-  DealMode,
-  OrderStatus,
-  UserRole,
-} from "@/generated/prisma/enums";
+import type { DealMode, OrderStatus, UserRole } from "@/generated/prisma/enums";
+import { db } from "@/lib/db";
 import { canTransition, type DealActor, isTerminal } from "@/lib/deal-machine";
 import { OPENING_STATUS, templateFor } from "@/lib/deal-templates";
-import { db } from "@/lib/db";
 import { orderAmounts } from "@/lib/fees";
+import { recordAudit } from "@/server/audit";
 import { getSettings } from "@/server/settings";
 
 /**
@@ -188,9 +185,18 @@ export async function createDeal(input: {
         return order.id;
       });
 
+      await recordAudit({
+        actorId: input.buyerId,
+        action: "deal.created",
+        entity: "order",
+        entityId: orderId,
+        after: { mode: input.mode, reference, totalUsd: amounts.totalUsd },
+      });
+
       return { ok: true, orderId, reference };
     } catch (error) {
-      if (error instanceof DealAbort) return { ok: false, reason: error.reason };
+      if (error instanceof DealAbort)
+        return { ok: false, reason: error.reason };
       if (isUniqueViolation(error)) continue;
       throw error;
     }
@@ -283,6 +289,21 @@ export async function recordOpeningPayment(
       },
     });
   });
+
+  // No actor: the platform did this on its own, on a cleared payment.
+  await recordAudit({
+    actorId: null,
+    action: "deal.fee_paid",
+    entity: "order",
+    entityId: order.id,
+    before: { status: order.status },
+    after: {
+      status: target,
+      paymentRef: ref,
+      asset,
+      amountUsd: ledger.amountUsd,
+    },
+  });
 }
 
 /** The staff desks. `AGENT` is deliberately absent — see `roleOnDeal`. */
@@ -319,7 +340,13 @@ async function roleOnDeal(
 
 /** Which `Order` timestamp a completed step stamps, if any. */
 const STEP_TIMESTAMP: Partial<
-  Record<DealMode, Record<number, "custodyAt" | "buyerPaidAt" | "sellerConfirmedAt" | "handoverAt">>
+  Record<
+    DealMode,
+    Record<
+      number,
+      "custodyAt" | "buyerPaidAt" | "sellerConfirmedAt" | "handoverAt"
+    >
+  >
 > = {
   SAFEST: {
     4: "custodyAt",
@@ -338,7 +365,11 @@ const STEP_TIMESTAMP: Partial<
  */
 export async function holdsFor(agentId: string): Promise<number> {
   return db.order.count({
-    where: { agentId, mode: "SAFEST", status: { in: [...AGENT_HOLD_STATUSES] } },
+    where: {
+      agentId,
+      mode: "SAFEST",
+      status: { in: [...AGENT_HOLD_STATUSES] },
+    },
   });
 }
 
@@ -432,6 +463,15 @@ export async function assignAgent(input: {
     }
     throw error;
   }
+
+  await recordAudit({
+    actorId: input.byUserId,
+    action: "deal.agent_assigned",
+    entity: "order",
+    entityId: order.id,
+    before: { agentId: order.agentId },
+    after: { agentId: input.agentId, agentEmail: input.agentEmail },
+  });
 
   return { ok: true };
 }
@@ -570,6 +610,21 @@ export async function advanceStep(input: {
     }
   });
 
+  await recordAudit({
+    actorId: input.userId,
+    action: completing ? "deal.completed" : "deal.step_completed",
+    entity: "order",
+    entityId: order.id,
+    before: { status: order.status },
+    after: {
+      position: input.position,
+      label: template.label,
+      status: template.entersStatus ?? order.status,
+      ...(approver ? { approvedById: approver } : {}),
+      ...(input.paymentRef ? { buyerPaymentRef: input.paymentRef } : {}),
+    },
+  });
+
   return { ok: true };
 }
 
@@ -580,6 +635,14 @@ export async function advanceStep(input: {
  * `CANCELLED`, `RETURNED_TO_SELLER`, `REFUNDED` and `DISPUTED` would be
  * values no code could ever write.
  */
+/** One audit action per terminal, so the feed reads as what happened. */
+const RESOLUTION_ACTIONS = {
+  CANCELLED: "deal.cancelled",
+  RETURNED_TO_SELLER: "deal.returned",
+  REFUNDED: "deal.refunded",
+  DISPUTED: "deal.disputed",
+} as const;
+
 export async function resolveDeal(input: {
   orderId: string;
   to: "CANCELLED" | "RETURNED_TO_SELLER" | "REFUNDED" | "DISPUTED";
@@ -641,6 +704,15 @@ export async function resolveDeal(input: {
         },
       });
     }
+  });
+
+  await recordAudit({
+    actorId: input.byUserId,
+    action: RESOLUTION_ACTIONS[input.to],
+    entity: "order",
+    entityId: order.id,
+    before: { status: order.status },
+    after: { status: input.to, note: input.note },
   });
 
   return { ok: true };

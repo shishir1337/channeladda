@@ -1,10 +1,6 @@
 import { expect, test } from "vitest";
 import { db } from "@/lib/db";
-import {
-  balanceOf,
-  createDeal,
-  recordOpeningPayment,
-} from "@/server/deals";
+import { balanceOf, createDeal, recordOpeningPayment } from "@/server/deals";
 import { seedListing, seedUser, withCleanDb } from "@/test/db";
 
 async function openDeal(mode: "SAFEST" | "FASTEST" = "SAFEST") {
@@ -192,7 +188,12 @@ test(
     const { seller, orderId } = await openDeal("FASTEST");
     await db.ledgerEntry.createMany({
       data: [
-        { userId: seller.id, orderId, kind: "ESCROW_RELEASE", amountUsd: 10_000 },
+        {
+          userId: seller.id,
+          orderId,
+          kind: "ESCROW_RELEASE",
+          amountUsd: 10_000,
+        },
         { userId: seller.id, orderId, kind: "SELLER_FEE", amountUsd: -500 },
         // A platform row must never count towards anyone's balance.
         { userId: null, orderId, kind: "BUYER_FEE", amountUsd: 300 },

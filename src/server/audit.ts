@@ -14,7 +14,13 @@ import { db } from "@/lib/db";
  * one. There is deliberately no update or delete helper here.
  */
 export type AuditEntry = {
-  actorId: string;
+  /**
+   * Null for something the platform did on its own — a cleared payment, a
+   * lapsed window. The column has always been nullable; the type was not, so
+   * system-initiated events had nowhere to go and silently left holes in the
+   * trail exactly where automated actions happened.
+   */
+  actorId: string | null;
   action: string;
   entity:
     | "listing"

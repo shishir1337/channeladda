@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
-import { templateFor } from "@/lib/deal-templates";
 import { db } from "@/lib/db";
+import { templateFor } from "@/lib/deal-templates";
 import {
   advanceStep,
   balanceOf,
@@ -94,7 +94,9 @@ test(
 
     // The platform never held the price, so it never released it either.
     expect(
-      await db.ledgerEntry.count({ where: { orderId, kind: "ESCROW_RELEASE" } }),
+      await db.ledgerEntry.count({
+        where: { orderId, kind: "ESCROW_RELEASE" },
+      }),
     ).toBe(0);
     expect(await balanceOf(seller.id)).toBe(0);
   }),

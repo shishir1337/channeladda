@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
 import type { OrderStatus } from "@/generated/prisma/enums";
-import { templateFor } from "@/lib/deal-templates";
 import { db } from "@/lib/db";
+import { templateFor } from "@/lib/deal-templates";
 import {
   advanceStep,
   assignAgent,
@@ -122,7 +122,9 @@ test(
     const agent = await seedUser("AGENT");
     const staff = await seedUser("MODERATOR");
 
-    const first = await dealFor("SAFEST", { settings: { maxHoldsPerAgent: 1 } });
+    const first = await dealFor("SAFEST", {
+      settings: { maxHoldsPerAgent: 1 },
+    });
     expect(
       await assignAgent({
         orderId: first.orderId,

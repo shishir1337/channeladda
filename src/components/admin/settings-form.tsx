@@ -28,20 +28,32 @@ export function SettingsForm({
   current,
 }: {
   current: {
-    buyerFeeBp: number;
+    buyerFeeBpSafest: number;
+    buyerFeeBpFastest: number;
     sellerFeeBp: number;
+    maxHoldsPerAgent: number;
+    /** Cents, as stored. Shown and typed in dollars. */
+    secondApprovalAboveUsd: number;
     offerExpiryHours: number;
   };
 }) {
   const router = useRouter();
   const ids = {
-    buyer: useId(),
+    safest: useId(),
+    fastest: useId(),
     seller: useId(),
+    holds: useId(),
+    approval: useId(),
     offer: useId(),
   };
 
-  const [buyer, setBuyer] = useState(formatRate(current.buyerFeeBp));
+  const [safest, setSafest] = useState(formatRate(current.buyerFeeBpSafest));
+  const [fastest, setFastest] = useState(formatRate(current.buyerFeeBpFastest));
   const [seller, setSeller] = useState(formatRate(current.sellerFeeBp));
+  const [holds, setHolds] = useState(String(current.maxHoldsPerAgent));
+  const [approval, setApproval] = useState(
+    String(current.secondApprovalAboveUsd / 100),
+  );
   const [offerHours, setOfferHours] = useState(
     String(current.offerExpiryHours),
   );
@@ -52,15 +64,21 @@ export function SettingsForm({
   // Preview against what is typed, not what is saved, so the effect of a
   // change is visible before it is committed.
   const draft = {
-    buyerFeeBp: toBp(buyer),
+    buyerFeeBpSafest: toBp(safest),
+    buyerFeeBpFastest: toBp(fastest),
     sellerFeeBp: toBp(seller),
   };
   const previewable =
-    Number.isFinite(draft.buyerFeeBp) && Number.isFinite(draft.sellerFeeBp);
+    Number.isFinite(draft.buyerFeeBpSafest) &&
+    Number.isFinite(draft.buyerFeeBpFastest) &&
+    Number.isFinite(draft.sellerFeeBp);
 
   const changed =
-    draft.buyerFeeBp !== current.buyerFeeBp ||
+    draft.buyerFeeBpSafest !== current.buyerFeeBpSafest ||
+    draft.buyerFeeBpFastest !== current.buyerFeeBpFastest ||
     draft.sellerFeeBp !== current.sellerFeeBp ||
+    Number(holds) !== current.maxHoldsPerAgent ||
+    Math.round(Number(approval) * 100) !== current.secondApprovalAboveUsd ||
     Number(offerHours) !== current.offerExpiryHours;
 
   return (
@@ -72,8 +90,11 @@ export function SettingsForm({
         setSaved(null);
         startTransition(async () => {
           const result = await saveSettings({
-            buyerFeeBp: toBp(buyer),
+            buyerFeeBpSafest: toBp(safest),
+            buyerFeeBpFastest: toBp(fastest),
             sellerFeeBp: toBp(seller),
+            maxHoldsPerAgent: Number(holds),
+            secondApprovalAbove: Number(approval),
             offerExpiryHours: Number(offerHours),
           });
           if (!result.ok) {
@@ -101,25 +122,71 @@ export function SettingsForm({
 
         <div className="mt-5 grid gap-5 sm:grid-cols-2">
           <TextField
-            id={ids.buyer}
-            name="buyerFeeBp"
-            label="Buyer fee (%)"
-            hint="Added on top of the listing price."
+            id={ids.safest}
+            name="buyerFeeBpSafest"
+            label="Buyer fee, Safest (%)"
+            hint="The only thing a Safest buyer pays us."
             inputMode="decimal"
-            value={buyer}
-            onChange={(e) => setBuyer(e.target.value)}
-            error={errors.buyerFeeBp}
+            value={safest}
+            onChange={(e) => setSafest(e.target.value)}
+            error={errors.buyerFeeBpSafest}
+            required
+          />
+          <TextField
+            id={ids.fastest}
+            name="buyerFeeBpFastest"
+            label="Buyer fee, Fastest (%)"
+            hint="On top of the price, which we also hold."
+            inputMode="decimal"
+            value={fastest}
+            onChange={(e) => setFastest(e.target.value)}
+            error={errors.buyerFeeBpFastest}
             required
           />
           <TextField
             id={ids.seller}
             name="sellerFeeBp"
             label="Seller fee (%)"
-            hint="Deducted when a deal completes."
+            hint="Fastest only - a Safest price never reaches us."
             inputMode="decimal"
             value={seller}
             onChange={(e) => setSeller(e.target.value)}
             error={errors.sellerFeeBp}
+            required
+          />
+        </div>
+      </section>
+
+      <section className="rounded-panel border border-line bg-surface p-5 sm:p-6">
+        <h2 className="font-display text-lg font-bold text-fg">
+          Agent safeguards
+        </h2>
+        <p className="mt-1.5 text-sm leading-relaxed text-muted">
+          On a Safest deal the agent genuinely owns the channel while they hold
+          it. Google limits how many channels one account can own, and an agent
+          account that gets locked freezes every deal it is holding.
+        </p>
+        <div className="mt-5 grid gap-5 sm:grid-cols-2">
+          <TextField
+            id={ids.holds}
+            name="maxHoldsPerAgent"
+            label="Channels one agent may hold"
+            hint="Assignment is refused past this."
+            inputMode="numeric"
+            value={holds}
+            onChange={(e) => setHolds(e.target.value)}
+            error={errors.maxHoldsPerAgent}
+            required
+          />
+          <TextField
+            id={ids.approval}
+            name="secondApprovalAbove"
+            label="Second approval above (USD)"
+            hint="0 requires it on every handover."
+            inputMode="decimal"
+            value={approval}
+            onChange={(e) => setApproval(e.target.value)}
+            error={errors.secondApprovalAbove}
             required
           />
         </div>
@@ -167,15 +234,7 @@ export function SettingsForm({
                 {EXAMPLES.map((price) => {
                   // FASTEST, because it is the mode where both fees apply
                   // and so the one that shows the full effect of a change.
-                  const q = quote(
-                    price,
-                    {
-                      buyerFeeBpSafest: draft.buyerFeeBp,
-                      buyerFeeBpFastest: draft.buyerFeeBp,
-                      sellerFeeBp: draft.sellerFeeBp,
-                    },
-                    "FASTEST",
-                  );
+                  const q = quote(price, draft, "FASTEST");
                   return (
                     <tr key={price} className="border-b border-line-soft">
                       <td className="py-3 pr-4 tabular-nums">{usd(price)}</td>
