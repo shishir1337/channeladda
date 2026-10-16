@@ -16,6 +16,7 @@ import { db } from "@/lib/db";
 
 export const ROLES: readonly UserRole[] = [
   "USER",
+  "AGENT",
   "MODERATOR",
   "FINANCE",
   "SUPERADMIN",
@@ -23,6 +24,7 @@ export const ROLES: readonly UserRole[] = [
 
 export const ROLE_LABELS: Record<UserRole, string> = {
   USER: "Member",
+  AGENT: "Transfer agent",
   MODERATOR: "Moderator",
   FINANCE: "Finance",
   SUPERADMIN: "Superadmin",
@@ -30,6 +32,7 @@ export const ROLE_LABELS: Record<UserRole, string> = {
 
 export const ROLE_BLURBS: Record<UserRole, string> = {
   USER: "Buys and sells. No staff access.",
+  AGENT: "Takes custody of channels and runs transfers. Deals only.",
   MODERATOR: "Listing queue, reports, conversations.",
   FINANCE: "Withdrawals, refunds, dispute payouts.",
   SUPERADMIN: "Everything, including fees and staff.",

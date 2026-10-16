@@ -21,15 +21,17 @@ const globalForSettings = globalThis as unknown as {
 export type PlatformSettings = FeeSettings & {
   /** How long an offer stands before it lapses. */
   offerExpiryHours: number;
-  /** Transitional. The two-mode model makes escrow the buyer's choice rather
-   *  than a price threshold, so this leaves the schema with the deal work. */
-  escrowRequiredAbove: number;
+  /** How many Safest channels one agent may hold at once. */
+  maxHoldsPerAgent: number;
+  /** Cents. At or above this, handing value across needs a second approval. */
+  secondApprovalAboveUsd: number;
   updatedAt: Date | null;
   updatedByName: string | null;
 };
 
 const DEFAULT_OFFER_EXPIRY_HOURS = 48;
-const DEFAULT_ESCROW_REQUIRED_ABOVE = 1000;
+const DEFAULT_MAX_HOLDS_PER_AGENT = 10;
+const DEFAULT_SECOND_APPROVAL_ABOVE_USD = 500_000;
 
 export async function getSettings(): Promise<PlatformSettings> {
   const cached = globalForSettings.settingsCache;
@@ -38,9 +40,11 @@ export async function getSettings(): Promise<PlatformSettings> {
   const row = await db.platformSettings.findUnique({
     where: { id: "singleton" },
     select: {
-      buyerFeeBp: true,
+      buyerFeeBpSafest: true,
+      buyerFeeBpFastest: true,
       sellerFeeBp: true,
-      escrowRequiredAboveUsd: true,
+      maxHoldsPerAgent: true,
+      secondApprovalAboveUsd: true,
       offerExpiryHours: true,
       updatedAt: true,
       updatedBy: { select: { name: true } },
@@ -52,20 +56,20 @@ export async function getSettings(): Promise<PlatformSettings> {
   // would be a very expensive way to fail.
   const value: PlatformSettings = row
     ? {
-        // One stored rate still feeds both modes: the per-mode columns arrive
-        // with the deal schema, and until then they cannot diverge.
-        buyerFeeBpSafest: row.buyerFeeBp,
-        buyerFeeBpFastest: row.buyerFeeBp,
+        buyerFeeBpSafest: row.buyerFeeBpSafest,
+        buyerFeeBpFastest: row.buyerFeeBpFastest,
         sellerFeeBp: row.sellerFeeBp,
-        escrowRequiredAbove: row.escrowRequiredAboveUsd / 100,
+        maxHoldsPerAgent: row.maxHoldsPerAgent,
+        secondApprovalAboveUsd: row.secondApprovalAboveUsd,
         offerExpiryHours: row.offerExpiryHours,
         updatedAt: row.updatedAt,
         updatedByName: row.updatedBy?.name ?? null,
       }
     : {
         ...DEFAULT_FEES,
+        maxHoldsPerAgent: DEFAULT_MAX_HOLDS_PER_AGENT,
+        secondApprovalAboveUsd: DEFAULT_SECOND_APPROVAL_ABOVE_USD,
         offerExpiryHours: DEFAULT_OFFER_EXPIRY_HOURS,
-        escrowRequiredAbove: DEFAULT_ESCROW_REQUIRED_ABOVE,
         updatedAt: null,
         updatedByName: null,
       };
@@ -84,8 +88,6 @@ export async function getFeeSettings(): Promise<FeeSettings> {
 export type SettingsInput = {
   buyerFeeBp: number;
   sellerFeeBp: number;
-  /** Dollars, as typed into the form. */
-  escrowRequiredAbove: number;
   offerExpiryHours: number;
 };
 
@@ -120,16 +122,6 @@ export function validateSettings(input: SettingsInput): SettingsError[] {
   }
 
   if (
-    !Number.isFinite(input.escrowRequiredAbove) ||
-    input.escrowRequiredAbove < 0
-  ) {
-    errors.push({
-      field: "escrowRequiredAbove",
-      message: "Enter an amount, or 0 to make escrow mandatory on everything.",
-    });
-  }
-
-  if (
     !Number.isInteger(input.offerExpiryHours) ||
     input.offerExpiryHours < 1 ||
     input.offerExpiryHours > 720
@@ -150,17 +142,19 @@ export async function updateSettings(input: SettingsInput, actorId: string) {
   const before = await db.platformSettings.findUnique({
     where: { id: "singleton" },
     select: {
-      buyerFeeBp: true,
+      buyerFeeBpSafest: true,
+      buyerFeeBpFastest: true,
       sellerFeeBp: true,
-      escrowRequiredAboveUsd: true,
       offerExpiryHours: true,
     },
   });
 
   const data = {
-    buyerFeeBp: input.buyerFeeBp,
+    // One form input still drives both modes. The per-mode fields and the
+    // agent safeguards get their own controls with the admin surface work.
+    buyerFeeBpSafest: input.buyerFeeBp,
+    buyerFeeBpFastest: input.buyerFeeBp,
     sellerFeeBp: input.sellerFeeBp,
-    escrowRequiredAboveUsd: Math.round(input.escrowRequiredAbove * 100),
     offerExpiryHours: input.offerExpiryHours,
     updatedById: actorId,
   };

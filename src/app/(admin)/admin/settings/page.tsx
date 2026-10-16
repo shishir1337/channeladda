@@ -36,7 +36,6 @@ export default async function AdminSettingsPage() {
           current={{
             buyerFeeBp: settings.buyerFeeBpSafest,
             sellerFeeBp: settings.sellerFeeBp,
-            escrowRequiredAbove: settings.escrowRequiredAbove,
             offerExpiryHours: settings.offerExpiryHours,
           }}
         />

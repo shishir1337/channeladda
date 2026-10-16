@@ -25,6 +25,7 @@ enum Platform {
 
 enum UserRole {
   USER // buys and/or sells
+  AGENT // takes custody of assets and runs transfers
   MODERATOR // listings, KYC, reports
   FINANCE // withdrawals, refunds, dispute payouts
   SUPERADMIN // fees, roles, bans
@@ -58,22 +59,28 @@ enum OfferStatus {
   WITHDRAWN
 }
 
-enum CheckoutMode {
-  QUICK // credentials on payment, 24h window
-  ESCROW // full supervised handover
+/// The two deal shapes, with mirror-image protections.
+enum DealMode {
+  SAFEST // the channel is escrowed with an agent; buyer pays the seller direct
+  FASTEST // the money is escrowed with the platform; it pays the seller
 }
 
+/// Coarse on purpose: this answers "whose move is it?" and little else. The
+/// step-by-step choreography lives in TransferStep, seeded per mode.
 enum OrderStatus {
-  AWAITING_PAYMENT
-  IN_ESCROW
-  TRANSFERRING
-  BUYER_CHECKING
-  COOLING_OFF // buyer confirmed; funds still held
+  AWAITING_PAYMENT // both: buyer owes the opening payment
+  AGENT_VERIFYING // fastest: agent checking the channel matches the listing
+  AWAITING_CUSTODY // safest: seller must hand ownership to the agent
+  IN_CUSTODY // safest: agent owns it, buyer inspecting
+  AWAITING_BUYER_PAYMENT // safest: buyer owes the seller directly
+  AWAITING_HANDOVER // both: final ownership transfer under way
+  AWAITING_RELEASE // fastest: buyer has access, seller not yet paid
   COMPLETED
   PAYMENT_EXPIRED
-  CANCELLED
-  DISPUTED
-  REFUNDED
+  CANCELLED // before anything moved
+  RETURNED_TO_SELLER // safest: buyer never paid, agent handed it back
+  REFUNDED // fastest: platform returned the funds
+  DISPUTED // a pause, not an outcome: staff resolve it onward
 }
 
 enum DisputeStatus {
@@ -100,6 +107,7 @@ enum LedgerKind {
   REFUND
   WITHDRAWAL
   ADJUSTMENT
+  DEPOSIT // wallet top-up
 }
 
 enum NotificationKind {
@@ -168,6 +176,8 @@ model User {
   settingsEdits  PlatformSettings[] @relation("SettingsEditor")
   supportSent    SupportTicket[]    @relation("SupportRequester")
   supportHandled SupportTicket[]    @relation("SupportHandler")
+  ordersAgented  Order[]            @relation("OrderAgent")
+  stepsApproved  TransferStep[]     @relation("StepApprover")
 
   @@index([slug])
   @@index([role])
@@ -311,6 +321,7 @@ model Listing {
   favourites    Favourite[]
 
   @@index([status, platform])
+  @@index([featured])
   @@index([sellerId])
   @@index([platform, priceUsd])
   @@index([listedAt])
@@ -375,8 +386,16 @@ model Order {
   sellerId  String
   seller    User    @relation("OrderSeller", fields: [sellerId], references: [id])
 
-  mode   CheckoutMode @default(ESCROW)
-  status OrderStatus  @default(AWAITING_PAYMENT)
+  mode   DealMode    @default(SAFEST)
+  status OrderStatus @default(AWAITING_PAYMENT)
+
+  /// The staff member who takes custody (Safest) or supervises (Fastest).
+  agentId    String?
+  agent      User?   @relation("OrderAgent", fields: [agentId], references: [id])
+  /// The Google account the seller invites, shown to them with agentBrand.
+  agentEmail String?
+  /// Display name beside agentEmail, e.g. "Channel Adda Transfers".
+  agentBrand String?
 
   priceUsd     Int // cents, agreed price
   buyerFeeUsd  Int // cents
@@ -391,6 +410,15 @@ model Order {
 
   /// Buyer acknowledged that ad revenue does not transfer.
   revenueRiskAcceptedAt DateTime?
+
+  feePaidAt         DateTime? // opening payment cleared
+  custodyAt         DateTime? // safest: agent confirmed it owns the channel
+  buyerPaidAt       DateTime? // safest: buyer says they paid the seller
+  /// On-chain reference for the buyer-to-seller leg, so a dispute has
+  /// something checkable rather than one party's word against the other's.
+  buyerPaymentRef   String?
+  sellerConfirmedAt DateTime? // safest: seller says the money arrived
+  handoverAt        DateTime? // final transfer confirmed by the agent
 
   confirmedAt DateTime? // buyer pressed confirm
   /// Set from the platform's own recovery window when the buyer confirms.
@@ -409,6 +437,7 @@ model Order {
 
   @@index([buyerId, status])
   @@index([sellerId, status])
+  @@index([agentId, status])
   @@index([status])
 }
 
@@ -423,6 +452,10 @@ model TransferStep {
   actor       String
   completedAt DateTime?
   proofUrl    String?
+
+  /// Set when a second staff member signed off a step that required it.
+  approvedById String?
+  approvedBy   User?   @relation("StepApprover", fields: [approvedById], references: [id])
 
   @@unique([orderId, position])
 }
@@ -598,6 +631,7 @@ model AuditLog {
   createdAt DateTime @default(now())
 
   @@index([entity, entityId])
+  @@index([entity, createdAt])
   @@index([actorId, createdAt])
 }
 
@@ -659,13 +693,21 @@ model Report {
 model PlatformSettings {
   id String @id @default("singleton")
 
-  /// Added on top of the listing price, paid by the buyer.
-  buyerFeeBp  Int @default(300)
-  /// Deducted from the sale price on completion, paid by the seller.
-  sellerFeeBp Int @default(500)
+  /// Added on top of the listing price, paid by the buyer. Per mode: Fastest
+  /// is more work and carries the funds, so it may be priced higher.
+  buyerFeeBpSafest  Int @default(300)
+  buyerFeeBpFastest Int @default(300)
+  /// Deducted before a Fastest seller is credited. A Safest sale cannot be
+  /// charged one: the price never passes through the platform.
+  sellerFeeBp       Int @default(0)
 
-  /// At or above this, a deal must use escrow. Cents.
-  escrowRequiredAboveUsd Int @default(100000)
+  /// How many Safest channels one agent may hold at once. Google caps how many
+  /// channels an account can own, and a locked agent account freezes each deal
+  /// it is holding.
+  maxHoldsPerAgent       Int @default(10)
+  /// At or above this price, the step that hands value across needs a second
+  /// staff approval. Cents.
+  secondApprovalAboveUsd Int @default(500000)
 
   /// How long an offer stands before it lapses. Stops listings accumulating
   /// stale interest that neither side ever closes out.

@@ -1,4 +1,4 @@
-import type { DealMode } from "@/lib/fees";
+import type { DealMode, OrderStatus } from "@/generated/prisma/enums";
 
 /**
  * Which statuses a deal may move between, and who may move it.
@@ -12,25 +12,7 @@ import type { DealMode } from "@/lib/fees";
  * The table is pure: no Prisma, no session, no clock. Everything it needs is
  * in its arguments, so the rules can be tested exhaustively without a database
  * and the server layer is left with nothing to decide.
- *
- * `OrderStatus` is declared locally rather than imported from the generated
- * Prisma enums because the schema does not gain these states until the
- * migration lands; the two are reconciled then.
  */
-export type OrderStatus =
-  | "AWAITING_PAYMENT"
-  | "AGENT_VERIFYING"
-  | "AWAITING_CUSTODY"
-  | "IN_CUSTODY"
-  | "AWAITING_BUYER_PAYMENT"
-  | "AWAITING_HANDOVER"
-  | "AWAITING_RELEASE"
-  | "COMPLETED"
-  | "PAYMENT_EXPIRED"
-  | "CANCELLED"
-  | "RETURNED_TO_SELLER"
-  | "REFUNDED"
-  | "DISPUTED";
 
 /**
  * Who is asking.

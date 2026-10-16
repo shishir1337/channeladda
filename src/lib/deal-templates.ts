@@ -1,5 +1,5 @@
-import type { DealActor, OrderStatus } from "@/lib/deal-machine";
-import type { DealMode } from "@/lib/fees";
+import type { DealMode, OrderStatus } from "@/generated/prisma/enums";
+import type { DealActor } from "@/lib/deal-machine";
 
 /**
  * What actually has to happen, in order, for each kind of deal.

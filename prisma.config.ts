@@ -10,5 +10,10 @@ export default defineConfig({
   },
   datasource: {
     url: process.env.DATABASE_URL,
+    // Only `prisma migrate dev` and `migrate diff --from-migrations` use this:
+    // they replay the migration history into a throwaway database to work out
+    // the diff. Leave it unset in production — `migrate deploy` never needs it,
+    // and pointing it at a real database would wipe that database.
+    shadowDatabaseUrl: process.env.SHADOW_DATABASE_URL,
   },
 });

@@ -30,7 +30,6 @@ export function SettingsForm({
   current: {
     buyerFeeBp: number;
     sellerFeeBp: number;
-    escrowRequiredAbove: number;
     offerExpiryHours: number;
   };
 }) {
@@ -38,13 +37,11 @@ export function SettingsForm({
   const ids = {
     buyer: useId(),
     seller: useId(),
-    escrow: useId(),
     offer: useId(),
   };
 
   const [buyer, setBuyer] = useState(formatRate(current.buyerFeeBp));
   const [seller, setSeller] = useState(formatRate(current.sellerFeeBp));
-  const [escrow, setEscrow] = useState(String(current.escrowRequiredAbove));
   const [offerHours, setOfferHours] = useState(
     String(current.offerExpiryHours),
   );
@@ -57,7 +54,6 @@ export function SettingsForm({
   const draft = {
     buyerFeeBp: toBp(buyer),
     sellerFeeBp: toBp(seller),
-    escrowRequiredAbove: Number(escrow),
   };
   const previewable =
     Number.isFinite(draft.buyerFeeBp) && Number.isFinite(draft.sellerFeeBp);
@@ -65,7 +61,6 @@ export function SettingsForm({
   const changed =
     draft.buyerFeeBp !== current.buyerFeeBp ||
     draft.sellerFeeBp !== current.sellerFeeBp ||
-    draft.escrowRequiredAbove !== current.escrowRequiredAbove ||
     Number(offerHours) !== current.offerExpiryHours;
 
   return (
@@ -79,7 +74,6 @@ export function SettingsForm({
           const result = await saveSettings({
             buyerFeeBp: toBp(buyer),
             sellerFeeBp: toBp(seller),
-            escrowRequiredAbove: Number(escrow),
             offerExpiryHours: Number(offerHours),
           });
           if (!result.ok) {
@@ -129,25 +123,6 @@ export function SettingsForm({
             required
           />
         </div>
-      </section>
-
-      <section className="rounded-panel border border-line bg-surface p-5 sm:p-6">
-        <h2 className="font-display text-lg font-bold text-fg">Escrow</h2>
-        <p className="mt-1.5 text-sm leading-relaxed text-muted">
-          At or above this price, a deal must go through full escrow. Set it to
-          0 to make escrow mandatory on everything.
-        </p>
-        <TextField
-          id={ids.escrow}
-          name="escrowRequiredAbove"
-          label="Escrow required at or above (USD)"
-          inputMode="decimal"
-          value={escrow}
-          onChange={(e) => setEscrow(e.target.value)}
-          error={errors.escrowRequiredAbove}
-          className="mt-5 max-w-xs"
-          required
-        />
       </section>
 
       <section className="rounded-panel border border-line bg-surface p-5 sm:p-6">

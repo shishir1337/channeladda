@@ -1,10 +1,9 @@
 import { expect, test } from "vitest";
-import type { DealMode } from "@/lib/fees";
+import type { DealMode, OrderStatus } from "@/generated/prisma/enums";
 import {
   canTransition,
   type DealActor,
   isTerminal,
-  type OrderStatus,
   TERMINAL_STATUSES,
 } from "@/lib/deal-machine";
 

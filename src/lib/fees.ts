@@ -20,8 +20,7 @@
  *   holds it, and the seller is credited the price less the seller fee.
  */
 
-/** Local until the schema lands; Task 4 swaps this for the generated enum. */
-export type DealMode = "SAFEST" | "FASTEST";
+import type { DealMode } from "@/generated/prisma/enums";
 
 export type FeeSettings = {
   /** Added on top of the price, paid by the buyer, on a Safest deal. */

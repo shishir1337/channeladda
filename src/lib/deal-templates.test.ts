@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
-import { canTransition, type OrderStatus } from "@/lib/deal-machine";
+import type { DealMode, OrderStatus } from "@/generated/prisma/enums";
+import { canTransition } from "@/lib/deal-machine";
 import { OPENING_STATUS, templateFor } from "@/lib/deal-templates";
-import type { DealMode } from "@/lib/fees";
 
 test("safest has nine steps in the spec's order", () => {
   const steps = templateFor("SAFEST");
