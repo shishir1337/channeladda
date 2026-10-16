@@ -2,7 +2,7 @@ import type { NavGroup } from "@/components/dashboard/app-shell";
 import { AppShell } from "@/components/dashboard/app-shell";
 import { getQueueCounts } from "@/server/admin-listings";
 import { countFlaggedThreads } from "@/server/messages";
-import { requireStaff } from "@/server/session";
+import { requireAdminArea } from "@/server/session";
 import { countOpenTickets } from "@/server/support";
 
 /**
@@ -14,9 +14,40 @@ import { countOpenTickets } from "@/server/support";
  *
  * The guard here decides what is drawn. It is not the security boundary: every
  * action re-checks the role itself.
+ *
+ * An AGENT gets in, and sees Deals and nothing else. They are not in the STAFF
+ * list, so every other page here still guards with `requireStaff()` and hands
+ * them the same 404 a stranger would get. The moderation counts are skipped
+ * for them too — they feed badges on pages an agent cannot open.
  */
 export default async function AdminLayout({ children }: LayoutProps<"/">) {
-  const staff = await requireStaff();
+  const staff = await requireAdminArea();
+
+  // Returned before the moderation counts are fetched, not after: they feed
+  // badges on pages an agent cannot open, so running those queries for them
+  // would be three round trips to render nothing.
+  if (staff.role === "AGENT") {
+    return (
+      <AppShell
+        groups={[
+          {
+            label: null,
+            items: [
+              {
+                label: "Deals",
+                href: "/admin/deals?agent=me",
+                icon: "transfer",
+                section: true,
+              },
+            ],
+          },
+        ]}
+      >
+        {children}
+      </AppShell>
+    );
+  }
+
   const [counts, flagged, openTickets] = await Promise.all([
     getQueueCounts(),
     countFlaggedThreads(),
@@ -27,6 +58,17 @@ export default async function AdminLayout({ children }: LayoutProps<"/">) {
     {
       label: null,
       items: [{ label: "Overview", href: "/admin", icon: "overview" }],
+    },
+    {
+      label: "Transfers",
+      items: [
+        {
+          label: "Deals",
+          href: "/admin/deals",
+          icon: "transfer",
+          section: true,
+        },
+      ],
     },
     {
       label: "Moderation",
