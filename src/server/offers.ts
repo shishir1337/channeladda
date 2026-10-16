@@ -423,3 +423,23 @@ export async function releaseReservation(listingId: string) {
   });
   return { ok: released.count === 1 };
 }
+
+/**
+ * Writes down what `toView` has been deriving all along.
+ *
+ * Reading an expired offer as EXPIRED keeps the rule correct, but it leaves
+ * the database saying OPEN for ever: the seller's dashboard count is wrong,
+ * `@@index([status])` stops being selective, and any future query that trusts
+ * the column is subtly broken. Now that there is a sweep to call it, the
+ * derivation and the stored value agree.
+ *
+ * Idempotent, and safe to run twice at once: the `status: "OPEN"` predicate
+ * means a second pass over the same rows changes nothing.
+ */
+export async function expireOffers(now = new Date()): Promise<number> {
+  const { count } = await db.offer.updateMany({
+    where: { status: "OPEN", expiresAt: { lte: now } },
+    data: { status: "EXPIRED", respondedAt: now },
+  });
+  return count;
+}

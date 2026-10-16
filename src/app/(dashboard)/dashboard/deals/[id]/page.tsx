@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { DealTimeline } from "@/components/deals/deal-timeline";
+import { PayNow } from "@/components/deals/pay-now";
 import { Price } from "@/components/ui/price";
 import { db } from "@/lib/db";
 import { getDealFor } from "@/server/deals";
@@ -131,6 +132,15 @@ export default async function DealPage({
             </p>
           ) : null}
         </div>
+      ) : null}
+
+      {deal.status === "AWAITING_PAYMENT" && deal.viewerRole === "buyer" ? (
+        <PayNow
+          orderId={deal.id}
+          totalUsd={deal.totalUsd}
+          priceUsd={deal.priceUsd}
+          mode={deal.mode}
+        />
       ) : null}
 
       <h2 className="mt-8 font-display text-lg font-bold text-fg">
