@@ -12,7 +12,9 @@
     "db:migrate": "prisma migrate deploy",
     "db:studio": "prisma studio",
     "create:admin": "tsx --conditions=react-server scripts/create-admin.ts",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.9.1",
@@ -46,7 +48,9 @@
     "prisma": "^7.9.1",
     "tailwindcss": "^4",
     "tsx": "^4.23.12",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vite-tsconfig-paths": "^6.1.1",
+    "vitest": "^5.0.5"
   },
   "packageManager": "pnpm@11.24.0"
 }

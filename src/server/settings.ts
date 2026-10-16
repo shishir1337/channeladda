@@ -21,11 +21,15 @@ const globalForSettings = globalThis as unknown as {
 export type PlatformSettings = FeeSettings & {
   /** How long an offer stands before it lapses. */
   offerExpiryHours: number;
+  /** Transitional. The two-mode model makes escrow the buyer's choice rather
+   *  than a price threshold, so this leaves the schema with the deal work. */
+  escrowRequiredAbove: number;
   updatedAt: Date | null;
   updatedByName: string | null;
 };
 
 const DEFAULT_OFFER_EXPIRY_HOURS = 48;
+const DEFAULT_ESCROW_REQUIRED_ABOVE = 1000;
 
 export async function getSettings(): Promise<PlatformSettings> {
   const cached = globalForSettings.settingsCache;
@@ -48,7 +52,10 @@ export async function getSettings(): Promise<PlatformSettings> {
   // would be a very expensive way to fail.
   const value: PlatformSettings = row
     ? {
-        buyerFeeBp: row.buyerFeeBp,
+        // One stored rate still feeds both modes: the per-mode columns arrive
+        // with the deal schema, and until then they cannot diverge.
+        buyerFeeBpSafest: row.buyerFeeBp,
+        buyerFeeBpFastest: row.buyerFeeBp,
         sellerFeeBp: row.sellerFeeBp,
         escrowRequiredAbove: row.escrowRequiredAboveUsd / 100,
         offerExpiryHours: row.offerExpiryHours,
@@ -58,6 +65,7 @@ export async function getSettings(): Promise<PlatformSettings> {
     : {
         ...DEFAULT_FEES,
         offerExpiryHours: DEFAULT_OFFER_EXPIRY_HOURS,
+        escrowRequiredAbove: DEFAULT_ESCROW_REQUIRED_ABOVE,
         updatedAt: null,
         updatedByName: null,
       };
@@ -68,8 +76,9 @@ export async function getSettings(): Promise<PlatformSettings> {
 
 /** Only the numbers, for passing into a Client Component. */
 export async function getFeeSettings(): Promise<FeeSettings> {
-  const { buyerFeeBp, sellerFeeBp, escrowRequiredAbove } = await getSettings();
-  return { buyerFeeBp, sellerFeeBp, escrowRequiredAbove };
+  const { buyerFeeBpSafest, buyerFeeBpFastest, sellerFeeBp } =
+    await getSettings();
+  return { buyerFeeBpSafest, buyerFeeBpFastest, sellerFeeBp };
 }
 
 export type SettingsInput = {

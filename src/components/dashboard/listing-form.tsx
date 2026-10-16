@@ -132,7 +132,7 @@ export function ListingForm({
 
   const priceNumber = num(draft.price);
   const showPayout = Number.isFinite(priceNumber) && priceNumber > 0;
-  const preview = showPayout ? quote(priceNumber, fees) : null;
+  const preview = showPayout ? quote(priceNumber, fees, "FASTEST") : null;
 
   function toInput(): ListingDraftInput {
     return {

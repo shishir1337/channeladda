@@ -8,20 +8,36 @@
  *
  * Rates are **basis points**: 300 is 3.00%. Integers, because a percentage
  * stored as 0.03 in a money path is how rounding errors begin.
+ *
+ * Every calculation also takes the deal's mode, because the two modes charge
+ * differently and the difference is not cosmetic:
+ *
+ * - **Safest** — the buyer pays Channel Adda the admin fee and nothing else.
+ *   The price goes straight from buyer to seller and never passes through the
+ *   platform, so there is nothing to deduct a seller fee from and `totalUsd`
+ *   is the fee alone.
+ * - **Fastest** — the buyer pays the price and the fee together, the platform
+ *   holds it, and the seller is credited the price less the seller fee.
  */
 
+/** Local until the schema lands; Task 4 swaps this for the generated enum. */
+export type DealMode = "SAFEST" | "FASTEST";
+
 export type FeeSettings = {
-  buyerFeeBp: number;
+  /** Added on top of the price, paid by the buyer, on a Safest deal. */
+  buyerFeeBpSafest: number;
+  /** The same, on a Fastest deal. Set separately: Fastest is more work for
+   *  the platform and it carries the funds, so it may be priced higher. */
+  buyerFeeBpFastest: number;
+  /** Deducted before the seller is credited. Only ever applies to Fastest. */
   sellerFeeBp: number;
-  /** At or above this many dollars, a deal must use escrow. */
-  escrowRequiredAbove: number;
 };
 
 /** What the code shipped with, and what a fresh database starts at. */
 export const DEFAULT_FEES: FeeSettings = {
-  buyerFeeBp: 300,
-  sellerFeeBp: 500,
-  escrowRequiredAbove: 1000,
+  buyerFeeBpSafest: 300,
+  buyerFeeBpFastest: 300,
+  sellerFeeBp: 0,
 };
 
 export const MAX_FEE_BP = 3000; // 30%, an obvious-mistake ceiling
@@ -35,6 +51,10 @@ function applyBp(cents: number, bp: number) {
   return Math.round((cents * bp) / 10_000);
 }
 
+function buyerBpFor(fees: FeeSettings, mode: DealMode) {
+  return mode === "FASTEST" ? fees.buyerFeeBpFastest : fees.buyerFeeBpSafest;
+}
+
 /**
  * A full quote for one price, in dollars in and dollars out.
  *
@@ -43,29 +63,33 @@ function applyBp(cents: number, bp: number) {
  * whole dollars, which was harmless while this was display-only and would not
  * have been once it reached a charge.
  */
-export function quote(price: number, fees: FeeSettings) {
-  const priceCents = Math.round(price * 100);
-  const buyerFeeCents = applyBp(priceCents, fees.buyerFeeBp);
-  const sellerFeeCents = applyBp(priceCents, fees.sellerFeeBp);
+export function quote(price: number, fees: FeeSettings, mode: DealMode) {
+  const amounts = orderAmounts(Math.round(price * 100), fees, mode);
 
   return {
     price,
-    buyerFee: buyerFeeCents / 100,
-    total: (priceCents + buyerFeeCents) / 100,
-    sellerFee: sellerFeeCents / 100,
-    payout: (priceCents - sellerFeeCents) / 100,
+    buyerFee: amounts.buyerFeeUsd / 100,
+    total: amounts.totalUsd / 100,
+    sellerFee: amounts.sellerFeeUsd / 100,
+    payout: amounts.payoutUsd / 100,
   };
 }
 
-/** What the buyer pays: price plus the buyer fee. */
-export function buyerTotal(price: number, fees: FeeSettings) {
-  const q = quote(price, fees);
+/** What the buyer owes the platform up front. */
+export function buyerTotal(price: number, fees: FeeSettings, mode: DealMode) {
+  const q = quote(price, fees, mode);
   return { price: q.price, fee: q.buyerFee, total: q.total };
 }
 
-/** What the seller receives: price minus the seller fee. */
-export function sellerPayout(price: number, fees: FeeSettings) {
-  const q = quote(price, fees);
+/**
+ * What the seller receives.
+ *
+ * Only meaningful for Fastest, where the platform pays the seller. On a Safest
+ * deal the buyer pays the seller directly and the platform is not in the path,
+ * so the payout is the whole price.
+ */
+export function sellerPayout(price: number, fees: FeeSettings, mode: DealMode) {
+  const q = quote(price, fees, mode);
   return { price: q.price, fee: q.sellerFee, payout: q.payout };
 }
 
@@ -73,14 +97,22 @@ export function sellerPayout(price: number, fees: FeeSettings) {
  * The cents an order should record. Orders store amounts, not rates, so a
  * later rate change never rewrites a sale that already happened.
  */
-export function orderAmounts(priceCents: number, fees: FeeSettings) {
-  const buyerFeeUsd = applyBp(priceCents, fees.buyerFeeBp);
-  const sellerFeeUsd = applyBp(priceCents, fees.sellerFeeBp);
+export function orderAmounts(
+  priceCents: number,
+  fees: FeeSettings,
+  mode: DealMode,
+) {
+  const buyerFeeUsd = applyBp(priceCents, buyerBpFor(fees, mode));
+  const sellerFeeUsd =
+    mode === "FASTEST" ? applyBp(priceCents, fees.sellerFeeBp) : 0;
+
   return {
     priceUsd: priceCents,
     buyerFeeUsd,
     sellerFeeUsd,
-    totalUsd: priceCents + buyerFeeUsd,
+    // A Safest buyer is charged the fee and nothing else; the price reaches
+    // the seller without the platform touching it.
+    totalUsd: mode === "FASTEST" ? priceCents + buyerFeeUsd : buyerFeeUsd,
     payoutUsd: priceCents - sellerFeeUsd,
   };
 }

@@ -46,7 +46,7 @@ const EXAMPLE = 42_500;
 
 export default async function SellPage() {
   const fees = await getFeeSettings();
-  const { fee, payout } = sellerPayout(EXAMPLE, fees);
+  const { fee, payout } = sellerPayout(EXAMPLE, fees, "FASTEST");
 
   return (
     <>
@@ -151,7 +151,7 @@ export default async function SellPage() {
                 </div>
               </dl>
               <p className="mt-4 border-t border-line pt-4 text-xs leading-relaxed text-subtle">
-                The buyer pays {formatRate(fees.buyerFeeBp)}% on top of your
+                The buyer pays {formatRate(fees.buyerFeeBpSafest)}% on top of your
                 price, so your listing stays at{" "}
                 <Price usd={EXAMPLE} className="text-muted" /> on the
                 marketplace.

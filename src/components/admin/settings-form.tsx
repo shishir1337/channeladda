@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useId, useState, useTransition } from "react";
 import { FormNotice, TextField } from "@/components/auth/fields";
 import { Button } from "@/components/ui/button";
-import { type FeeSettings, formatRate, quote } from "@/lib/fees";
+import { formatRate, quote } from "@/lib/fees";
 import { saveSettings } from "@/server/actions/settings";
 
 const EXAMPLES = [99, 4_500, 42_500];
@@ -27,7 +27,12 @@ function toBp(value: string) {
 export function SettingsForm({
   current,
 }: {
-  current: FeeSettings & { offerExpiryHours: number };
+  current: {
+    buyerFeeBp: number;
+    sellerFeeBp: number;
+    escrowRequiredAbove: number;
+    offerExpiryHours: number;
+  };
 }) {
   const router = useRouter();
   const ids = {
@@ -49,7 +54,7 @@ export function SettingsForm({
 
   // Preview against what is typed, not what is saved, so the effect of a
   // change is visible before it is committed.
-  const draft: FeeSettings = {
+  const draft = {
     buyerFeeBp: toBp(buyer),
     sellerFeeBp: toBp(seller),
     escrowRequiredAbove: Number(escrow),
@@ -185,7 +190,17 @@ export function SettingsForm({
               </thead>
               <tbody>
                 {EXAMPLES.map((price) => {
-                  const q = quote(price, draft);
+                  // FASTEST, because it is the mode where both fees apply
+                  // and so the one that shows the full effect of a change.
+                  const q = quote(
+                    price,
+                    {
+                      buyerFeeBpSafest: draft.buyerFeeBp,
+                      buyerFeeBpFastest: draft.buyerFeeBp,
+                      sellerFeeBp: draft.sellerFeeBp,
+                    },
+                    "FASTEST",
+                  );
                   return (
                     <tr key={price} className="border-b border-line-soft">
                       <td className="py-3 pr-4 tabular-nums">{usd(price)}</td>

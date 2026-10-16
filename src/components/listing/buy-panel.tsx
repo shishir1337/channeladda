@@ -39,9 +39,10 @@ export function BuyPanel({
   isOwnListing: boolean;
 }) {
   const _checkoutNoteId = useId();
-  const { fee, total } = buyerTotal(listing.price, fees);
-  // Escrow is mandatory above the cap and on platforms an owner can recover.
-  const escrowOnly = listing.price >= fees.escrowRequiredAbove || holdDays > 7;
+  const { fee, total } = buyerTotal(listing.price, fees, "SAFEST");
+  // Escrow is mandatory on platforms an owner can recover. The old price cap
+  // is gone: under the two-mode model the buyer chooses, not the price.
+  const escrowOnly = holdDays > 7;
 
   return (
     <div className="rounded-panel border border-line bg-surface p-5 shadow-soft sm:p-6">
@@ -75,7 +76,7 @@ export function BuyPanel({
           <dt className="text-muted">
             Buyer fee{" "}
             <span className="tnum text-subtle">
-              ({formatRate(fees.buyerFeeBp)}%)
+              ({formatRate(fees.buyerFeeBpSafest)}%)
             </span>
           </dt>
           <dd>
@@ -139,9 +140,8 @@ export function BuyPanel({
         <p className="mt-3 flex items-start gap-2 text-xs leading-relaxed text-subtle">
           <TimerIcon aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" />
           <span>
-            Escrow is required on this listing. Quick checkout is only available
-            on Telegram and Facebook under{" "}
-            <Price usd={fees.escrowRequiredAbove} />.
+            Escrow is required on this listing. Quick checkout is only
+            available on Telegram and Facebook.
           </span>
         </p>
       ) : (

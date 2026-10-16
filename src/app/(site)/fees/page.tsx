@@ -12,7 +12,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const fees = await getFeeSettings();
   return {
     title: "Pricing & fees",
-    description: `Buyers pay ${formatRate(fees.buyerFeeBp)}% on top of the listing price. Sellers pay ${formatRate(fees.sellerFeeBp)}% only when a deal completes. No listing fee, no monthly cost, no charge for a deal that falls through.`,
+    description: `Buyers pay ${formatRate(fees.buyerFeeBpSafest)}% on top of the listing price. Sellers pay ${formatRate(fees.sellerFeeBp)}% only when a deal completes. No listing fee, no monthly cost, no charge for a deal that falls through.`,
     alternates: { canonical: "/fees" },
   };
 }
@@ -56,7 +56,7 @@ export default async function FeesPage() {
                 Buyer fee
               </p>
               <p className="tnum mt-3 font-display text-5xl font-bold text-primary-text">
-                {formatRate(fees.buyerFeeBp)}%
+                {formatRate(fees.buyerFeeBpSafest)}%
               </p>
               <p className="mt-4 text-[0.9375rem] leading-relaxed text-muted">
                 Added on top of the listing price and shown in full on the
@@ -117,8 +117,8 @@ export default async function FeesPage() {
               </thead>
               <tbody>
                 {EXAMPLES.map((price) => {
-                  const b = buyerTotal(price, fees);
-                  const s = sellerPayout(price, fees);
+                  const b = buyerTotal(price, fees, "SAFEST");
+                  const s = sellerPayout(price, fees, "FASTEST");
                   return (
                     <tr
                       key={price}
