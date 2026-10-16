@@ -308,12 +308,33 @@ model Listing {
   /// Main audience country, or "Global".
   country String
 
+  /// The canonical link to the account, e.g. a YouTube channel URL. Sellers
+  /// paste this and the rest is fetched from it, because a handle typed by
+  /// hand is wrong often enough to matter.
+  sourceUrl  String?
+  /// The platform's own id for the account, e.g. a YouTube channel id. Stable
+  /// across renames, which a handle is not.
+  externalId String?
+
   audience          Int
   monetized         Boolean @default(false)
   monthlyRevenueUsd Int     @default(0) // cents
+  /// Cents. Stored rather than derived from the monthly figure: this trade is
+  /// seasonal, and twelve times a good month is a number nobody believes.
+  yearlyRevenueUsd  Int     @default(0)
+
+  /// The seller's own account of what this is and how it earns. Long-form and
+  /// optional, because the fields above cannot carry "the audience moved from
+  /// shorts to long-form in March".
+  description String?
+
+  /// Staff-only. Collected so a transfer that stalls can be unstuck by
+  /// somebody phoning the seller, and never shown to a buyer — the product's
+  /// whole contact-redaction rule exists to stop deals walking off-platform.
+  whatsapp     String?
   /// Percentage times 10, so 7.4% is stored as 74.
-  engagementBp      Int
-  ageYears          Int
+  engagementBp Int
+  ageYears     Int
 
   priceUsd    Int // cents
   wasPriceUsd Int? // cents
@@ -350,6 +371,7 @@ model Listing {
 
   @@index([status, platform])
   @@index([featured])
+  @@index([platform, externalId])
   @@index([sellerId])
   @@index([platform, priceUsd])
   @@index([listedAt])

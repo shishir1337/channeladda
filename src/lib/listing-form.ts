@@ -71,6 +71,9 @@ export const listingDraftSchema = z.object({
 
   /** Dollars per month. Zero is normal and not an error. */
   monthlyRevenue: dollars(10_000_000),
+  /** Asked for separately rather than taken as twelve times the month: this
+   *  trade is seasonal and 12x a good month is a number nobody believes. */
+  yearlyRevenue: dollars(100_000_000),
 
   /** A percentage, e.g. 7.4. Stored as 74. */
   engagement: z
@@ -94,6 +97,42 @@ export const listingDraftSchema = z.object({
   avatarUrl: z.string().min(1, "Add a profile picture."),
 
   transferProfile: z.string().trim().max(200).optional().or(z.literal("")),
+
+  /** The link the seller pasted. Kept so staff can open what was listed. */
+  sourceUrl: z
+    .string()
+    .trim()
+    .max(300)
+    .optional()
+    .or(z.literal(""))
+    .refine(
+      (value) => !value || /^https?:\/\//i.test(value) || value.startsWith("@"),
+      "Paste the full link, starting with https://",
+    ),
+  /** The platform's own id, filled in by the lookup rather than by hand. */
+  externalId: z.string().trim().max(120).optional().or(z.literal("")),
+
+  description: z
+    .string()
+    .trim()
+    .max(
+      4_000,
+      "That is longer than buyers will read. Keep it under 4,000 characters.",
+    )
+    .optional()
+    .or(z.literal("")),
+
+  /** Staff-only, and never rendered to a buyer. */
+  whatsapp: z
+    .string()
+    .trim()
+    .max(32)
+    .optional()
+    .or(z.literal(""))
+    .refine(
+      (value) => !value || /^\+?[0-9 ()-]{7,32}$/.test(value),
+      "Use the international form, e.g. +8801712345678.",
+    ),
 
   proofs: z
     .array(

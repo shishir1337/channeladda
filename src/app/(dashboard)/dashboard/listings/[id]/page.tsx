@@ -14,6 +14,7 @@ import {
   ListingStatusBadge,
   statusMeta,
 } from "@/components/dashboard/listing-status";
+import { OwnershipCheck } from "@/components/dashboard/ownership-check";
 import { platforms } from "@/data/platforms";
 import { EDITABLE, getMyListing } from "@/server/seller-listings";
 import { requireUser } from "@/server/session";
@@ -91,6 +92,18 @@ export default async function SellerListingPage({
         </div>
       ) : null}
 
+      {!listing.ownershipVerifiedAt &&
+      listing.status !== "DRAFT" &&
+      listing.status !== "REMOVED" ? (
+        <div className="mt-6">
+          <OwnershipCheck
+            listingId={listing.id}
+            code={listing.ownershipCode}
+            verified={listing.ownershipVerifiedAt !== null}
+          />
+        </div>
+      ) : null}
+
       {listing.status === "CODE_CHECK" && listing.ownershipCode ? (
         <div className="mt-6">
           <OwnershipStep
@@ -117,12 +130,17 @@ export default async function SellerListingPage({
               audience: String(listing.audience),
               monetized: listing.monetized,
               monthlyRevenue: String(listing.monthlyRevenue),
+              yearlyRevenue: String(listing.yearlyRevenue),
               engagement: String(listing.engagement),
               ageYears: String(listing.ageYears),
               price: String(listing.price),
               coverUrl: listing.coverUrl,
               avatarUrl: listing.avatarUrl,
               transferProfile: listing.transferProfile ?? "",
+              sourceUrl: listing.sourceUrl ?? "",
+              externalId: listing.externalId ?? "",
+              description: listing.description ?? "",
+              whatsapp: listing.whatsapp ?? "",
               proofs: listing.proofs.map((p) => ({
                 url: p.url,
                 label: p.label,

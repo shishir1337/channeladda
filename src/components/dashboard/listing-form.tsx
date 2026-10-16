@@ -3,7 +3,11 @@
 import { PlusIcon, TrashIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useId, useState, useTransition } from "react";
-import { FormNotice, TextField } from "@/components/auth/fields";
+import { FormNotice, TextArea, TextField } from "@/components/auth/fields";
+import {
+  ChannelImport,
+  type ImportedChannel,
+} from "@/components/dashboard/channel-import";
 import { Button } from "@/components/ui/button";
 import { ImageUpload } from "@/components/upload/image-upload";
 import { type FeeSettings, formatRate, quote } from "@/lib/fees";
@@ -29,12 +33,17 @@ type Draft = {
   audience: string;
   monetized: boolean;
   monthlyRevenue: string;
+  yearlyRevenue: string;
   engagement: string;
   ageYears: string;
   price: string;
   coverUrl: string | null;
   avatarUrl: string | null;
   transferProfile: string;
+  sourceUrl: string;
+  externalId: string;
+  description: string;
+  whatsapp: string;
   proofs: Proof[];
 };
 
@@ -47,12 +56,17 @@ const EMPTY: Draft = {
   audience: "",
   monetized: false,
   monthlyRevenue: "0",
+  yearlyRevenue: "0",
   engagement: "",
   ageYears: "",
   price: "",
   coverUrl: null,
   avatarUrl: null,
   transferProfile: "",
+  sourceUrl: "",
+  externalId: "",
+  description: "",
+  whatsapp: "",
   proofs: [],
 };
 
@@ -115,6 +129,9 @@ export function ListingForm({
     engagement: useId(),
     age: useId(),
     revenue: useId(),
+    yearly: useId(),
+    description: useId(),
+    whatsapp: useId(),
     price: useId(),
     transfer: useId(),
     monetized: useId(),
@@ -126,6 +143,32 @@ export function ListingForm({
 
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) =>
     setDraft((d) => ({ ...d, [key]: value }));
+
+  /**
+   * Copies what the channel lookup found into the draft.
+   *
+   * Only fills blanks. A seller who has already written a better title than
+   * the channel's own must not lose it by pressing fetch a second time.
+   */
+  const applyImport = (channel: ImportedChannel) =>
+    setDraft((current) => ({
+      ...current,
+      platform: (channel.platform.toLowerCase() ||
+        current.platform) as Draft["platform"],
+      sourceUrl: channel.canonicalUrl || current.sourceUrl,
+      externalId: channel.channelId ?? current.externalId,
+      title: current.title || channel.title,
+      handle: current.handle || channel.title,
+      description: current.description || channel.description,
+      avatarUrl: current.avatarUrl ?? channel.avatarUrl,
+      audience:
+        current.audience ||
+        (channel.subscribers > 0 ? String(channel.subscribers) : ""),
+      ageYears:
+        current.ageYears ||
+        (channel.ageYears > 0 ? String(channel.ageYears) : ""),
+      country: current.country || (channel.country ?? ""),
+    }));
 
   const platform =
     platforms.find((p) => p.id === draft.platform) ?? platforms[0];
@@ -144,6 +187,7 @@ export function ListingForm({
       audience: num(draft.audience),
       monetized: draft.monetized,
       monthlyRevenue: num(draft.monthlyRevenue),
+      yearlyRevenue: num(draft.yearlyRevenue),
       engagement: num(draft.engagement),
       ageYears: num(draft.ageYears),
       price: priceNumber,
@@ -152,6 +196,10 @@ export function ListingForm({
       coverUrl: draft.coverUrl ?? "",
       avatarUrl: draft.avatarUrl ?? "",
       transferProfile: draft.transferProfile,
+      sourceUrl: draft.sourceUrl,
+      externalId: draft.externalId,
+      description: draft.description,
+      whatsapp: draft.whatsapp,
       proofs: draft.proofs,
     };
   }
@@ -176,352 +224,397 @@ export function ListingForm({
   }
 
   return (
-    <form
-      className="flex flex-col gap-5"
-      onSubmit={(e) => {
-        e.preventDefault();
-        submit(false);
-      }}
-    >
-      {errors.form ? <FormNotice>{errors.form}</FormNotice> : null}
+    <div className="flex flex-col gap-5">
+      {/* Outside the form: pasting a link fills the fields in, it does not
+          submit anything. */}
+      <ChannelImport onImported={applyImport} />
 
-      <Section
-        title="What are you selling?"
-        description="This is what buyers search and filter on, so be specific."
+      <form
+        className="flex flex-col gap-5"
+        onSubmit={(e) => {
+          e.preventDefault();
+          submit(false);
+        }}
       >
-        <fieldset>
-          <legend className="text-sm font-medium text-fg">Platform</legend>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {platforms.map((p) => (
-              <button
-                key={p.id}
-                type="button"
-                onClick={() => set("platform", p.id)}
-                aria-pressed={draft.platform === p.id}
-                className={cn(
-                  "inline-flex min-h-11 cursor-pointer items-center rounded-xl border px-4 text-sm font-medium transition-colors",
-                  draft.platform === p.id
-                    ? "border-primary bg-primary-soft text-primary-text"
-                    : "border-line bg-surface-2 text-muted hover:border-line-strong hover:text-fg",
-                )}
-              >
-                {p.name}
-              </button>
-            ))}
+        {errors.form ? <FormNotice>{errors.form}</FormNotice> : null}
+
+        <Section
+          title="What are you selling?"
+          description="This is what buyers search and filter on, so be specific."
+        >
+          <fieldset>
+            <legend className="text-sm font-medium text-fg">Platform</legend>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {platforms.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => set("platform", p.id)}
+                  aria-pressed={draft.platform === p.id}
+                  className={cn(
+                    "inline-flex min-h-11 cursor-pointer items-center rounded-xl border px-4 text-sm font-medium transition-colors",
+                    draft.platform === p.id
+                      ? "border-primary bg-primary-soft text-primary-text"
+                      : "border-line bg-surface-2 text-muted hover:border-line-strong hover:text-fg",
+                  )}
+                >
+                  {p.name}
+                </button>
+              ))}
+            </div>
+            {errors.platform ? (
+              <p role="alert" className="mt-2 text-sm text-danger">
+                {errors.platform}
+              </p>
+            ) : null}
+          </fieldset>
+
+          <TextField
+            id={ids.handle}
+            name="handle"
+            label="Handle"
+            hint="Without the URL — just the name, for example @dailytechbrief."
+            value={draft.handle}
+            onChange={(e) => set("handle", e.target.value)}
+            error={errors.handle}
+            placeholder="@dailytechbrief"
+            required
+          />
+          <TextField
+            id={ids.title}
+            name="title"
+            label="Listing title"
+            hint="What a buyer sees first. Say what it is and why it is worth having."
+            value={draft.title}
+            onChange={(e) => set("title", e.target.value)}
+            error={errors.title}
+            placeholder="Monetized tech review channel with 4 years of watch time"
+            required
+          />
+          <div className="grid gap-5 sm:grid-cols-2">
+            <TextField
+              id={ids.niche}
+              name="niche"
+              label="Niche"
+              value={draft.niche}
+              onChange={(e) => set("niche", e.target.value)}
+              error={errors.niche}
+              placeholder="Technology"
+              required
+            />
+            <TextField
+              id={ids.country}
+              name="country"
+              label="Main audience country"
+              hint='"Global" is fine if it is spread out.'
+              value={draft.country}
+              onChange={(e) => set("country", e.target.value)}
+              error={errors.country}
+              placeholder="United States"
+              required
+            />
           </div>
-          {errors.platform ? (
-            <p role="alert" className="mt-2 text-sm text-danger">
-              {errors.platform}
+        </Section>
+
+        <Section
+          title="The numbers"
+          description="Buyers will check these against the screenshots you upload below, so put down what is actually there."
+        >
+          <div className="grid gap-5 sm:grid-cols-2">
+            <TextField
+              id={ids.audience}
+              name="audience"
+              label={platform?.metricLabel ?? "Audience"}
+              inputMode="numeric"
+              value={draft.audience}
+              onChange={(e) => set("audience", e.target.value)}
+              error={errors.audience}
+              placeholder="128000"
+              required
+            />
+            <TextField
+              id={ids.engagement}
+              name="engagement"
+              label="Engagement rate (%)"
+              hint="Average, over the last 30 days."
+              inputMode="decimal"
+              value={draft.engagement}
+              onChange={(e) => set("engagement", e.target.value)}
+              error={errors.engagement}
+              placeholder="7.4"
+              required
+            />
+            <TextField
+              id={ids.age}
+              name="ageYears"
+              label="Account age (years)"
+              inputMode="numeric"
+              value={draft.ageYears}
+              onChange={(e) => set("ageYears", e.target.value)}
+              error={errors.ageYears}
+              placeholder="4"
+              required
+            />
+            <TextField
+              id={ids.revenue}
+              name="monthlyRevenue"
+              label="Monthly revenue (USD)"
+              hint="Zero if it does not earn yet."
+              inputMode="decimal"
+              value={draft.monthlyRevenue}
+              onChange={(e) => set("monthlyRevenue", e.target.value)}
+              error={errors.monthlyRevenue}
+              placeholder="0"
+            />
+            <TextField
+              id={ids.yearly}
+              name="yearlyRevenue"
+              label="Last 12 months (USD)"
+              hint="Asked separately because twelve times a good month is a number buyers do not believe."
+              inputMode="decimal"
+              value={draft.yearlyRevenue}
+              onChange={(e) => set("yearlyRevenue", e.target.value)}
+              error={errors.yearlyRevenue}
+              placeholder="0"
+            />
+          </div>
+
+          <label
+            htmlFor={ids.monetized}
+            className="flex cursor-pointer items-start gap-3 text-sm text-muted"
+          >
+            <input
+              id={ids.monetized}
+              type="checkbox"
+              checked={draft.monetized}
+              onChange={(e) => set("monetized", e.target.checked)}
+              className="mt-0.5 size-4 shrink-0 cursor-pointer accent-primary"
+            />
+            <span>
+              This account is monetized.
+              <span className="block text-xs text-subtle">
+                Claiming this when it is not is the fastest way to have a
+                listing rejected.
+              </span>
+            </span>
+          </label>
+        </Section>
+
+        <Section title="Price">
+          <TextField
+            id={ids.price}
+            name="price"
+            label="Asking price (USD)"
+            inputMode="decimal"
+            value={draft.price}
+            onChange={(e) => set("price", e.target.value)}
+            error={errors.price}
+            placeholder="4500"
+            required
+          />
+          {preview ? (
+            <dl className="grid gap-px overflow-hidden rounded-xl border border-line bg-line sm:grid-cols-3">
+              <div className="bg-surface-2 p-4">
+                <dt className="text-xs text-subtle">Buyer pays</dt>
+                <dd className="mt-1 font-display text-lg font-bold text-fg">
+                  {money(preview?.total ?? 0)}
+                </dd>
+              </div>
+              <div className="bg-surface-2 p-4">
+                <dt className="text-xs text-subtle">
+                  Our fee ({formatRate(fees.sellerFeeBp)}%)
+                </dt>
+                <dd className="mt-1 font-display text-lg font-bold text-muted">
+                  −{money(preview?.sellerFee ?? 0)}
+                </dd>
+              </div>
+              <div className="bg-surface-2 p-4">
+                <dt className="text-xs text-subtle">You receive</dt>
+                <dd className="mt-1 font-display text-lg font-bold text-verified">
+                  {money(preview?.payout ?? 0)}
+                </dd>
+              </div>
+            </dl>
+          ) : null}
+        </Section>
+
+        <Section
+          title="Images"
+          description="A cover for the listing card and a profile picture for the account itself."
+        >
+          <div className="grid gap-5 sm:grid-cols-2">
+            <ImageUpload
+              kind="cover"
+              label="Cover image"
+              hint="Wide. A channel banner or a screenshot of the feed works well."
+              value={draft.coverUrl}
+              onChange={(url) => set("coverUrl", url)}
+            />
+            <ImageUpload
+              kind="avatar"
+              aspect="square"
+              label="Profile picture"
+              hint="Square. The account's own avatar."
+              value={draft.avatarUrl}
+              onChange={(url) => set("avatarUrl", url)}
+            />
+          </div>
+          {errors.coverUrl ? (
+            <p role="alert" className="text-sm text-danger">
+              {errors.coverUrl}
             </p>
           ) : null}
-        </fieldset>
+          {errors.avatarUrl ? (
+            <p role="alert" className="text-sm text-danger">
+              {errors.avatarUrl}
+            </p>
+          ) : null}
+        </Section>
 
-        <TextField
-          id={ids.handle}
-          name="handle"
-          label="Handle"
-          hint="Without the URL — just the name, for example @dailytechbrief."
-          value={draft.handle}
-          onChange={(e) => set("handle", e.target.value)}
-          error={errors.handle}
-          placeholder="@dailytechbrief"
-          required
-        />
-        <TextField
-          id={ids.title}
-          name="title"
-          label="Listing title"
-          hint="What a buyer sees first. Say what it is and why it is worth having."
-          value={draft.title}
-          onChange={(e) => set("title", e.target.value)}
-          error={errors.title}
-          placeholder="Monetized tech review channel with 4 years of watch time"
-          required
-        />
-        <div className="grid gap-5 sm:grid-cols-2">
-          <TextField
-            id={ids.niche}
-            name="niche"
-            label="Niche"
-            value={draft.niche}
-            onChange={(e) => set("niche", e.target.value)}
-            error={errors.niche}
-            placeholder="Technology"
-            required
-          />
-          <TextField
-            id={ids.country}
-            name="country"
-            label="Main audience country"
-            hint='"Global" is fine if it is spread out.'
-            value={draft.country}
-            onChange={(e) => set("country", e.target.value)}
-            error={errors.country}
-            placeholder="United States"
-            required
-          />
-        </div>
-      </Section>
-
-      <Section
-        title="The numbers"
-        description="Buyers will check these against the screenshots you upload below, so put down what is actually there."
-      >
-        <div className="grid gap-5 sm:grid-cols-2">
-          <TextField
-            id={ids.audience}
-            name="audience"
-            label={platform?.metricLabel ?? "Audience"}
-            inputMode="numeric"
-            value={draft.audience}
-            onChange={(e) => set("audience", e.target.value)}
-            error={errors.audience}
-            placeholder="128000"
-            required
-          />
-          <TextField
-            id={ids.engagement}
-            name="engagement"
-            label="Engagement rate (%)"
-            hint="Average, over the last 30 days."
-            inputMode="decimal"
-            value={draft.engagement}
-            onChange={(e) => set("engagement", e.target.value)}
-            error={errors.engagement}
-            placeholder="7.4"
-            required
-          />
-          <TextField
-            id={ids.age}
-            name="ageYears"
-            label="Account age (years)"
-            inputMode="numeric"
-            value={draft.ageYears}
-            onChange={(e) => set("ageYears", e.target.value)}
-            error={errors.ageYears}
-            placeholder="4"
-            required
-          />
-          <TextField
-            id={ids.revenue}
-            name="monthlyRevenue"
-            label="Monthly revenue (USD)"
-            hint="Zero if it does not earn yet."
-            inputMode="decimal"
-            value={draft.monthlyRevenue}
-            onChange={(e) => set("monthlyRevenue", e.target.value)}
-            error={errors.monthlyRevenue}
-            placeholder="0"
-          />
-        </div>
-
-        <label
-          htmlFor={ids.monetized}
-          className="flex cursor-pointer items-start gap-3 text-sm text-muted"
+        <Section
+          title="Proof"
+          description="Screenshots from inside the account — analytics, revenue, the account settings page. This is what a moderator checks the numbers against."
         >
-          <input
-            id={ids.monetized}
-            type="checkbox"
-            checked={draft.monetized}
-            onChange={(e) => set("monetized", e.target.checked)}
-            className="mt-0.5 size-4 shrink-0 cursor-pointer accent-primary"
-          />
-          <span>
-            This account is monetized.
-            <span className="block text-xs text-subtle">
-              Claiming this when it is not is the fastest way to have a listing
-              rejected.
-            </span>
-          </span>
-        </label>
-      </Section>
-
-      <Section title="Price">
-        <TextField
-          id={ids.price}
-          name="price"
-          label="Asking price (USD)"
-          inputMode="decimal"
-          value={draft.price}
-          onChange={(e) => set("price", e.target.value)}
-          error={errors.price}
-          placeholder="4500"
-          required
-        />
-        {preview ? (
-          <dl className="grid gap-px overflow-hidden rounded-xl border border-line bg-line sm:grid-cols-3">
-            <div className="bg-surface-2 p-4">
-              <dt className="text-xs text-subtle">Buyer pays</dt>
-              <dd className="mt-1 font-display text-lg font-bold text-fg">
-                {money(preview?.total ?? 0)}
-              </dd>
-            </div>
-            <div className="bg-surface-2 p-4">
-              <dt className="text-xs text-subtle">
-                Our fee ({formatRate(fees.sellerFeeBp)}%)
-              </dt>
-              <dd className="mt-1 font-display text-lg font-bold text-muted">
-                −{money(preview?.sellerFee ?? 0)}
-              </dd>
-            </div>
-            <div className="bg-surface-2 p-4">
-              <dt className="text-xs text-subtle">You receive</dt>
-              <dd className="mt-1 font-display text-lg font-bold text-verified">
-                {money(preview?.payout ?? 0)}
-              </dd>
-            </div>
-          </dl>
-        ) : null}
-      </Section>
-
-      <Section
-        title="Images"
-        description="A cover for the listing card and a profile picture for the account itself."
-      >
-        <div className="grid gap-5 sm:grid-cols-2">
-          <ImageUpload
-            kind="cover"
-            label="Cover image"
-            hint="Wide. A channel banner or a screenshot of the feed works well."
-            value={draft.coverUrl}
-            onChange={(url) => set("coverUrl", url)}
-          />
-          <ImageUpload
-            kind="avatar"
-            aspect="square"
-            label="Profile picture"
-            hint="Square. The account's own avatar."
-            value={draft.avatarUrl}
-            onChange={(url) => set("avatarUrl", url)}
-          />
-        </div>
-        {errors.coverUrl ? (
-          <p role="alert" className="text-sm text-danger">
-            {errors.coverUrl}
-          </p>
-        ) : null}
-        {errors.avatarUrl ? (
-          <p role="alert" className="text-sm text-danger">
-            {errors.avatarUrl}
-          </p>
-        ) : null}
-      </Section>
-
-      <Section
-        title="Proof"
-        description="Screenshots from inside the account — analytics, revenue, the account settings page. This is what a moderator checks the numbers against."
-      >
-        {draft.proofs.map((proof, i) => (
-          <div
-            key={proof.url}
-            className="flex flex-wrap items-start gap-3 rounded-xl border border-line bg-surface-2 p-3"
-          >
-            {/* biome-ignore lint/performance/noImgElement: a thumbnail of the
+          {draft.proofs.map((proof, i) => (
+            <div
+              key={proof.url}
+              className="flex flex-wrap items-start gap-3 rounded-xl border border-line bg-surface-2 p-3"
+            >
+              {/* biome-ignore lint/performance/noImgElement: a thumbnail of the
                 seller's own upload. next/image would send their file back
                 through the optimiser to draw it at 64px. */}
-            <img
-              src={proof.url}
-              alt=""
-              width={64}
-              height={64}
-              className="size-16 shrink-0 rounded-lg border border-line object-cover"
-            />
-            <label className="min-w-[12rem] flex-1 text-sm">
-              <span className="sr-only">What this screenshot shows</span>
-              <input
-                value={proof.label}
-                onChange={(e) =>
+              <img
+                src={proof.url}
+                alt=""
+                width={64}
+                height={64}
+                className="size-16 shrink-0 rounded-lg border border-line object-cover"
+              />
+              <label className="min-w-[12rem] flex-1 text-sm">
+                <span className="sr-only">What this screenshot shows</span>
+                <input
+                  value={proof.label}
+                  onChange={(e) =>
+                    setDraft((d) => ({
+                      ...d,
+                      proofs: d.proofs.map((p, j) =>
+                        j === i ? { ...p, label: e.target.value } : p,
+                      ),
+                    }))
+                  }
+                  placeholder="e.g. Last 28 days of revenue"
+                  className="h-11 w-full rounded-xl border border-line bg-surface px-3.5 text-base text-fg placeholder:text-subtle focus:border-primary/60 focus:outline-none sm:text-[0.9375rem]"
+                />
+              </label>
+              <button
+                type="button"
+                onClick={() =>
                   setDraft((d) => ({
                     ...d,
-                    proofs: d.proofs.map((p, j) =>
-                      j === i ? { ...p, label: e.target.value } : p,
-                    ),
+                    proofs: d.proofs.filter((_, j) => j !== i),
                   }))
                 }
-                placeholder="e.g. Last 28 days of revenue"
-                className="h-11 w-full rounded-xl border border-line bg-surface px-3.5 text-base text-fg placeholder:text-subtle focus:border-primary/60 focus:outline-none sm:text-[0.9375rem]"
-              />
-            </label>
-            <button
-              type="button"
-              onClick={() =>
+                aria-label={`Remove screenshot ${i + 1}`}
+                className="inline-flex size-11 cursor-pointer items-center justify-center rounded-xl border border-line text-muted transition-colors hover:border-danger/50 hover:text-danger"
+              >
+                <TrashIcon aria-hidden="true" className="size-4" />
+              </button>
+            </div>
+          ))}
+
+          {draft.proofs.length < 8 ? (
+            <ImageUpload
+              kind="proof"
+              label={
+                draft.proofs.length === 0
+                  ? "Add a screenshot"
+                  : "Add another screenshot"
+              }
+              hint="Up to eight."
+              value={null}
+              onChange={(_url, file) => {
+                if (!file) return;
                 setDraft((d) => ({
                   ...d,
-                  proofs: d.proofs.filter((_, j) => j !== i),
-                }))
-              }
-              aria-label={`Remove screenshot ${i + 1}`}
-              className="inline-flex size-11 cursor-pointer items-center justify-center rounded-xl border border-line text-muted transition-colors hover:border-danger/50 hover:text-danger"
-            >
-              <TrashIcon aria-hidden="true" className="size-4" />
-            </button>
-          </div>
-        ))}
+                  proofs: [
+                    ...d.proofs,
+                    { url: file.url, label: "", sha256: file.sha256 },
+                  ],
+                }));
+              }}
+            />
+          ) : (
+            <p className="text-sm text-subtle">
+              <PlusIcon aria-hidden="true" className="mr-1 inline size-4" />
+              That is the maximum of eight.
+            </p>
+          )}
 
-        {draft.proofs.length < 8 ? (
-          <ImageUpload
-            kind="proof"
-            label={
-              draft.proofs.length === 0
-                ? "Add a screenshot"
-                : "Add another screenshot"
-            }
-            hint="Up to eight."
-            value={null}
-            onChange={(_url, file) => {
-              if (!file) return;
-              setDraft((d) => ({
-                ...d,
-                proofs: [
-                  ...d.proofs,
-                  { url: file.url, label: "", sha256: file.sha256 },
-                ],
-              }));
-            }}
-          />
-        ) : (
-          <p className="text-sm text-subtle">
-            <PlusIcon aria-hidden="true" className="mr-1 inline size-4" />
-            That is the maximum of eight.
-          </p>
-        )}
+          {errors.proofs ? (
+            <p role="alert" className="text-sm text-danger">
+              {errors.proofs}
+            </p>
+          ) : null}
+        </Section>
 
-        {errors.proofs ? (
-          <p role="alert" className="text-sm text-danger">
-            {errors.proofs}
-          </p>
-        ) : null}
-      </Section>
-
-      <Section
-        title="How the handover works"
-        description={platform?.transferNote}
-      >
-        <TextField
-          id={ids.transfer}
-          name="transferProfile"
-          label="Anything specific about this account (optional)"
-          hint="For example: sits on a Brand Account, or the domain is at Cloudflare."
-          value={draft.transferProfile}
-          onChange={(e) => set("transferProfile", e.target.value)}
-          error={errors.transferProfile}
-          placeholder="Brand Account, 2FA on the owner email"
-        />
-      </Section>
-
-      <div className="flex flex-wrap gap-3 pb-4">
-        <Button type="submit" variant="secondary" size="md" disabled={pending}>
-          {pending ? "Saving…" : "Save draft"}
-        </Button>
-        <Button
-          type="button"
-          size="md"
-          disabled={pending}
-          onClick={() => submit(true)}
+        <Section
+          title="How the handover works"
+          description={platform?.transferNote}
         >
-          {pending ? "Saving…" : "Save and verify ownership"}
-        </Button>
-      </div>
-    </form>
+          <TextField
+            id={ids.transfer}
+            name="transferProfile"
+            label="Anything specific about this account (optional)"
+            hint="For example: sits on a Brand Account, or the domain is at Cloudflare."
+            value={draft.transferProfile}
+            onChange={(e) => set("transferProfile", e.target.value)}
+            error={errors.transferProfile}
+            placeholder="Brand Account, 2FA on the owner email"
+          />
+
+          <TextArea
+            id={ids.description}
+            name="description"
+            label="About this account (optional)"
+            hint="What it is, who watches it, how it earns, and anything a buyer would be annoyed to find out later. The fields above cannot carry 'the audience moved from shorts to long-form in March'."
+            rows={6}
+            value={draft.description}
+            onChange={(e) => set("description", e.target.value)}
+            error={errors.description}
+          />
+
+          <TextField
+            id={ids.whatsapp}
+            name="whatsapp"
+            label="WhatsApp number (Channel Adda only)"
+            hint="Never shown to buyers. We use it to reach you if a transfer stalls, which is the one moment email is too slow."
+            inputMode="tel"
+            value={draft.whatsapp}
+            onChange={(e) => set("whatsapp", e.target.value)}
+            error={errors.whatsapp}
+            placeholder="+8801712345678"
+          />
+        </Section>
+
+        <div className="flex flex-wrap gap-3 pb-4">
+          <Button
+            type="submit"
+            variant="secondary"
+            size="md"
+            disabled={pending}
+          >
+            {pending ? "Saving…" : "Save draft"}
+          </Button>
+          <Button
+            type="button"
+            size="md"
+            disabled={pending}
+            onClick={() => submit(true)}
+          >
+            {pending ? "Saving…" : "Save and verify ownership"}
+          </Button>
+        </div>
+      </form>
+    </div>
   );
 }

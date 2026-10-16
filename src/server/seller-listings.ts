@@ -55,6 +55,12 @@ export type SellerListing = {
   audience: number;
   monetized: boolean;
   monthlyRevenue: number;
+  yearlyRevenue: number;
+  sourceUrl: string | null;
+  externalId: string | null;
+  description: string | null;
+  /** Staff only. Never put on a page a buyer can open. */
+  whatsapp: string | null;
   engagement: number;
   ageYears: number;
   price: number;
@@ -82,6 +88,11 @@ const select = {
   audience: true,
   monetized: true,
   monthlyRevenueUsd: true,
+  yearlyRevenueUsd: true,
+  sourceUrl: true,
+  externalId: true,
+  description: true,
+  whatsapp: true,
   engagementBp: true,
   ageYears: true,
   priceUsd: true,
@@ -112,6 +123,11 @@ function toSellerListing(row: {
   audience: number;
   monetized: boolean;
   monthlyRevenueUsd: number;
+  yearlyRevenueUsd: number;
+  sourceUrl: string | null;
+  externalId: string | null;
+  description: string | null;
+  whatsapp: string | null;
   engagementBp: number;
   ageYears: number;
   priceUsd: number;
@@ -138,6 +154,11 @@ function toSellerListing(row: {
     audience: row.audience,
     monetized: row.monetized,
     monthlyRevenue: fromCents(row.monthlyRevenueUsd),
+    yearlyRevenue: fromCents(row.yearlyRevenueUsd),
+    sourceUrl: row.sourceUrl,
+    externalId: row.externalId,
+    description: row.description,
+    whatsapp: row.whatsapp,
     engagement: fromEngagementBp(row.engagementBp),
     ageYears: row.ageYears,
     price: fromCents(row.priceUsd),
@@ -220,6 +241,11 @@ function toColumns(input: ListingDraft) {
     audience: input.audience,
     monetized: input.monetized,
     monthlyRevenueUsd: toCents(input.monthlyRevenue),
+    yearlyRevenueUsd: toCents(input.yearlyRevenue),
+    sourceUrl: input.sourceUrl || null,
+    externalId: input.externalId || null,
+    description: input.description || null,
+    whatsapp: input.whatsapp || null,
     engagementBp: toEngagementBp(input.engagement),
     ageYears: input.ageYears,
     priceUsd: toCents(input.price),
