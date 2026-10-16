@@ -93,8 +93,12 @@ export const listingDraftSchema = z.object({
     "Set a price of at least $1.",
   ),
 
-  coverUrl: z.string().min(1, "Add a cover image."),
-  avatarUrl: z.string().min(1, "Add a profile picture."),
+  // Not required here. A draft is allowed to be half-finished, and these
+  // two are the slowest fields to fill: the seller has to go and take a
+  // screenshot. Requiring them to save contradicted the page's own promise
+  // of "save a draft at any point" and lost everything they had typed.
+  coverUrl: z.string().default(""),
+  avatarUrl: z.string().default(""),
 
   transferProfile: z.string().trim().max(200).optional().or(z.literal("")),
 
@@ -161,6 +165,8 @@ export type ListingDraft = z.output<typeof listingDraftSchema>;
  * allowed to be half-finished; a listing about to be shown to buyers is not.
  */
 export const listingSubmitSchema = listingDraftSchema.extend({
+  coverUrl: z.string().min(1, "Add a cover image."),
+  avatarUrl: z.string().min(1, "Add a profile picture."),
   proofs: listingDraftSchema.shape.proofs.unwrap().min(1, {
     message: "Add at least one screenshot proving the account is yours.",
   }),
