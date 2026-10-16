@@ -439,7 +439,9 @@ export async function releaseReservation(listingId: string) {
 export async function expireOffers(now = new Date()): Promise<number> {
   const { count } = await db.offer.updateMany({
     where: { status: "OPEN", expiresAt: { lte: now } },
-    data: { status: "EXPIRED", respondedAt: now },
+    // No respondedAt: the clock ran out, which is not a response. Writing
+    // one here made "lapsed" and "rejected" indistinguishable in the history.
+    data: { status: "EXPIRED" },
   });
   return count;
 }

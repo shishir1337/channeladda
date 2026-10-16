@@ -40,6 +40,7 @@ export default async function AdminSettingsPage() {
             secondApprovalAboveUsd: settings.secondApprovalAboveUsd,
             sellerFeeBp: settings.sellerFeeBp,
             offerExpiryHours: settings.offerExpiryHours,
+            minWithdrawalUsd: settings.minWithdrawalUsd,
           }}
         />
       </div>

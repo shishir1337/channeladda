@@ -860,6 +860,12 @@ model PlatformSettings {
   /// stale interest that neither side ever closes out.
   offerExpiryHours Int @default(48)
 
+  /// The smallest withdrawal finance will send. Cents. A crypto payout pays
+  /// the chain's fee whatever its size, so below some figure the seller is
+  /// paying more to receive the money than the money is worth — and the
+  /// figure depends on the network, so it is a setting, not a constant.
+  minWithdrawalUsd Int @default(2000)
+
   updatedAt   DateTime @updatedAt
   updatedById String?
   updatedBy   User?    @relation("SettingsEditor", fields: [updatedById], references: [id])

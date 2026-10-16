@@ -146,7 +146,7 @@ const SIGNATURES: ReadonlyArray<{
 /** Which content types are clips rather than stills. */
 const VIDEO_TYPES = new Set(["video/mp4", "video/quicktime", "video/webm"]);
 
-export function isVideo(contentType: string): boolean {
+function isVideo(contentType: string): boolean {
   return VIDEO_TYPES.has(contentType);
 }
 

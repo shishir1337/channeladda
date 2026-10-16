@@ -35,6 +35,8 @@ export function SettingsForm({
     /** Cents, as stored. Shown and typed in dollars. */
     secondApprovalAboveUsd: number;
     offerExpiryHours: number;
+    /** Cents, as stored. Shown and typed in dollars. */
+    minWithdrawalUsd: number;
   };
 }) {
   const router = useRouter();
@@ -45,6 +47,7 @@ export function SettingsForm({
     holds: useId(),
     approval: useId(),
     offer: useId(),
+    minWithdrawal: useId(),
   };
 
   const [safest, setSafest] = useState(formatRate(current.buyerFeeBpSafest));
@@ -56,6 +59,9 @@ export function SettingsForm({
   );
   const [offerHours, setOfferHours] = useState(
     String(current.offerExpiryHours),
+  );
+  const [minWithdrawal, setMinWithdrawal] = useState(
+    String(current.minWithdrawalUsd / 100),
   );
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saved, setSaved] = useState<string | null>(null);
@@ -79,7 +85,8 @@ export function SettingsForm({
     draft.sellerFeeBp !== current.sellerFeeBp ||
     Number(holds) !== current.maxHoldsPerAgent ||
     Math.round(Number(approval) * 100) !== current.secondApprovalAboveUsd ||
-    Number(offerHours) !== current.offerExpiryHours;
+    Number(offerHours) !== current.offerExpiryHours ||
+    Math.round(Number(minWithdrawal) * 100) !== current.minWithdrawalUsd;
 
   return (
     <form
@@ -96,6 +103,7 @@ export function SettingsForm({
             maxHoldsPerAgent: Number(holds),
             secondApprovalAbove: Number(approval),
             offerExpiryHours: Number(offerHours),
+            minWithdrawal: Number(minWithdrawal),
           });
           if (!result.ok) {
             setErrors(result.errors);
@@ -207,6 +215,26 @@ export function SettingsForm({
           value={offerHours}
           onChange={(e) => setOfferHours(e.target.value)}
           error={errors.offerExpiryHours}
+          className="mt-5 max-w-xs"
+          required
+        />
+      </section>
+
+      <section className="rounded-panel border border-line bg-surface p-5 sm:p-6">
+        <h2 className="font-display text-lg font-bold text-fg">Payouts</h2>
+        <p className="mt-1.5 text-sm leading-relaxed text-muted">
+          The smallest withdrawal we will send. A crypto payout pays the
+          chain&rsquo;s fee whatever its size, so below some figure the seller
+          loses money by collecting it. Raise this when network fees do.
+        </p>
+        <TextField
+          id={ids.minWithdrawal}
+          name="minWithdrawal"
+          label="Smallest withdrawal (USD)"
+          inputMode="decimal"
+          value={minWithdrawal}
+          onChange={(e) => setMinWithdrawal(e.target.value)}
+          error={errors.minWithdrawal}
           className="mt-5 max-w-xs"
           required
         />

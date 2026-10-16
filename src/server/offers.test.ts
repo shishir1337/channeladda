@@ -27,7 +27,10 @@ test(
       where: { id: stale.id },
     });
     expect(after.status).toBe("EXPIRED");
-    expect(after.respondedAt).not.toBeNull();
+    // Nobody answered: the clock ran out. Stamping respondedAt here made a
+    // lapsed offer indistinguishable from a rejected one in the history,
+    // which is the one thing the column is for.
+    expect(after.respondedAt).toBeNull();
   }),
 );
 

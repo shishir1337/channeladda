@@ -9,13 +9,18 @@ set -u
 
 BASE="${1:?usage: e2e-routes.sh BASE_URL JAR_DIR}"
 JARS="${2:?}"
+# Better Auth rejects a sign-in whose Origin is not its own baseURL with a
+# 403 and no session, which reads downstream as every authenticated route
+# redirecting to /signin. Run the server with BETTER_AUTH_URL set to the
+# URL you sweep, or pass that URL here as the third argument.
+ORIGIN="${3:-$BASE}"
 PASS=0
 FAIL=0
 
 login() {
   local email="$1" jar="$2"
   curl -s -c "$JARS/$jar.jar" -X POST "$BASE/api/auth/sign-in/email" \
-    -H 'Content-Type: application/json' -H "Origin: $BASE" \
+    -H 'Content-Type: application/json' -H "Origin: $ORIGIN" \
     -d "{\"email\":\"$email\",\"password\":\"channeladda-dev-2026\"}" \
     -o /dev/null -w '%{http_code}'
 }
@@ -43,6 +48,13 @@ for pair in "admin@dealbaron.com:admin" "moderator@dealbaron.com:mod" \
   email="${pair%%:*}"; jar="${pair##*:}"
   code=$(login "$email" "$jar")
   printf '%-8s %s\n' "$jar" "$code"
+  # Stop here rather than report fifty redirects that all have one cause.
+  if [ "$code" != "200" ]; then
+    echo "could not sign in as $email (HTTP $code). Every later check would"
+    echo "fail for that one reason, so this stops now. Check that the server"
+    echo "on $BASE is this project and its BETTER_AUTH_URL is $ORIGIN."
+    exit 1
+  fi
   # Better Auth allows 3 sign-ins per 10s per IP. Four seconds is not enough
   # once there are six accounts: the fourth lands inside the window of the
   # first three and comes back 429, leaving that role with no session and

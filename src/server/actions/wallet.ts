@@ -23,6 +23,7 @@ const MESSAGES: Record<repo.WalletFailure, string> = {
   "wrong-actor": "That is not yours to do.",
   insufficient: "Your available balance does not cover that.",
   "no-address": "Add a payout address first.",
+  "below-minimum": "That is below the smallest withdrawal we can send.",
   "already-settled": "That withdrawal has already been dealt with.",
   "not-payable": "This deal is not waiting on a payment.",
 };

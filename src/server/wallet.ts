@@ -6,6 +6,7 @@ import { canTransition } from "@/lib/deal-machine";
 import { OPENING_STATUS } from "@/lib/deal-templates";
 import { isSerializationFailure } from "@/lib/serialization-failure";
 import { recordAudit } from "@/server/audit";
+import { getSettings } from "@/server/settings";
 
 /**
  * Wallets.
@@ -30,6 +31,7 @@ export type WalletFailure =
   | "wrong-actor"
   | "insufficient"
   | "no-address"
+  | "below-minimum"
   | "already-settled"
   | "not-payable";
 
@@ -164,7 +166,7 @@ export async function creditDeposit(
 }
 
 /** The handle a deposit is claimed under. Unique across the ledger. */
-export function depositNote(reference: string): string {
+function depositNote(reference: string): string {
   return `deposit:${reference}`;
 }
 
@@ -306,6 +308,13 @@ export async function requestWithdrawal(
 ): Promise<WalletOutcome<{ withdrawalId: string }>> {
   if (!Number.isInteger(amountUsd) || amountUsd <= 0) {
     return { ok: false, reason: "insufficient" };
+  }
+
+  // Checked before the balance, because a seller asking for two dollars
+  // needs to be told the floor, not that they cannot afford it.
+  const { minWithdrawalUsd } = await getSettings();
+  if (amountUsd < minWithdrawalUsd) {
+    return { ok: false, reason: "below-minimum" };
   }
 
   const address = await db.payoutAddress.findUnique({

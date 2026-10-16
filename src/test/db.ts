@@ -127,6 +127,7 @@ export type TestSettings = {
   maxHoldsPerAgent: number;
   secondApprovalAboveUsd: number;
   offerExpiryHours: number;
+  minWithdrawalUsd: number;
 };
 
 // Annotated rather than `as const`: an override of { sellerFeeBp: 500 } has to
@@ -138,6 +139,7 @@ export const TEST_SETTINGS: TestSettings = {
   maxHoldsPerAgent: 10,
   secondApprovalAboveUsd: 500_000,
   offerExpiryHours: 48,
+  minWithdrawalUsd: 2_000,
 };
 
 export type SeedOverrides = {

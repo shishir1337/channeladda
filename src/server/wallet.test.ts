@@ -317,3 +317,49 @@ test(
     });
   }),
 );
+
+
+test(
+  "a withdrawal below the platform minimum is refused",
+  withCleanDb(async () => {
+    // Network fees on a crypto payout are a floor the seller pays regardless
+    // of size, so a two-dollar withdrawal costs more to send than it carries.
+    // The minimum is a setting rather than a constant because the fee depends
+    // on the chain, and only the admin can see what it is costing.
+    const user = await withPayout(50_000);
+
+    expect(await requestWithdrawal(user.id, 500)).toMatchObject({
+      ok: false,
+      reason: "below-minimum",
+    });
+    expect(await requestWithdrawal(user.id, 2_000)).toMatchObject({ ok: true });
+
+    const wallet = await getWallet(user.id);
+    expect(wallet.pendingWithdrawalUsd).toBe(2_000);
+  }),
+);
+
+test(
+  "the admin can lower the withdrawal minimum",
+  withCleanDb(async () => {
+    const admin = await seedUser("SUPERADMIN");
+    const { updateSettings } = await import("@/server/settings");
+    const user = await withPayout(50_000);
+
+    const saved = await updateSettings(
+      {
+        buyerFeeBpSafest: 300,
+        buyerFeeBpFastest: 300,
+        sellerFeeBp: 0,
+        maxHoldsPerAgent: 10,
+        secondApprovalAbove: 5_000,
+        offerExpiryHours: 48,
+        minWithdrawal: 3,
+      },
+      admin.id,
+    );
+    expect(saved).toMatchObject({ ok: true });
+
+    expect(await requestWithdrawal(user.id, 500)).toMatchObject({ ok: true });
+  }),
+);

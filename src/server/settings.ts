@@ -25,6 +25,8 @@ export type PlatformSettings = FeeSettings & {
   maxHoldsPerAgent: number;
   /** Cents. At or above this, handing value across needs a second approval. */
   secondApprovalAboveUsd: number;
+  /** Cents. The smallest withdrawal finance will send. */
+  minWithdrawalUsd: number;
   updatedAt: Date | null;
   updatedByName: string | null;
 };
@@ -32,6 +34,7 @@ export type PlatformSettings = FeeSettings & {
 const DEFAULT_OFFER_EXPIRY_HOURS = 48;
 const DEFAULT_MAX_HOLDS_PER_AGENT = 10;
 const DEFAULT_SECOND_APPROVAL_ABOVE_USD = 500_000;
+const DEFAULT_MIN_WITHDRAWAL_USD = 2_000;
 
 /**
  * Throws away the cached row.
@@ -57,6 +60,7 @@ export async function getSettings(): Promise<PlatformSettings> {
       maxHoldsPerAgent: true,
       secondApprovalAboveUsd: true,
       offerExpiryHours: true,
+      minWithdrawalUsd: true,
       updatedAt: true,
       updatedBy: { select: { name: true } },
     },
@@ -73,6 +77,7 @@ export async function getSettings(): Promise<PlatformSettings> {
         maxHoldsPerAgent: row.maxHoldsPerAgent,
         secondApprovalAboveUsd: row.secondApprovalAboveUsd,
         offerExpiryHours: row.offerExpiryHours,
+        minWithdrawalUsd: row.minWithdrawalUsd,
         updatedAt: row.updatedAt,
         updatedByName: row.updatedBy?.name ?? null,
       }
@@ -81,6 +86,7 @@ export async function getSettings(): Promise<PlatformSettings> {
         maxHoldsPerAgent: DEFAULT_MAX_HOLDS_PER_AGENT,
         secondApprovalAboveUsd: DEFAULT_SECOND_APPROVAL_ABOVE_USD,
         offerExpiryHours: DEFAULT_OFFER_EXPIRY_HOURS,
+        minWithdrawalUsd: DEFAULT_MIN_WITHDRAWAL_USD,
         updatedAt: null,
         updatedByName: null,
       };
@@ -104,6 +110,8 @@ export type SettingsInput = {
   /** Dollars, as typed into the form. Stored as cents. */
   secondApprovalAbove: number;
   offerExpiryHours: number;
+  /** Dollars, as typed into the form. Stored as cents. */
+  minWithdrawal: number;
 };
 
 export type SettingsError = { field: string; message: string };
@@ -167,6 +175,13 @@ export function validateSettings(input: SettingsInput): SettingsError[] {
     });
   }
 
+  if (!Number.isFinite(input.minWithdrawal) || input.minWithdrawal < 0) {
+    errors.push({
+      field: "minWithdrawal",
+      message: "Enter an amount, or 0 for no minimum.",
+    });
+  }
+
   return errors;
 }
 
@@ -183,6 +198,7 @@ export async function updateSettings(input: SettingsInput, actorId: string) {
       maxHoldsPerAgent: true,
       secondApprovalAboveUsd: true,
       offerExpiryHours: true,
+      minWithdrawalUsd: true,
     },
   });
 
@@ -193,6 +209,7 @@ export async function updateSettings(input: SettingsInput, actorId: string) {
     maxHoldsPerAgent: input.maxHoldsPerAgent,
     secondApprovalAboveUsd: Math.round(input.secondApprovalAbove * 100),
     offerExpiryHours: input.offerExpiryHours,
+    minWithdrawalUsd: Math.round(input.minWithdrawal * 100),
     updatedById: actorId,
   };
 

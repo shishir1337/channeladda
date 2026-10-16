@@ -8,6 +8,7 @@ const VALID: SettingsInput = {
   maxHoldsPerAgent: 10,
   secondApprovalAbove: 5_000,
   offerExpiryHours: 48,
+  minWithdrawal: 20,
 };
 
 const fields = (input: SettingsInput) =>
