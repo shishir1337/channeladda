@@ -20,7 +20,7 @@ const steps = [
   },
   {
     icon: LockIcon,
-    title: "Pay into escrow",
+    title: "Choose how to pay",
     body: "Your crypto payment goes to Channel Adda, not the seller. The seller sees the funds are secured and starts the transfer.",
   },
   {
@@ -31,7 +31,7 @@ const steps = [
   {
     icon: BanknoteIcon,
     title: "You confirm, seller gets paid",
-    body: "Funds release only when you confirm full control. If the handover fails, escrow refunds you in full.",
+    body: "On a Fastest deal we hold the money and release it when you confirm full control. On a Safest deal we hold the account instead, and you pay the seller only once it is in our hands.",
   },
 ];
 
@@ -54,7 +54,7 @@ const modes = [
   {
     id: "safest",
     icon: LockIcon,
-    name: "Safest escrow",
+    name: "Safest",
     tagline: "Our default for every serious deal",
     fee: "3%",
     release: "After you confirm",
@@ -115,7 +115,7 @@ export function HowItWorks() {
               Two ways to close a deal
             </h3>
             <p className="mt-3 text-[0.9375rem] text-muted">
-              Anything above $1,000 is routed to Safest escrow automatically.
+              Which one you use is your choice on every listing.
             </p>
           </div>
 

@@ -116,7 +116,8 @@ export default async function PlatformBrowsePage({
                 Your payment stays with Channel Adda for{" "}
                 <span className="font-semibold text-fg">{p.holdDays} days</span>{" "}
                 after you confirm the handover. If the previous owner recovers
-                the account in that window, you are refunded in full.
+                the account in that window, the deal is reversed and you are not
+                left paying for it.
               </p>
               <Link
                 href="/how-it-works"

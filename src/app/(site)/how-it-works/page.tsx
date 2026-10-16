@@ -100,7 +100,7 @@ export default function HowItWorksPage() {
             />
             <span>
               If the previous owner recovers the account inside that window, you
-              reopen the dispute and are refunded in full.
+              reopen the dispute, and it is decided on the record.
             </span>
           </p>
         </Container>

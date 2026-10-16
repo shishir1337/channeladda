@@ -18,7 +18,7 @@ import { getFeeSettings } from "@/server/settings";
 export const metadata: Metadata = {
   title: "Sell your account",
   description:
-    "List a YouTube channel, Instagram or Facebook page, Telegram channel or website for free. Escrow proves the buyer is real, and you are paid in crypto once the handover is confirmed.",
+    "List a YouTube channel, Instagram or Facebook page, Telegram channel or website for free. A supervised handover proves the buyer is real, and you are paid in crypto once it is confirmed.",
   alternates: { canonical: "/sell" },
 };
 
@@ -54,7 +54,7 @@ export default async function SellPage() {
         crumbs={[{ label: "Home", href: "/" }, { label: "Sell" }]}
         eyebrow="For sellers"
         title="Your channel is an asset. Cash it out safely."
-        description="List for free, put your account in front of active buyers, and let escrow prove you are dealing with someone serious. We only earn when your deal completes."
+        description="List for free, put your account in front of active buyers, and let a supervised handover prove you are dealing with someone serious. We only earn when your deal completes."
         actions={
           <Button asChild size="lg">
             <Link href="/signup">
@@ -151,8 +151,8 @@ export default async function SellPage() {
                 </div>
               </dl>
               <p className="mt-4 border-t border-line pt-4 text-xs leading-relaxed text-subtle">
-                The buyer pays {formatRate(fees.buyerFeeBpSafest)}% on top of your
-                price, so your listing stays at{" "}
+                The buyer pays {formatRate(fees.buyerFeeBpSafest)}% on top of
+                your price, so your listing stays at{" "}
                 <Price usd={EXAMPLE} className="text-muted" /> on the
                 marketplace.
               </p>
@@ -166,7 +166,7 @@ export default async function SellPage() {
           <SectionHeading
             eyebrow="What you can sell"
             title="Five marketplaces, one listing flow"
-            description="Each platform has its own transfer mechanism, so each has its own checklist and its own escrow hold. Pick yours to see how the handover works."
+            description="Each platform has its own transfer mechanism, so each has its own checklist and its own hold period. Pick yours to see how the handover works."
           />
 
           <ul className="mt-9 grid grid-cols-2 gap-3 sm:mt-12 sm:grid-cols-3 sm:gap-4 lg:grid-cols-5">
@@ -186,8 +186,7 @@ export default async function SellPage() {
                     {platform.name}
                   </h3>
                   <p className="text-xs text-subtle">
-                    <span className="tnum">{platform.holdDays}</span>-day escrow
-                    hold
+                    <span className="tnum">{platform.holdDays}</span>-day hold
                   </p>
                 </Link>
               </li>

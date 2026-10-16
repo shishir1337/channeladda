@@ -17,7 +17,7 @@ const sellerSteps = [
   {
     step: "03",
     title: "Get paid in crypto",
-    body: "Once the buyer confirms the handover, escrow releases to your Cryptomus wallet.",
+    body: "On a Fastest deal the money lands in your Channel Adda wallet the moment the buyer confirms, and you withdraw it to your own crypto wallet. On a Safest deal the buyer pays you directly.",
   },
 ];
 
@@ -45,8 +45,8 @@ export function SellerCta() {
               </h2>
               <p className="mt-5 max-w-lg text-[0.9375rem] leading-relaxed text-muted sm:text-base">
                 List for free, put your account in front of active buyers, and
-                let escrow prove you are serious. No listing fee — we only earn
-                when your deal completes.
+                let a supervised handover prove you are serious. No listing fee
+                — we only earn when your deal completes.
               </p>
 
               <ul className="mt-7 flex flex-wrap gap-x-5 gap-y-2.5">

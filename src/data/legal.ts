@@ -27,7 +27,9 @@ export const legalDocs: Record<string, LegalDoc> = {
       {
         heading: "What Channel Adda is",
         paragraphs: [
-          "Channel Adda is a marketplace and escrow agent. We introduce buyers and sellers of social media accounts and content websites, hold the buyer's payment while ownership is transferred, and release it once the buyer confirms the handover.",
+          "Channel Adda is a marketplace and a supervised transfer service. We introduce buyers and sellers of social media accounts and content websites, and on every deal one side of the exchange is held by us while the other moves.",
+          "On a Safest deal we hold the account. One of our agents takes ownership of it, the buyer pays the seller directly once it is verifiably in our hands, and we transfer it on to the buyer afterwards. The purchase price never passes through Channel Adda.",
+          "On a Fastest deal we hold the money. The buyer pays us the price and our fee together, our agent supervises while the seller transfers the account to the buyer, and we pay the seller once the buyer confirms access.",
           "We are not a party to the sale itself. The contract for the account is between the buyer and the seller. Our role is to hold the money, verify what we reasonably can, and decide disputes fairly on the record in front of us.",
         ],
       },
@@ -72,7 +74,7 @@ export const legalDocs: Record<string, LegalDoc> = {
       {
         heading: "Limits of our liability",
         paragraphs: [
-          "Our liability on any order is limited to the amount held in escrow for that order. We are not liable for indirect losses, including lost advertising revenue, lost future earnings, or the value of an audience that declines after a sale.",
+          "Our liability on any order is limited to what we are holding for that order: on a Fastest deal, the amount paid to us; on a Safest deal, the account in our custody and the fee you paid us. We do not hold the purchase price on a Safest deal and cannot return money we never received. We are not liable for indirect losses, including lost advertising revenue, lost future earnings, or the value of an audience that declines after a sale.",
         ],
       },
     ],
@@ -98,7 +100,7 @@ export const legalDocs: Record<string, LegalDoc> = {
       {
         heading: "Why we collect it",
         paragraphs: [
-          "To run the marketplace, to hold and release escrow correctly, to verify that sellers control what they list, to decide disputes on evidence rather than assertion, and to meet anti-money-laundering obligations.",
+          "To run the marketplace, to hold and release accounts and payments correctly, to verify that sellers control what they list, to decide disputes on evidence rather than assertion, and to meet anti-money-laundering obligations.",
           "We do not sell personal data, and we do not use your data to train advertising profiles.",
         ],
       },
@@ -106,7 +108,7 @@ export const legalDocs: Record<string, LegalDoc> = {
         heading: "What other users can see",
         paragraphs: [
           "Buyers and sellers in an order can see each other's display name, rating, history and everything either of them writes or uploads to that order. They cannot see your email address, your identity documents or your wallet addresses.",
-          "Until an order exists, contact details in chat are masked. This protects both sides and keeps deals inside the escrow that protects them.",
+          "Until an order exists, contact details in chat are masked. This protects both sides and keeps deals inside the supervision that protects them.",
         ],
       },
       {
@@ -134,17 +136,28 @@ export const legalDocs: Record<string, LegalDoc> = {
       {
         heading: "The short version",
         paragraphs: [
-          "If you do not end up with working, uncontested control of the account you paid for, you get a full refund. Escrow exists precisely so this is possible.",
+          "What you get back depends on which of the two deal types you chose, because they protect you in opposite ways. Read the section for yours.",
         ],
       },
       {
-        heading: "Always refunded in full",
+        heading: "A Fastest deal",
+        paragraphs: [
+          "We hold the whole amount — the account's price and our fee — from the moment you pay until you confirm you have access. If the transfer does not complete, we return all of it.",
+        ],
         bullets: [
           "The seller never starts the transfer",
           "The seller goes silent partway through the handover",
           "The account is materially different from the listing — wrong audience size, undisclosed strikes, different niche",
-          "The previous owner recovers the account during the escrow hold period",
+          "The previous owner recovers the account during the hold period",
           "The seller cannot complete the transfer for a reason within their control",
+        ],
+      },
+      {
+        heading: "A Safest deal",
+        paragraphs: [
+          "You pay us our fee and nothing else. The account's price goes straight from you to the seller, and only after one of our agents has taken ownership of the account and you have inspected it. Channel Adda never holds that money and therefore cannot refund it.",
+          "What protects you is the order of events, not a pot of money we are sitting on. Before you pay the seller a penny, the account is already out of their hands and in ours — they cannot take it back, sell it twice, or disappear with it.",
+          "If a deal fails before our agent has taken custody, we refund our fee in full. If it fails after that, we return the account to the seller and you have paid nobody but us. If you have already paid the seller and something then goes wrong, we decide the outcome by moving the account — to you, or back to the seller — because the account is the thing we hold.",
         ],
       },
       {
@@ -153,13 +166,14 @@ export const legalDocs: Record<string, LegalDoc> = {
           "Advertising revenue not continuing after the sale — this is disclosed on the listing and acknowledged at checkout, because ad accounts cannot be transferred",
           "The audience declining after you take over",
           "A change of mind after you have confirmed the handover and the hold period has ended",
+          "On a Safest deal, money you paid the seller directly — we were never holding it, and no part of this policy can conjure it back",
           "A platform banning the account for something you did after taking ownership",
         ],
       },
       {
         heading: "Platform action after completion",
         paragraphs: [
-          "If a platform suspends or bans a sold account within the escrow hold period for a reason that pre-dates the sale, that is treated as the account being materially different from the listing and is refunded in full.",
+          "If a platform suspends or bans a sold account within the hold period for a reason that pre-dates the sale, that is treated as the account being materially different from the listing. On a Fastest deal you are refunded in full. On a Safest deal, if our agent still holds the account it goes back to the seller and your fee is returned; if you have already paid the seller, we will pursue it with them on your behalf but cannot guarantee recovery of money we never held.",
           "After the hold period ends, the account is yours and the risk sits with you. This is why the hold periods are set by each platform's own recovery and review windows rather than picked for convenience.",
         ],
       },
@@ -167,7 +181,7 @@ export const legalDocs: Record<string, LegalDoc> = {
         heading: "How refunds are paid",
         paragraphs: [
           "Crypto payments cannot be reversed, so a refund is a new outbound payment. Refunds are credited to your Channel Adda balance immediately on a decision, and you withdraw to your own wallet from there. Network fees on that withdrawal are set by the blockchain, not by us.",
-          "The 3% buyer fee is refunded alongside a full refund. On a partial settlement it is adjusted to match the amount actually settled.",
+          "The buyer fee is returned with a full refund, and on a Safest deal it is returned on its own if the deal dies before our agent takes custody of the account. Once an agent has held the account, the fee has bought the work that was done and is not returned. On a partial settlement it is adjusted to match the amount actually settled.",
         ],
       },
       {

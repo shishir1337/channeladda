@@ -10,7 +10,7 @@ import { sellers } from "@/data/sellers";
 export const metadata: Metadata = {
   title: "About Channel Adda",
   description:
-    "Why we built an escrow-first marketplace for social media accounts, and how the business actually makes money.",
+    "Why we built a supervised marketplace for social media accounts, and how the business actually makes money.",
   alternates: { canonical: "/about" },
 };
 
@@ -51,7 +51,7 @@ export default function AboutPage() {
             <p className="text-fg">
               That is the whole product. Everything else — the search, the
               filters, the seller ratings — exists to get two people to the
-              point where escrow can do its job.
+              point where a supervised handover can do its job.
             </p>
             <p>
               We make money one way: a percentage when a deal completes. Not on
@@ -80,7 +80,7 @@ export default function AboutPage() {
               <Link href="/browse">Browse the marketplace</Link>
             </Button>
             <Button asChild variant="outline" size="lg">
-              <Link href="/how-it-works">See how escrow works</Link>
+              <Link href="/how-it-works">See how a deal works</Link>
             </Button>
           </div>
         </Container>

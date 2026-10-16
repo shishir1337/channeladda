@@ -16,7 +16,7 @@ export const metadata: Metadata = {
 const disputeSteps = [
   {
     title: "You open the dispute",
-    body: "One button on the order page. Escrow freezes instantly and the seller cannot withdraw anything, including from earlier sales.",
+    body: "One button on the deal page. The deal freezes where it stands, the account stays in our custody if it is there, and the seller cannot withdraw a balance held with us — including from earlier sales.",
   },
   {
     title: "A moderator reads the record",
@@ -84,7 +84,7 @@ export default function TrustSafetyPage() {
                   <span className="font-semibold text-fg">
                     Keep every message on Channel Adda.
                   </span>{" "}
-                  A deal arranged on Telegram or WhatsApp has no escrow, no
+                  A deal arranged on Telegram or WhatsApp has no custody, no
                   record and no dispute process. We cannot help with it.
                 </li>
                 <li>

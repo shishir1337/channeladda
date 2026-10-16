@@ -43,7 +43,7 @@ export const helpArticles: HelpArticle[] = [
       "If the handover fails at any point, you open a dispute and the money freezes where it is. Nothing is released until a moderator has read the order record and decided.",
     ],
     steps: [
-      "You pay — funds are held by Channel Adda",
+      "You pay — on a Fastest deal we hold the money; on a Safest deal just our fee, and the account is held instead",
       "The seller starts the transfer, working a platform-specific checklist",
       "You verify and confirm you have full control",
       "The cooling-off period passes",
@@ -57,7 +57,7 @@ export const helpArticles: HelpArticle[] = [
     summary: "The buyer fee, when it is charged, and what happens on a refund.",
     body: [
       "Buyers pay the listing price plus a 3% platform fee. The total is shown in full on the listing page before you commit to anything — there is never a number that appears for the first time at checkout.",
-      "The fee is charged at the same time as the purchase. If a deal is refunded in full, the fee is refunded with it. If a dispute ends in a partial settlement, the fee is adjusted to match the amount actually settled.",
+      "The fee is charged when the deal opens. On a Fastest deal a full refund returns the fee with it. On a Safest deal the fee comes back on its own if the deal dies before one of our agents takes custody of the account; after that it has paid for work that was actually done. A partial settlement adjusts it to match the amount settled.",
     ],
   },
   {

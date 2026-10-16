@@ -14,7 +14,7 @@ const trustPoints = [
   {
     icon: LockIcon,
     title: "Your money is never at risk",
-    body: "Payments sit in escrow until you confirm you hold the account. If a transfer fails, you are refunded in full.",
+    body: "Every deal is held open by us: either the account sits with one of our agents, or your payment does. A transfer that fails leaves you no worse off.",
   },
   {
     icon: BadgeCheckIcon,

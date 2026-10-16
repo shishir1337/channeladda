@@ -29,12 +29,11 @@ export const metadata: Metadata = {
     process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
   ),
   title: {
-    default:
-      "Channel Adda — Buy & sell social media accounts with escrow protection",
+    default: "Channel Adda — Buy & sell social media accounts, safely",
     template: "%s | Channel Adda",
   },
   description:
-    "The escrow-protected marketplace for YouTube channels, Instagram, Facebook and Telegram accounts and content websites. KYC-verified sellers, crypto payments via Cryptomus, and funds released only after a confirmed handover.",
+    "The supervised marketplace for YouTube channels, Instagram, Facebook and Telegram accounts and content websites. KYC-verified sellers, crypto payments via Cryptomus, and a Channel Adda agent holding either the account or the money until the handover is confirmed.",
   keywords: [
     "buy youtube channel",
     "sell instagram account",
@@ -44,10 +43,9 @@ export const metadata: Metadata = {
     "escrow account transfer",
   ],
   openGraph: {
-    title:
-      "Channel Adda — Buy & sell social media accounts with escrow protection",
+    title: "Channel Adda — Buy & sell social media accounts, safely",
     description:
-      "Escrow-held crypto payments, KYC-verified sellers, and a supervised handover on every deal.",
+      "KYC-verified sellers, crypto payments, and an agent holding one side of every deal until the handover is confirmed.",
     siteName: "Channel Adda",
     type: "website",
   },

@@ -139,7 +139,7 @@ export const testimonials = [
   },
   {
     quote:
-      "The dispute team actually reads the chat log. Seller went quiet mid-transfer, I opened a dispute, and I was refunded in full within 48 hours.",
+      "The dispute team actually reads the chat log. Seller went quiet mid-transfer, I opened a dispute, and it was settled in my favour within 48 hours.",
     name: "Tomas Neubauer",
     role: "Buyer since 2022",
     initials: "TN",
@@ -151,7 +151,7 @@ export const testimonials = [
 export const faqs = [
   {
     q: "How does Channel Adda protect my money?",
-    a: "Every purchase runs through escrow. Your crypto payment is held by Channel Adda — never sent to the seller — until you confirm you have full, uncontested control of the account. If the handover fails, the funds come back to you.",
+    a: "Every purchase is supervised, and you choose which half we hold. On a Safest deal one of our agents takes ownership of the account first, and you pay the seller directly only once it is verifiably in our hands — so the seller cannot take it back or sell it twice. On a Fastest deal we hold your payment instead, and release it to the seller only once you confirm you have control. Either way, a handover that fails leaves you no worse off.",
   },
   {
     q: "What is the difference between Quick and Safest checkout?",

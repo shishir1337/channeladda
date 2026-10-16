@@ -75,8 +75,8 @@ export function Hero({ stats }: { stats: Stats }) {
           </h1>
 
           <p className="mx-auto mt-6 max-w-xl text-base leading-relaxed text-muted sm:mt-7 sm:text-lg">
-            Escrow holds every payment until you confirm the account is fully in
-            your hands.{" "}
+            Every deal is held open by us — the account sits with one of our
+            agents, or your payment does, until the handover is confirmed.{" "}
             <span className="tnum">
               {stats.transfers.toLocaleString("en-US")}
             </span>{" "}

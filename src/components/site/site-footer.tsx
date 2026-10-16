@@ -35,8 +35,8 @@ export function SiteFooter() {
               </span>
             </Link>
             <p className="mt-4 max-w-xs text-sm leading-relaxed text-muted">
-              The escrow-protected marketplace for social media accounts,
-              channels and content websites.
+              The supervised marketplace for social media accounts, channels and
+              content websites.
             </p>
 
             <div className="mt-6 inline-flex items-center gap-2.5 rounded-xl border border-line bg-surface px-3.5 py-2.5">
