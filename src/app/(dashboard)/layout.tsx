@@ -1,6 +1,7 @@
 import type { NavGroup } from "@/components/dashboard/app-shell";
 import { AppShell } from "@/components/dashboard/app-shell";
 import { getWaitingOnYou } from "@/server/dashboard";
+import { countDealsAwaiting } from "@/server/deals";
 import { countUnreadThreads } from "@/server/messages";
 import { getCurrentUser } from "@/server/session";
 
@@ -25,9 +26,10 @@ export default async function DashboardLayout({ children }: LayoutProps<"/">) {
   const user = await getCurrentUser();
   if (!user) return <>{children}</>;
 
-  const [waiting, unread] = await Promise.all([
+  const [waiting, unread, deals] = await Promise.all([
     getWaitingOnYou(user.id),
     countUnreadThreads(user.id),
+    countDealsAwaiting(user.id),
   ]);
 
   const groups: NavGroup[] = [
@@ -38,6 +40,13 @@ export default async function DashboardLayout({ children }: LayoutProps<"/">) {
     {
       label: "Trading",
       items: [
+        {
+          label: "Deals",
+          href: "/dashboard/deals",
+          icon: "transfer",
+          section: true,
+          waiting: deals,
+        },
         {
           label: "Offers",
           href: "/dashboard/offers",

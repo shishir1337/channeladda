@@ -725,6 +725,93 @@ export async function resolveDeal(input: {
   return { ok: true };
 }
 
+export type DealListRow = {
+  id: string;
+  reference: string;
+  mode: DealMode;
+  status: OrderStatus;
+  priceUsd: number;
+  totalUsd: number;
+  listingTitle: string;
+  otherSideName: string;
+  side: "buyer" | "seller" | "agent";
+  /** Whose move it is, or null once the deal has stopped. */
+  awaiting: DealActor | null;
+  createdAt: Date;
+};
+
+/**
+ * Every deal this person is part of, on any side.
+ *
+ * One list rather than a buyer tab and a seller tab, because everyone here
+ * buys and sells and a mode switch would hide half of what they are doing.
+ */
+export async function listDealsFor(userId: string): Promise<DealListRow[]> {
+  const orders = await db.order.findMany({
+    where: {
+      OR: [{ buyerId: userId }, { sellerId: userId }, { agentId: userId }],
+    },
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      reference: true,
+      mode: true,
+      status: true,
+      priceUsd: true,
+      totalUsd: true,
+      buyerId: true,
+      sellerId: true,
+      agentId: true,
+      createdAt: true,
+      listing: { select: { title: true } },
+      buyer: { select: { name: true } },
+      seller: { select: { name: true } },
+      steps: {
+        where: { completedAt: null },
+        orderBy: { position: "asc" },
+        take: 1,
+        select: { actor: true },
+      },
+    },
+  });
+
+  return orders.map((order) => {
+    const side =
+      order.buyerId === userId
+        ? ("buyer" as const)
+        : order.sellerId === userId
+          ? ("seller" as const)
+          : ("agent" as const);
+
+    return {
+      id: order.id,
+      reference: order.reference,
+      mode: order.mode,
+      status: order.status,
+      priceUsd: order.priceUsd,
+      totalUsd: order.totalUsd,
+      listingTitle: order.listing.title,
+      otherSideName: side === "buyer" ? order.seller.name : order.buyer.name,
+      side,
+      awaiting: isTerminal(order.status)
+        ? null
+        : ((order.steps[0]?.actor as DealActor) ?? null),
+      createdAt: order.createdAt,
+    };
+  });
+}
+
+/**
+ * How many of this person's deals are waiting on them specifically.
+ *
+ * Only their own move counts. A badge that lights up for every deal in flight
+ * would be lit permanently and stop meaning anything.
+ */
+export async function countDealsAwaiting(userId: string): Promise<number> {
+  const rows = await listDealsFor(userId);
+  return rows.filter((row) => row.awaiting === row.side).length;
+}
+
 export type DealStepView = {
   position: number;
   label: string;

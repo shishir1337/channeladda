@@ -1,23 +1,16 @@
 "use client";
 
-import {
-  EyeIcon,
-  MessageSquareIcon,
-  ShieldCheckIcon,
-  TimerIcon,
-  ZapIcon,
-} from "lucide-react";
+import { EyeIcon, MessageSquareIcon, ShieldCheckIcon } from "lucide-react";
 import Link from "next/link";
-import { useId } from "react";
 import { FavoriteButton } from "@/components/home/favorite-button";
 import { AskSeller } from "@/components/listing/ask-seller";
-import { BuyAtAsking } from "@/components/listing/buy-at-asking";
 import { ReportListing } from "@/components/listing/report-listing";
+import { StartDeal } from "@/components/listing/start-deal";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Price } from "@/components/ui/price";
 import type { Listing } from "@/data/listings";
-import { buyerTotal, type FeeSettings, formatRate } from "@/lib/fees";
+import type { FeeSettings } from "@/lib/fees";
 
 /**
  * Sticky purchase panel. The fee is shown before the buyer commits to
@@ -38,12 +31,6 @@ export function BuyPanel({
   /** A seller cannot buy their own listing, so they get neither action. */
   isOwnListing: boolean;
 }) {
-  const _checkoutNoteId = useId();
-  const { fee, total } = buyerTotal(listing.price, fees, "SAFEST");
-  // Escrow is mandatory on platforms an owner can recover. The old price cap
-  // is gone: under the two-mode model the buyer chooses, not the price.
-  const escrowOnly = holdDays > 7;
-
   return (
     <div className="rounded-panel border border-line bg-surface p-5 shadow-soft sm:p-6">
       <div className="flex items-start justify-between gap-3">
@@ -65,48 +52,15 @@ export function BuyPanel({
         <FavoriteButton listingId={listing.id} handle={listing.handle} />
       </div>
 
-      <dl className="mt-5 space-y-2.5 border-y border-line py-4 text-sm">
-        <div className="flex items-center justify-between gap-3">
-          <dt className="text-muted">Listing price</dt>
-          <dd>
-            <Price usd={listing.price} />
-          </dd>
-        </div>
-        <div className="flex items-center justify-between gap-3">
-          <dt className="text-muted">
-            Buyer fee{" "}
-            <span className="tnum text-subtle">
-              ({formatRate(fees.buyerFeeBpSafest)}%)
-            </span>
-          </dt>
-          <dd>
-            <Price usd={fee} />
-          </dd>
-        </div>
-        <div className="flex items-center justify-between gap-3 pt-1.5 font-semibold">
-          <dt>You pay</dt>
-          <dd>
-            <Price usd={total} className="text-base" />
-          </dd>
-        </div>
-      </dl>
+      <StartDeal
+        listingId={listing.id}
+        listingSlug={listing.slug}
+        price={listing.price}
+        fees={fees}
+        isOwnListing={isOwnListing}
+      />
 
-      {/*
-        Two ways to buy, and neither is mandatory.
-
-        Someone happy with the price should never have to haggle for it, so
-        taking the asking price is the primary action. Checkout does not exist
-        yet, so today that sends a full-price offer the seller confirms; when
-        checkout lands this button goes to payment and nothing else here
-        changes.
-      */}
       <div className="mt-5 grid gap-2.5">
-        <BuyAtAsking
-          listingId={listing.id}
-          listingSlug={listing.slug}
-          price={listing.price}
-          isOwnListing={isOwnListing}
-        />
         {!isOwnListing ? (
           <Button asChild variant="secondary" size="md">
             <Link href={`/listing/${listing.slug}#offer`}>
@@ -118,41 +72,22 @@ export function BuyPanel({
         {!isOwnListing ? (
           <AskSeller listingId={listing.id} listingSlug={listing.slug} />
         ) : null}
-        <p className="text-center text-xs leading-relaxed text-subtle">
-          Paying online is not open yet. Either way the seller confirms first,
-          and the listing is then held for you.
-        </p>
       </div>
 
       <div className="mt-5 rounded-card border border-verified/25 bg-verified-soft p-4">
         <p className="flex items-center gap-2 text-sm font-semibold text-verified">
           <ShieldCheckIcon aria-hidden="true" className="size-4 shrink-0" />
-          Escrow protected
+          Nobody can be left short
         </p>
         <p className="mt-2 text-xs leading-relaxed text-muted">
-          Your payment is held by Channel Adda and released{" "}
-          <span className="font-medium text-fg">{holdDays} days</span> after you
-          confirm the handover. If the transfer fails you are refunded in full.
+          Whichever way you buy, one side of the deal is always held by Channel
+          Adda — the channel on a Safest deal, the money on a Fastest one. A
+          transfer that fails leaves you no worse off, and the{" "}
+          <span className="font-medium text-fg">{holdDays}-day</span> hold on
+          this platform covers the window in which an old owner could try to
+          recover the account.
         </p>
       </div>
-
-      {escrowOnly ? (
-        <p className="mt-3 flex items-start gap-2 text-xs leading-relaxed text-subtle">
-          <TimerIcon aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" />
-          <span>
-            Escrow is required on this listing. Quick checkout is only
-            available on Telegram and Facebook.
-          </span>
-        </p>
-      ) : (
-        <p className="mt-3 flex items-start gap-2 text-xs leading-relaxed text-subtle">
-          <ZapIcon aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" />
-          <span>
-            Quick checkout is available on this listing — credentials released
-            as soon as payment clears.
-          </span>
-        </p>
-      )}
 
       <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
         <Badge className="text-subtle">

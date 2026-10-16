@@ -6,6 +6,7 @@ import {
   balanceOf,
   createDeal,
   getDealFor,
+  listDealsFor,
   recordOpeningPayment,
   resolveDeal,
 } from "@/server/deals";
@@ -393,5 +394,45 @@ test(
     const view = await getDealFor(buyer.id, orderId);
     expect(view?.status).toBe("COMPLETED");
     expect(view?.nextStep).toBeNull();
+  }),
+);
+
+test(
+  "the list shows a deal to every side, from their own angle",
+  withCleanDb(async () => {
+    const { orderId, buyer, seller, agent } = await runTo("SAFEST", 3);
+
+    const asBuyer = await listDealsFor(buyer.id);
+    expect(asBuyer).toHaveLength(1);
+    expect(asBuyer[0]).toMatchObject({
+      id: orderId,
+      side: "buyer",
+      otherSideName: seller.name,
+      // Step 3 is the agent's, so neither buyer nor seller is holding it up.
+      awaiting: "agent",
+    });
+
+    expect((await listDealsFor(seller.id))[0]).toMatchObject({
+      side: "seller",
+      otherSideName: buyer.name,
+    });
+    expect((await listDealsFor(agent.id))[0]).toMatchObject({ side: "agent" });
+  }),
+);
+
+test(
+  "the list is empty for someone with no deals",
+  withCleanDb(async () => {
+    await runTo("SAFEST", 2);
+    const outsider = await seedUser();
+    expect(await listDealsFor(outsider.id)).toEqual([]);
+  }),
+);
+
+test(
+  "a finished deal is waiting on nobody",
+  withCleanDb(async () => {
+    const { buyer } = await runTo("SAFEST", 10);
+    expect((await listDealsFor(buyer.id))[0].awaiting).toBeNull();
   }),
 );
