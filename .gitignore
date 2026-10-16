@@ -51,3 +51,8 @@ next-env.d.ts
 /.agents/
 /.claude/
 /.windsurf/
+
+# Creates the shared-password demo logins for a local database. Useful because
+# there is no seed script, but it hardcodes a credential and must never be
+# committed — it has been swept in twice by a careless `git add`.
+scripts/dev-credentials.ts
