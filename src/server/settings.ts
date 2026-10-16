@@ -33,6 +33,17 @@ const DEFAULT_OFFER_EXPIRY_HOURS = 48;
 const DEFAULT_MAX_HOLDS_PER_AGENT = 10;
 const DEFAULT_SECOND_APPROVAL_ABOVE_USD = 500_000;
 
+/**
+ * Throws away the cached row.
+ *
+ * `updateSettings` does this inline, but anything else that writes the table
+ * behind this module's back — a migration, a seed, a test harness truncating
+ * it — has to say so, or reads keep serving a row that no longer exists.
+ */
+export function clearSettingsCache() {
+  globalForSettings.settingsCache = undefined;
+}
+
 export async function getSettings(): Promise<PlatformSettings> {
   const cached = globalForSettings.settingsCache;
   if (cached && Date.now() - cached.at < CACHE_MS) return cached.value;

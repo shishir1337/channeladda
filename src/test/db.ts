@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { db } from "@/lib/db";
+import { clearSettingsCache } from "@/server/settings";
 
 /**
  * The database harness for integration tests.
@@ -81,6 +82,10 @@ export async function resetDb() {
   assertSafeDatabase();
   const list = TABLES.map((t) => `"public"."${t}"`).join(", ");
   await db.$executeRawUnsafe(`TRUNCATE TABLE ${list} CASCADE`);
+  // getSettings() caches the singleton for ten seconds on globalThis, which
+  // outlives a truncate and would hand the next test the previous test's fee
+  // rates. Found by a test that set a seller fee and watched it not apply.
+  clearSettingsCache();
 }
 
 /**
@@ -98,19 +103,30 @@ export function withCleanDb(fn: () => Promise<void>): () => Promise<void> {
 }
 
 /** Defaults the deal tests assume. Mirrors the schema's own defaults. */
-export const TEST_SETTINGS = {
+export type TestSettings = {
+  buyerFeeBpSafest: number;
+  buyerFeeBpFastest: number;
+  sellerFeeBp: number;
+  maxHoldsPerAgent: number;
+  secondApprovalAboveUsd: number;
+  offerExpiryHours: number;
+};
+
+// Annotated rather than `as const`: an override of { sellerFeeBp: 500 } has to
+// typecheck, and a literal type of 0 would reject it.
+export const TEST_SETTINGS: TestSettings = {
   buyerFeeBpSafest: 300,
   buyerFeeBpFastest: 300,
   sellerFeeBp: 0,
   maxHoldsPerAgent: 10,
   secondApprovalAboveUsd: 500_000,
   offerExpiryHours: 48,
-} as const;
+};
 
 export type SeedOverrides = {
   priceUsd?: number;
   listingStatus?: "DRAFT" | "LIVE" | "RESERVED" | "SOLD";
-  settings?: Partial<typeof TEST_SETTINGS>;
+  settings?: Partial<TestSettings>;
 };
 
 /**
@@ -126,6 +142,7 @@ export async function seedListing(overrides: SeedOverrides = {}) {
     create: { id: "singleton", ...TEST_SETTINGS, ...overrides.settings },
     update: { ...TEST_SETTINGS, ...overrides.settings },
   });
+  clearSettingsCache();
 
   const [seller, buyer, agent] = await Promise.all([
     db.user.create({

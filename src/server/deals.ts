@@ -1,7 +1,11 @@
 import "server-only";
 
-import type { DealMode } from "@/generated/prisma/enums";
-import { canTransition } from "@/lib/deal-machine";
+import type {
+  DealMode,
+  OrderStatus,
+  UserRole,
+} from "@/generated/prisma/enums";
+import { canTransition, type DealActor, isTerminal } from "@/lib/deal-machine";
 import { OPENING_STATUS, templateFor } from "@/lib/deal-templates";
 import { db } from "@/lib/db";
 import { orderAmounts } from "@/lib/fees";
@@ -226,4 +230,340 @@ export async function recordOpeningPayment(
       },
     });
   });
+}
+
+/** The staff desks. `AGENT` is deliberately absent — see `roleOnDeal`. */
+const STAFF_ROLES: readonly UserRole[] = ["MODERATOR", "FINANCE", "SUPERADMIN"];
+
+type DealParties = {
+  buyerId: string;
+  sellerId: string;
+  agentId: string | null;
+};
+
+/**
+ * Which part the caller plays **in this deal**.
+ *
+ * Worked out from the order, never taken from the caller. Holding the AGENT
+ * role is not enough: an agent who is not assigned to this order is no more
+ * entitled to advance it than a stranger, which is the same reason a seller
+ * cannot act on another seller's deal.
+ */
+async function roleOnDeal(
+  parties: DealParties,
+  userId: string,
+): Promise<DealActor | null> {
+  if (userId === parties.buyerId) return "buyer";
+  if (userId === parties.sellerId) return "seller";
+  if (parties.agentId && userId === parties.agentId) return "agent";
+
+  const user = await db.user.findUnique({
+    where: { id: userId },
+    select: { role: true },
+  });
+  return user && STAFF_ROLES.includes(user.role) ? "staff" : null;
+}
+
+/** Which `Order` timestamp a completed step stamps, if any. */
+const STEP_TIMESTAMP: Partial<
+  Record<DealMode, Record<number, "custodyAt" | "buyerPaidAt" | "sellerConfirmedAt" | "handoverAt">>
+> = {
+  SAFEST: {
+    4: "custodyAt",
+    6: "buyerPaidAt",
+    7: "sellerConfirmedAt",
+    9: "handoverAt",
+  },
+  FASTEST: { 5: "handoverAt" },
+};
+
+export async function advanceStep(input: {
+  orderId: string;
+  position: number;
+  userId: string;
+  proofUrl?: string;
+  paymentRef?: string;
+}): Promise<DealOutcome> {
+  const order = await db.order.findUnique({
+    where: { id: input.orderId },
+    select: {
+      id: true,
+      mode: true,
+      status: true,
+      listingId: true,
+      buyerId: true,
+      sellerId: true,
+      agentId: true,
+      priceUsd: true,
+      sellerFeeUsd: true,
+      buyerFeeUsd: true,
+      steps: {
+        where: { completedAt: null },
+        orderBy: { position: "asc" },
+        take: 1,
+        select: { position: true },
+      },
+    },
+  });
+
+  if (!order) return { ok: false, reason: "not-found" };
+  if (isTerminal(order.status)) return { ok: false, reason: "terminal" };
+
+  const actor = await roleOnDeal(order, input.userId);
+  if (!actor) return { ok: false, reason: "wrong-actor" };
+
+  // Only the lowest incomplete step is available. Nothing is skipped and
+  // nothing is redone.
+  const next = order.steps[0]?.position;
+  if (next !== input.position) return { ok: false, reason: "wrong-step" };
+
+  const template = templateFor(order.mode).find(
+    (s) => s.position === input.position,
+  );
+  if (!template) return { ok: false, reason: "wrong-step" };
+  if (template.actor !== actor) return { ok: false, reason: "wrong-actor" };
+
+  if (
+    template.entersStatus &&
+    !canTransition(order.mode, order.status, template.entersStatus, actor)
+  ) {
+    return { ok: false, reason: "wrong-step" };
+  }
+
+  const now = new Date();
+  const stamp = STEP_TIMESTAMP[order.mode]?.[input.position];
+  const completing = template.entersStatus === "COMPLETED";
+
+  await db.$transaction(async (tx) => {
+    await tx.transferStep.update({
+      where: {
+        orderId_position: { orderId: order.id, position: input.position },
+      },
+      data: { completedAt: now, proofUrl: input.proofUrl ?? undefined },
+    });
+
+    await tx.order.update({
+      where: { id: order.id },
+      data: {
+        ...(template.entersStatus ? { status: template.entersStatus } : {}),
+        ...(stamp ? { [stamp]: now } : {}),
+        ...(input.paymentRef ? { buyerPaymentRef: input.paymentRef } : {}),
+        ...(completing ? { completedAt: now, handoverAt: now } : {}),
+      },
+    });
+
+    if (!completing) return;
+
+    await tx.listing.update({
+      where: { id: order.listingId },
+      data: { status: "SOLD" },
+    });
+
+    // Only Fastest pays anybody: it is the mode where the platform took the
+    // money. A Safest seller was paid directly by the buyer at step 6.
+    if (order.mode === "FASTEST") {
+      await tx.ledgerEntry.create({
+        data: {
+          orderId: order.id,
+          userId: order.sellerId,
+          kind: "ESCROW_RELEASE",
+          amountUsd: order.priceUsd,
+          note: "Sale released to seller",
+        },
+      });
+      if (order.sellerFeeUsd > 0) {
+        await tx.ledgerEntry.create({
+          data: {
+            orderId: order.id,
+            userId: order.sellerId,
+            kind: "SELLER_FEE",
+            amountUsd: -order.sellerFeeUsd,
+            note: "Seller fee",
+          },
+        });
+      }
+      await tx.ledgerEntry.create({
+        data: {
+          orderId: order.id,
+          userId: null,
+          kind: "BUYER_FEE",
+          amountUsd: order.buyerFeeUsd,
+          note: "Buyer fee",
+        },
+      });
+    }
+  });
+
+  return { ok: true };
+}
+
+/**
+ * The ways a deal ends other than by completing.
+ *
+ * This exists so those four statuses are reachable at all. Without it
+ * `CANCELLED`, `RETURNED_TO_SELLER`, `REFUNDED` and `DISPUTED` would be
+ * values no code could ever write.
+ */
+export async function resolveDeal(input: {
+  orderId: string;
+  to: "CANCELLED" | "RETURNED_TO_SELLER" | "REFUNDED" | "DISPUTED";
+  byUserId: string;
+  note: string;
+}): Promise<DealOutcome> {
+  const order = await db.order.findUnique({
+    where: { id: input.orderId },
+    select: {
+      id: true,
+      mode: true,
+      status: true,
+      listingId: true,
+      buyerId: true,
+      sellerId: true,
+      agentId: true,
+      totalUsd: true,
+    },
+  });
+
+  if (!order) return { ok: false, reason: "not-found" };
+  if (isTerminal(order.status)) return { ok: false, reason: "terminal" };
+
+  const actor = await roleOnDeal(order, input.byUserId);
+  if (!actor) return { ok: false, reason: "wrong-actor" };
+  if (!canTransition(order.mode, order.status, input.to, actor)) {
+    return { ok: false, reason: "wrong-actor" };
+  }
+
+  const now = new Date();
+  await db.$transaction(async (tx) => {
+    await tx.order.update({
+      where: { id: order.id },
+      data: {
+        status: input.to,
+        ...(input.to === "DISPUTED" ? {} : { cancelledAt: now }),
+      },
+    });
+
+    // A dispute is a pause: the listing stays reserved because the deal may
+    // still complete.
+    if (input.to === "DISPUTED") return;
+
+    await tx.listing.updateMany({
+      where: { id: order.listingId, status: "RESERVED" },
+      data: { status: "LIVE" },
+    });
+
+    // Only Fastest has anything to give back. A Safest buyer's fee is kept —
+    // the agent did the work and the channel goes home to the seller.
+    if (input.to === "REFUNDED" && order.mode === "FASTEST") {
+      await tx.ledgerEntry.create({
+        data: {
+          orderId: order.id,
+          userId: null,
+          kind: "REFUND",
+          amountUsd: -order.totalUsd,
+          note: input.note,
+        },
+      });
+    }
+  });
+
+  return { ok: true };
+}
+
+export type DealStepView = {
+  position: number;
+  label: string;
+  actor: DealActor;
+  completedAt: Date | null;
+  proofUrl: string | null;
+};
+
+export type DealView = {
+  id: string;
+  reference: string;
+  mode: DealMode;
+  status: OrderStatus;
+  priceUsd: number;
+  totalUsd: number;
+  buyerFeeUsd: number;
+  listingTitle: string;
+  listingSlug: string;
+  buyerName: string;
+  sellerName: string;
+  agentName: string | null;
+  agentEmail: string | null;
+  agentBrand: string | null;
+  viewerRole: DealActor;
+  steps: DealStepView[];
+  /** The lowest incomplete step, or null once the deal has stopped. */
+  nextStep: DealStepView | null;
+};
+
+/**
+ * One deal, as the person asking is allowed to see it.
+ *
+ * Returns null both for a deal that does not exist and for one this person is
+ * not part of, so guessing ids tells you nothing either way.
+ */
+export async function getDealFor(
+  userId: string,
+  orderId: string,
+): Promise<DealView | null> {
+  const order = await db.order.findUnique({
+    where: { id: orderId },
+    select: {
+      id: true,
+      reference: true,
+      mode: true,
+      status: true,
+      priceUsd: true,
+      totalUsd: true,
+      buyerFeeUsd: true,
+      buyerId: true,
+      sellerId: true,
+      agentId: true,
+      agentEmail: true,
+      agentBrand: true,
+      listing: { select: { title: true, slug: true } },
+      buyer: { select: { name: true } },
+      seller: { select: { name: true } },
+      agent: { select: { name: true } },
+      steps: { orderBy: { position: "asc" } },
+    },
+  });
+
+  if (!order) return null;
+
+  const viewerRole = await roleOnDeal(order, userId);
+  if (!viewerRole) return null;
+
+  const steps: DealStepView[] = order.steps.map((s) => ({
+    position: s.position,
+    label: s.label,
+    actor: s.actor as DealActor,
+    completedAt: s.completedAt,
+    proofUrl: s.proofUrl,
+  }));
+
+  return {
+    id: order.id,
+    reference: order.reference,
+    mode: order.mode,
+    status: order.status,
+    priceUsd: order.priceUsd,
+    totalUsd: order.totalUsd,
+    buyerFeeUsd: order.buyerFeeUsd,
+    listingTitle: order.listing.title,
+    listingSlug: order.listing.slug,
+    buyerName: order.buyer.name,
+    sellerName: order.seller.name,
+    agentName: order.agent?.name ?? null,
+    agentEmail: order.agentEmail,
+    agentBrand: order.agentBrand,
+    viewerRole,
+    steps,
+    nextStep: isTerminal(order.status)
+      ? null
+      : (steps.find((s) => s.completedAt === null) ?? null),
+  };
 }
