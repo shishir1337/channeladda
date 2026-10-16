@@ -1,3 +1,4 @@
+import "dotenv/config";
 import { defineConfig } from "vitest/config";
 
 /**
@@ -14,6 +15,10 @@ import { defineConfig } from "vitest/config";
  * now; the `vite-tsconfig-paths` plugin would only duplicate it and warns as
  * much on every run.
  *
+ * `dotenv/config` is imported because Vitest, unlike Next and
+ * prisma.config.ts, does not read `.env` on its own — without it
+ * DATABASE_URL_TEST is undefined and the harness refuses to run.
+ *
  * `.mts` rather than `.ts` because this file is ESM and Vite would otherwise
  * load it as CommonJS and warn. The alternative — `"type": "module"` in
  * package.json — would change how every other .js file in the project is
@@ -24,5 +29,15 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["src/**/*.test.ts"],
+    // The integration tests talk to real Postgres. Pointing DATABASE_URL at
+    // the test database here — rather than in each test — means `src/lib/db`
+    // builds its pool against the right database no matter which module
+    // imports it first. src/test/db.ts refuses to run if this is missing.
+    env: {
+      DATABASE_URL: process.env.DATABASE_URL_TEST ?? "",
+      DATABASE_URL_TEST: process.env.DATABASE_URL_TEST ?? "",
+    },
+    // One database, shared. Parallel files would truncate each other mid-test.
+    fileParallelism: false,
   },
 });
