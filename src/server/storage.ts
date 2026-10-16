@@ -23,7 +23,25 @@ const ROOT = resolve(process.cwd(), ".data", "uploads");
 /** 8 MB. Generous for a screenshot, small enough to bound a request. */
 export const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
 
-export type UploadKind = "cover" | "avatar" | "proof";
+/**
+ * 25 MB for a chat clip.
+ *
+ * Bigger than any image needs to be, because a short screen recording of a
+ * dashboard is the most useful thing a seller can send — and asking them to
+ * compress it first is how you get a dozen screenshots instead.
+ *
+ * Raising this means raising client_max_body_size on the proxy to match, or
+ * the request is rejected before it reaches this code, with a 413 that
+ * explains nothing.
+ */
+export const MAX_VIDEO_BYTES = 25 * 1024 * 1024;
+
+export type UploadKind = "cover" | "avatar" | "proof" | "message";
+
+/** The ceiling for a given kind, in bytes. */
+export function limitFor(kind: UploadKind): number {
+  return kind === "message" ? MAX_VIDEO_BYTES : MAX_UPLOAD_BYTES;
+}
 
 export type StoredFile = {
   /** Relative URL the app should render. */
@@ -90,17 +108,67 @@ const SIGNATURES: ReadonlyArray<{
     matches: (b) =>
       b.length > 6 && /^GIF8[79]a$/.test(b.subarray(0, 6).toString("latin1")),
   },
+  // ---- clips, for chat only ---------------------------------------------
+  //
+  // An ISO base media file (MP4, M4V, MOV) announces itself with an "ftyp"
+  // box four bytes in. The brand that follows says which flavour; they all
+  // serve as video/mp4 except QuickTime, which browsers want as
+  // video/quicktime.
+  {
+    contentType: "video/mp4",
+    ext: "mp4",
+    matches: (b) =>
+      b.length > 12 &&
+      b.subarray(4, 8).toString("latin1") === "ftyp" &&
+      b.subarray(8, 12).toString("latin1") !== "qt  ",
+  },
+  {
+    contentType: "video/quicktime",
+    ext: "mov",
+    matches: (b) =>
+      b.length > 12 &&
+      b.subarray(4, 8).toString("latin1") === "ftyp" &&
+      b.subarray(8, 12).toString("latin1") === "qt  ",
+  },
+  {
+    // WebM is a Matroska subset; both open with the EBML magic number.
+    contentType: "video/webm",
+    ext: "webm",
+    matches: (b) =>
+      b.length > 4 &&
+      b[0] === 0x1a &&
+      b[1] === 0x45 &&
+      b[2] === 0xdf &&
+      b[3] === 0xa3,
+  },
 ];
+
+/** Which content types are clips rather than stills. */
+const VIDEO_TYPES = new Set(["video/mp4", "video/quicktime", "video/webm"]);
+
+export function isVideo(contentType: string): boolean {
+  return VIDEO_TYPES.has(contentType);
+}
 
 export class UploadError extends Error {}
 
-function identify(bytes: Buffer) {
+function identify(bytes: Buffer, kind: UploadKind) {
   const found = SIGNATURES.find((s) => s.matches(bytes));
   if (!found) {
     throw new UploadError(
-      "That file is not a PNG, JPEG, WebP or GIF image. Export it as one and try again.",
+      kind === "message"
+        ? "That file is not an image or a clip we can show. Images: PNG, JPEG, WebP, GIF. Clips: MP4, MOV, WebM."
+        : "That file is not a PNG, JPEG, WebP or GIF image. Export it as one and try again.",
     );
   }
+
+  // Clips belong in chat and nowhere else. A listing cover that is secretly a
+  // video breaks every card it appears on, and a proof screenshot is meant to
+  // be a screenshot.
+  if (isVideo(found.contentType) && kind !== "message") {
+    throw new UploadError("That needs to be an image, not a video.");
+  }
+
   return found;
 }
 
@@ -128,20 +196,23 @@ export async function putUpload(
   file: File,
   kind: UploadKind,
 ): Promise<StoredFile> {
+  const limit = limitFor(kind);
+  const limitMb = limit / 1024 / 1024;
+
   if (file.size === 0) throw new UploadError("That file is empty.");
-  if (file.size > MAX_UPLOAD_BYTES) {
+  if (file.size > limit) {
     throw new UploadError(
-      `That file is ${(file.size / 1024 / 1024).toFixed(1)}MB. The limit is ${MAX_UPLOAD_BYTES / 1024 / 1024}MB.`,
+      `That file is ${(file.size / 1024 / 1024).toFixed(1)}MB. The limit is ${limitMb}MB.`,
     );
   }
 
   const bytes = Buffer.from(await file.arrayBuffer());
   // Re-check after reading: `file.size` is a claim until the bytes are counted.
-  if (bytes.byteLength > MAX_UPLOAD_BYTES) {
-    throw new UploadError("That file is larger than the 8MB limit.");
+  if (bytes.byteLength > limit) {
+    throw new UploadError(`That file is larger than the ${limitMb}MB limit.`);
   }
 
-  const { contentType, ext } = identify(bytes);
+  const { contentType, ext } = identify(bytes, kind);
   const key = newKey(kind, ext);
   const target = pathFor(key);
 
@@ -159,7 +230,12 @@ export async function putUpload(
 
 export async function readUpload(key: string) {
   const bytes = await readFile(pathFor(key));
-  return { bytes, contentType: identify(bytes).contentType };
+  // Keys are written as `kind/hash.ext`, so the kind this file was stored
+  // under is in the key itself. It matters because a clip is only a legal
+  // upload under `message`, and re-identifying it as anything else here would
+  // refuse to serve a file this code wrote.
+  const kind = key.split("/")[0] as UploadKind;
+  return { bytes, contentType: identify(bytes, kind).contentType };
 }
 
 export async function deleteUpload(key: string) {

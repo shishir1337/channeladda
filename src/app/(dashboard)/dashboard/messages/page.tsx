@@ -1,6 +1,5 @@
+import { MessagesSquareIcon } from "lucide-react";
 import type { Metadata } from "next";
-import Link from "next/link";
-import { ThreadList, type ThreadRow } from "@/components/messages/thread-list";
 import { listThreads } from "@/server/messages";
 import { requireUser } from "@/server/session";
 
@@ -10,58 +9,32 @@ export const metadata: Metadata = {
 };
 
 /**
- * The inbox.
+ * The empty right-hand pane.
  *
- * One list for both sides of the account, since everyone here buys and sells.
- * The listing each thread is about is on every row, because "Nadia Hassan" on
- * its own means nothing to someone running eight conversations.
+ * The conversation list is in the layout, so this page is only ever what you
+ * see before picking one. It says what the inbox is for rather than repeating
+ * the list that is already on screen beside it.
  */
 export default async function MessagesPage() {
   const user = await requireUser("/dashboard/messages");
   const threads = await listThreads(user);
-
-  const rows: ThreadRow[] = threads.map((thread) => ({
-    id: thread.id,
-    listingTitle: thread.listingTitle,
-    listingHandle: thread.listingHandle,
-    withName: thread.withName,
-    lastMessageAt: thread.lastMessageAt.toISOString(),
-    preview: thread.preview,
-    unread: thread.unread,
-    flagged: thread.flagged,
-    closed: thread.closed,
-  }));
+  const waiting = threads.filter((thread) => thread.unread > 0).length;
 
   return (
-    <>
-      <p className="text-xs font-semibold tracking-[0.14em] text-subtle uppercase">
-        Conversations
+    <div className="flex min-h-[20rem] flex-col items-center justify-center rounded-panel border border-dashed border-line bg-surface p-8 text-center">
+      <MessagesSquareIcon aria-hidden="true" className="size-7 text-subtle" />
+      <p className="mt-3 text-sm font-semibold text-fg">
+        {threads.length === 0
+          ? "No conversations yet"
+          : waiting > 0
+            ? `${waiting} ${waiting === 1 ? "conversation needs" : "conversations need"} a reply`
+            : "Pick a conversation"}
       </p>
-      <h1 className="mt-2 font-display text-3xl font-black tracking-tight text-fg sm:text-4xl">
-        Messages
-      </h1>
-      <p className="mt-2 max-w-prose text-muted">
-        Every conversation about a listing lives here, and Channel Adda can read
-        all of them. That is deliberate: if a deal goes wrong we can see what
-        was actually agreed.
+      <p className="mx-auto mt-1.5 max-w-sm text-sm leading-relaxed text-muted">
+        {threads.length === 0
+          ? "Ask a question on any listing and the thread starts here. Every conversation is readable by Channel Adda, which is what lets us settle a dispute on the record."
+          : "Choose one from the list to read it and reply. Photos and clips are deleted after 48 hours, and a thread with no deal attached clears after 10 days."}
       </p>
-
-      <ThreadList
-        threads={rows}
-        basePath="/dashboard/messages"
-        empty="No conversations yet. Open a listing and ask the seller a question."
-      />
-
-      <p className="mt-10 text-sm text-subtle">
-        Looking for something to buy?{" "}
-        <Link
-          href="/browse"
-          className="font-medium text-primary-text underline-offset-4 hover:underline"
-        >
-          Browse accounts
-        </Link>
-        .
-      </p>
-    </>
+    </div>
   );
 }

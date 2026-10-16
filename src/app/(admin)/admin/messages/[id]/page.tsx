@@ -57,6 +57,8 @@ export default async function AdminThreadPage({
           messages={thread.messages.map((message) => ({
             ...message,
             createdAt: message.createdAt.toISOString(),
+            attachmentExpiresAt:
+              message.attachmentExpiresAt?.toISOString() ?? null,
           }))}
         />
 

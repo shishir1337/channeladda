@@ -110,6 +110,13 @@ enum LedgerKind {
   DEPOSIT // wallet top-up
 }
 
+/// What a chat attachment is. Decided from the file's own bytes, never from
+/// the name or the content type the browser claimed.
+enum MediaKind {
+  IMAGE
+  VIDEO
+}
+
 enum NotificationKind {
   MESSAGE
   OFFER
@@ -529,8 +536,19 @@ model Message {
   sender         User         @relation(fields: [senderId], references: [id])
 
   /// What everyone sees. Contact details are already stripped out of this.
-  body          String
-  attachmentUrl String?
+  body String
+
+  /// An attached photo or clip. Deliberately short-lived: a marketplace chat
+  /// accumulates screenshots of dashboards, bank pages and ID documents, and
+  /// keeping them for ever turns a support tool into a breach waiting to
+  /// happen. The file is deleted from disk when it expires and these go null.
+  attachmentUrl       String?
+  attachmentKind      MediaKind?
+  attachmentBytes     Int?
+  /// When the file gets deleted. Set on upload, not derived, so changing the
+  /// policy later does not retroactively destroy what people already sent.
+  attachmentExpiresAt DateTime?
+  attachmentRemovedAt DateTime?
 
   /// Set when contact details were removed on the way in. The original is
   /// never stored: keeping it would recreate the private channel in the
@@ -545,6 +563,8 @@ model Message {
   createdAt DateTime  @default(now())
 
   @@index([conversationId, createdAt])
+  @@index([attachmentExpiresAt])
+  @@index([createdAt])
 }
 
 model Dispute {

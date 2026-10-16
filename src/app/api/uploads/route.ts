@@ -1,5 +1,10 @@
 import { getCurrentUser } from "@/server/session";
-import { MAX_UPLOAD_BYTES, putUpload, UploadError } from "@/server/storage";
+import {
+  limitFor,
+  putUpload,
+  UploadError,
+  type UploadKind,
+} from "@/server/storage";
 
 /**
  * Accepts one image.
@@ -10,7 +15,7 @@ import { MAX_UPLOAD_BYTES, putUpload, UploadError } from "@/server/storage";
  * dispatch one at a time per client, so a gallery of screenshots would upload
  * in single file.
  */
-const KINDS = new Set(["cover", "avatar", "proof"]);
+const KINDS = new Set<UploadKind>(["cover", "avatar", "proof", "message"]);
 
 export async function POST(request: Request) {
   const user = await getCurrentUser();
@@ -27,14 +32,6 @@ export async function POST(request: Request) {
     );
   }
 
-  const contentLength = Number(request.headers.get("content-length") ?? 0);
-  if (contentLength > MAX_UPLOAD_BYTES * 1.1) {
-    return Response.json(
-      { error: "That file is larger than the 8MB limit." },
-      { status: 413 },
-    );
-  }
-
   let form: FormData;
   try {
     form = await request.formData();
@@ -45,7 +42,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const kind = String(form.get("kind") ?? "");
+  const kind = String(form.get("kind") ?? "") as UploadKind;
   if (!KINDS.has(kind)) {
     return Response.json({ error: "Unknown upload type." }, { status: 400 });
   }
@@ -55,8 +52,21 @@ export async function POST(request: Request) {
     return Response.json({ error: "No file was attached." }, { status: 400 });
   }
 
+  // Checked after the kind is known, because a chat clip is allowed to be
+  // three times the size of a listing image. The headroom is for multipart
+  // framing, which adds a little to the declared length.
+  const limit = limitFor(kind);
+  if (file.size > limit) {
+    return Response.json(
+      {
+        error: `That file is ${(file.size / 1024 / 1024).toFixed(1)}MB. The limit is ${limit / 1024 / 1024}MB.`,
+      },
+      { status: 413 },
+    );
+  }
+
   try {
-    const stored = await putUpload(file, kind as "cover" | "avatar" | "proof");
+    const stored = await putUpload(file, kind);
     return Response.json({
       url: stored.url,
       key: stored.key,

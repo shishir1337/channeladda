@@ -49,9 +49,15 @@ export async function startConversation(
 export async function postMessage(
   conversationId: string,
   body: string,
+  attachment?: { url: string; kind: "IMAGE" | "VIDEO"; bytes: number },
 ): Promise<MessageActionResult> {
   const user = await requireUser();
-  const result = await repo.sendMessage({ conversationId, sender: user, body });
+  const result = await repo.sendMessage({
+    conversationId,
+    sender: user,
+    body,
+    attachment,
+  });
 
   if (!result.ok) {
     const errors = {

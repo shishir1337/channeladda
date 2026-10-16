@@ -1,5 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 import { after } from "next/server";
+import { purgeExpiredMedia, purgeOldMessages } from "@/server/chat-retention";
 import { expireStaleDeals } from "@/server/deals";
 import { expireOffers } from "@/server/offers";
 
@@ -51,6 +52,10 @@ export async function POST(request: Request) {
   for (const [name, run] of [
     ["deals", expireStaleDeals],
     ["offers", expireOffers],
+    // Media before messages: deleting a message first would take its
+    // attachment row with it and orphan the file on disk for ever.
+    ["media", purgeExpiredMedia],
+    ["messages", purgeOldMessages],
   ] as const) {
     try {
       results[name] = await run();

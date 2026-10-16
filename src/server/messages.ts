@@ -7,6 +7,7 @@ import {
   type RedactionKind,
   redactContactDetails,
 } from "@/lib/redact";
+import { mediaExpiryFrom } from "@/server/chat-retention";
 import type { CurrentUser } from "@/server/session";
 
 /**
@@ -35,6 +36,11 @@ export type ThreadMessage = {
   senderRole: ThreadRole;
   /** What was taken out, shown to everyone so the gap is never a mystery. */
   redactedKinds: string | null;
+  attachmentUrl: string | null;
+  attachmentKind: "IMAGE" | "VIDEO" | null;
+  attachmentExpiresAt: Date | null;
+  /** True once the file has been deleted, so the gap can be explained. */
+  attachmentRemoved: boolean;
 };
 
 export type Thread = {
@@ -82,6 +88,16 @@ function isStaff(user: CurrentUser) {
  * leave a seller with three threads, and staff reviewing a dispute should have
  * one place to read the whole history.
  */
+/**
+ * What a new thread starts with.
+ *
+ * Deliberately a real question rather than "hi": it is sent as the buyer, and
+ * a seller who opens their inbox should find something they can answer in one
+ * reply instead of an opener that costs a round trip.
+ */
+export const OPENING_MESSAGE =
+  "Hi — I'm interested in this one. Is it still available, and is there anything about the account or the handover I should know before I make an offer?";
+
 export async function openConversation(input: {
   listingId: string;
   buyerId: string;
@@ -113,6 +129,16 @@ export async function openConversation(input: {
         listingId: listing.id,
         buyerId: input.buyerId,
         sellerId: listing.sellerId,
+        // Written as the buyer, so the thread arrives in the seller's inbox
+        // as a question rather than as an empty row. An empty thread tells
+        // the seller somebody looked and nothing more, and it gives the buyer
+        // a blank box to work out what to say into.
+        messages: {
+          create: {
+            senderId: input.buyerId,
+            body: OPENING_MESSAGE,
+          },
+        },
       },
       select: { id: true },
     });
@@ -163,6 +189,10 @@ export async function getThread(
       messages: {
         orderBy: { createdAt: "asc" },
         select: {
+          attachmentUrl: true,
+          attachmentKind: true,
+          attachmentExpiresAt: true,
+          attachmentRemovedAt: true,
           id: true,
           body: true,
           createdAt: true,
@@ -208,6 +238,10 @@ export async function getThread(
           ? "buyer"
           : "seller",
       redactedKinds: message.redactedKinds,
+      attachmentUrl: message.attachmentUrl,
+      attachmentKind: message.attachmentKind,
+      attachmentExpiresAt: message.attachmentExpiresAt,
+      attachmentRemoved: message.attachmentRemovedAt !== null,
     })),
   };
 }
@@ -357,9 +391,16 @@ export async function sendMessage(input: {
   conversationId: string;
   sender: CurrentUser;
   body: string;
+  attachment?: {
+    url: string;
+    kind: "IMAGE" | "VIDEO";
+    bytes: number;
+  };
 }): Promise<SendResult> {
   const text = input.body.trim();
-  if (!text) return { ok: false, reason: "empty" };
+  // A photo or a clip on its own is a message. Requiring words alongside it
+  // would just make people type a full stop.
+  if (!text && !input.attachment) return { ok: false, reason: "empty" };
   if (text.length > MAX_MESSAGE) return { ok: false, reason: "too-long" };
 
   const row = await db.conversation.findUnique({
@@ -396,6 +437,17 @@ export async function sendMessage(input: {
         senderId: input.sender.id,
         body,
         fromStaff: role === "staff",
+        ...(input.attachment
+          ? {
+              attachmentUrl: input.attachment.url,
+              attachmentKind: input.attachment.kind,
+              attachmentBytes: input.attachment.bytes,
+              // Stamped now rather than worked out at read time, so changing
+              // the policy later does not retroactively delete what people
+              // have already sent.
+              attachmentExpiresAt: mediaExpiryFrom(now),
+            }
+          : {}),
         redactedAt: kinds.length > 0 ? now : null,
         redactedKinds: kinds.length > 0 ? kinds.join(", ") : null,
       },
