@@ -57,6 +57,59 @@ function isUniqueViolation(error: unknown): boolean {
 }
 
 /**
+ * Postgres 40001 — "could not serialize access due to read/write
+ * dependencies" — which a Serializable transaction raises when it loses a
+ * race.
+ *
+ * Three shapes, because it arrives differently depending on the layer that
+ * catches it: Prisma's own `P2034`, the raw SQLSTATE, and — with the pg driver
+ * adapter — a `DriverAdapterError` whose cause carries
+ * `kind: "TransactionWriteConflict"` and `originalCode: "40001"`. The last one
+ * is what this project actually sees, and it cost a test that passed alone and
+ * failed in a full suite run to find out.
+ */
+function isSerializationFailure(error: unknown): boolean {
+  for (let e: unknown = error, depth = 0; e && depth < 5; depth++) {
+    if (typeof e !== "object") break;
+    const it = e as {
+      code?: string;
+      originalCode?: string;
+      kind?: string;
+      cause?: unknown;
+    };
+    if (
+      it.code === "P2034" ||
+      it.code === "40001" ||
+      it.originalCode === "40001" ||
+      it.kind === "TransactionWriteConflict"
+    ) {
+      return true;
+    }
+    e = it.cause;
+  }
+  return false;
+}
+
+/**
+ * The second pair of eyes on a step that hands value across.
+ *
+ * Must be someone else, and must be staff: an agent who could nominate
+ * themselves, or nominate the buyer, would not be a control at all.
+ */
+async function validApprover(
+  approvedById: string | undefined,
+  actingUserId: string,
+): Promise<string | null> {
+  if (!approvedById || approvedById === actingUserId) return null;
+  const approver = await db.user.findUnique({
+    where: { id: approvedById },
+    select: { role: true, bannedAt: true },
+  });
+  if (!approver || approver.bannedAt) return null;
+  return STAFF_ROLES.includes(approver.role) ? approvedById : null;
+}
+
+/**
  * Human-facing, and short enough to read down a phone. Five digits is 90,000
  * references, which is plenty while collisions are retried rather than
  * assumed away.
@@ -277,12 +330,119 @@ const STEP_TIMESTAMP: Partial<
   FASTEST: { 5: "handoverAt" },
 };
 
+/**
+ * How many channels this agent is holding right now.
+ *
+ * Only Safest counts. A Fastest agent supervises as a manager and never takes
+ * ownership, so they tie up nothing that has to be given back.
+ */
+export async function holdsFor(agentId: string): Promise<number> {
+  return db.order.count({
+    where: { agentId, mode: "SAFEST", status: { in: [...AGENT_HOLD_STATUSES] } },
+  });
+}
+
+const AGENT_HOLD_STATUSES: readonly OrderStatus[] = [
+  "AWAITING_CUSTODY",
+  "IN_CUSTODY",
+  "AWAITING_BUYER_PAYMENT",
+  "AWAITING_HANDOVER",
+];
+
+/**
+ * Put an agent on a deal.
+ *
+ * The cap exists because a Safest agent genuinely owns other people's
+ * channels: Google limits how many channels one account may own, and an agent
+ * account that gets locked or phished freezes every deal it is holding.
+ */
+export async function assignAgent(input: {
+  orderId: string;
+  agentId: string;
+  agentEmail: string;
+  agentBrand: string;
+  byUserId: string;
+}): Promise<DealOutcome> {
+  const order = await db.order.findUnique({
+    where: { id: input.orderId },
+    select: {
+      id: true,
+      mode: true,
+      status: true,
+      buyerId: true,
+      sellerId: true,
+      agentId: true,
+    },
+  });
+
+  if (!order) return { ok: false, reason: "not-found" };
+  if (isTerminal(order.status)) return { ok: false, reason: "terminal" };
+
+  // Assignment is a staff decision. Being the buyer, seller or outgoing agent
+  // is not enough — otherwise a seller could pick who holds their channel.
+  const actor = await roleOnDeal(order, input.byUserId);
+  if (actor !== "staff") return { ok: false, reason: "wrong-actor" };
+
+  const assignee = await db.user.findUnique({
+    where: { id: input.agentId },
+    select: { role: true, bannedAt: true },
+  });
+  if (!assignee || assignee.role !== "AGENT" || assignee.bannedAt) {
+    return { ok: false, reason: "wrong-actor" };
+  }
+
+  const settings = await getSettings();
+
+  try {
+    await db.$transaction(
+      async (tx) => {
+        // Counting and writing in one serialisable transaction: two staff
+        // assigning the same agent at once must not both read "one under the
+        // cap" and both write.
+        const held = await tx.order.count({
+          where: {
+            agentId: input.agentId,
+            mode: "SAFEST",
+            status: { in: [...AGENT_HOLD_STATUSES] },
+            // Reassigning this very order is not a new channel to hold.
+            id: { not: order.id },
+          },
+        });
+        if (order.mode === "SAFEST" && held >= settings.maxHoldsPerAgent) {
+          throw new DealAbort("cap-reached");
+        }
+
+        await tx.order.update({
+          where: { id: order.id },
+          data: {
+            agentId: input.agentId,
+            agentEmail: input.agentEmail,
+            agentBrand: input.agentBrand,
+          },
+        });
+      },
+      { isolationLevel: "Serializable" },
+    );
+  } catch (error) {
+    if (error instanceof DealAbort) return { ok: false, reason: error.reason };
+    // A serialisation failure means the other transaction won the race, which
+    // for this purpose is the same answer as being over the cap.
+    if (isSerializationFailure(error)) {
+      return { ok: false, reason: "cap-reached" };
+    }
+    throw error;
+  }
+
+  return { ok: true };
+}
+
 export async function advanceStep(input: {
   orderId: string;
   position: number;
   userId: string;
   proofUrl?: string;
   paymentRef?: string;
+  approvedById?: string;
 }): Promise<DealOutcome> {
   const order = await db.order.findUnique({
     where: { id: input.orderId },
@@ -330,6 +490,18 @@ export async function advanceStep(input: {
     return { ok: false, reason: "wrong-step" };
   }
 
+  // The step that hands value across needs a second pair of eyes above the
+  // platform's threshold, so one compromised agent account cannot misdirect a
+  // channel or a payout on its own.
+  let approver: string | null = null;
+  if (template.needsApprovalAbove) {
+    const settings = await getSettings();
+    if (order.priceUsd >= settings.secondApprovalAboveUsd) {
+      approver = await validApprover(input.approvedById, input.userId);
+      if (!approver) return { ok: false, reason: "needs-approval" };
+    }
+  }
+
   const now = new Date();
   const stamp = STEP_TIMESTAMP[order.mode]?.[input.position];
   const completing = template.entersStatus === "COMPLETED";
@@ -339,7 +511,11 @@ export async function advanceStep(input: {
       where: {
         orderId_position: { orderId: order.id, position: input.position },
       },
-      data: { completedAt: now, proofUrl: input.proofUrl ?? undefined },
+      data: {
+        completedAt: now,
+        proofUrl: input.proofUrl ?? undefined,
+        approvedById: approver ?? undefined,
+      },
     });
 
     await tx.order.update({
