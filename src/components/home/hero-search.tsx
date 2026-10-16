@@ -1,7 +1,6 @@
 "use client";
 
-import { ChevronDownIcon, SearchIcon, TrendingUpIcon } from "lucide-react";
-import Link from "next/link";
+import { ChevronDownIcon, SearchIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -16,15 +15,6 @@ const budgets = [
   { value: "2500-10000", label: "$2,500 – $10,000" },
   { value: "10000-50000", label: "$10,000 – $50,000" },
   { value: "50000-", label: "$50,000+" },
-];
-
-const popularSearches = [
-  "Monetized YouTube channels",
-  "US audience Instagram",
-  "Crypto Telegram channels",
-  "Faceless channels under $5K",
-  "Monetized Facebook pages",
-  "AdSense websites",
 ];
 
 type Filter = PlatformId | "all";
@@ -137,23 +127,6 @@ export function HeroSearch() {
           </div>
         </form>
       </search>
-
-      <div className="mt-5 flex flex-wrap items-center justify-center gap-x-2 gap-y-2">
-        <span className="inline-flex items-center gap-1.5 text-xs font-medium text-subtle">
-          <TrendingUpIcon aria-hidden="true" className="size-3.5" />
-          Popular
-        </span>
-        {popularSearches.map((term) => (
-          <Link
-            key={term}
-            href={`/browse${serializeFilters({ ...emptyFilters, q: term })}`}
-            // Full 44px target on touch; tightened once hover is the input.
-            className="inline-flex min-h-11 items-center rounded-full border border-line bg-surface px-3.5 text-xs font-medium text-muted transition-colors duration-200 hover:border-primary/50 hover:bg-primary-soft hover:text-primary-text sm:min-h-9"
-          >
-            {term}
-          </Link>
-        ))}
-      </div>
     </div>
   );
 }

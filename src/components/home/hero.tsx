@@ -1,7 +1,4 @@
-import { CheckCircle2Icon } from "lucide-react";
 import { HeroSearch } from "@/components/home/hero-search";
-import { CryptomusIcon } from "@/components/icons/brand-icons";
-import { Price } from "@/components/ui/price";
 import { Container } from "@/components/ui/section";
 import { platforms } from "@/data/platforms";
 
@@ -14,25 +11,10 @@ const floatingMarks = [
 ] as const;
 
 type Stats = {
-  settledUsd: number;
   transfers: number;
-  verifiedSellers: number;
 };
 
 export function Hero({ stats }: { stats: Stats }) {
-  const siteStats: { value?: string; usd?: number; label: string }[] = [
-    { usd: stats.settledUsd, label: "Settled through escrow" },
-    {
-      value: stats.transfers.toLocaleString("en-US"),
-      label: "Accounts transferred",
-    },
-    {
-      value: stats.verifiedSellers.toLocaleString("en-US"),
-      label: "KYC-verified sellers",
-    },
-    { value: "4h 12m", label: "Median handover time" },
-  ];
-
   return (
     <section
       id="top"
@@ -105,57 +87,6 @@ export function Hero({ stats }: { stats: Stats }) {
 
         <div className="mx-auto mt-9 max-w-5xl sm:mt-10">
           <HeroSearch />
-        </div>
-
-        <ul className="mx-auto mt-9 flex max-w-3xl flex-wrap items-center justify-center gap-x-5 gap-y-2.5 sm:mt-10">
-          {[
-            "No payment leaves escrow early",
-            "KYC-verified sellers only",
-            "Full refund if a transfer fails",
-          ].map((point) => (
-            <li
-              key={point}
-              className="inline-flex items-center gap-2 text-[0.8125rem] text-muted sm:text-sm"
-            >
-              <CheckCircle2Icon
-                aria-hidden="true"
-                className="size-4 shrink-0 text-verified"
-              />
-              {point}
-            </li>
-          ))}
-        </ul>
-
-        <div className="mt-12 rounded-panel border border-line bg-surface/60 p-6 backdrop-blur-sm sm:mt-16 sm:p-8">
-          <dl className="grid grid-cols-2 gap-x-4 gap-y-8 sm:gap-6 lg:grid-cols-4">
-            {siteStats.map((stat) => (
-              <div key={stat.label} className="text-center lg:text-left">
-                <dt className="sr-only">{stat.label}</dt>
-                <dd>
-                  {/* Sans, not mono: at display sizes mono's wide word-space
-                      pulls values like "4h 12m" apart. */}
-                  <span className="tnum block font-sans text-2xl font-semibold text-fg sm:text-3xl lg:text-[2rem]">
-                    {stat.usd !== undefined ? (
-                      <Price usd={stat.usd} compact className="font-sans" />
-                    ) : (
-                      stat.value
-                    )}
-                  </span>
-                  <span className="mt-1.5 block text-xs text-muted sm:text-sm">
-                    {stat.label}
-                  </span>
-                </dd>
-              </div>
-            ))}
-          </dl>
-          <div className="mt-7 flex flex-wrap items-center justify-center gap-x-3 gap-y-2 border-t border-line pt-6 text-xs text-subtle lg:justify-start">
-            <CryptomusIcon aria-hidden="true" className="size-5 text-muted" />
-            <span>
-              Payments and payouts processed in crypto by{" "}
-              <span className="font-medium text-muted">Cryptomus</span> — USDT,
-              BTC, ETH, TRX and 20+ assets
-            </span>
-          </div>
         </div>
       </Container>
     </section>
