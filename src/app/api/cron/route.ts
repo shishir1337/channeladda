@@ -4,6 +4,7 @@ import { purgeExpiredMedia, purgeOldMessages } from "@/server/chat-retention";
 import { expireStaleDeals } from "@/server/deals";
 import { reconcileInvoices } from "@/server/invoices";
 import { expireOffers } from "@/server/offers";
+import { collectOrphanUploads } from "@/server/upload-access";
 
 /**
  * The scheduled sweep.
@@ -62,6 +63,9 @@ export async function POST(request: Request) {
     // attachment row with it and orphan the file on disk for ever.
     ["media", purgeExpiredMedia],
     ["messages", purgeOldMessages],
+    // Last: a file nobody ever attached to anything. The upload endpoint is
+    // open to any signed-in account, so without this it is free storage.
+    ["orphans", collectOrphanUploads],
   ] as const) {
     try {
       results[name] = await run();

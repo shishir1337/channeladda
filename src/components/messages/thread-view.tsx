@@ -200,7 +200,7 @@ export function ThreadView({
   const [attachment, setAttachment] = useState<{
     /** The storage key, which is what the server will accept. */
     key: string;
-    /** For the local preview only. */
+    /** An object URL for the local preview. Revoked when it is cleared. */
     url: string;
     kind: "IMAGE" | "VIDEO";
     bytes: number;
@@ -231,6 +231,7 @@ export function ThreadView({
         return;
       }
       setDraft("");
+      if (attachment) URL.revokeObjectURL(attachment.url);
       setAttachment(null);
       setNote(result.note);
       endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -261,7 +262,10 @@ export function ThreadView({
       }
       setAttachment({
         key: data.key,
-        url: data.url,
+        // A local blob, not the server URL. Nothing references the file yet,
+        // so the serving route will not release it to anybody — including the
+        // person who just uploaded it — until a message points at it.
+        url: URL.createObjectURL(file),
         kind: data.contentType?.startsWith("video/") ? "VIDEO" : "IMAGE",
         bytes: data.bytes ?? file.size,
         name: file.name,
@@ -359,7 +363,10 @@ export function ThreadView({
               </span>
               <button
                 type="button"
-                onClick={() => setAttachment(null)}
+                onClick={() => {
+                  URL.revokeObjectURL(attachment.url);
+                  setAttachment(null);
+                }}
                 aria-label="Remove attachment"
                 className="cursor-pointer rounded p-1 text-subtle transition-colors duration-200 hover:text-fg"
               >

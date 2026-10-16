@@ -459,3 +459,255 @@ test(
     ).not.toBeNull();
   }),
 );
+
+// -------------- uploads are not readable by anybody with the link
+
+test(
+  "listing artwork is public, a proof screenshot is not",
+  withCleanDb(async () => {
+    const { listing, seller, buyer } = await seedListing();
+    const outsider = await seedUser();
+    const staff = await seedUser("MODERATOR");
+    const { canReadUpload } = await import("@/server/upload-access");
+
+    const coverKey = `cover/${"d".repeat(32)}.png`;
+    const proofKey = `proof/${"e".repeat(32)}.png`;
+    await db.listingProof.create({
+      data: {
+        listingId: listing.id,
+        url: `/uploads/${proofKey}`,
+        label: "Analytics",
+        fileHash: "hash",
+      },
+    });
+
+    const user = (id: string, role: "USER" | "MODERATOR" = "USER") => ({
+      id,
+      email: "x@example.test",
+      name: "X",
+      image: null,
+      emailVerified: true,
+      role,
+      slug: null,
+      banned: false,
+    });
+
+    // Artwork is on every card; a check on it would be theatre.
+    expect(await canReadUpload(coverKey, null)).toBe(true);
+
+    // Evidence of ownership is not.
+    expect(await canReadUpload(proofKey, null)).toBe(false);
+    expect(await canReadUpload(proofKey, user(outsider.id))).toBe(false);
+    expect(await canReadUpload(proofKey, user(seller.id))).toBe(true);
+    expect(await canReadUpload(proofKey, user(staff.id, "MODERATOR"))).toBe(
+      true,
+    );
+
+    // A buyer with a deal on the listing is exactly who it is for.
+    expect(await canReadUpload(proofKey, user(buyer.id))).toBe(false);
+    const created = await createDeal({
+      listingId: listing.id,
+      buyerId: buyer.id,
+      mode: "SAFEST",
+    });
+    if (!created.ok) throw new Error(created.reason);
+    expect(await canReadUpload(proofKey, user(buyer.id))).toBe(true);
+  }),
+);
+
+test(
+  "a chat attachment is readable only inside its thread",
+  withCleanDb(async () => {
+    const { listing, buyer, seller } = await seedListing();
+    const outsider = await seedUser();
+    const { canReadUpload } = await import("@/server/upload-access");
+
+    const opened = await openConversation({
+      listingId: listing.id,
+      buyerId: buyer.id,
+    });
+    if (!opened.ok) throw new Error(opened.reason);
+
+    const key = `message/${"f".repeat(32)}.png`;
+    await db.message.create({
+      data: {
+        conversationId: opened.id,
+        senderId: buyer.id,
+        body: "here",
+        attachmentUrl: `/uploads/${key}`,
+        attachmentKind: "IMAGE",
+      },
+    });
+
+    const user = (id: string) => ({
+      id,
+      email: "x@example.test",
+      name: "X",
+      image: null,
+      emailVerified: true,
+      role: "USER" as const,
+      slug: null,
+      banned: false,
+    });
+
+    expect(await canReadUpload(key, null)).toBe(false);
+    expect(await canReadUpload(key, user(outsider.id))).toBe(false);
+    expect(await canReadUpload(key, user(buyer.id))).toBe(true);
+    expect(await canReadUpload(key, user(seller.id))).toBe(true);
+  }),
+);
+
+test(
+  "a suspended account reads nothing private",
+  withCleanDb(async () => {
+    const { listing, seller } = await seedListing();
+    const { canReadUpload } = await import("@/server/upload-access");
+    const proofKey = `proof/${"9".repeat(32)}.png`;
+    await db.listingProof.create({
+      data: {
+        listingId: listing.id,
+        url: `/uploads/${proofKey}`,
+        label: "Analytics",
+        fileHash: "hash",
+      },
+    });
+
+    expect(
+      await canReadUpload(proofKey, {
+        id: seller.id,
+        email: "x@example.test",
+        name: "X",
+        image: null,
+        emailVerified: true,
+        role: "USER",
+        slug: null,
+        banned: true,
+      }),
+    ).toBe(false);
+  }),
+);
+
+
+// ------------------------------------------- I5: uploads belong to somebody
+
+test(
+  "the uploader can read a file nothing points at yet",
+  withCleanDb(async () => {
+    // Locking uploads down broke every preview: a screenshot a seller has
+    // just chosen is referenced by nothing, so it belonged to nobody and
+    // 404'd back at the person who had uploaded it one second earlier.
+    const seller = await seedUser("USER");
+    const stranger = await seedUser("USER");
+    const { canReadUpload } = await import("@/server/upload-access");
+    const key = `proof/${"b".repeat(32)}.png`;
+
+    await db.upload.create({
+      data: {
+        key,
+        uploaderId: seller.id,
+        kind: "proof",
+        bytes: 1234,
+        contentType: "image/png",
+      },
+    });
+
+    expect(await canReadUpload(key, asUser(seller.id))).toBe(true);
+    expect(await canReadUpload(key, asUser(stranger.id))).toBe(false);
+    expect(await canReadUpload(key, null)).toBe(false);
+  }),
+);
+
+test(
+  "an upload nobody ever attached is collected, a fresh one is not",
+  withCleanDb(async () => {
+    // The upload endpoint takes 25MB clips from any signed-in account. With
+    // nothing collecting the ones that never reach a message, it was storage.
+    const seller = await seedUser("USER");
+    const { collectOrphanUploads } = await import("@/server/upload-access");
+    const stale = `message/${"c".repeat(32)}.mp4`;
+    const fresh = `message/${"d".repeat(32)}.mp4`;
+    const base = {
+      uploaderId: seller.id,
+      kind: "message",
+      bytes: 10,
+      contentType: "video/mp4",
+    };
+
+    await db.upload.create({
+      data: {
+        ...base,
+        key: stale,
+        createdAt: new Date(Date.now() - 3 * 60 * 60 * 1000),
+      },
+    });
+    await db.upload.create({ data: { ...base, key: fresh } });
+
+    expect(await collectOrphanUploads()).toBe(1);
+    expect(await db.upload.findUnique({ where: { key: stale } })).toBeNull();
+    expect(await db.upload.findUnique({ where: { key: fresh } })).not.toBeNull();
+  }),
+);
+
+test(
+  "an old upload a message points at survives the sweep",
+  withCleanDb(async () => {
+    // The stamp is written when something attaches the file. If that write is
+    // ever missed the sweep must still not delete a live attachment, so it
+    // re-checks the references before unlinking anything.
+    const { listing, seller, buyer } = await seedListing();
+    const { collectOrphanUploads } = await import("@/server/upload-access");
+    const key = `message/${"e".repeat(32)}.png`;
+
+    const conversation = await db.conversation.create({
+      data: { listingId: listing.id, buyerId: buyer.id, sellerId: seller.id },
+      select: { id: true },
+    });
+    await db.message.create({
+      data: {
+        conversationId: conversation.id,
+        senderId: buyer.id,
+        body: "here",
+        attachmentUrl: `/uploads/${key}`,
+        attachmentKind: "IMAGE",
+      },
+    });
+    await db.upload.create({
+      data: {
+        key,
+        uploaderId: buyer.id,
+        kind: "message",
+        bytes: 10,
+        contentType: "image/png",
+        createdAt: new Date(Date.now() - 3 * 60 * 60 * 1000),
+      },
+    });
+
+    expect(await collectOrphanUploads()).toBe(0);
+    const row = await db.upload.findUnique({ where: { key } });
+    expect(row?.attachedAt).not.toBeNull();
+  }),
+);
+
+test(
+  "sending an attachment stamps its upload as attached",
+  withCleanDb(async () => {
+    const { listing, seller, buyer } = await seedListing();
+    const { markUploadsAttached } = await import("@/server/upload-access");
+    const key = `message/${"f".repeat(32)}.png`;
+
+    await db.upload.create({
+      data: {
+        key,
+        uploaderId: buyer.id,
+        kind: "message",
+        bytes: 10,
+        contentType: "image/png",
+      },
+    });
+    await markUploadsAttached([`/uploads/${key}`]);
+
+    const row = await db.upload.findUnique({ where: { key } });
+    expect(row?.attachedAt).not.toBeNull();
+    expect(seller.id).not.toBe(buyer.id);
+  }),
+);

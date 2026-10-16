@@ -1,13 +1,19 @@
 import { isServableKey } from "@/lib/upload-keys";
+import { getCurrentUser } from "@/server/session";
 import { readUpload, UploadError } from "@/server/storage";
+import { canReadUpload } from "@/server/upload-access";
 
 /**
  * Serves uploaded files.
  *
  * Uploads live outside `public/` so that requests for them pass through code.
- * Right now that code only sniffs the type and sets safe headers, but proof
- * screenshots and identity documents will need a permission check here, and
- * this is where it goes.
+ * This is where the permission check lives, which the comment here used to
+ * promise and not do: listing artwork is public, but a proof screenshot
+ * belongs to the seller who uploaded it and the buyers dealing on that
+ * listing, and a chat attachment belongs to the two people in the thread.
+ *
+ * An unguessable name is not a permission. A URL ends up in support tickets,
+ * referrer headers and browser history, and none of those should be a way in.
  */
 export async function GET(
   _request: Request,
@@ -21,6 +27,13 @@ export async function GET(
   // every video extension, so every photo and clip sent in a conversation was
   // a 404 while the test suite stayed green.
   if (!isServableKey(key)) {
+    return new Response("Not found", { status: 404 });
+  }
+
+  // 404 rather than 403 throughout: telling somebody a file exists but is not
+  // theirs is information they have no use for and an attacker does.
+  const user = await getCurrentUser();
+  if (!(await canReadUpload(key, user))) {
     return new Response("Not found", { status: 404 });
   }
 

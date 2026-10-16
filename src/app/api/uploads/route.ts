@@ -1,3 +1,4 @@
+import { db } from "@/lib/db";
 import { getCurrentUser } from "@/server/session";
 import {
   limitFor,
@@ -84,6 +85,19 @@ export async function POST(request: Request) {
 
   try {
     const stored = await putUpload(file, kind);
+
+    // Recorded so the uploader can read their own file before anything else
+    // references it, and so an upload nobody ever attaches can be collected.
+    await db.upload.create({
+      data: {
+        key: stored.key,
+        uploaderId: user.id,
+        kind,
+        bytes: stored.bytes,
+        contentType: stored.contentType,
+      },
+    });
+
     return Response.json({
       url: stored.url,
       key: stored.key,

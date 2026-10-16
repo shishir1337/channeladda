@@ -8,6 +8,7 @@ import {
   redactContactDetails,
 } from "@/lib/redact";
 import { isChatAttachmentKey, keyIsVideo, urlForKey } from "@/lib/upload-keys";
+import { markUploadsAttached } from "@/server/upload-access";
 import { mediaExpiryFrom } from "@/server/chat-retention";
 import type { CurrentUser } from "@/server/session";
 import { sizeOfUpload } from "@/server/storage";
@@ -502,6 +503,10 @@ export async function sendMessage(input: {
       },
     });
   });
+
+  if (input.attachmentKey) {
+    await markUploadsAttached([urlForKey(input.attachmentKey)]);
+  }
 
   return { ok: true, redactedKinds: kinds };
 }

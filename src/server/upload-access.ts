@@ -1,0 +1,171 @@
+import "server-only";
+
+import { db } from "@/lib/db";
+import { keyFromUrl, urlForKey } from "@/lib/upload-keys";
+import { deleteUpload } from "@/server/storage";
+import type { CurrentUser } from "@/server/session";
+
+/**
+ * Who may read an uploaded file.
+ *
+ * Until now the answer was "anybody with the link", and the serving route said
+ * so in a comment: a 32-hex name is unguessable, so nothing leaked by
+ * accident. But proof screenshots are the evidence a seller uploads to show
+ * they control an account, and they routinely contain analytics dashboards and
+ * payout pages — and chat attachments are whatever two strangers sent each
+ * other. A URL that reaches a support ticket, a referrer header or a browser
+ * history should not be a credential.
+ *
+ * Artwork stays public, because it is rendered on every listing card and a
+ * permission check on it would be theatre.
+ */
+const STAFF_ROLES = ["MODERATOR", "FINANCE", "SUPERADMIN", "AGENT"] as const;
+
+function isStaff(user: CurrentUser | null): boolean {
+  return user !== null && STAFF_ROLES.includes(user.role as "MODERATOR");
+}
+
+export async function canReadUpload(
+  key: string,
+  user: CurrentUser | null,
+): Promise<boolean> {
+  const kind = key.split("/")[0];
+
+  // Listing artwork. On every card, so public by design.
+  if (kind === "cover" || kind === "avatar") return true;
+
+  // Everything else needs a session at minimum.
+  if (!user || user.banned) return false;
+  if (isStaff(user)) return true;
+
+  // Whoever uploaded it. Without this a seller could not see the thumbnail of
+  // the screenshot they had just chosen, because nothing referenced it yet.
+  const upload = await db.upload.findUnique({
+    where: { key },
+    select: { uploaderId: true },
+  });
+  if (upload?.uploaderId === user.id) return true;
+
+  if (kind === "proof") {
+    // The seller who uploaded it, and anybody with a deal on that listing —
+    // a buyer deciding whether to pay is exactly who the evidence is for.
+    const proof = await db.listingProof.findFirst({
+      where: { url: urlForKey(key) },
+      select: {
+        listing: {
+          select: {
+            sellerId: true,
+            orders: {
+              where: { buyerId: user.id },
+              select: { id: true },
+              take: 1,
+            },
+          },
+        },
+      },
+    });
+    if (!proof) return false;
+    return (
+      proof.listing.sellerId === user.id || proof.listing.orders.length > 0
+    );
+  }
+
+  if (kind === "message") {
+    // Only the two people in the conversation it was sent in.
+    const message = await db.message.findFirst({
+      where: { attachmentUrl: urlForKey(key) },
+      select: {
+        conversation: { select: { buyerId: true, sellerId: true } },
+      },
+    });
+    if (!message) return false;
+    return (
+      message.conversation.buyerId === user.id ||
+      message.conversation.sellerId === user.id
+    );
+  }
+
+  return false;
+}
+
+/**
+ * Stamps uploads as attached, so the orphan sweep leaves them alone.
+ *
+ * Called at every point something starts pointing at a file. The sweep
+ * re-checks references before deleting anything, so a missed call here costs
+ * a query rather than a file — but a stamp is cheaper than that query and
+ * says plainly that the upload found a home.
+ */
+export async function markUploadsAttached(urls: (string | null | undefined)[]) {
+  const keys = urls
+    .map((url) => (url ? keyFromUrl(url) : null))
+    .filter((key): key is string => key !== null);
+  if (keys.length === 0) return;
+
+  await db.upload.updateMany({
+    where: { key: { in: keys }, attachedAt: null },
+    data: { attachedAt: new Date() },
+  });
+}
+
+/**
+ * Deletes uploads nobody ever attached to anything.
+ *
+ * `purgeExpiredMedia` only removes files a message still points at, so an
+ * upload abandoned halfway through a form — or produced by hitting the upload
+ * endpoint in a loop — stayed on disk for ever. An hour is long enough for the
+ * slowest form to be submitted and short enough that the endpoint is not
+ * storage.
+ */
+export async function collectOrphanUploads(): Promise<number> {
+  const cutoff = new Date(Date.now() - 60 * 60 * 1000);
+
+  const orphans = await db.upload.findMany({
+    where: { attachedAt: null, createdAt: { lt: cutoff } },
+    select: { id: true, key: true },
+    take: 200,
+  });
+
+  let removed = 0;
+  for (const orphan of orphans) {
+    // Referenced after all? Mark it and move on rather than deleting it.
+    const [proof, message, listing] = await Promise.all([
+      db.listingProof.findFirst({
+        where: { url: urlForKey(orphan.key) },
+        select: { id: true },
+      }),
+      db.message.findFirst({
+        where: { attachmentUrl: urlForKey(orphan.key) },
+        select: { id: true },
+      }),
+      db.listing.findFirst({
+        where: {
+          OR: [
+            { coverUrl: urlForKey(orphan.key) },
+            { avatarUrl: urlForKey(orphan.key) },
+          ],
+        },
+        select: { id: true },
+      }),
+    ]);
+
+    if (proof || message || listing) {
+      await db.upload.update({
+        where: { id: orphan.id },
+        data: { attachedAt: new Date() },
+      });
+      continue;
+    }
+
+    try {
+      await deleteUpload(orphan.key);
+    } catch (error) {
+      console.error(`[uploads] could not delete ${orphan.key}`, error);
+      continue;
+    }
+    await db.upload.delete({ where: { id: orphan.id } });
+    removed += 1;
+  }
+
+  return removed;
+}

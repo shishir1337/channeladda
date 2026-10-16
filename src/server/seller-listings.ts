@@ -3,6 +3,7 @@ import "server-only";
 import { randomBytes } from "node:crypto";
 import type { ListingStatus, Platform } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
+import { markUploadsAttached } from "@/server/upload-access";
 import {
   fromCents,
   fromEngagementBp,
@@ -266,7 +267,13 @@ export async function createDraft(sellerId: string, input: ListingDraft) {
     },
     select: { id: true },
   });
+  await markUploadsAttached(attachedUrls(input));
   return listing.id;
+}
+
+/** Every uploaded file a draft points at. */
+function attachedUrls(input: ListingDraft) {
+  return [input.coverUrl, input.avatarUrl, ...input.proofs.map((p) => p.url)];
 }
 
 function proofRow(p: { url: string; label: string; sha256: string }) {
@@ -314,6 +321,7 @@ export async function updateDraft(
       },
     }),
   ]);
+  await markUploadsAttached(attachedUrls(input));
 
   return { ok: true as const };
 }

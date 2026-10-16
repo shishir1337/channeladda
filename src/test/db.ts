@@ -19,6 +19,9 @@ import { clearSettingsCache } from "@/server/settings";
 /** Every table the schema owns, children before parents. */
 const TABLES = [
   "AuditLog",
+  "Upload",
+  "Invoice",
+  "TwoFactor",
   "Notification",
   "Report",
   "SupportTicket",

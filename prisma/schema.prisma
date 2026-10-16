@@ -190,6 +190,7 @@ model User {
   stepsApproved  TransferStep[]     @relation("StepApprover")
   twoFactors     TwoFactor[]
   invoices       Invoice[]
+  uploads        Upload[]
 
   @@index([slug])
   @@index([role])
@@ -759,6 +760,36 @@ model Report {
 ///
 /// Changing these never rewrites history: an Order stores the fee it was
 /// charged in cents, so a rate change moves the next sale, not the last one.
+/// A file this app stored, and who put it there.
+///
+/// Two things needed it. The serving route gates proof screenshots and chat
+/// attachments, and without a record of the uploader a person could not see
+/// their own file until something else referenced it — so every preview in a
+/// half-finished form was broken. And an upload that is never attached to
+/// anything was never collected, which let any signed-in account fill the
+/// disk with 25MB clips through the upload endpoint alone.
+model Upload {
+  id  String @id @default(cuid())
+  /// The storage key, e.g. `message/<32 hex>.png`. Generated, never supplied.
+  key String @unique
+
+  uploaderId String
+  uploader   User   @relation(fields: [uploaderId], references: [id], onDelete: Cascade)
+
+  kind        String
+  bytes       Int
+  contentType String
+
+  /// Set once something points at this file. Null means it is an orphan and
+  /// the sweep may collect it.
+  attachedAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([uploaderId])
+  @@index([attachedAt, createdAt])
+}
+
 /// What an invoice was raised for.
 enum InvoicePurpose {
   DEAL
