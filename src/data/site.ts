@@ -155,7 +155,7 @@ export const faqs = [
   },
   {
     q: "What is the difference between Quick and Safest checkout?",
-    a: "Quick is for low-value, instantly transferable accounts: you pay the listed price plus a 3% platform fee and get credentials immediately. Safest is our full escrow flow with a 7-day ownership window, recovery-email reset and a Channel Adda agent supervising the handover. Anything above $1,000 defaults to Safest.",
+    a: "Safest means we hold the account: one of our agents takes ownership of it first, you pay the seller directly once it is verifiably in our hands, and we transfer it to you afterwards. Two Google waiting periods. Fastest means we hold the money: you pay us the price and our fee together, our agent supervises while the seller transfers the account straight to you, and we pay the seller once you confirm access. One waiting period. You choose on every listing; there is no price threshold.",
   },
   {
     q: "Which payment methods do you accept?",
@@ -167,7 +167,7 @@ export const faqs = [
   },
   {
     q: "What fees does Channel Adda charge?",
-    a: "Buyers pay a 3% platform fee on Quick checkout. Sellers pay a success fee only when a deal completes — there is no cost to create an account or publish a listing.",
+    a: "Buyers pay a 3% platform fee, set by us and shown before you commit. On a Safest deal that fee is the only thing you pay us — the price goes directly to the seller. Sellers pay a success fee only on a Fastest deal, where the money passes through us; there is no cost to create an account or publish a listing.",
   },
   {
     q: "What happens if a transfer goes wrong?",

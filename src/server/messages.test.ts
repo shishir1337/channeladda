@@ -88,11 +88,7 @@ test(
       conversationId: opened.id,
       sender: asUser(buyer.id),
       body: "",
-      attachment: {
-        url: "/uploads/message/shot.png",
-        kind: "IMAGE",
-        bytes: 2_048,
-      },
+      attachmentKey: `message/${"a".repeat(32)}.png`,
     });
     expect(result.ok).toBe(true);
 
@@ -100,7 +96,9 @@ test(
       where: { conversationId: opened.id, attachmentUrl: { not: null } },
     });
     expect(latest.attachmentKind).toBe("IMAGE");
-    expect(latest.attachmentBytes).toBe(2_048);
+    // Read from disk rather than taken from the caller, so a test with no
+    // file behind the key records null — which is the honest answer.
+    expect(latest.attachmentBytes).toBeNull();
     // Stamped on the way in, so a later policy change cannot retroactively
     // delete what people already sent.
     expect(latest.attachmentExpiresAt).not.toBeNull();
@@ -147,11 +145,7 @@ test(
       conversationId: opened.id,
       sender: asUser(buyer.id),
       body: "here it is, whatsapp me on +1 555 0100",
-      attachment: {
-        url: "/uploads/message/shot.png",
-        kind: "IMAGE",
-        bytes: 10,
-      },
+      attachmentKey: `message/${"b".repeat(32)}.png`,
     });
 
     const latest = await db.message.findFirstOrThrow({

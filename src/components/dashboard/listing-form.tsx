@@ -41,7 +41,6 @@ type Draft = {
   avatarUrl: string | null;
   transferProfile: string;
   sourceUrl: string;
-  externalId: string;
   description: string;
   whatsapp: string;
   proofs: Proof[];
@@ -64,7 +63,6 @@ const EMPTY: Draft = {
   avatarUrl: null,
   transferProfile: "",
   sourceUrl: "",
-  externalId: "",
   description: "",
   whatsapp: "",
   proofs: [],
@@ -156,7 +154,6 @@ export function ListingForm({
       platform: (channel.platform.toLowerCase() ||
         current.platform) as Draft["platform"],
       sourceUrl: channel.canonicalUrl || current.sourceUrl,
-      externalId: channel.channelId ?? current.externalId,
       title: current.title || channel.title,
       handle: current.handle || channel.title,
       description: current.description || channel.description,
@@ -197,7 +194,6 @@ export function ListingForm({
       avatarUrl: draft.avatarUrl ?? "",
       transferProfile: draft.transferProfile,
       sourceUrl: draft.sourceUrl,
-      externalId: draft.externalId,
       description: draft.description,
       whatsapp: draft.whatsapp,
       proofs: draft.proofs,

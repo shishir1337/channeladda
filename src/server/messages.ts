@@ -7,8 +7,10 @@ import {
   type RedactionKind,
   redactContactDetails,
 } from "@/lib/redact";
+import { isChatAttachmentKey, keyIsVideo, urlForKey } from "@/lib/upload-keys";
 import { mediaExpiryFrom } from "@/server/chat-retention";
 import type { CurrentUser } from "@/server/session";
+import { sizeOfUpload } from "@/server/storage";
 
 /**
  * Every conversation on Channel Adda.
@@ -123,12 +125,22 @@ export async function openConversation(input: {
   });
   if (existing) return { ok: true, id: existing.id };
 
+  // A deal may already exist — the buyer can pay first and ask questions
+  // after. Found here so the thread is part of the record from the moment it
+  // is created, rather than waiting for a sweep to notice.
+  const order = await db.order.findFirst({
+    where: { listingId: listing.id, buyerId: input.buyerId },
+    orderBy: { createdAt: "desc" },
+    select: { id: true },
+  });
+
   try {
     const created = await db.conversation.create({
       data: {
         listingId: listing.id,
         buyerId: input.buyerId,
         sellerId: listing.sellerId,
+        orderId: order?.id ?? null,
         // Written as the buyer, so the thread arrives in the seller's inbox
         // as a question rather than as an empty row. An empty thread tells
         // the seller somebody looked and nothing more, and it gives the buyer
@@ -378,7 +390,15 @@ export async function countFlaggedThreads(): Promise<number> {
 
 export type SendResult =
   | { ok: true; redactedKinds: RedactionKind[] }
-  | { ok: false; reason: "not-allowed" | "empty" | "too-long" | "closed" };
+  | {
+      ok: false;
+      reason:
+        | "not-allowed"
+        | "bad-attachment"
+        | "empty"
+        | "too-long"
+        | "closed";
+    };
 
 /**
  * Post a message.
@@ -391,16 +411,25 @@ export async function sendMessage(input: {
   conversationId: string;
   sender: CurrentUser;
   body: string;
-  attachment?: {
-    url: string;
-    kind: "IMAGE" | "VIDEO";
-    bytes: number;
-  };
+  /**
+   * The storage key of something this app stored, e.g.
+   * `message/<32 hex>.png`. Deliberately not a URL and not a kind: the
+   * sender used to supply all three, which let an attachment point at an
+   * external address — an out-of-band channel to the counterparty's browser,
+   * which is the exact thing the contact redaction exists to prevent — and
+   * let it point at another user's public proof screenshot, which the
+   * retention sweep would then delete.
+   */
+  attachmentKey?: string;
 }): Promise<SendResult> {
   const text = input.body.trim();
   // A photo or a clip on its own is a message. Requiring words alongside it
   // would just make people type a full stop.
-  if (!text && !input.attachment) return { ok: false, reason: "empty" };
+  if (!text && !input.attachmentKey) return { ok: false, reason: "empty" };
+
+  if (input.attachmentKey && !isChatAttachmentKey(input.attachmentKey)) {
+    return { ok: false, reason: "bad-attachment" };
+  }
   if (text.length > MAX_MESSAGE) return { ok: false, reason: "too-long" };
 
   const row = await db.conversation.findUnique({
@@ -437,11 +466,14 @@ export async function sendMessage(input: {
         senderId: input.sender.id,
         body,
         fromStaff: role === "staff",
-        ...(input.attachment
+        ...(input.attachmentKey
           ? {
-              attachmentUrl: input.attachment.url,
-              attachmentKind: input.attachment.kind,
-              attachmentBytes: input.attachment.bytes,
+              // Derived here, never taken from the caller.
+              attachmentUrl: urlForKey(input.attachmentKey),
+              attachmentKind: keyIsVideo(input.attachmentKey)
+                ? ("VIDEO" as const)
+                : ("IMAGE" as const),
+              attachmentBytes: await sizeOfUpload(input.attachmentKey),
               // Stamped now rather than worked out at read time, so changing
               // the policy later does not retroactively delete what people
               // have already sent.

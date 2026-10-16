@@ -10,7 +10,7 @@ import { services } from "@/data/site";
 export const metadata: Metadata = {
   title: "Services",
   description:
-    "Promotion, faceless video production, award claims, strike appeals and supervised transfers — run by vetted specialists under the same escrow protection as a sale.",
+    "Promotion, faceless video production, award claims, strike appeals and supervised transfers — run by vetted specialists, arranged through Channel Adda.",
   alternates: { canonical: "/services" },
 };
 
@@ -21,7 +21,7 @@ export default function ServicesPage() {
         crumbs={[{ label: "Home", href: "/" }, { label: "Services" }]}
         eyebrow="Channel Adda services"
         title="Growth and recovery work, handled in-house"
-        description="Buying the account is step one. These are the add-ons buyers and sellers ask for most, run by vetted specialists and paid for through the same escrow."
+        description="Buying the account is step one. These are the add-ons buyers and sellers ask for most, run by vetted specialists and arranged through us."
       />
 
       <Section>
@@ -79,9 +79,10 @@ export default function ServicesPage() {
               className="mt-0.5 size-5 shrink-0 text-verified"
             />
             <span>
-              Service orders run through the same escrow as an account sale. You
-              pay Channel Adda, the specialist delivers, and the money is
-              released once you confirm the work is done.
+              A service order works like a Fastest deal: you pay Channel Adda,
+              the specialist delivers, and the money reaches them once you
+              confirm the work is done. Unlike an account sale there is nothing
+              to take custody of, so the money is the only thing being held.
             </span>
           </p>
         </Container>

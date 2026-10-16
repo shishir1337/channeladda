@@ -8,6 +8,7 @@ import {
   getInvoice,
 } from "@/server/cryptomus";
 import { recordOpeningPayment } from "@/server/deals";
+import { markApplied, noteCallback } from "@/server/invoices";
 import { creditDeposit } from "@/server/wallet";
 
 /**
@@ -58,18 +59,49 @@ export async function POST(request: Request) {
 
   const outcome = classifyStatus(status, isFinal);
 
-  // The heavy work happens after the response. Cryptomus counts a slow reply
-  // as a failure and retries, and a confirmation round trip plus a database
-  // transaction is slower than its patience.
-  after(async () => {
-    try {
-      await handle(orderId, status, outcome, payload);
-    } catch (error) {
-      console.error(`[cryptomus] handling ${orderId}`, error);
-    }
-  });
+  // Anything that is not money yet is noted and acknowledged — there is
+  // nothing to retry and no reason to make the processor keep asking.
+  if (outcome !== "settled") {
+    after(async () => {
+      try {
+        await noteCallback(
+          orderId,
+          status,
+          typeof payload.uuid === "string" ? payload.uuid : null,
+        );
+        await handle(orderId, status, outcome, payload);
+      } catch (error) {
+        console.error(`[cryptomus] noting ${orderId}`, error);
+      }
+    });
+    return Response.json({ ok: true });
+  }
 
-  return Response.json({ ok: true });
+  // A settled callback is money, and it is applied *before* answering.
+  //
+  // Doing this after the response was wrong in a way that cost the buyer:
+  // returning 200 discards the processor's retry, so a database blip or a
+  // failed confirmation lost the payment silently — and the expiry sweep then
+  // moved the deal to PAYMENT_EXPIRED, which is terminal, with the money
+  // already sent. Answering non-2xx instead asks for the retry, and every
+  // write underneath is idempotent (a compare-and-set on the order's null
+  // paymentRef, a unique index on the deposit reference), which is what makes
+  // a retry safe rather than a second charge.
+  try {
+    await noteCallback(
+      orderId,
+      status,
+      typeof payload.uuid === "string" ? payload.uuid : null,
+    );
+    await handle(orderId, status, outcome, payload);
+    await markApplied(orderId);
+    return Response.json({ ok: true });
+  } catch (error) {
+    console.error(`[cryptomus] handling ${orderId}`, error);
+    // 500 so Cryptomus delivers it again. The reconciliation sweep is the
+    // backstop for when it stops trying.
+    return Response.json({ error: "retry" }, { status: 500 });
+  }
 }
 
 /**
@@ -85,17 +117,19 @@ async function handleTopUp(
 ) {
   if (outcome !== "settled") return;
 
-  const suffix = reference.split("-")[1];
-  if (!suffix) return;
-
-  const user = await db.user.findFirst({
-    where: { id: { endsWith: suffix } },
-    select: { id: true },
+  // From the invoice we wrote when it was raised. This used to slice eight
+  // characters off the reference and scan the user table for an id ending in
+  // them — lossy, unindexed, and with no ordering, so a collision would land
+  // somebody's deposit in a stranger's withdrawable balance.
+  const invoice = await db.invoice.findUnique({
+    where: { reference },
+    select: { userId: true },
   });
-  if (!user) {
-    console.warn(`[cryptomus] top-up ${reference} matches no user`);
-    return;
+  if (!invoice) {
+    console.warn(`[cryptomus] top-up ${reference} has no invoice`);
+    throw new Error(`No invoice for ${reference}`);
   }
+  const user = { id: invoice.userId };
 
   const confirmed = await getInvoice(reference);
   if (

@@ -8,6 +8,7 @@ import {
   listingSubmitSchema,
 } from "@/lib/listing-form";
 import * as repo from "@/server/seller-listings";
+import { clearVerificationIfIdentityChanged } from "@/server/seller-listings";
 import { requireUser } from "@/server/session";
 
 /**
@@ -70,6 +71,18 @@ export async function saveListing(
     refreshFor(newId);
     return { ok: true, id: newId };
   }
+
+  // A verified listing that a moderator rejected is editable again, so an
+  // edit that changes *which account this is* has to drop the verification
+  // with it. Otherwise one channel gets verified, the listing is rejected,
+  // and it is re-pointed at a different channel while keeping the badge —
+  // `checkOwnershipCode` short-circuits on "already verified" and never looks
+  // again. Done before the write, so the identity being compared is the one
+  // still on the row.
+  await clearVerificationIfIdentityChanged(id, {
+    sourceUrl: parsed.data.sourceUrl ?? null,
+    handle: parsed.data.handle ?? null,
+  });
 
   const updated = await repo.updateDraft(user.id, id, parsed.data);
   if (!updated.ok) return updated.reason === "locked" ? LOCKED : NOT_YOURS;

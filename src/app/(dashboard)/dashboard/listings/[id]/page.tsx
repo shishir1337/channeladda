@@ -138,7 +138,6 @@ export default async function SellerListingPage({
               avatarUrl: listing.avatarUrl,
               transferProfile: listing.transferProfile ?? "",
               sourceUrl: listing.sourceUrl ?? "",
-              externalId: listing.externalId ?? "",
               description: listing.description ?? "",
               whatsapp: listing.whatsapp ?? "",
               proofs: listing.proofs.map((p) => ({

@@ -24,7 +24,7 @@ const disputeSteps = [
   },
   {
     title: "A decision inside seven days",
-    body: "Full release, full refund, or a split. First response within 48 hours. The outcome and the reasoning are written onto the order.",
+    body: "Either the deal completes or it is reversed — the account goes on to the buyer, or back to the seller with the money. First response within 48 hours, and the outcome and the reasoning are written onto the deal.",
   },
 ];
 

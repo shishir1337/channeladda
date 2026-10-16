@@ -173,7 +173,7 @@ export const legalDocs: Record<string, LegalDoc> = {
       {
         heading: "Platform action after completion",
         paragraphs: [
-          "If a platform suspends or bans a sold account within the hold period for a reason that pre-dates the sale, that is treated as the account being materially different from the listing. On a Fastest deal you are refunded in full. On a Safest deal, if our agent still holds the account it goes back to the seller and your fee is returned; if you have already paid the seller, we will pursue it with them on your behalf but cannot guarantee recovery of money we never held.",
+          "If a platform suspends or bans a sold account within the hold period for a reason that pre-dates the sale, that is treated as the account being materially different from the listing — but raise it before the deal completes. Once a deal is closed it cannot be reopened, on either side, which is why the hold periods exist and why we ask you to check the account properly before confirming. On a Fastest deal raised in time you are refunded in full. On a Safest deal, if our agent still holds the account it goes back to the seller and your fee is returned; if you have already paid the seller, we will pursue it with them on your behalf but cannot guarantee recovery of money we never held.",
           "After the hold period ends, the account is yours and the risk sits with you. This is why the hold periods are set by each platform's own recovery and review windows rather than picked for convenience.",
         ],
       },
@@ -181,7 +181,7 @@ export const legalDocs: Record<string, LegalDoc> = {
         heading: "How refunds are paid",
         paragraphs: [
           "Crypto payments cannot be reversed, so a refund is a new outbound payment. Refunds are credited to your Channel Adda balance immediately on a decision, and you withdraw to your own wallet from there. Network fees on that withdrawal are set by the blockchain, not by us.",
-          "The buyer fee is returned with a full refund, and on a Safest deal it is returned on its own if the deal dies before our agent takes custody of the account. Once an agent has held the account, the fee has bought the work that was done and is not returned. On a partial settlement it is adjusted to match the amount actually settled.",
+          "The buyer fee is returned with a full refund, and on a Safest deal it is returned on its own if the deal dies before our agent takes custody of the account. Once an agent has held the account, the fee has bought the work that was done and is not returned.",
         ],
       },
       {

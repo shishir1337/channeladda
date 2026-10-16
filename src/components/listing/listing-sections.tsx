@@ -163,7 +163,7 @@ export function TransferPanel({ platform }: { platform: Platform }) {
         ))}
       </ol>
       <p className="mt-5 rounded-xl border border-line bg-surface-2 p-4 text-xs leading-relaxed text-muted">
-        Funds stay in escrow for{" "}
+        The hold period on this platform is{" "}
         <span className="font-semibold text-fg">{platform.holdDays} days</span>{" "}
         after you confirm every step above.{" "}
         <Link

@@ -18,6 +18,20 @@ import { authClient } from "@/lib/auth-client";
  * situation the codes exist for, and making them hunt for the option is how
  * people end up emailing support instead.
  */
+/**
+ * Where it is safe to send somebody after they verify.
+ *
+ * Taken from the query string, so it is an open redirect unless it is
+ * checked: "?next=https://evil.example" would hand a freshly authenticated
+ * user to an attacker's page. "//evil.example" has to be refused too — a
+ * browser reads it as protocol-relative to another host, which is exactly
+ * what the looser check elsewhere in this codebase misses.
+ */
+function safeNext(next: string): string {
+  if (!next.startsWith("/") || next.startsWith("//")) return "/dashboard";
+  return next;
+}
+
 export function TwoFactorChallenge({ next }: { next: string }) {
   const router = useRouter();
   const ids = { code: useId(), backup: useId() };
@@ -49,7 +63,7 @@ export function TwoFactorChallenge({ next }: { next: string }) {
         );
         return;
       }
-      router.push(next);
+      router.push(safeNext(next));
       router.refresh();
     });
   };

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { createInvoice, isConfigured } from "@/server/cryptomus";
+import { newReference, recordInvoice } from "@/server/invoices";
 import { requireRole, requireUser } from "@/server/session";
 import * as repo from "@/server/wallet";
 
@@ -62,12 +63,22 @@ export async function startTopUp(dollars: number): Promise<WalletResult> {
     };
   }
 
-  // The reference is what the webhook credits against, so it has to name the
-  // person as well as be unique.
-  const reference = `TOPUP-${user.id.slice(-8)}-${Date.now().toString(36)}`;
+  // The reference no longer has to carry the payee — the invoice row does
+  // that. It used to embed eight characters of the user id, which the webhook
+  // recovered by scanning the user table for an id ending in them: lossy,
+  // unindexed, and with no ordering, so a collision would land somebody's
+  // deposit in a stranger's withdrawable balance.
+  const reference = newReference("TOPUP");
   const base = siteUrl();
 
   try {
+    await recordInvoice({
+      reference,
+      purpose: "TOPUP",
+      amountUsd: cents,
+      userId: user.id,
+    });
+
     const invoice = await createInvoice({
       amountUsd: cents,
       orderId: reference,

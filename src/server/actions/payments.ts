@@ -2,6 +2,7 @@
 
 import { createInvoice, isConfigured } from "@/server/cryptomus";
 import { getDealFor } from "@/server/deals";
+import { recordInvoice } from "@/server/invoices";
 import { requireUser } from "@/server/session";
 
 /**
@@ -52,6 +53,18 @@ export async function startPayment(orderId: string): Promise<PayResult> {
 
   const base = siteUrl();
   try {
+    // Written before the invoice is raised, so a callback always has
+    // something to resolve against even if this request then fails.
+    await recordInvoice({
+      reference: deal.reference,
+      purpose: "DEAL",
+      amountUsd: deal.totalUsd,
+      userId: user.id,
+      orderId: deal.id,
+    }).catch(() => {
+      // Already recorded: the buyer pressed pay twice. Harmless.
+    });
+
     const invoice = await createInvoice({
       amountUsd: deal.totalUsd,
       // The deal reference is what the webhook looks the order up by, and

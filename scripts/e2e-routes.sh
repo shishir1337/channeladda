@@ -81,6 +81,28 @@ for p in /admin /admin/listings /admin/users /admin/settings /admin/payouts \
   check agent "$p" 404
 done
 
+echo "--- negative assertions: the desks do not overlap ---"
+# The point of writing these down. A guard that quietly disappears has to
+# show up here as a diff, and only a 404 expectation can do that.
+check mod /admin/payouts 404
+check mod /admin/settings 404
+check fin /admin/settings 404
+check agent /admin/users 404
+check agent /admin/payouts 404
+check seller /admin/deals 404
+check buyer /admin/deals 404
+check buyer /admin/payouts 404
+check buyer /admin/users 404
+
+echo "--- uploads: only generated keys are served ---"
+# C1 lived here: the serving route refused the `message/` prefix the chat
+# uploader produces, so every attachment 404'd with a green test suite. These
+# are shapes, not real files, so 404 is the right answer for all of them —
+# what matters is that nothing interesting reaches the filesystem.
+for p in "/uploads/../../etc/passwd" "/uploads/secrets/x.png"          "/uploads/message/short.png" "/uploads/cover/$(printf 'a%.0s' $(seq 32)).mp4"; do
+  check - "$p" 404
+done
+
 echo "--- a moderator: everything but money and fees ---"
 for p in /admin /admin/deals /admin/listings /admin/users /admin/support \
          /admin/messages; do

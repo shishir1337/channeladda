@@ -198,6 +198,9 @@ export function ThreadView({
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const [attachment, setAttachment] = useState<{
+    /** The storage key, which is what the server will accept. */
+    key: string;
+    /** For the local preview only. */
     url: string;
     kind: "IMAGE" | "VIDEO";
     bytes: number;
@@ -222,17 +225,7 @@ export function ThreadView({
     setError(null);
     setNote(null);
     startTransition(async () => {
-      const result = await postMessage(
-        conversationId,
-        body,
-        attachment
-          ? {
-              url: attachment.url,
-              kind: attachment.kind,
-              bytes: attachment.bytes,
-            }
-          : undefined,
-      );
+      const result = await postMessage(conversationId, body, attachment?.key);
       if (!result.ok) {
         setError(result.error);
         return;
@@ -257,15 +250,17 @@ export function ThreadView({
       });
       const data = (await response.json()) as {
         url?: string;
+        key?: string;
         bytes?: number;
         contentType?: string;
         error?: string;
       };
-      if (!response.ok || !data.url) {
+      if (!response.ok || !data.url || !data.key) {
         setError(data.error ?? "That file could not be attached.");
         return;
       }
       setAttachment({
+        key: data.key,
         url: data.url,
         kind: data.contentType?.startsWith("video/") ? "VIDEO" : "IMAGE",
         bytes: data.bytes ?? file.size,

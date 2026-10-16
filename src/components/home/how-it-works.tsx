@@ -39,7 +39,7 @@ const modes = [
   {
     id: "quick",
     icon: ZapIcon,
-    name: "Quick checkout",
+    name: "Fastest",
     tagline: "For small, instantly transferable accounts",
     fee: "3%",
     release: "Immediately",
@@ -60,7 +60,7 @@ const modes = [
     release: "After you confirm",
     accent: true,
     points: [
-      "Funds held until you confirm the handover",
+      "We hold the account, not your money — you pay the seller once it is ours",
       "7-day ownership window before payout",
       "Recovery email and 2FA reset supervised by an agent",
       "Full refund and dispute review if anything breaks",

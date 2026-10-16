@@ -109,8 +109,11 @@ export const listingDraftSchema = z.object({
       (value) => !value || /^https?:\/\//i.test(value) || value.startsWith("@"),
       "Paste the full link, starting with https://",
     ),
-  /** The platform's own id, filled in by the lookup rather than by hand. */
-  externalId: z.string().trim().max(120).optional().or(z.literal("")),
+  // externalId is deliberately NOT here. It is the channel verification is
+  // checked against, and as a writable field it let a seller list one channel
+  // while pointing the ownership check at another they did control — earning
+  // a public verified badge on an account they had nothing to do with. The
+  // server resolves it from sourceUrl at verification time instead.
 
   description: z
     .string()

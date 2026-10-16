@@ -1,6 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db";
+import { isChatAttachmentKey, keyFromUrl } from "@/lib/upload-keys";
 import { deleteUpload } from "@/server/storage";
 
 /**
@@ -60,14 +61,23 @@ export async function purgeExpiredMedia(now = new Date()): Promise<number> {
   for (const message of due) {
     if (!message.attachmentUrl) continue;
 
-    // `/uploads/message/abc.png` -> `message/abc.png`
-    const key = message.attachmentUrl.replace(/^\/uploads\//, "");
-    try {
-      await deleteUpload(key);
-    } catch (error) {
-      // A file already gone is fine — the row still needs clearing. Anything
-      // else is left for the next sweep rather than silently forgotten.
-      console.error(`[chat-retention] could not delete ${key}`, error);
+    // Only ever a chat attachment. Rows written before the send path
+    // validated its input could name any public file — a listing cover, or
+    // somebody else's proof screenshot — and this sweep would have unlinked
+    // it. Such a row still gets cleared, so it stops being rendered; no file
+    // outside `message/` is touched.
+    const key = keyFromUrl(message.attachmentUrl);
+    if (key && isChatAttachmentKey(key)) {
+      try {
+        await deleteUpload(key);
+      } catch (error) {
+        // A file already gone is fine — the row still needs clearing.
+        console.error(`[chat-retention] could not delete ${key}`, error);
+      }
+    } else {
+      console.warn(
+        `[chat-retention] not deleting ${message.attachmentUrl}: not a chat attachment`,
+      );
     }
 
     const cleared = await db.message.updateMany({
@@ -85,32 +95,35 @@ export async function purgeExpiredMedia(now = new Date()): Promise<number> {
   return removed;
 }
 
-/** Conversation ids whose messages are part of the permanent record. */
-async function protectedConversationIds(): Promise<string[]> {
-  const [withOrder, flagged] = await Promise.all([
-    db.conversation.findMany({
-      where: { orderId: { not: null } },
-      select: { id: true },
-    }),
-    db.conversation.findMany({
-      where: { flaggedAt: { not: null } },
-      select: { id: true },
-    }),
-  ]);
-
-  return [...new Set([...withOrder, ...flagged].map((c) => c.id))];
-}
-
+/**
+ * Messages past their ten days, except the ones that are part of the record.
+ *
+ * Expressed as a relational filter rather than by loading every protected
+ * conversation id and passing it as `notIn`. That version worked and then
+ * stopped: past about thirty-two thousand protected conversations the query
+ * exceeds Postgres's bind-parameter limit and the sweep throws, and long
+ * before that it is a large transfer on every run.
+ *
+ * The carve-outs, each of which is something somebody will one day need to
+ * prove:
+ *
+ * - a thread tied to an order — the only account of what was agreed
+ * - a thread tied to an order with a dispute open on it
+ * - a thread staff flagged, which is evidence about a person, not a deal
+ * - any message staff wrote, which they wrote to be found later
+ */
 export async function purgeOldMessages(now = new Date()): Promise<number> {
   const cutoff = new Date(now.getTime() - MESSAGE_TTL_MS);
-  const keep = await protectedConversationIds();
 
   const { count } = await db.message.deleteMany({
     where: {
       createdAt: { lt: cutoff },
       // Staff notes outlive the thread they are in.
       fromStaff: false,
-      ...(keep.length > 0 ? { conversationId: { notIn: keep } } : {}),
+      conversation: {
+        orderId: null,
+        flaggedAt: null,
+      },
     },
   });
 

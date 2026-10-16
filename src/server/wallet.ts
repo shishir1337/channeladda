@@ -4,6 +4,7 @@ import type { WithdrawalStatus } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
 import { canTransition } from "@/lib/deal-machine";
 import { OPENING_STATUS } from "@/lib/deal-templates";
+import { isSerializationFailure } from "@/lib/serialization-failure";
 import { recordAudit } from "@/server/audit";
 
 /**
@@ -270,12 +271,11 @@ export async function payFromWallet(
       return { ok: false, reason: error.reason };
     }
     // A lost serialisable race means somebody else spent the balance first.
-    if (
-      typeof error === "object" &&
-      error !== null &&
-      ((error as { code?: string }).code === "P2034" ||
-        JSON.stringify(error).includes("TransactionWriteConflict"))
-    ) {
+    // The shape this project actually sees is a DriverAdapterError whose
+    // cause carries kind: "TransactionWriteConflict" — not P2034, and not
+    // reachable by JSON.stringify, because an Error's cause is
+    // non-enumerable. Getting this wrong turned a lost race into a 500.
+    if (isSerializationFailure(error)) {
       return { ok: false, reason: "insufficient" };
     }
     throw error;
@@ -350,12 +350,11 @@ export async function requestWithdrawal(
     if (error instanceof WalletAbort) {
       return { ok: false, reason: error.reason };
     }
-    if (
-      typeof error === "object" &&
-      error !== null &&
-      ((error as { code?: string }).code === "P2034" ||
-        JSON.stringify(error).includes("TransactionWriteConflict"))
-    ) {
+    // The shape this project actually sees is a DriverAdapterError whose
+    // cause carries kind: "TransactionWriteConflict" — not P2034, and not
+    // reachable by JSON.stringify, because an Error's cause is
+    // non-enumerable. Getting this wrong turned a lost race into a 500.
+    if (isSerializationFailure(error)) {
       return { ok: false, reason: "insufficient" };
     }
     throw error;

@@ -1,6 +1,6 @@
 import "server-only";
 
-import { signPayload } from "@/lib/cryptomus-sign";
+import { canonicalJson, signPayload } from "@/lib/cryptomus-sign";
 
 /**
  * The Cryptomus client.
@@ -76,9 +76,12 @@ async function call<T>(
   body: Record<string, unknown>,
   config: CryptomusConfig,
 ): Promise<T> {
-  // The signature is over the exact bytes sent, so the body is serialised once
-  // and that same string is what goes on the wire. Re-serialising for the
-  // request would risk a different ordering and a signature that cannot match.
+  // The signature covers these exact bytes. This used to hash the canonical
+  // form and send `JSON.stringify`, which are different strings — the slash
+  // escaping is the whole point of the canonical form — so the comment was
+  // true of the intent and false of the code. Sending the canonical bytes is
+  // correct whether the processor hashes what it received or re-encodes it.
+  const signedBody = canonicalJson(body);
   const sign = signPayload(body, config.paymentKey);
 
   const response = await fetch(`${API}${path}`, {
@@ -88,7 +91,7 @@ async function call<T>(
       merchant: config.merchantId,
       sign,
     },
-    body: JSON.stringify(body),
+    body: signedBody,
     // Never cached: these are charges.
     cache: "no-store",
   });

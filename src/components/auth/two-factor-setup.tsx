@@ -30,7 +30,8 @@ export function TwoFactorSetup({
   const [code, setCode] = useState("");
   const [uri, setUri] = useState<string | null>(null);
   const [codes, setCodes] = useState<string[] | null>(null);
-  const [done, setDone] = useState(false);
+  /** Issued, but not yet proven to have reached the authenticator. */
+  const [pendingCodes, setPendingCodes] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -173,13 +174,15 @@ export function TwoFactorSetup({
                   backupCodes?: string[];
                 };
                 setUri(data.totpURI ?? null);
-                // Held until the code is confirmed, so they are not shown to
-                // somebody who abandons setup half way.
-                if (data.backupCodes) setCodes(null);
-                sessionStorage.setItem(
-                  "ca-2fa-codes",
-                  JSON.stringify(data.backupCodes ?? []),
-                );
+                // Held in component state until the code is confirmed, so
+                // they are never shown to somebody who abandons setup.
+                //
+                // Not sessionStorage: there is no navigation between these
+                // two steps, so writing ten plaintext account-recovery
+                // secrets to a fixed key — readable by any script on the
+                // origin, and left behind entirely if setup is abandoned —
+                // bought nothing at all.
+                setPendingCodes(data.backupCodes ?? []);
               });
             }}
           >
@@ -231,10 +234,8 @@ export function TwoFactorSetup({
                   return;
                 }
                 // Confirmed, so the codes are now worth showing.
-                const stored = sessionStorage.getItem("ca-2fa-codes");
-                sessionStorage.removeItem("ca-2fa-codes");
-                setCodes(stored ? (JSON.parse(stored) as string[]) : []);
-                setDone(true);
+                setCodes(pendingCodes);
+                setPendingCodes([]);
               });
             }}
           >
@@ -248,7 +249,6 @@ export function TwoFactorSetup({
           {error}
         </p>
       ) : null}
-      {done ? null : null}
     </div>
   );
 }

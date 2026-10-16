@@ -1,7 +1,7 @@
 import "server-only";
 
 import { createHash, randomBytes } from "node:crypto";
-import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
+import { mkdir, readFile, stat, unlink, writeFile } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
 
 /**
@@ -242,4 +242,21 @@ export async function deleteUpload(key: string) {
   await unlink(pathFor(key)).catch(() => {
     // Already gone is the outcome we wanted.
   });
+}
+
+/**
+ * How big a stored file is, for recording against the message that carries it.
+ *
+ * Read from disk rather than taken from the client: the uploader used to send
+ * its own byte count, which made the 25MB ceiling advisory and the column
+ * useless for accounting. Returns null when the file has gone, which is not
+ * an error — the row is still worth writing.
+ */
+export async function sizeOfUpload(key: string): Promise<number | null> {
+  try {
+    const { size } = await stat(pathFor(key));
+    return size;
+  } catch {
+    return null;
+  }
 }

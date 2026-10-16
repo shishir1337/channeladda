@@ -189,6 +189,7 @@ model User {
   ordersAgented  Order[]            @relation("OrderAgent")
   stepsApproved  TransferStep[]     @relation("StepApprover")
   twoFactors     TwoFactor[]
+  invoices       Invoice[]
 
   @@index([slug])
   @@index([role])
@@ -483,6 +484,7 @@ model Order {
   conversation Conversation?
   dispute      Dispute?
   ledger       LedgerEntry[]
+  invoices     Invoice[]
   review       Review?
 
   @@index([buyerId, status])
@@ -757,6 +759,53 @@ model Report {
 ///
 /// Changing these never rewrites history: an Order stores the fee it was
 /// charged in cents, so a rate change moves the next sale, not the last one.
+/// What an invoice was raised for.
+enum InvoicePurpose {
+  DEAL
+  TOPUP
+}
+
+/// An invoice raised with the payment processor.
+///
+/// Written when the invoice is created, which is the only moment we know for
+/// certain who it belongs to and what it was for. Without it a top-up callback
+/// had to recover its payee from an eight-character slice of the reference by
+/// scanning the user table, and a callback whose handler failed left no trace
+/// that money had ever been asked for — so nothing could reconcile it and the
+/// deal quietly expired with the buyer out of pocket.
+model Invoice {
+  id String @id @default(cuid())
+
+  /// Our reference, which is what the processor echoes back.
+  reference String         @unique
+  purpose   InvoicePurpose
+  amountUsd Int // cents
+
+  /// Who it belongs to. A top-up has no order, so this is the only link.
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// Set for a deal invoice.
+  orderId String?
+  order   Order?  @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  /// The processor's own id, once it tells us.
+  externalId String?
+  /// Last status seen on a callback, for the reconciliation sweep to read.
+  lastStatus String?
+  settledAt  DateTime?
+  /// Set once the money has actually been applied to a balance or a deal, so
+  /// reconciliation knows the difference between paid and paid-and-handled.
+  appliedAt  DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([purpose, appliedAt])
+  @@index([userId])
+  @@index([orderId])
+}
+
 model PlatformSettings {
   id String @id @default("singleton")
 

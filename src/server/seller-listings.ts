@@ -243,7 +243,6 @@ function toColumns(input: ListingDraft) {
     monthlyRevenueUsd: toCents(input.monthlyRevenue),
     yearlyRevenueUsd: toCents(input.yearlyRevenue),
     sourceUrl: input.sourceUrl || null,
-    externalId: input.externalId || null,
     description: input.description || null,
     whatsapp: input.whatsapp || null,
     engagementBp: toEngagementBp(input.engagement),
@@ -435,4 +434,45 @@ export async function deleteDraft(sellerId: string, id: string) {
   }
   await db.listing.delete({ where: { id } });
   return { ok: true as const };
+}
+
+/**
+ * Drops an ownership verification when the thing being verified changes.
+ *
+ * A verified listing can be rejected by a moderator, and a rejected listing is
+ * editable — so without this a seller could get one channel verified, have the
+ * listing rejected, then point it at a different channel and keep the badge,
+ * because `checkOwnershipCode` short-circuits on "already verified".
+ *
+ * The code is cleared too, not just the flag. The old one may still be sitting
+ * in the old channel's description, where it proves nothing about the new one.
+ */
+export async function clearVerificationIfIdentityChanged(
+  listingId: string,
+  next: { sourceUrl?: string | null; handle?: string | null },
+): Promise<boolean> {
+  const listing = await db.listing.findUnique({
+    where: { id: listingId },
+    select: { sourceUrl: true, handle: true, ownershipVerifiedAt: true },
+  });
+  if (!listing) return false;
+
+  const normalise = (value: string | null | undefined) =>
+    (value ?? "").trim().replace(/^@/, "").toLowerCase();
+
+  const changed =
+    normalise(next.sourceUrl) !== normalise(listing.sourceUrl) ||
+    normalise(next.handle) !== normalise(listing.handle);
+
+  if (!changed) return false;
+
+  await db.listing.update({
+    where: { id: listingId },
+    data: {
+      ownershipVerifiedAt: null,
+      ownershipCode: null,
+      externalId: null,
+    },
+  });
+  return true;
 }

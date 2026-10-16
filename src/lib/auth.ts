@@ -178,6 +178,22 @@ export const auth = betterAuth({
 
   socialProviders: socialProviders(),
 
+  account: {
+    accountLinking: {
+      enabled: true,
+      // Without this, Better Auth refuses to link a Google sign-in to an
+      // existing password account unless that account's email is already
+      // verified — and with no email provider wired, no account's ever is.
+      // So anyone who signed up with a password and later pressed the Google
+      // button got an opaque failure with no way out of it.
+      //
+      // Trusting Google here is sound: it is authoritative for its own
+      // addresses, and mapProfileToUser still refuses to assume a
+      // verification Google did not actually assert.
+      trustedProviders: ["google"],
+    },
+  },
+
   plugins: [
     twoFactor({
       // What an authenticator app shows next to the code.

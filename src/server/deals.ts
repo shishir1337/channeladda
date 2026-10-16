@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { canTransition, type DealActor, isTerminal } from "@/lib/deal-machine";
 import { OPENING_STATUS, templateFor } from "@/lib/deal-templates";
 import { orderAmounts } from "@/lib/fees";
+import { isSerializationFailure } from "@/lib/serialization-failure";
 import { recordAudit } from "@/server/audit";
 import { notifyDealEnded, notifyNextActor } from "@/server/deal-notify";
 import { getSettings } from "@/server/settings";
@@ -59,40 +60,6 @@ function isUniqueViolation(error: unknown): boolean {
     error !== null &&
     (error as { code?: string }).code === "P2002"
   );
-}
-
-/**
- * Postgres 40001 — "could not serialize access due to read/write
- * dependencies" — which a Serializable transaction raises when it loses a
- * race.
- *
- * Three shapes, because it arrives differently depending on the layer that
- * catches it: Prisma's own `P2034`, the raw SQLSTATE, and — with the pg driver
- * adapter — a `DriverAdapterError` whose cause carries
- * `kind: "TransactionWriteConflict"` and `originalCode: "40001"`. The last one
- * is what this project actually sees, and it cost a test that passed alone and
- * failed in a full suite run to find out.
- */
-function isSerializationFailure(error: unknown): boolean {
-  for (let e: unknown = error, depth = 0; e && depth < 5; depth++) {
-    if (typeof e !== "object") break;
-    const it = e as {
-      code?: string;
-      originalCode?: string;
-      kind?: string;
-      cause?: unknown;
-    };
-    if (
-      it.code === "P2034" ||
-      it.code === "40001" ||
-      it.originalCode === "40001" ||
-      it.kind === "TransactionWriteConflict"
-    ) {
-      return true;
-    }
-    e = it.cause;
-  }
-  return false;
 }
 
 /**
@@ -237,6 +204,22 @@ export async function createDeal(input: {
           select: { id: true },
         });
 
+        // The 10-day chat purge carves out threads with an order on them, and
+        // nothing ever wrote that link — so the carve-out could never fire,
+        // and every deal's conversation was deleted after ten days. That
+        // conversation is what the dispute process and the refund policy both
+        // call the only account of what was agreed.
+        //
+        // Inside the transaction: if the order rolls back, the claim does too.
+        await tx.conversation.updateMany({
+          where: {
+            listingId: listing.id,
+            buyerId: input.buyerId,
+            orderId: null,
+          },
+          data: { orderId: order.id },
+        });
+
         return order.id;
       });
 
@@ -269,6 +252,53 @@ export async function createDeal(input: {
  * exists, which is why it is idempotent on the payment reference: a webhook
  * that fires twice must not charge two fees or write two ledger rows.
  */
+/**
+ * A payment that arrived for a deal somebody had already paid.
+ *
+ * Credited to the payer's balance rather than refused, because the money is
+ * real and it is theirs. Idempotent on the reference, so a retried callback
+ * does not credit twice.
+ */
+async function creditOverpayment(
+  order: {
+    id: string;
+    buyerId: string;
+    totalUsd: number;
+    paymentRef: string | null;
+  },
+  ref: string,
+  asset: string,
+): Promise<void> {
+  const externalRef = `overpay:${ref}`;
+  try {
+    await db.ledgerEntry.create({
+      data: {
+        userId: order.buyerId,
+        orderId: order.id,
+        kind: "DEPOSIT",
+        amountUsd: order.totalUsd,
+        note: `Paid twice for this deal; credited to your balance (${asset})`,
+        externalRef,
+      },
+    });
+  } catch (error) {
+    if (isUniqueViolation(error)) return;
+    throw error;
+  }
+
+  await recordAudit({
+    actorId: null,
+    action: "payment.duplicate_credited",
+    entity: "order",
+    entityId: order.id,
+    after: {
+      reference: ref,
+      alreadyPaidUnder: order.paymentRef,
+      amountUsd: order.totalUsd,
+    },
+  });
+}
+
 export async function recordOpeningPayment(
   orderId: string,
   ref: string,
@@ -283,6 +313,7 @@ export async function recordOpeningPayment(
       paymentRef: true,
       totalUsd: true,
       buyerFeeUsd: true,
+      buyerId: true,
     },
   });
 
@@ -291,12 +322,15 @@ export async function recordOpeningPayment(
   // Same reference twice: the first one already did the work.
   if (order.paymentRef === ref) return;
 
-  // A different reference on an order that is already paid is not a retry, it
-  // is a second payment. Refusing loudly beats quietly double-crediting.
+  // A different reference on an order that is already paid is a second
+  // payment, not a retry — a buyer can open an invoice and then pay the same
+  // deal from their balance, and nothing cancels the invoice. Throwing here
+  // lost the money: the webhook swallowed it, and there was no deposit, no
+  // refund row and no audit trail. It becomes a wallet credit instead, which
+  // is both recoverable and visible.
   if (order.paymentRef) {
-    throw new Error(
-      `Order ${order.id} is already paid under ${order.paymentRef}; refusing ${ref}.`,
-    );
+    await creditOverpayment(order, ref, asset);
+    return;
   }
 
   const target = OPENING_STATUS[order.mode];
@@ -789,6 +823,10 @@ async function completeOrder(
         amountUsd: order.buyerFeeUsd,
         note: "Buyer fee",
       },
+      // Debited from the seller and credited to the platform. Only one half
+      // was written before, so the moment the rate stopped being zero the
+      // seller fee vanished from the books and the platform's position no
+      // longer netted to what it had actually kept.
       ...(order.sellerFeeUsd > 0
         ? [
             {
@@ -796,6 +834,13 @@ async function completeOrder(
               userId: order.sellerId,
               kind: "SELLER_FEE" as const,
               amountUsd: -order.sellerFeeUsd,
+              note: "Seller fee",
+            },
+            {
+              orderId: order.id,
+              userId: null,
+              kind: "SELLER_FEE" as const,
+              amountUsd: order.sellerFeeUsd,
               note: "Seller fee",
             },
           ]
@@ -904,10 +949,15 @@ export async function resolveDeal(input: {
     return { ok: false, reason: "wrong-actor" };
   }
 
-  // There is nothing to give back if nothing was ever taken. Reachable
-  // because a dispute may be raised before payment, and the dispute outcomes
-  // are not restricted to the states where the platform is holding funds.
-  if (input.to === "REFUNDED" && !order.paymentRef) {
+  // There is nothing to give back if nothing was ever taken, and nothing to
+  // pay out either. Both are reachable because a dispute may be raised before
+  // payment and the dispute outcomes are not restricted to states where the
+  // platform holds funds — so completing an unpaid Fastest deal used to
+  // credit the seller the full price against a hold that never existed.
+  if (
+    (input.to === "REFUNDED" || input.to === "COMPLETED") &&
+    !order.paymentRef
+  ) {
     return { ok: false, reason: "not-paid" };
   }
 
@@ -950,34 +1000,50 @@ export async function resolveDeal(input: {
         data: { status: "LIVE" },
       });
 
-      if (input.to === "REFUNDED") {
-        // Returns the whole hold, so the platform's own position nets to zero.
+      // A deal paid out of a balance is refunded back into it. Writing only
+      // the platform side left the buyer's ledger carrying the debit with the
+      // money existing nowhere — and made the refund policy's "credited to
+      // your Channel Adda balance" untrue for the one case where the platform
+      // could actually perform it.
+      const fromWallet = order.paymentRef?.startsWith("wallet:") === true;
+
+      const refund = async (amountUsd: number, note: string) => {
         await tx.ledgerEntry.create({
           data: {
             orderId: order.id,
             userId: null,
             kind: "REFUND",
-            amountUsd: -order.totalUsd,
-            note: input.note,
+            amountUsd: -amountUsd,
+            note,
           },
         });
+        if (fromWallet) {
+          await tx.ledgerEntry.create({
+            data: {
+              orderId: order.id,
+              userId: order.buyerId,
+              kind: "REFUND",
+              amountUsd,
+              note,
+            },
+          });
+        }
+      };
+
+      if (input.to === "REFUNDED") {
+        // Returns the whole hold, so the platform's own position nets to zero.
+        await refund(order.totalUsd, input.note);
         return;
       }
 
       // The admin fee buys the agent's work. Where the agent never got as far
-      // as holding the channel, it was not earned — the spec says staff may
-      // cancel and refund it, and /fees tells buyers there is no charge for a
-      // deal that falls through. Once custody happened the fee stands.
-      if (!order.custodyAt) {
-        await tx.ledgerEntry.create({
-          data: {
-            orderId: order.id,
-            userId: null,
-            kind: "REFUND",
-            amountUsd: -order.buyerFeeUsd,
-            note: `Fee refunded: ${input.note}`,
-          },
-        });
+      // as holding the channel it was not earned — the spec says staff may
+      // cancel and refund it, and /fees tells buyers so. Once custody has
+      // happened the fee stands. And a fee that was never collected is not
+      // refunded at all: doing that pushed the platform's position negative,
+      // repeatably, from a buyer cancelling their own unpaid deal.
+      if (order.paymentRef && !order.custodyAt) {
+        await refund(order.buyerFeeUsd, `Fee refunded: ${input.note}`);
       }
     });
   } catch (error) {

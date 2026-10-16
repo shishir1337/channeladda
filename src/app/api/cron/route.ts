@@ -1,7 +1,8 @@
-import { timingSafeEqual } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
 import { after } from "next/server";
 import { purgeExpiredMedia, purgeOldMessages } from "@/server/chat-retention";
 import { expireStaleDeals } from "@/server/deals";
+import { reconcileInvoices } from "@/server/invoices";
 import { expireOffers } from "@/server/offers";
 
 /**
@@ -30,13 +31,14 @@ function authorized(request: Request): boolean {
 
   const header = request.headers.get("authorization") ?? "";
   const offered = header.replace(/^Bearer\s+/i, "");
-  if (offered.length !== secret.length) return false;
 
-  try {
-    return timingSafeEqual(Buffer.from(offered), Buffer.from(secret));
-  } catch {
-    return false;
-  }
+  // Hashed first, so the comparison is over two fixed-length digests.
+  // Returning early on a length mismatch leaked the secret's length — not
+  // much for a 32-byte random value, but this costs nothing and removes the
+  // caveat entirely.
+  const digest = (value: string) => createHash("sha256").update(value).digest();
+
+  return timingSafeEqual(digest(offered), digest(secret));
 }
 
 export async function POST(request: Request) {
@@ -50,6 +52,10 @@ export async function POST(request: Request) {
   // Each sweep is independent: one failing must not stop the others, because
   // a crontab only retries on the next tick.
   for (const [name, run] of [
+    // Reconciliation first, and before expiry: an invoice that was paid but
+    // whose callback was lost has to be applied before the sweep decides the
+    // deal was abandoned and expires it.
+    ["reconciled", reconcileInvoices],
     ["deals", expireStaleDeals],
     ["offers", expireOffers],
     // Media before messages: deleting a message first would take its

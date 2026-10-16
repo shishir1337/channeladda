@@ -49,14 +49,15 @@ export async function startConversation(
 export async function postMessage(
   conversationId: string,
   body: string,
-  attachment?: { url: string; kind: "IMAGE" | "VIDEO"; bytes: number },
+  /** A key this app stored, not a URL. See `sendMessage`. */
+  attachmentKey?: string,
 ): Promise<MessageActionResult> {
   const user = await requireUser();
   const result = await repo.sendMessage({
     conversationId,
     sender: user,
     body,
-    attachment,
+    attachmentKey,
   });
 
   if (!result.ok) {
@@ -65,6 +66,8 @@ export async function postMessage(
       "too-long": `Keep it under ${repo.MAX_MESSAGE.toLocaleString("en-US")} characters.`,
       closed: "This conversation has been closed by Channel Adda.",
       "not-allowed": "You are not part of this conversation.",
+      "bad-attachment":
+        "That attachment could not be used. Pick the file again.",
     } as const;
     return { ok: false, error: errors[result.reason] };
   }

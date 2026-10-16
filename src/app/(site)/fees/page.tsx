@@ -20,7 +20,7 @@ export async function generateMetadata(): Promise<Metadata> {
 const EXAMPLES = [8_900, 42_500, 74_000];
 
 const included = [
-  "Escrow on every order",
+  "An agent on every deal",
   "Ownership verification before listing",
   "Platform-specific transfer checklists",
   "Order-linked chat and proof storage",

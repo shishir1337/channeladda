@@ -1,6 +1,7 @@
 import { getCurrentUser } from "@/server/session";
 import {
   limitFor,
+  MAX_VIDEO_BYTES,
   putUpload,
   UploadError,
   type UploadKind,
@@ -29,6 +30,22 @@ export async function POST(request: Request) {
     return Response.json(
       { error: "This account is suspended." },
       { status: 403 },
+    );
+  }
+
+  // Refused before the body is read. `request.formData()` buffers and parses
+  // the whole multipart payload into memory, so a size check after it — which
+  // is where this used to be — means a 2GB POST is fully buffered before
+  // anyone is told no. The ceiling here is the largest any kind allows plus
+  // room for multipart framing; the per-kind limit is applied once the kind
+  // is known.
+  const declared = Number(request.headers.get("content-length") ?? 0);
+  if (declared > MAX_VIDEO_BYTES + 1024 * 1024) {
+    return Response.json(
+      {
+        error: `That file is ${(declared / 1024 / 1024).toFixed(1)}MB. The limit is ${MAX_VIDEO_BYTES / 1024 / 1024}MB.`,
+      },
+      { status: 413 },
     );
   }
 

@@ -42,8 +42,45 @@ export type LookupResult =
     }
   | { ok: false; error: string };
 
+/**
+ * Lookups per person, per hour.
+ *
+ * The YouTube quota is ten thousand units a day for the whole platform, and a
+ * lookup costs one. Without a cap, one signed-in account in a loop disables
+ * automated ownership verification for everybody until midnight — so this is
+ * a shared resource being spent, not just a request being served.
+ *
+ * In memory, which means per instance and reset on deploy. That matches the
+ * rate limiting in `src/lib/auth.ts` and is honest about what it is: a
+ * backstop against a runaway client, not a security control.
+ */
+const LOOKUPS_PER_HOUR = 30;
+const lookupCounts = new Map<string, { count: number; resetAt: number }>();
+
+function withinLookupBudget(userId: string): boolean {
+  const now = Date.now();
+  const existing = lookupCounts.get(userId);
+
+  if (!existing || existing.resetAt < now) {
+    lookupCounts.set(userId, { count: 1, resetAt: now + 3_600_000 });
+    return true;
+  }
+  if (existing.count >= LOOKUPS_PER_HOUR) return false;
+
+  existing.count += 1;
+  return true;
+}
+
 export async function lookupChannel(url: string): Promise<LookupResult> {
-  await requireUser();
+  const user = await requireUser();
+
+  if (!withinLookupBudget(user.id)) {
+    return {
+      ok: false,
+      error:
+        "That is a lot of lookups in an hour. Fill the figures in by hand for now — nothing is lost, and the limit resets shortly.",
+    };
+  }
 
   const parsed = parseChannelUrl(url);
   if (!parsed) {
@@ -173,7 +210,7 @@ export async function checkOwnershipCode(
       slug: true,
       platform: true,
       ownershipCode: true,
-      externalId: true,
+      sourceUrl: true,
       ownershipVerifiedAt: true,
     },
   });
@@ -187,11 +224,19 @@ export async function checkOwnershipCode(
     return { ok: false, error: "Get a code first." };
   }
 
-  // No API key, or not a YouTube channel: a human reads the description. The
-  // listing still cannot go live unverified, it just waits for a person.
+  // The channel is resolved from the link on the listing, every time, and
+  // never from a stored id. It used to be checked against `externalId`, which
+  // the seller could set to anything through the form — so listing one channel
+  // and pointing the check at another they did control earned a public
+  // verified badge on an account they had nothing to do with.
+  const parsed = listing.sourceUrl ? parseChannelUrl(listing.sourceUrl) : null;
+
+  // No API key, no usable link, or not a YouTube channel: a human reads the
+  // description. The listing still cannot go live unverified, it just waits.
   if (
     listing.platform !== "YOUTUBE" ||
-    !listing.externalId ||
+    !parsed ||
+    parsed.platform !== "YOUTUBE" ||
     !isYouTubeConfigured()
   ) {
     await db.listing.update({
@@ -208,8 +253,11 @@ export async function checkOwnershipCode(
   }
 
   try {
+    // Fetched fresh from the link, so the id the code is checked against is
+    // the id of the channel the listing actually advertises.
+    const facts = await fetchChannel(parsed);
     const result = await verifyOwnershipCode(
-      listing.externalId,
+      facts.channelId,
       listing.ownershipCode,
     );
     if (!result.ok) {
@@ -222,14 +270,27 @@ export async function checkOwnershipCode(
 
     await db.listing.update({
       where: { id: listing.id },
-      data: { ownershipVerifiedAt: new Date(), status: "ADMIN_REVIEW" },
+      data: {
+        ownershipVerifiedAt: new Date(),
+        status: "ADMIN_REVIEW",
+        // Recorded now that it is proven, and overwritten from the verified
+        // channel so the listing cannot advertise figures from another one.
+        externalId: facts.channelId,
+        title: facts.title || undefined,
+        audience: facts.subscribersHidden ? undefined : facts.subscribers,
+        avatarUrl: facts.avatarUrl ?? undefined,
+      },
     });
     await recordAudit({
       actorId: user.id,
       action: "listing.ownership_verified",
       entity: "listing",
       entityId: listing.id,
-      after: { channelId: listing.externalId, automatic: true },
+      after: {
+        channelId: facts.channelId,
+        resolvedFrom: listing.sourceUrl,
+        automatic: true,
+      },
     });
 
     revalidatePath(`/dashboard/listings/${listing.id}`);

@@ -32,7 +32,7 @@ const safeguards = [
   {
     icon: GavelIcon,
     title: "Dispute resolution",
-    body: "Open a dispute and escrow freezes instantly. Our moderation team reviews the log and either completes the handover or refunds in full.",
+    body: "Open a dispute and the deal freezes where it stands. Our moderation team reads the whole record and decides it — the account goes on to the buyer or back to the seller, and on a Fastest deal the money follows.",
   },
   {
     icon: ShieldCheckIcon,

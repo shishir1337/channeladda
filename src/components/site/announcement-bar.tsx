@@ -15,7 +15,7 @@ export function AnnouncementBar() {
           className="hidden size-4 shrink-0 text-verified sm:block"
         />
         <p className="text-[0.8125rem] leading-snug text-muted">
-          Every deal is escrow-protected.{" "}
+          Every deal is supervised by a Channel Adda agent.{" "}
           <span className="text-fg">
             Funds release only after you confirm the handover.
           </span>
