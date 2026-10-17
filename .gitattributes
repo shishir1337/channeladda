@@ -1,0 +1,4 @@
+# Biome checks for LF, and Windows checkouts with core.autocrlf=true used to
+# arrive as CRLF, so a fresh clone failed `pnpm lint` on every file. Text
+# files are stored and checked out as LF everywhere; binaries are detected.
+* text=auto eol=lf
