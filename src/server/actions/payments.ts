@@ -61,8 +61,6 @@ export async function startPayment(orderId: string): Promise<PayResult> {
       amountUsd: deal.totalUsd,
       userId: user.id,
       orderId: deal.id,
-    }).catch(() => {
-      // Already recorded: the buyer pressed pay twice. Harmless.
     });
 
     const invoice = await createInvoice({

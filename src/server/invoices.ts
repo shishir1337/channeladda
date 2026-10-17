@@ -35,14 +35,21 @@ export async function recordInvoice(input: {
   userId: string;
   orderId?: string;
 }): Promise<void> {
-  await db.invoice.create({
-    data: {
+  // Idempotent on the reference, which is what makes it safe for a buyer
+  // to press pay twice. Any *other* failure is raised: this row is the
+  // only evidence a second payment is ever credited against, and the
+  // reconciliation sweep has nothing to chase without it, so swallowing a
+  // transient database error here loses money quietly later.
+  await db.invoice.upsert({
+    where: { reference: input.reference },
+    create: {
       reference: input.reference,
       purpose: input.purpose,
       amountUsd: input.amountUsd,
       userId: input.userId,
       orderId: input.orderId ?? null,
     },
+    update: {},
   });
 }
 
