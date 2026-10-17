@@ -2,18 +2,25 @@ import { ArrowLeftIcon } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { STATUS_LABELS, STATUS_TONE } from "@/components/deals/deal-status";
+import { DealNextStep, RaiseDispute } from "@/components/deals/deal-timeline";
+import { PayNow } from "@/components/deals/pay-now";
+import { StartDeal } from "@/components/listing/start-deal";
 import { DealPanel } from "@/components/messages/deal-panel";
 import { LiveRefresh } from "@/components/messages/live-refresh";
 import type { OfferComposerConfig } from "@/components/messages/offer-composer";
 import { toMessageViews, toPanelView } from "@/components/messages/serialize";
 import { ThreadView } from "@/components/messages/thread-view";
+import { Badge } from "@/components/ui/badge";
 import { dealPanelState } from "@/lib/deal-panel";
 import { fromCents } from "@/lib/listing-form";
 import { loadPanelInput } from "@/server/deal-panel";
+import { getDealFor } from "@/server/deals";
 import { getThread, markThreadRead } from "@/server/messages";
 import { requireUser } from "@/server/session";
 import { getSettings } from "@/server/settings";
 import { threadFingerprint } from "@/server/thread-fingerprint";
+import { getWallet } from "@/server/wallet";
 
 export const metadata: Metadata = {
   title: "Conversation",
@@ -49,6 +56,13 @@ export default async function ThreadPage({
     getSettings(),
   ]);
   const panel = panelInput ? dealPanelState(panelInput) : null;
+
+  // Only what the panel's card for this state needs, and only then: the
+  // deal for a deal state, the balance only when paying.
+  const dealId = panelInput?.deal?.id ?? null;
+  const deal = dealId ? await getDealFor(user.id, dealId) : null;
+  const wallet =
+    panel?.kind === "pay" && deal ? await getWallet(user.id) : null;
 
   const otherSide =
     thread.viewerRole === "buyer" ? thread.sellerName : thread.buyerName;
@@ -91,6 +105,28 @@ export default async function ThreadPage({
         </Link>
       </div>
 
+      {deal ? (
+        <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+          <Badge
+            variant={STATUS_TONE[deal.status]}
+            size="sm"
+            className="max-w-full whitespace-normal"
+          >
+            {STATUS_LABELS[deal.status]}
+          </Badge>
+          <span className="tnum text-xs text-subtle">
+            {deal.mode === "SAFEST" ? "Safest" : "Fastest"} deal ·{" "}
+            {deal.reference}
+          </span>
+          <Link
+            href={`/dashboard/deals/${deal.id}`}
+            className="text-xs font-medium text-primary-text underline-offset-4 hover:underline"
+          >
+            Deal page
+          </Link>
+        </div>
+      ) : null}
+
       {panel ? (
         <div className="mt-5">
           <DealPanel
@@ -102,7 +138,42 @@ export default async function ThreadPage({
             otherName={otherSide.split(/\s+/)[0] || otherSide}
             listingSlug={thread.listingSlug}
             dealReference={panelInput?.deal?.reference ?? null}
-          />
+          >
+            {panel.kind === "buy" || panel.kind === "start-deal" ? (
+              <StartDeal
+                listingId={thread.listingId}
+                listingSlug={thread.listingSlug}
+                // The held price when one was agreed, as createDeal will use.
+                price={fromCents(
+                  panel.kind === "start-deal"
+                    ? panel.priceCents
+                    : panel.askingCents,
+                )}
+                // The rates only: the rest of the settings has no business
+                // in the browser.
+                fees={{
+                  buyerFeeBpSafest: settings.buyerFeeBpSafest,
+                  buyerFeeBpFastest: settings.buyerFeeBpFastest,
+                  sellerFeeBp: settings.sellerFeeBp,
+                }}
+                isOwnListing={false}
+                after="refresh"
+              />
+            ) : panel.kind === "pay" && deal && wallet ? (
+              <PayNow
+                orderId={deal.id}
+                totalUsd={deal.totalUsd}
+                priceUsd={deal.priceUsd}
+                mode={deal.mode}
+                availableUsd={wallet.availableUsd}
+              />
+            ) : panel.kind === "step" && deal ? (
+              <div className="flex flex-col gap-4">
+                <DealNextStep deal={deal} />
+                {deal.nextStep ? <RaiseDispute deal={deal} /> : null}
+              </div>
+            ) : null}
+          </DealPanel>
         </div>
       ) : null}
 

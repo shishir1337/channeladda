@@ -68,13 +68,21 @@ export async function startPayment(orderId: string): Promise<PayResult> {
   }
 
   const base = siteUrl();
+  // Back to the conversation, whichever page the buyer paid from: it shows
+  // the payment arriving and the next step, with the deal page a click away.
+  // It cannot depend on where they started — pressing Pay again reuses the
+  // invoice still open, and Cryptomus keeps the first request's return
+  // address. (The deal page's old ?paid=1 was read by nothing.)
+  const back = deal.conversationId
+    ? `${base}/dashboard/messages/${deal.conversationId}`
+    : `${base}/dashboard/deals/${deal.id}`;
   const raise = (reference: string) =>
     createInvoice({
       amountUsd: deal.totalUsd,
       orderId: reference,
       callbackUrl: `${base}/api/webhooks/cryptomus`,
-      successUrl: `${base}/dashboard/deals/${deal.id}?paid=1`,
-      returnUrl: `${base}/dashboard/deals/${deal.id}`,
+      successUrl: back,
+      returnUrl: back,
     });
 
   try {

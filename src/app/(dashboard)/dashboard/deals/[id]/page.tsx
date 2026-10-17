@@ -2,6 +2,7 @@ import {
   ArrowLeftIcon,
   ExternalLinkIcon,
   MailIcon,
+  MessagesSquareIcon,
   ShieldCheckIcon,
   UsersIcon,
   ZapIcon,
@@ -112,13 +113,25 @@ export default async function DealPage({
         {deal.listingTitle}
       </h1>
 
-      <Link
-        href={`/listing/${deal.listingSlug}`}
-        className="mt-1.5 inline-flex min-h-9 items-center gap-1.5 text-sm text-primary-text underline-offset-4 hover:underline"
-      >
-        View the listing
-        <ExternalLinkIcon aria-hidden="true" className="size-3.5" />
-      </Link>
+      <div className="mt-1.5 flex flex-wrap items-center gap-x-5">
+        {/* Where the people on this deal talk, and where it can be run from. */}
+        {deal.conversationId ? (
+          <Link
+            href={`/dashboard/messages/${deal.conversationId}`}
+            className="inline-flex min-h-9 items-center gap-1.5 text-sm font-medium text-primary-text underline-offset-4 hover:underline"
+          >
+            <MessagesSquareIcon aria-hidden="true" className="size-3.5" />
+            Open the deal chat
+          </Link>
+        ) : null}
+        <Link
+          href={`/listing/${deal.listingSlug}`}
+          className="inline-flex min-h-9 items-center gap-1.5 text-sm text-primary-text underline-offset-4 hover:underline"
+        >
+          View the listing
+          <ExternalLinkIcon aria-hidden="true" className="size-3.5" />
+        </Link>
+      </div>
 
       <div className="mt-6 lg:grid lg:grid-cols-[minmax(0,1fr)_21rem] lg:items-start lg:gap-8">
         {/* ---- stage, action, money --------------------------------------- */}

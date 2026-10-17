@@ -1834,6 +1834,8 @@ export type DealView = {
   agentEmail: string | null;
   agentBrand: string | null;
   viewerRole: DealActor;
+  /** The conversation this deal runs in. Every deal has one now. */
+  conversationId: string | null;
   steps: DealStepView[];
   /** The lowest incomplete step, or null once the deal has stopped. */
   nextStep: DealStepView | null;
@@ -1868,6 +1870,7 @@ export async function getDealFor(
       agentId: true,
       agentEmail: true,
       agentBrand: true,
+      conversationId: true,
       listing: { select: { title: true, slug: true } },
       buyer: { select: { name: true } },
       seller: { select: { name: true } },
@@ -1910,6 +1913,7 @@ export async function getDealFor(
     agentEmail: order.agentEmail,
     agentBrand: order.agentBrand,
     viewerRole,
+    conversationId: order.conversationId,
     steps,
     nextStep: isTerminal(order.status)
       ? null

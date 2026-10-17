@@ -82,22 +82,34 @@ export function DealPanel({
 }) {
   const view = describe(state, viewerRole, otherName);
   const [open, setOpen] = useState(view.yourMove);
+  // Paying and a deal step already have a card of their own — the deal
+  // page's — with its heading and its one button. The panel then is that
+  // card, not a frame around it.
+  const childOwns =
+    Boolean(children) && (state.kind === "pay" || state.kind === "step");
 
   return (
     <section
       aria-label="What happens next"
       className={cn(
-        "rounded-panel border",
-        view.yourMove
-          ? "border-primary/40 bg-primary-soft"
-          : "border-line bg-surface",
+        !childOwns && "rounded-panel border",
+        !childOwns &&
+          (view.yourMove
+            ? "border-primary/40 bg-primary-soft"
+            : "border-line bg-surface"),
       )}
     >
       <button
         type="button"
         onClick={() => setOpen((was) => !was)}
         aria-expanded={open}
-        className="flex w-full cursor-pointer items-center gap-2 px-4 py-3 text-left lg:hidden"
+        className={cn(
+          "flex w-full cursor-pointer items-center gap-2 px-4 py-3 text-left lg:hidden",
+          childOwns &&
+            (view.yourMove
+              ? "rounded-panel border border-primary/40 bg-primary-soft"
+              : "rounded-panel border border-line bg-surface"),
+        )}
       >
         {view.yourMove ? (
           <span
@@ -122,34 +134,50 @@ export function DealPanel({
         />
       </button>
 
-      <div
-        className={cn(
-          "px-4 pb-4 sm:px-5 lg:block lg:py-5",
-          open ? "block" : "hidden",
-        )}
-      >
-        <p className="hidden font-mono text-[0.6875rem] font-semibold tracking-[0.14em] uppercase lg:block">
-          <span className={view.yourMove ? "text-primary-text" : "text-subtle"}>
-            {view.yourMove ? "Your move" : "What happens next"}
-          </span>
-        </p>
-        <h2 className="font-display text-base leading-snug font-bold text-fg lg:mt-2">
-          {view.title}
-        </h2>
-        {view.detail ? (
-          <p className="mt-1.5 max-w-[62ch] text-sm leading-relaxed text-muted">
-            {view.detail}
+      {childOwns ? (
+        <div className={cn("mt-2 lg:mt-0 lg:block", open ? "block" : "hidden")}>
+          {children}
+          <Body
+            state={state}
+            viewerRole={viewerRole}
+            listingSlug={listingSlug}
+            dealReference={dealReference}
+            hasChildren
+          />
+        </div>
+      ) : (
+        <div
+          className={cn(
+            "px-4 pb-4 sm:px-5 lg:block lg:py-5",
+            open ? "block" : "hidden",
+          )}
+        >
+          <p className="hidden font-mono text-[0.6875rem] font-semibold tracking-[0.14em] uppercase lg:block">
+            <span
+              className={view.yourMove ? "text-primary-text" : "text-subtle"}
+            >
+              {view.yourMove ? "Your move" : "What happens next"}
+            </span>
           </p>
-        ) : null}
+          <h2 className="font-display text-base leading-snug font-bold text-fg lg:mt-2">
+            {view.title}
+          </h2>
+          {view.detail ? (
+            <p className="mt-1.5 max-w-[62ch] text-sm leading-relaxed text-muted">
+              {view.detail}
+            </p>
+          ) : null}
 
-        <Body
-          state={state}
-          viewerRole={viewerRole}
-          listingSlug={listingSlug}
-          dealReference={dealReference}
-        />
-        {children ? <div className="mt-4">{children}</div> : null}
-      </div>
+          <Body
+            state={state}
+            viewerRole={viewerRole}
+            listingSlug={listingSlug}
+            dealReference={dealReference}
+            hasChildren={Boolean(children)}
+          />
+          {children ? <div className="mt-4">{children}</div> : null}
+        </div>
+      )}
     </section>
   );
 }
@@ -292,11 +320,14 @@ function Body({
   viewerRole,
   listingSlug,
   dealReference,
+  hasChildren = false,
 }: {
   state: PanelStateView;
   viewerRole: "buyer" | "seller" | "agent" | "staff";
   listingSlug: string;
   dealReference: string | null;
+  /** The page supplied the card for this state, so no fallback link. */
+  hasChildren?: boolean;
 }) {
   const side = viewerRole === "buyer" || viewerRole === "seller";
 
@@ -339,7 +370,7 @@ function Body({
     );
   }
 
-  if (state.kind === "buy" || state.kind === "start-deal") {
+  if ((state.kind === "buy" || state.kind === "start-deal") && !hasChildren) {
     return (
       <Link
         href={`/listing/${listingSlug}`}

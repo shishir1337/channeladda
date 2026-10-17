@@ -47,12 +47,19 @@ export function StartDeal({
   price,
   fees,
   isOwnListing,
+  after = "deal-page",
 }: {
   listingId: string;
   listingSlug: string;
   price: number;
   fees: FeeSettings;
   isOwnListing: boolean;
+  /**
+   * Where the buyer goes once the deal is open. From the listing, to the
+   * deal page; from a conversation, nowhere — the conversation redraws with
+   * the payment card, and the buyer never has to leave it.
+   */
+  after?: "deal-page" | "refresh";
 }) {
   const { data: session } = useSession();
   const router = useRouter();
@@ -195,6 +202,10 @@ export function StartDeal({
             const result = await startDeal(listingId, mode, acceptedRisk);
             if (!result.ok) {
               setError(result.error);
+              return;
+            }
+            if (after === "refresh") {
+              router.refresh();
               return;
             }
             router.push(`/dashboard/deals/${result.orderId}`);
