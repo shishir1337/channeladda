@@ -4,7 +4,7 @@ import { randomBytes } from "node:crypto";
 import type { InvoicePurpose } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
 import { recordAudit } from "@/server/audit";
-import { classifyStatus, getInvoice } from "@/server/cryptomus";
+import { classifyStatus, lookupInvoice } from "@/server/cryptomus";
 import { recordOpeningPayment } from "@/server/deals";
 import { creditDeposit } from "@/server/wallet";
 
@@ -172,13 +172,18 @@ async function reconcileOne(invoice: {
     data: { updatedAt: new Date() },
   });
 
-  const confirmed = await getInvoice(invoice.reference);
-  if (!confirmed) {
-    // Never heard of, never called back about, and old enough that it
-    // could not still be paid: it was never created at the processor.
-    // Usually a top-up whose page the buyer never reached.
+  const lookup = await lookupInvoice(invoice.reference);
+  if (lookup.kind !== "found") {
+    // The processor says it has no such invoice, nothing ever called back
+    // about it, and it is old enough that it could not still be paid: it was
+    // never created there. Usually a top-up whose page the buyer never
+    // reached. Not being able to ask is not that answer.
     const age = Date.now() - invoice.createdAt.getTime();
-    if (!invoice.lastStatus && age > NEVER_REGISTERED_AFTER_MS) {
+    if (
+      lookup.kind === "missing" &&
+      !invoice.lastStatus &&
+      age > NEVER_REGISTERED_AFTER_MS
+    ) {
       await markApplied(invoice.reference);
       await recordAudit({
         actorId: null,
@@ -191,6 +196,7 @@ async function reconcileOne(invoice: {
     return false;
   }
 
+  const confirmed = lookup.invoice;
   const outcome = classifyStatus(confirmed.status, confirmed.isFinal);
   if (outcome !== "settled") {
     // Dead invoices stop being chased; a pending one is looked at again.

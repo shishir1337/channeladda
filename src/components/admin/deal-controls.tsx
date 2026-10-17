@@ -19,6 +19,8 @@ import {
   endDeal,
   markOpeningPaymentReceived,
 } from "@/server/actions/deals";
+import { checkInvoiceNow } from "@/server/actions/money";
+import type { AssignableAgent } from "@/server/admin-users";
 
 /**
  * The staff controls on a deal row.
@@ -93,10 +95,17 @@ export function ClaimDeal({
   orderId,
   defaultEmail,
   defaultBrand,
+  locked = false,
 }: {
   orderId: string;
   defaultEmail: string;
   defaultBrand: string;
+  /**
+   * The agent has a stored identity, set on the Team page. The server uses
+   * it whatever is typed, so the fields are shown read-only rather than
+   * offering an edit that would be silently ignored.
+   */
+  locked?: boolean;
 }) {
   const router = useRouter();
   const ids = { email: useId(), brand: useId() };
@@ -116,9 +125,14 @@ export function ClaimDeal({
           id={ids.email}
           name="agentEmail"
           label="Google account to invite"
-          hint="The seller invites this as channel owner."
+          hint={
+            locked
+              ? "Your transfer identity, set on the Team page."
+              : "The seller invites this as channel owner."
+          }
           value={email}
           onChange={(e) => setEmail(e.target.value)}
+          readOnly={locked}
           required
         />
         <TextField
@@ -127,6 +141,7 @@ export function ClaimDeal({
           label="Shown to the seller as"
           value={brand}
           onChange={(e) => setBrand(e.target.value)}
+          readOnly={locked}
           required
         />
         <Button
@@ -224,6 +239,37 @@ export function RecordPayment({ orderId }: { orderId: string }) {
   );
 }
 
+/** Asking the processor about this deal's invoice instead of waiting. */
+export function CheckInvoice({ reference }: { reference: string }) {
+  const router = useRouter();
+  const [message, setMessage] = useState<string | null>(null);
+  const [ok, setOk] = useState(false);
+  const [pending, startTransition] = useTransition();
+
+  return (
+    <div className="mt-3">
+      <Button
+        type="button"
+        size="sm"
+        variant="secondary"
+        disabled={pending}
+        onClick={() => {
+          setMessage(null);
+          startTransition(async () => {
+            const result = await checkInvoiceNow(reference);
+            setOk(result.ok);
+            setMessage(result.ok ? result.message : result.error);
+            if (result.ok) router.refresh();
+          });
+        }}
+      >
+        {pending ? "Asking Cryptomus…" : "Check with Cryptomus now"}
+      </Button>
+      <Outcome message={message} ok={ok} />
+    </div>
+  );
+}
+
 /**
  * Staff moving a deal to a different agent.
  *
@@ -231,12 +277,23 @@ export function RecordPayment({ orderId }: { orderId: string }) {
  * case: an agent who has been suspended, or has gone quiet, still owns the
  * channel, and somebody has to be able to take it on.
  */
-export function AssignAgent({ orderId }: { orderId: string }) {
+export function AssignAgent({
+  orderId,
+  agents,
+  currentAgentId,
+}: {
+  orderId: string;
+  agents: readonly AssignableAgent[];
+  currentAgentId?: string | null;
+}) {
   const router = useRouter();
   const ids = { agent: useId(), email: useId(), brand: useId() };
   const [agentId, setAgentId] = useState("");
   const [email, setEmail] = useState("");
   const [brand, setBrand] = useState("Channel Adda Transfers");
+  const chosen = agents.find((agent) => agent.id === agentId);
+  const locked = Boolean(chosen?.agentEmail && chosen.agentBrand);
+  const choices = agents.filter((agent) => agent.id !== currentAgentId);
   const [message, setMessage] = useState<string | null>(null);
   const [ok, setOk] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -246,22 +303,53 @@ export function AssignAgent({ orderId }: { orderId: string }) {
       title="Move it to another agent"
       hint="The new agent is invited as channel owner. Ownership does not move until the seller accepts that invitation, so tell them it is coming."
     >
+      {choices.length === 0 ? (
+        <p className="mt-3 text-sm text-muted">
+          There is no other active agent to give it to. Invite one from the Team
+          page first.
+        </p>
+      ) : null}
       <div className="mt-3 grid gap-3 sm:grid-cols-3 sm:items-end">
-        <TextField
-          id={ids.agent}
-          name="agentId"
-          label="New agent (user id)"
-          hint="From their account page."
-          value={agentId}
-          onChange={(e) => setAgentId(e.target.value)}
-          required
-        />
+        <div>
+          <label
+            htmlFor={ids.agent}
+            className="block text-sm font-medium text-fg"
+          >
+            New agent
+            <span className="ml-0.5 text-danger">*</span>
+          </label>
+          <select
+            id={ids.agent}
+            name="agentId"
+            value={agentId}
+            required
+            onChange={(e) => {
+              const next = agents.find((a) => a.id === e.target.value);
+              setAgentId(e.target.value);
+              // Their stored identity is what the server will use, so the
+              // fields show it; without one, they start empty to be typed.
+              setEmail(next?.agentEmail ?? "");
+              setBrand(next?.agentBrand ?? "Channel Adda Transfers");
+            }}
+            className="mt-2 h-12 w-full cursor-pointer appearance-none rounded-xl border border-line bg-surface-2 px-3.5 text-base text-fg focus:border-primary/60 focus:outline-none sm:text-[0.9375rem]"
+          >
+            <option value="">Choose an agent…</option>
+            {choices.map((agent) => (
+              <option key={agent.id} value={agent.id} disabled={agent.atCap}>
+                {agent.name} — holding {agent.holds}
+                {agent.atCap ? " (at their limit)" : ""}
+              </option>
+            ))}
+          </select>
+        </div>
         <TextField
           id={ids.email}
           name="agentEmail"
           label="Google account to invite"
+          hint={locked ? "Their stored identity." : undefined}
           value={email}
           onChange={(e) => setEmail(e.target.value)}
+          readOnly={locked}
           required
         />
         <TextField
@@ -270,6 +358,7 @@ export function AssignAgent({ orderId }: { orderId: string }) {
           label="Shown to the seller as"
           value={brand}
           onChange={(e) => setBrand(e.target.value)}
+          readOnly={locked}
           required
         />
       </div>

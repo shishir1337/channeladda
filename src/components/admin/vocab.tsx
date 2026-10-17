@@ -193,7 +193,6 @@ export function DealModeBadge({
   );
 }
 
-
 /**
  * What is in whose hands right now, and what can still be undone.
  *
@@ -260,7 +259,8 @@ export function custodyFacts(
     recoverable =
       "The price never passed through us, so only the admin fee is ours to return.";
   } else {
-    recoverable = "Nothing has cleared to us, so there is nothing of the buyer’s to return.";
+    recoverable =
+      "Nothing has cleared to us, so there is nothing of the buyer’s to return.";
   }
   return { finished, agentHolds, platformHolds, asset, money, recoverable };
 }
@@ -379,6 +379,7 @@ export const AUDIT_LABEL: Record<string, string> = {
   "deal.completed": "completed a deal",
   "deal.created": "opened a deal",
   "deal.disputed": "raised a dispute",
+  "deal.dispute_note": "added to a dispute’s record",
   "deal.expired": "let a payment window lapse",
   "deal.fee_paid": "cleared an opening payment",
   "deal.refunded": "refunded a buyer",
@@ -388,6 +389,9 @@ export const AUDIT_LABEL: Record<string, string> = {
   "listing.ownership_verified": "confirmed an ownership code",
   "listing.reject": "sent a listing back",
   "listing.remove": "took a listing down",
+  "listing.reopen": "sent a taken-down listing back to review",
+  "listing.feature": "featured a listing",
+  "listing.unfeature": "stopped featuring a listing",
   "payment.arrived_too_late": "took a payment that arrived too late",
   "payment.duplicate_credited": "credited a duplicate payment",
   "payment.reconciled": "reconciled a payment",

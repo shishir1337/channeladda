@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import * as repo from "@/server/adjustments";
+import { cryptomusConfig } from "@/server/cryptomus";
+import { reconcileInvoice } from "@/server/invoices";
 import { requireRole } from "@/server/session";
 
 /**
@@ -111,4 +113,47 @@ export async function adjustMemberBalance(input: {
         ? `Added ${amount}. The member has been told, and the platform's side of the books was debited to match.`
         : `Took ${amount}. The member has been told, and the platform's side of the books was credited to match.`,
   };
+}
+
+/**
+ * Asking the processor about one invoice, now.
+ *
+ * For a buyer who says they paid while the deal says they did not. The
+ * sweep would get to it in time; this is for when somebody is waiting. It
+ * applies the payment only if the processor confirms it, exactly as the
+ * sweep would, so pressing it twice is harmless.
+ */
+export async function checkInvoiceNow(reference: string): Promise<MoneyResult> {
+  await requireRole("FINANCE");
+  if (!cryptomusConfig()) {
+    return {
+      ok: false,
+      error:
+        "Cryptomus is not connected on this server, so there is nobody to ask. Add its keys, or record the payment by hand if you have proof.",
+    };
+  }
+
+  const outcome = await reconcileInvoice(reference.trim());
+  revalidatePath("/admin/deals");
+  switch (outcome) {
+    case "applied":
+      return {
+        ok: true,
+        message:
+          "Cryptomus confirmed it as paid. The payment is applied and the deal has moved on.",
+      };
+    case "already-applied":
+      return {
+        ok: true,
+        message: "This invoice was already dealt with. Nothing changed.",
+      };
+    case "not-found":
+      return { ok: false, error: "We have no invoice with that reference." };
+    case "not-yet":
+      return {
+        ok: false,
+        error:
+          "Cryptomus has not confirmed this as paid, or did not answer. Nothing changed. Try again in a few minutes.",
+      };
+  }
 }

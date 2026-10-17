@@ -57,6 +57,8 @@ export class CryptomusError extends Error {
   constructor(
     message: string,
     readonly detail?: unknown,
+    /** The HTTP status, when the processor answered at all. */
+    readonly status?: number,
   ) {
     super(message);
     this.name = "CryptomusError";
@@ -104,6 +106,7 @@ async function call<T>(
     throw new CryptomusError(
       `Cryptomus returned ${response.status} with a non-JSON body`,
       text.slice(0, 300),
+      response.status,
     );
   }
 
@@ -120,6 +123,7 @@ async function call<T>(
     throw new CryptomusError(
       payload.message ?? `Cryptomus rejected the request (${response.status})`,
       payload.errors ?? text.slice(0, 300),
+      response.status,
     );
   }
 
@@ -174,14 +178,42 @@ export async function createInvoice(request: InvoiceRequest): Promise<Invoice> {
  * that moves money. A forged webhook that somehow passed signature checking
  * still has to agree with this.
  */
-export async function getInvoice(orderId: string): Promise<{
+export async function getInvoice(
+  orderId: string,
+): Promise<InvoiceState | null> {
+  const found = await lookupInvoice(orderId);
+  return found.kind === "found" ? found.invoice : null;
+}
+
+export type InvoiceState = {
   status: string;
   isFinal: boolean;
   paidAmountUsd: number | null;
   payerCurrency: string | null;
-} | null> {
+};
+
+/**
+ * The same question, with the two kinds of silence kept apart.
+ *
+ * `missing` is the processor answering that it has no such invoice.
+ * `unknown` is everything else: no credentials, a timeout, an outage, a
+ * rejected key. Only the first is evidence there was nothing to pay — an
+ * invoice paid during an outage must not be written off because the
+ * outage lasted longer than the give-up window.
+ *
+ * Only an HTTP 404 counts as `missing`. Whether Cryptomus also answers a
+ * 200 with an error state for an unknown invoice has not been checked
+ * against the live API; if it does, that case reads as `unknown`, and the
+ * invoice is retried rather than given up — the safe way to be wrong.
+ */
+export type InvoiceLookup =
+  | { kind: "found"; invoice: InvoiceState }
+  | { kind: "missing" }
+  | { kind: "unknown" };
+
+export async function lookupInvoice(orderId: string): Promise<InvoiceLookup> {
   const config = cryptomusConfig();
-  if (!config) return null;
+  if (!config) return { kind: "unknown" };
 
   try {
     const result = await call<{
@@ -194,17 +226,23 @@ export async function getInvoice(orderId: string): Promise<{
 
     const paid = result.payment_amount_usd;
     return {
-      status: result.payment_status ?? result.status ?? "unknown",
-      isFinal: Boolean(result.is_final),
-      paidAmountUsd:
-        paid === null || paid === undefined
-          ? null
-          : Math.round(Number(paid) * 100),
-      payerCurrency: result.payer_currency ?? null,
+      kind: "found",
+      invoice: {
+        status: result.payment_status ?? result.status ?? "unknown",
+        isFinal: Boolean(result.is_final),
+        paidAmountUsd:
+          paid === null || paid === undefined
+            ? null
+            : Math.round(Number(paid) * 100),
+        payerCurrency: result.payer_currency ?? null,
+      },
     };
   } catch (error) {
+    if (error instanceof CryptomusError && error.status === 404) {
+      return { kind: "missing" };
+    }
     console.error(`[cryptomus] info ${orderId}`, error);
-    return null;
+    return { kind: "unknown" };
   }
 }
 

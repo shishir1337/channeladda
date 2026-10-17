@@ -299,9 +299,9 @@ test(
       },
     });
 
-    expect(
-      await recordManualPayment(created.orderId, "0xabc", "USDT"),
-    ).toBe("reference-mismatch");
+    expect(await recordManualPayment(created.orderId, "0xabc", "USDT")).toBe(
+      "reference-mismatch",
+    );
     expect(await balanceOf(seeded.buyer.id)).toBe(0);
   }),
 );
@@ -366,14 +366,18 @@ test(
       },
     });
 
-    // No credentials here, so the processor says nothing about any of them:
-    // exactly the never-registered case.
+    // No credentials here, so the processor cannot be asked at all. That is
+    // not the processor saying it never heard of the invoice — an outage or a
+    // missing key looks exactly like this, and an invoice paid during one
+    // must not be written off. It is kept, and moved to the back so it does
+    // not block the queue; the give-up itself is in reconcile-giveup.test.ts.
     await reconcileInvoices();
 
     const row = await db.invoice.findUniqueOrThrow({
       where: { reference: "TOPUP-NEVER-SEEN" },
     });
-    expect(row.appliedAt).not.toBeNull();
+    expect(row.appliedAt).toBeNull();
+    expect(row.updatedAt.getTime()).toBeGreaterThan(old.getTime());
   }),
 );
 

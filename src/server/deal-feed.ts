@@ -199,7 +199,7 @@ export async function listDealsNeedingReassignment(limit = 50) {
       // thing on the staff desk, and without this it was the only queue
       // that could not say how long it had been like that.
       createdAt: true,
-      agent: { select: { name: true, email: true } },
+      agent: { select: { id: true, name: true, email: true } },
       listing: { select: { title: true } },
     },
   });

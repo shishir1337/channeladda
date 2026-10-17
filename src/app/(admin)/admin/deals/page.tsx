@@ -32,6 +32,7 @@ import {
 } from "@/components/admin/console";
 import {
   AssignAgent,
+  CheckInvoice,
   ClaimDeal,
   EndDeal,
   RecordPayment,
@@ -60,6 +61,7 @@ import {
   listFinishedDeals,
   searchDeals,
 } from "@/server/admin-money";
+import { agentIdentity, listAssignableAgents } from "@/server/admin-users";
 import {
   listDealActivity,
   listDealsForAgent,
@@ -218,33 +220,42 @@ export default async function AdminDealsPage({
     );
   }
 
-  const [activity, needingAgent, needingReassignment, awaitingPayment, mine] =
-    await Promise.all([
-      // Staff only, and not fetched otherwise. The platform-wide trail used
-      // to be queried for everybody and then hidden from agents with a CSS
-      // class, which is not access control: the rows were sitting in the
-      // HTML, so an agent could read every deal on the marketplace from
-      // view-source. An agent gets an empty list and no section at all.
-      isStaff ? listDealActivity(50) : Promise.resolve([]),
-      listDealsNeedingAgent(),
-      listDealsNeedingReassignment(),
-      isFinance
-        ? db.order.findMany({
-            where: { status: "AWAITING_PAYMENT" },
-            orderBy: { createdAt: "asc" },
-            take: 25,
-            select: {
-              id: true,
-              reference: true,
-              mode: true,
-              totalUsd: true,
-              createdAt: true,
-              listing: { select: { title: true } },
-            },
-          })
-        : Promise.resolve([]),
-      mineOnly ? listDealsForAgent(viewer.id) : Promise.resolve([]),
-    ]);
+  const [
+    activity,
+    needingAgent,
+    needingReassignment,
+    awaitingPayment,
+    mine,
+    identity,
+    assignable,
+  ] = await Promise.all([
+    // Staff only, and not fetched otherwise. The platform-wide trail used
+    // to be queried for everybody and then hidden from agents with a CSS
+    // class, which is not access control: the rows were sitting in the
+    // HTML, so an agent could read every deal on the marketplace from
+    // view-source. An agent gets an empty list and no section at all.
+    isStaff ? listDealActivity(50) : Promise.resolve([]),
+    listDealsNeedingAgent(),
+    listDealsNeedingReassignment(),
+    isFinance
+      ? db.order.findMany({
+          where: { status: "AWAITING_PAYMENT" },
+          orderBy: { createdAt: "asc" },
+          take: 25,
+          select: {
+            id: true,
+            reference: true,
+            mode: true,
+            totalUsd: true,
+            createdAt: true,
+            listing: { select: { title: true } },
+          },
+        })
+      : Promise.resolve([]),
+    mineOnly ? listDealsForAgent(viewer.id) : Promise.resolve([]),
+    isAgent ? agentIdentity(viewer.id) : Promise.resolve(null),
+    isStaff ? listAssignableAgents() : Promise.resolve(null),
+  ]);
 
   const oldestUnheld = needingAgent.at(0)?.createdAt;
   const oldestUnpaid = awaitingPayment.at(0)?.createdAt;
@@ -384,7 +395,13 @@ export default async function AdminDealsPage({
                       </>
                     }
                   />
-                  {isStaff ? <AssignAgent orderId={order.id} /> : null}
+                  {assignable ? (
+                    <AssignAgent
+                      orderId={order.id}
+                      agents={assignable.agents}
+                      currentAgentId={order.agent?.id ?? null}
+                    />
+                  ) : null}
                   <EndDeal
                     orderId={order.id}
                     mode="SAFEST"
@@ -480,6 +497,9 @@ export default async function AdminDealsPage({
                           ) : null}
                         </div>
                       </div>
+                      {invoice && !invoice.appliedAt ? (
+                        <CheckInvoice reference={invoice.reference} />
+                      ) : null}
                       <RecordPayment orderId={order.id} />
                     </div>
                   </RowItem>
@@ -584,8 +604,11 @@ export default async function AdminDealsPage({
                     {isAgent ? (
                       <ClaimDeal
                         orderId={order.id}
-                        defaultEmail={viewer.email}
-                        defaultBrand="Channel Adda Transfers"
+                        defaultEmail={identity?.email ?? viewer.email}
+                        defaultBrand={
+                          identity?.brand ?? "Channel Adda Transfers"
+                        }
+                        locked={identity !== null}
                       />
                     ) : (
                       <p className="mt-2.5 text-xs text-subtle">

@@ -1,12 +1,13 @@
 "use client";
 
 import {
-  BellIcon,
   ArrowLeftRightIcon,
   BadgeCheckIcon,
+  BellIcon,
   ChevronsLeftIcon,
   CoinsIcon,
   ExternalLinkIcon,
+  GavelIcon,
   HandshakeIcon,
   LayoutDashboardIcon,
   LifeBuoyIcon,
@@ -51,6 +52,7 @@ const ICONS = {
   messages: MessageSquareIcon,
   people: UsersIcon,
   support: LifeBuoyIcon,
+  dispute: GavelIcon,
 } as const;
 
 export type NavIcon = keyof typeof ICONS;

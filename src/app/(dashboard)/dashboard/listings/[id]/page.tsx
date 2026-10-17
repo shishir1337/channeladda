@@ -4,16 +4,12 @@ import {
   CircleAlertIcon,
   ExternalLinkIcon,
   ImageIcon,
-  LinkIcon,
   ShieldAlertIcon,
 } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import {
-  ListingControls,
-  OwnershipStep,
-} from "@/components/dashboard/listing-actions";
+import { ListingControls } from "@/components/dashboard/listing-actions";
 import {
   ListingForm,
   type PlatformChoice,
@@ -22,7 +18,7 @@ import {
   ListingStatusBadge,
   statusMeta,
 } from "@/components/dashboard/listing-status";
-import { OwnershipCheck } from "@/components/dashboard/ownership-check";
+import { OwnershipPanel } from "@/components/dashboard/ownership-check";
 import { Section } from "@/components/dashboard/page-parts";
 import { Badge } from "@/components/ui/badge";
 import { platforms } from "@/data/platforms";
@@ -113,10 +109,6 @@ export default async function SellerListingPage({
     platforms.find((p) => p.id === listing.platform)?.name ?? listing.platform;
   const editable = EDITABLE.includes(listing.status);
   const verified = listing.ownershipVerifiedAt !== null;
-
-  // The automatic read-back only exists for YouTube. On every other platform
-  // a person does it, and the slower path must not be the hidden one.
-  const autoCheckable = listing.platform === "youtube";
 
   const showOwnership =
     !verified && listing.status !== "DRAFT" && listing.status !== "REMOVED";
@@ -329,61 +321,13 @@ export default async function SellerListingPage({
                 : "This listing is not ownership-verified yet. Buyers trust a verified listing far more, and it only takes a minute."
           }
         >
-          <div className="flex flex-col gap-3">
-            {!autoCheckable ? (
-              <p className="flex items-start gap-2.5 rounded-card border border-info/30 bg-info-soft p-3.5 text-sm leading-relaxed text-fg">
-                <LinkIcon
-                  aria-hidden="true"
-                  className="mt-0.5 size-4 shrink-0 text-info"
-                />
-                <span>
-                  {platformName} has no public way for us to read your
-                  description automatically, so a moderator checks this one by
-                  hand. Put the code in place, then use the second panel to tell
-                  us it is there.
-                </span>
-              </p>
-            ) : null}
-
-            <OwnershipCheck
-              listingId={listing.id}
-              code={listing.ownershipCode}
-              verified={verified}
-            />
-
-            {listing.status === "CODE_CHECK" && listing.ownershipCode ? (
-              // Two routes to the same place: we read the code, or a person
-              // does. The automatic one leads unless it cannot work here.
-              <details
-                open={!autoCheckable}
-                className="group rounded-panel border border-dashed border-line-strong"
-              >
-                {/* list-none alone leaves the triangle in Safari, which is
-                    most of the phones this is read on. */}
-                <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-5 py-4 text-sm font-medium text-fg [&::-webkit-details-marker]:hidden">
-                  <span>
-                    {autoCheckable
-                      ? "The code is in place but the check cannot see it"
-                      : "Tell us the code is in place"}
-                  </span>
-                  <span
-                    aria-hidden="true"
-                    className="text-xs text-subtle group-open:hidden"
-                  >
-                    Open
-                  </span>
-                </summary>
-                <div className="px-3 pb-3 sm:px-4 sm:pb-4">
-                  <OwnershipStep
-                    listingId={listing.id}
-                    code={listing.ownershipCode}
-                    platformName={platformName}
-                    hasProof={listing.proofs.length > 0}
-                  />
-                </div>
-              </details>
-            ) : null}
-          </div>
+          <OwnershipPanel
+            listingId={listing.id}
+            code={listing.ownershipCode}
+            platform={listing.platform}
+            status={listing.status}
+            hasProof={listing.proofs.length > 0}
+          />
         </Section>
       ) : null}
 

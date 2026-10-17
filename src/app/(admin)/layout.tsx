@@ -1,6 +1,7 @@
 import type { NavGroup } from "@/components/dashboard/app-shell";
 import { AppShell } from "@/components/dashboard/app-shell";
 import { NotificationBell } from "@/components/dashboard/notification-bell";
+import { countOpenDisputes } from "@/server/admin-disputes";
 import { getQueueCounts } from "@/server/admin-listings";
 import { countFlaggedThreads } from "@/server/messages";
 import { listNotifications, unreadCount } from "@/server/notifications";
@@ -84,10 +85,11 @@ export default async function AdminLayout({ children }: LayoutProps<"/">) {
     );
   }
 
-  const [counts, flagged, openTickets] = await Promise.all([
+  const [counts, flagged, openTickets, disputes] = await Promise.all([
     getQueueCounts(),
     countFlaggedThreads(),
     countOpenTickets(),
+    countOpenDisputes(),
   ]);
 
   const groups: NavGroup[] = [
@@ -104,6 +106,13 @@ export default async function AdminLayout({ children }: LayoutProps<"/">) {
           icon: "transfer",
           section: true,
         },
+        {
+          label: "Disputes",
+          href: "/admin/disputes",
+          icon: "dispute",
+          section: true,
+          waiting: disputes,
+        },
       ],
     },
     // Payouts is FINANCE and SUPERADMIN only, which is what the page's own
@@ -115,6 +124,12 @@ export default async function AdminLayout({ children }: LayoutProps<"/">) {
           {
             label: "Money",
             items: [
+              {
+                label: "Money desk",
+                href: "/admin/money",
+                icon: "money" as const,
+                section: true,
+              },
               {
                 label: "Payouts",
                 href: "/admin/payouts",

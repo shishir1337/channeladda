@@ -2,6 +2,7 @@ import {
   ArrowLeftIcon,
   ExternalLinkIcon,
   LockIcon,
+  SlidersHorizontalIcon,
   TriangleAlertIcon,
 } from "lucide-react";
 import type { Metadata } from "next";
@@ -283,6 +284,24 @@ export default async function AdminUserPage({
                 id="money"
                 title="Money"
                 description="Their balance as the ledger has it, what is held against payouts finance has not settled, and every recent movement. Read-only: the ledger is never edited from here."
+                actions={
+                  // The correction form refuses your own account, and a
+                  // staff account unless you are superadmin; the link is
+                  // drawn only where it leads somewhere that works.
+                  person.id !== staff.id &&
+                  (person.role === "USER" || staff.role === "SUPERADMIN") ? (
+                    <Link
+                      href={`/admin/money/adjust?member=${encodeURIComponent(person.id)}`}
+                      className="inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-primary-text underline-offset-4 hover:underline"
+                    >
+                      <SlidersHorizontalIcon
+                        aria-hidden="true"
+                        className="size-4"
+                      />
+                      Correct this balance
+                    </Link>
+                  ) : null
+                }
               >
                 <MetricGrid className="lg:grid-cols-3">
                   <Metric
