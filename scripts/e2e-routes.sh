@@ -85,7 +85,8 @@ check - /api/health 200
 
 echo "--- dashboard needs a session ---"
 for p in /dashboard /dashboard/deals /dashboard/wallet /dashboard/security \
-         /dashboard/messages /dashboard/offers /dashboard/listings; do
+         /dashboard/messages /dashboard/offers /dashboard/listings \
+         /dashboard/notifications; do
   check - "$p" 307
   check buyer "$p" 200
 done
