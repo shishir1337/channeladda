@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { LiveRefresh } from "@/components/messages/live-refresh";
+import { toMessageViews } from "@/components/messages/serialize";
 import { ThreadView } from "@/components/messages/thread-view";
 import { getThread, markThreadRead } from "@/server/messages";
 import { requireUser } from "@/server/session";
@@ -61,12 +62,8 @@ export default async function ThreadPage({
           conversationId={thread.id}
           otherSide={otherSide}
           closed={thread.closedAt !== null}
-          messages={thread.messages.map((message) => ({
-            ...message,
-            createdAt: message.createdAt.toISOString(),
-            attachmentExpiresAt:
-              message.attachmentExpiresAt?.toISOString() ?? null,
-          }))}
+          viewerRole={thread.viewerRole}
+          messages={toMessageViews(thread.messages)}
         />
       </div>
     </>

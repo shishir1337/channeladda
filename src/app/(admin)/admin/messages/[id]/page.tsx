@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Panel } from "@/components/admin/console";
 import { LiveRefresh } from "@/components/messages/live-refresh";
+import { toMessageViews } from "@/components/messages/serialize";
 import { StaffControls } from "@/components/messages/staff-controls";
 import { ThreadView } from "@/components/messages/thread-view";
 import { Badge } from "@/components/ui/badge";
@@ -92,12 +93,8 @@ export default async function AdminThreadPage({
             conversationId={thread.id}
             otherSide={`${thread.buyerName} and ${thread.sellerName}`}
             closed={false}
-            messages={thread.messages.map((message) => ({
-              ...message,
-              createdAt: message.createdAt.toISOString(),
-              attachmentExpiresAt:
-                message.attachmentExpiresAt?.toISOString() ?? null,
-            }))}
+            viewerRole="staff"
+            messages={toMessageViews(thread.messages)}
           />
           <p className="mt-3 text-xs leading-relaxed text-subtle">
             Anything you write here is sent as Channel Adda, not as {staff.name}

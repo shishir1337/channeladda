@@ -1,5 +1,6 @@
 import "server-only";
 
+import type { OfferStatus } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
 import { MAX_MESSAGE } from "@/lib/messages";
 import {
@@ -10,6 +11,7 @@ import {
 import { isChatAttachmentKey, keyIsVideo, urlForKey } from "@/lib/upload-keys";
 import { mediaExpiryFrom } from "@/server/chat-retention";
 import { notify } from "@/server/notifications";
+import { offerTurn } from "@/server/offers";
 import type { CurrentUser } from "@/server/session";
 import { sizeOfUpload } from "@/server/storage";
 import { markUploadsAttached } from "@/server/upload-access";
@@ -37,14 +39,35 @@ export type ThreadRole = "buyer" | "seller" | "staff";
  */
 export type SenderRole = "buyer" | "seller" | "staff" | "agent" | "system";
 
+/**
+ * An offer card, as it stands right now.
+ *
+ * Read from the offer itself, never from the message that announced it, so
+ * the card, the Offers page and the listing page cannot disagree about it.
+ */
+export type ThreadOffer = {
+  id: string;
+  amountCents: number;
+  bySeller: boolean;
+  /** Already through the contact filter. */
+  note: string | null;
+  effectiveStatus: OfferStatus;
+  awaiting: "buyer" | "seller" | null;
+  expiresAt: Date;
+};
+
 export type ThreadMessage = {
   id: string;
+  /** What somebody typed, an offer card, or one line of the deal's history. */
+  kind: "TEXT" | "OFFER" | "EVENT";
   body: string;
   createdAt: Date;
   mine: boolean;
   fromStaff: boolean;
   senderName: string;
   senderRole: SenderRole;
+  /** Set on an offer card only. */
+  offer: ThreadOffer | null;
   /** What was taken out, shown to everyone so the gap is never a mystery. */
   redactedKinds: string | null;
   attachmentUrl: string | null;
@@ -224,7 +247,18 @@ export async function getThread(
           senderId: true,
           fromStaff: true,
           redactedKinds: true,
+          kind: true,
           sender: { select: { name: true } },
+          offer: {
+            select: {
+              id: true,
+              amountUsd: true,
+              bySeller: true,
+              message: true,
+              status: true,
+              expiresAt: true,
+            },
+          },
         },
       },
     },
@@ -233,6 +267,8 @@ export async function getThread(
 
   const viewerRole = roleInThread(viewer, row);
   if (!viewerRole) return null;
+
+  const now = new Date();
 
   return {
     id: row.id,
@@ -250,11 +286,23 @@ export async function getThread(
     closedAt: row.closedAt,
     messages: row.messages.map((message) => ({
       id: message.id,
+      kind: message.kind,
       body: message.body,
       createdAt: message.createdAt,
       mine: message.senderId === viewer.id,
       fromStaff: message.fromStaff,
       ...senderOf(message, row),
+      offer:
+        message.kind === "OFFER" && message.offer
+          ? {
+              id: message.offer.id,
+              amountCents: message.offer.amountUsd,
+              bySeller: message.offer.bySeller,
+              note: message.offer.message,
+              expiresAt: message.offer.expiresAt,
+              ...offerTurn(message.offer, now),
+            }
+          : null,
       redactedKinds: message.redactedKinds,
       attachmentUrl: message.attachmentUrl,
       attachmentKind: message.attachmentKind,

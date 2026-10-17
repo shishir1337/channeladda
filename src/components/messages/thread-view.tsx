@@ -12,7 +12,13 @@ import {
   XIcon,
 } from "lucide-react";
 import { useEffect, useRef, useState, useTransition } from "react";
+import {
+  ChatOfferCard,
+  type ThreadOfferView,
+} from "@/components/messages/chat-offer-card";
+import { EventLine } from "@/components/messages/event-line";
 import { Button } from "@/components/ui/button";
+import { chatTime } from "@/lib/chat-time";
 import { MAX_MESSAGE } from "@/lib/messages";
 import { cn } from "@/lib/utils";
 import { postMessage } from "@/server/actions/messages";
@@ -28,12 +34,15 @@ import { postMessage } from "@/server/actions/messages";
 
 export type ThreadMessageView = {
   id: string;
+  kind: "TEXT" | "OFFER" | "EVENT";
   body: string;
   createdAt: string;
   mine: boolean;
   fromStaff: boolean;
   senderName: string;
   senderRole: "buyer" | "seller" | "staff" | "agent" | "system";
+  /** Set on an offer card only. */
+  offer: ThreadOfferView | null;
   redactedKinds: string | null;
   attachmentUrl: string | null;
   attachmentKind: "IMAGE" | "VIDEO" | null;
@@ -112,14 +121,13 @@ function Attachment({ message }: { message: ThreadMessageView }) {
   );
 }
 
-function when(iso: string) {
-  const date = new Date(iso);
-  const today = new Date().toDateString() === date.toDateString();
-  return date.toLocaleString("en-US", {
-    ...(today ? {} : { month: "short", day: "numeric" }),
-    hour: "numeric",
-    minute: "2-digit",
-  });
+const when = chatTime;
+
+/** The deal's agent writes as themselves, and says whose agent they are. */
+function displayName(message: ThreadMessageView) {
+  return message.senderRole === "agent"
+    ? `${message.senderName} · Channel Adda agent`
+    : message.senderName;
 }
 
 function Bubble({ message }: { message: ThreadMessageView }) {
@@ -167,7 +175,7 @@ function Bubble({ message }: { message: ThreadMessageView }) {
             )}
           >
             <span className="font-medium text-muted">
-              {message.mine ? "You" : message.senderName}
+              {message.mine ? "You" : displayName(message)}
             </span>
             <span>{when(message.createdAt)}</span>
           </p>
@@ -209,12 +217,15 @@ export function ThreadView({
   messages,
   closed,
   otherSide,
+  viewerRole,
 }: {
   conversationId: string;
   messages: ThreadMessageView[];
   closed: boolean;
   /** Who the reader is talking to, for the empty state. */
   otherSide: string;
+  /** How the reader is involved, so an offer card can say whose move it is. */
+  viewerRole: "buyer" | "seller" | "agent" | "staff";
 }) {
   const [draft, setDraft] = useState("");
   const [note, setNote] = useState<string | null>(null);
@@ -332,9 +343,22 @@ export function ThreadView({
         </div>
       ) : (
         <ul className="mt-4 flex flex-col gap-4">
-          {messages.map((message) => (
-            <Bubble key={message.id} message={message} />
-          ))}
+          {messages.map((message) =>
+            message.kind === "EVENT" ? (
+              <EventLine key={message.id} message={message} />
+            ) : message.kind === "OFFER" && message.offer ? (
+              <ChatOfferCard
+                key={message.id}
+                offer={message.offer}
+                viewerRole={viewerRole}
+                senderName={message.mine ? "You" : displayName(message)}
+                mine={message.mine}
+                createdAt={message.createdAt}
+              />
+            ) : (
+              <Bubble key={message.id} message={message} />
+            ),
+          )}
         </ul>
       )}
       <div ref={endRef} />
