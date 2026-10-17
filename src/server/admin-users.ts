@@ -1205,7 +1205,7 @@ export type AcceptInviteResult =
  *
  * The account is built the way `scripts/create-admin.ts` builds one — Better
  * Auth keeps the password on Account, hashed with its own `hashPassword`, and
- * looks it up by (issuer, accountId) — rather than going through the sign-up
+ * looks it up by (providerId, accountId) — rather than going through the sign-up
  * endpoint, which would try to send a verification email that may have
  * nowhere to go.
  */
@@ -1265,7 +1265,6 @@ export async function acceptStaffInvite(input: {
           userId: user.id,
           accountId: user.id,
           providerId: "credential",
-          issuer: "local:credential",
           password,
           updatedAt: new Date(),
         },

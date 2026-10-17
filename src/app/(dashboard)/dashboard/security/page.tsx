@@ -70,10 +70,8 @@ export default async function SecurityPage() {
               <h2 className="font-display text-base font-bold text-fg">
                 Two-step is expected on this account
               </h2>
-              {/* biome-ignore lint/a11y/useSemanticElements: an <output> is the
-                  result of a form. This is a standing warning about the account
-                  that happens to want announcing, which is what role=status is
-                  for — and it is the role this page has always carried. */}
+              {/* role=status, not <output>: an <output> is the result of a
+                  form, and this is a standing warning about the account. */}
               <p
                 role="status"
                 className="mt-1 text-sm leading-relaxed text-muted"

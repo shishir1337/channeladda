@@ -2,6 +2,9 @@ import { QuoteIcon, StarIcon } from "lucide-react";
 import { Container, Section, SectionHeading } from "@/components/ui/section";
 import { db } from "@/lib/db";
 
+/** One name per star, so a rating row is keyed by name, not position. */
+const STAR_KEYS = ["one", "two", "three", "four", "five"] as const;
+
 /**
  * Reviews, from the reviews table.
  *
@@ -86,10 +89,9 @@ export async function Testimonials() {
                   className="mt-6 flex items-center gap-0.5"
                   aria-label={`Rated ${review.rating} out of 5`}
                 >
-                  {Array.from({ length: review.rating }, (_, i) => (
+                  {STAR_KEYS.slice(0, review.rating).map((star) => (
                     <StarIcon
-                      // Fixed-length rating row; index is the only identity.
-                      key={`${review.id}-star-${i}`}
+                      key={star}
                       aria-hidden="true"
                       className="size-4 fill-primary text-primary"
                     />

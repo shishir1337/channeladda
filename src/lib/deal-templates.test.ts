@@ -61,21 +61,21 @@ test("the opening payment step never moves the status itself", () => {
   }
 });
 
-test.each([
-  "SAFEST",
-  "FASTEST",
-] as const)("every %s step transition is legal for that step's actor", (mode: DealMode) => {
-  let current: OrderStatus = OPENING_STATUS[mode];
-  for (const step of templateFor(mode)) {
-    if (!step.entersStatus) continue;
-    expect(
-      canTransition(mode, current, step.entersStatus, step.actor),
-      `step ${step.position} (${step.label}): ${current} -> ${step.entersStatus} as ${step.actor}`,
-    ).toBe(true);
-    current = step.entersStatus;
-  }
-  expect(current).toBe("COMPLETED");
-});
+test.each(["SAFEST", "FASTEST"] as const)(
+  "every %s step transition is legal for that step's actor",
+  (mode: DealMode) => {
+    let current: OrderStatus = OPENING_STATUS[mode];
+    for (const step of templateFor(mode)) {
+      if (!step.entersStatus) continue;
+      expect(
+        canTransition(mode, current, step.entersStatus, step.actor),
+        `step ${step.position} (${step.label}): ${current} -> ${step.entersStatus} as ${step.actor}`,
+      ).toBe(true);
+      current = step.entersStatus;
+    }
+    expect(current).toBe("COMPLETED");
+  },
+);
 
 test("each mode opens on the status its cleared payment leads to", () => {
   expect(OPENING_STATUS.SAFEST).toBe("AWAITING_CUSTODY");

@@ -230,7 +230,6 @@ model Account {
   id         String @id @default(cuid())
   accountId  String
   providerId String
-  issuer     String
   userId     String
 
   accessToken           String?
@@ -246,7 +245,9 @@ model Account {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([issuer, accountId])
+  // Better Auth's key for a linked account (1.7.3+, as in 1.6). It refuses
+  // to sign in when two rows share it, so the database refuses the second.
+  @@unique([providerId, accountId])
   @@index([userId])
 }
 
@@ -304,7 +305,7 @@ model StaffInvite {
   invitedById String
   invitedBy   User   @relation("StaffInviteAuthor", fields: [invitedById], references: [id])
 
-  acceptedAt DateTime?
+  acceptedAt     DateTime?
   /// The account the invitation produced. Scalar rather than a relation: it is
   /// a historical record, and nothing reads the team from this side.
   acceptedUserId String?

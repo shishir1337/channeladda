@@ -23,7 +23,7 @@ async function main() {
   const name = process.env.ADMIN_NAME?.trim();
   const password = process.env.ADMIN_PASSWORD;
 
-  if (!email || !email.includes("@")) {
+  if (!email?.includes("@")) {
     throw new Error("ADMIN_EMAIL must be a real email address.");
   }
   if (!name) throw new Error("ADMIN_NAME is required.");
@@ -64,13 +64,12 @@ async function main() {
 
   // Better Auth keeps the password on Account, never on User. providerId
   // "credential" is its name for password login, and it looks the row up by
-  // (issuer, accountId) -- which the seed sets to the user id, so this matches.
+  // (providerId, accountId) -- which the seed sets to the user id, so this matches.
   await db.account.create({
     data: {
       userId: user.id,
       accountId: user.id,
       providerId: "credential",
-      issuer: "local:credential",
       password: await hashPassword(password),
       updatedAt: new Date(),
     },

@@ -778,7 +778,7 @@ export async function assignAgent(input: {
     where: { id: input.agentId },
     select: { role: true, bannedAt: true },
   });
-  if (!assignee || assignee.role !== "AGENT" || assignee.bannedAt) {
+  if (assignee?.role !== "AGENT" || assignee.bannedAt) {
     return { ok: false, reason: "wrong-actor" };
   }
 

@@ -12,6 +12,9 @@ import { platformMap } from "@/data/platforms";
 import { type Seller, sellerAvatarSrc } from "@/data/sellers";
 import { ratingLabel } from "@/lib/utils";
 
+/** One name per star, so a rating row is keyed by name, not position. */
+const STAR_KEYS = ["one", "two", "three", "four", "five"] as const;
+
 export function TopSellers({ sellers }: { sellers: Seller[] }) {
   return (
     <Section>
@@ -75,10 +78,9 @@ export function TopSellers({ sellers }: { sellers: Seller[] }) {
                     className="flex items-center gap-0.5"
                     aria-hidden="true"
                   >
-                    {Array.from({ length: 5 }, (_, i) => (
+                    {STAR_KEYS.map((star) => (
                       <StarIcon
-                        // Fixed-length rating row; index is the only identity.
-                        key={`${seller.slug}-star-${i}`}
+                        key={star}
                         className="size-3.5 fill-primary text-primary"
                       />
                     ))}
