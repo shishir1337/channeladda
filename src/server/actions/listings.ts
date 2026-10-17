@@ -79,7 +79,7 @@ export async function saveListing(
   // `checkOwnershipCode` short-circuits on "already verified" and never looks
   // again. Done before the write, so the identity being compared is the one
   // still on the row.
-  await clearVerificationIfIdentityChanged(id, {
+  await clearVerificationIfIdentityChanged(user.id, id, {
     sourceUrl: parsed.data.sourceUrl ?? null,
     handle: parsed.data.handle ?? null,
   });

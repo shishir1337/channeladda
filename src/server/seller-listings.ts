@@ -456,11 +456,17 @@ export async function deleteDraft(sellerId: string, id: string) {
  * in the old channel's description, where it proves nothing about the new one.
  */
 export async function clearVerificationIfIdentityChanged(
+  sellerId: string,
   listingId: string,
   next: { sourceUrl?: string | null; handle?: string | null },
 ): Promise<boolean> {
-  const listing = await db.listing.findUnique({
-    where: { id: listingId },
+  // Scoped to the seller, and scoped here rather than at the caller: this
+  // runs before the caller has established who owns the listing, so an id
+  // alone let any signed-in account strip the verified badge, the ownership
+  // code and the channel id off any listing on the site — and be told the
+  // listing could not be found, after the write.
+  const listing = await db.listing.findFirst({
+    where: { id: listingId, sellerId },
     select: { sourceUrl: true, handle: true, ownershipVerifiedAt: true },
   });
   if (!listing) return false;
@@ -474,8 +480,8 @@ export async function clearVerificationIfIdentityChanged(
 
   if (!changed) return false;
 
-  await db.listing.update({
-    where: { id: listingId },
+  await db.listing.updateMany({
+    where: { id: listingId, sellerId },
     data: {
       ownershipVerifiedAt: null,
       ownershipCode: null,

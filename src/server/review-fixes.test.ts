@@ -394,7 +394,7 @@ test(
   withCleanDb(async () => {
     // A verified-then-rejected listing was editable, kept the flag, and
     // checkOwnershipCode short-circuits on "already verified".
-    const { listing } = await seedListing();
+    const { listing, seller } = await seedListing();
     await db.listing.update({
       where: { id: listing.id },
       data: {
@@ -409,7 +409,7 @@ test(
     const { clearVerificationIfIdentityChanged } = await import(
       "@/server/seller-listings"
     );
-    const cleared = await clearVerificationIfIdentityChanged(listing.id, {
+    const cleared = await clearVerificationIfIdentityChanged(seller.id, listing.id, {
       sourceUrl: "https://youtube.com/@somebody-else",
       handle: "@somebody-else",
     });
@@ -429,7 +429,7 @@ test(
 test(
   "editing something harmless keeps the verification",
   withCleanDb(async () => {
-    const { listing } = await seedListing();
+    const { listing, seller } = await seedListing();
     await db.listing.update({
       where: { id: listing.id },
       data: {
@@ -447,7 +447,7 @@ test(
     // Same link, same handle — the seller is editing a price or a
     // description, which has nothing to do with who controls the account.
     expect(
-      await clearVerificationIfIdentityChanged(listing.id, {
+      await clearVerificationIfIdentityChanged(seller.id, listing.id, {
         sourceUrl: "https://youtube.com/@original",
         handle: "@original",
       }),
@@ -709,5 +709,88 @@ test(
     const row = await db.upload.findUnique({ where: { key } });
     expect(row?.attachedAt).not.toBeNull();
     expect(seller.id).not.toBe(buyer.id);
+  }),
+);
+
+// ------------------------------------- verification belongs to its own seller
+
+test(
+  "a stranger cannot clear somebody else's ownership verification",
+  withCleanDb(async () => {
+    // saveListing cleared the verification before checking who owned the
+    // listing, and the helper looked the row up by id alone. So any signed-in
+    // account could strip the verified badge, the ownership code and the
+    // channel id off every listing on the site, one call each, and be told
+    // "that listing could not be found" after the write had happened.
+    const { listing, seller, buyer } = await seedListing();
+    const { clearVerificationIfIdentityChanged } = await import(
+      "@/server/seller-listings"
+    );
+    await db.listing.update({
+      where: { id: listing.id },
+      data: {
+        ownershipVerifiedAt: new Date(),
+        ownershipCode: "CA-ABCD2345",
+        sourceUrl: "https://www.youtube.com/@real",
+      },
+    });
+
+    const byStranger = await clearVerificationIfIdentityChanged(
+      buyer.id,
+      listing.id,
+      { sourceUrl: "https://www.youtube.com/@mine", handle: "mine" },
+    );
+    expect(byStranger).toBe(false);
+
+    const untouched = await db.listing.findUniqueOrThrow({
+      where: { id: listing.id },
+    });
+    expect(untouched.ownershipVerifiedAt).not.toBeNull();
+    expect(untouched.ownershipCode).toBe("CA-ABCD2345");
+
+    // The owner editing their own listing still clears it.
+    expect(
+      await clearVerificationIfIdentityChanged(seller.id, listing.id, {
+        sourceUrl: "https://www.youtube.com/@different",
+        handle: "different",
+      }),
+    ).toBe(true);
+    const cleared = await db.listing.findUniqueOrThrow({
+      where: { id: listing.id },
+    });
+    expect(cleared.ownershipVerifiedAt).toBeNull();
+  }),
+);
+
+test(
+  "an agent does not get to read every upload on the platform",
+  withCleanDb(async () => {
+    // AGENT is deliberately not staff: session.ts and messages.ts both keep
+    // agents out, and an agent gets a 404 at /admin/messages. The upload gate
+    // promoted them to full staff, so an agent holding any URL could read any
+    // seller's analytics screenshots and any private thread's attachments —
+    // including deals they have nothing to do with.
+    const { listing, seller } = await seedListing();
+    const agent = await seedUser("AGENT");
+    const { canReadUpload } = await import("@/server/upload-access");
+    const key = `proof/${"7".repeat(32)}.png`;
+    await db.listingProof.create({
+      data: {
+        listingId: listing.id,
+        url: `/uploads/${key}`,
+        label: "Analytics",
+        fileHash: "hash",
+      },
+    });
+
+    const asAgent = { ...asUser(agent.id), role: "AGENT" as const };
+    expect(await canReadUpload(key, asAgent)).toBe(false);
+
+    // A moderator still reads it: they are the ones who check the proof.
+    const mod = await seedUser("MODERATOR");
+    expect(
+      await canReadUpload(key, { ...asUser(mod.id), role: "MODERATOR" }),
+    ).toBe(true);
+    expect(await canReadUpload(key, asUser(seller.id))).toBe(true);
   }),
 );

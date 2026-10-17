@@ -176,11 +176,17 @@ const DISPUTABLE: readonly OrderStatus[] = Object.freeze([
  * `COMPLETED` matters as much as the refund routes: by the time most disputes
  * are raised one side has already performed, and an outcome set that only
  * ever favours one fixed party is not an adjudication.
+ *
+ * `CANCELLED` is here because a dispute can be raised before anyone has paid,
+ * and without it such a deal had no reachable end at all: the refund routes
+ * need a payment reference, the sweep only looked at orders still awaiting
+ * payment, and the listing stayed reserved for ever. Opening a deal is free,
+ * so that was a two-call denial of service against any listing on the site.
  */
 const DISPUTE_OUTCOMES: Readonly<Record<DealMode, readonly OrderStatus[]>> =
   Object.freeze({
-    SAFEST: ["COMPLETED", "RETURNED_TO_SELLER"],
-    FASTEST: ["COMPLETED", "REFUNDED"],
+    SAFEST: ["COMPLETED", "RETURNED_TO_SELLER", "CANCELLED"],
+    FASTEST: ["COMPLETED", "REFUNDED", "CANCELLED"],
   });
 
 export function canTransition(

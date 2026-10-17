@@ -19,7 +19,12 @@ import type { CurrentUser } from "@/server/session";
  * Artwork stays public, because it is rendered on every listing card and a
  * permission check on it would be theatre.
  */
-const STAFF_ROLES = ["MODERATOR", "FINANCE", "SUPERADMIN", "AGENT"] as const;
+// AGENT is deliberately not here. An agent is staff for the deals they are
+// assigned to, not for the platform: session.ts and messages.ts both keep
+// them out, and an agent is 404'd from /admin/messages. Reading every
+// seller's analytics screenshots and every private thread's attachments
+// from a URL is a wider grant than the page that would show them.
+const STAFF_ROLES = ["MODERATOR", "FINANCE", "SUPERADMIN"] as const;
 
 function isStaff(user: CurrentUser | null): boolean {
   return user !== null && STAFF_ROLES.includes(user.role as "MODERATOR");

@@ -41,6 +41,10 @@ export type DealFailure =
   | "disputed"
   /** Too late to undo: the buyer has already paid the seller. */
   | "already-paid"
+  /** Too late to refund: the buyer already holds the account. */
+  | "already-handed-over"
+  /** Finishing a deal is the last step’s job, not a shortcut past it. */
+  | "not-disputed"
   | "bad-proof";
 
 export type DealOutcome<T = Record<never, never>> =
@@ -984,7 +988,12 @@ async function expireStale(scope: { listingId?: string }): Promise<number> {
   const cutoff = new Date(Date.now() - PAYMENT_WINDOW_HOURS * 60 * 60 * 1000);
   const stale = await db.order.findMany({
     where: {
-      status: "AWAITING_PAYMENT",
+      // A dispute raised before anyone paid belongs here too. Opening a
+      // deal is free and either party may dispute one, so a listing could
+      // be taken off the market for ever with two calls and no money: the
+      // sweep looked only at orders still awaiting payment, and nothing
+      // else freed the reservation.
+      status: { in: ["AWAITING_PAYMENT", "DISPUTED"] },
       paymentRef: null,
       createdAt: { lt: cutoff },
       ...(scope.listingId ? { listingId: scope.listingId } : {}),
@@ -995,7 +1004,7 @@ async function expireStale(scope: { listingId?: string }): Promise<number> {
   let expired = 0;
   for (const order of stale) {
     const moved = await db.order.updateMany({
-      where: { id: order.id, status: "AWAITING_PAYMENT", paymentRef: null },
+      where: { id: order.id, status: order.status, paymentRef: null },
       data: { status: "PAYMENT_EXPIRED", cancelledAt: new Date() },
     });
     if (moved.count !== 1) continue;
@@ -1046,6 +1055,8 @@ export async function resolveDeal(input: {
       paymentRef: true,
       custodyAt: true,
       sellerConfirmedAt: true,
+      buyerPaidAt: true,
+      handoverAt: true,
     },
   });
 
@@ -1070,11 +1081,36 @@ export async function resolveDeal(input: {
     return { ok: false, reason: "not-paid" };
   }
 
-  // Once the seller has confirmed the buyer's payment arrived, handing the
-  // channel back would leave them holding both the money and the asset. The
-  // way out of a deal that far along is to finish it or to dispute it.
-  if (input.to === "RETURNED_TO_SELLER" && order.sellerConfirmedAt) {
+  // Finishing a deal is the final step's job. That step checks the template,
+  // the actor, and — above the threshold — a second staff member; none of
+  // which happens here. The same transitions are legal for an agent, so
+  // without this one call closed a live deal as a success with the channel
+  // still in the agent's hands and the dual control walked around.
+  //
+  // Deciding a dispute is what this path is for, and that is left intact.
+  if (input.to === "COMPLETED" && order.status !== "DISPUTED") {
+    return { ok: false, reason: "not-disputed" };
+  }
+
+  // Once the buyer has paid the seller, handing the channel back would leave
+  // the seller holding both the money and the asset.
+  //
+  // This used to read sellerConfirmedAt — the seller's own say-so — so the
+  // way to keep both was simply never to press “I received it”. buyerPaidAt
+  // is stamped by the buyer with their transaction reference, which is the
+  // fact the guard is about.
+  if (
+    input.to === "RETURNED_TO_SELLER" &&
+    (order.buyerPaidAt || order.sellerConfirmedAt)
+  ) {
     return { ok: false, reason: "already-paid" };
+  }
+
+  // The mirror image, which had no guard at all: once the buyer has
+  // confirmed they hold the account, a full refund leaves them with the
+  // account and the money both, and the seller with neither.
+  if (input.to === "REFUNDED" && order.handoverAt) {
+    return { ok: false, reason: "already-handed-over" };
   }
 
   const now = new Date();
