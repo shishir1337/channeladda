@@ -890,3 +890,44 @@ test(
     expect(sent).toMatchObject({ ok: false });
   }),
 );
+
+test(
+  "a half-finished draft can be saved and read back",
+  withCleanDb(async () => {
+    // The schema lets a seller save a draft with only a handle. The columns
+    // behind it are NOT NULL integers and strings, and the form sends NaN for
+    // an empty number — so without coercion the save passes validation and
+    // then fails at the database, which is the same dead end from one step
+    // further along.
+    const { createDraft, getMyListing } = await import(
+      "@/server/seller-listings"
+    );
+    const seller = await seedUser("USER");
+
+    const id = await createDraft(seller.id, {
+      platform: "youtube",
+      handle: "halffinished",
+      title: "",
+      niche: "",
+      country: "",
+      audience: Number.NaN,
+      monetized: false,
+      monthlyRevenue: Number.NaN,
+      yearlyRevenue: Number.NaN,
+      engagement: Number.NaN,
+      ageYears: Number.NaN,
+      price: Number.NaN,
+      coverUrl: "",
+      avatarUrl: "",
+      proofs: [],
+    });
+
+    const saved = await getMyListing(seller.id, id);
+    expect(saved).not.toBeNull();
+    expect(saved?.handle).toBe("halffinished");
+    expect(saved?.status).toBe("DRAFT");
+    // Blank, not NaN — a draft reads back the way it was left.
+    expect(saved?.audience).toBe(0);
+    expect(saved?.price).toBe(0);
+  }),
+);

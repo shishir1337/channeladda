@@ -29,7 +29,7 @@ const dollars = (max: number) =>
     .max(max, `That is above the ${max.toLocaleString()} limit.`)
     .refine((n) => Number.isFinite(n), "Enter a number.");
 
-export const listingDraftSchema = z.object({
+const listingFields = z.object({
   platform: z.enum(PLATFORM_IDS, { message: "Choose a platform." }),
 
   handle: z
@@ -164,12 +164,49 @@ export type ListingDraft = z.output<typeof listingDraftSchema>;
  * Submitting for review asks for more than saving a draft does. A draft is
  * allowed to be half-finished; a listing about to be shown to buyers is not.
  */
-export const listingSubmitSchema = listingDraftSchema.extend({
+export const listingSubmitSchema = listingFields.extend({
   coverUrl: z.string().min(1, "Add a cover image."),
   avatarUrl: z.string().min(1, "Add a profile picture."),
-  proofs: listingDraftSchema.shape.proofs.unwrap().min(1, {
+  proofs: listingFields.shape.proofs.unwrap().min(1, {
     message: "Add at least one screenshot proving the account is yours.",
   }),
+});
+
+/**
+ * What a seller may save and come back to.
+ *
+ * Only the handle is required, because the public slug is built from it and
+ * a draft with no identity is not a draft of anything. Everything else may
+ * be left blank — but anything actually typed goes through the same rule and
+ * the same message as it would on submission, because half-finished is not
+ * the same as unchecked: a two-character title is a typo, not a work in
+ * progress.
+ *
+ * The form has always promised “Save a draft at any point” and the comment
+ * above has always said a draft is allowed to be half-finished. Until now a
+ * draft also demanded a ten-character title, a niche, a country, an audience
+ * figure, an engagement rate, an account age and a price of at least a
+ * dollar — so a seller who typed a handle and went to find their analytics
+ * came back to a form that refused to save and told them off.
+ *
+ * `NaN` is what the form sends for an empty number field, and empty string
+ * for an empty text one. Both mean “not filled in yet” here.
+ */
+const blankText = z.literal("");
+const blankNumber = z.custom<number>((v) => typeof v === "number" && Number.isNaN(v));
+
+export const listingDraftSchema = listingFields.extend({
+  title: z.union([blankText, listingFields.shape.title]),
+  niche: z.union([blankText, listingFields.shape.niche]),
+  country: z.union([blankText, listingFields.shape.country]),
+  audience: z.union([blankNumber, listingFields.shape.audience]),
+  engagement: z.union([blankNumber, listingFields.shape.engagement]),
+  ageYears: z.union([blankNumber, listingFields.shape.ageYears]),
+  price: z.union([blankNumber, listingFields.shape.price]),
+  monthlyRevenue: z.union([blankNumber, listingFields.shape.monthlyRevenue]),
+  yearlyRevenue: z.union([blankNumber, listingFields.shape.yearlyRevenue]),
+  coverUrl: z.string().default(""),
+  avatarUrl: z.string().default(""),
 });
 
 /** Dollars to integer cents, without ever letting a float reach the database. */

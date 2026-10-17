@@ -232,6 +232,16 @@ async function uniqueSlug(handle: string, platform: string, exceptId?: string) {
   return `${base}-${randomBytes(4).toString("hex")}`;
 }
 
+/**
+ * A number the column will accept.
+ *
+ * A draft may be saved half-finished, and the form sends `NaN` for a number
+ * field nobody has filled in. The columns behind them are NOT NULL integers,
+ * so without this the save passes validation and then fails at the database
+ * — which is the same dead end one step further along.
+ */
+const orZero = (value: number) => (Number.isFinite(value) ? value : 0);
+
 function toColumns(input: ListingDraft) {
   return {
     platform: PLATFORM_BY_ID[input.platform],
@@ -239,16 +249,16 @@ function toColumns(input: ListingDraft) {
     title: input.title,
     niche: input.niche,
     country: input.country,
-    audience: input.audience,
+    audience: orZero(input.audience),
     monetized: input.monetized,
-    monthlyRevenueUsd: toCents(input.monthlyRevenue),
-    yearlyRevenueUsd: toCents(input.yearlyRevenue),
+    monthlyRevenueUsd: toCents(orZero(input.monthlyRevenue)),
+    yearlyRevenueUsd: toCents(orZero(input.yearlyRevenue)),
     sourceUrl: input.sourceUrl || null,
     description: input.description || null,
     whatsapp: input.whatsapp || null,
-    engagementBp: toEngagementBp(input.engagement),
-    ageYears: input.ageYears,
-    priceUsd: toCents(input.price),
+    engagementBp: toEngagementBp(orZero(input.engagement)),
+    ageYears: orZero(input.ageYears),
+    priceUsd: toCents(orZero(input.price)),
     coverUrl: input.coverUrl,
     avatarUrl: input.avatarUrl,
     transferProfile: input.transferProfile || null,
