@@ -552,7 +552,10 @@ export async function setUserBanned(input: {
     // Their listings come down with them. Leaving a suspended seller's
     // accounts on the browse page is how the next person gets scammed.
     // Lifting the suspension does not put them back: the seller relists, so
-    // nothing goes live again without somebody deciding it should.
+    // nothing goes live again without somebody deciding it should. A
+    // reserved listing is paused as well — its deal carries on, and if that
+    // deal is cancelled the listing stays off the marketplace — and the
+    // seller cannot resume it until the deal is over (setPaused).
     await db.listing.updateMany({
       where: { sellerId: target.id, status: { in: ["LIVE", "RESERVED"] } },
       data: { status: "PAUSED" },

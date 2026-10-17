@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import type { ListingStatus } from "@/generated/prisma/enums";
 import {
   containsOwnershipCode,
   handleFromUrl,
@@ -208,6 +209,17 @@ export type VerifyResult =
   | { ok: true; message: string }
   | { ok: false; error: string; manual?: boolean };
 
+/**
+ * The statuses a code check can act on.
+ *
+ * Waiting on the code, or already with a moderator. Anything else reaches
+ * review another way — a draft or a rejected listing through
+ * startOwnershipCheck, a taken-down one only through a moderator reopening
+ * it — and the check used to move a listing from any status, so it walked
+ * around every one of those.
+ */
+const CHECKABLE: readonly ListingStatus[] = ["CODE_CHECK", "ADMIN_REVIEW"];
+
 export async function checkOwnershipCode(
   listingId: string,
 ): Promise<VerifyResult> {
@@ -218,6 +230,7 @@ export async function checkOwnershipCode(
     select: {
       id: true,
       sellerId: true,
+      status: true,
       slug: true,
       platform: true,
       ownershipCode: true,
@@ -233,6 +246,15 @@ export async function checkOwnershipCode(
   }
   if (!listing.ownershipCode) {
     return { ok: false, error: "Get a code first." };
+  }
+  if (!CHECKABLE.includes(listing.status)) {
+    return {
+      ok: false,
+      error:
+        listing.status === "REMOVED"
+          ? "This listing was taken down by a moderator. If you think that was a mistake, contact support."
+          : "This listing is not waiting on an ownership check. Send it for review from the listing page first.",
+    };
   }
 
   // The channel is resolved from the link on the listing, every time, and
@@ -250,11 +272,9 @@ export async function checkOwnershipCode(
     parsed.platform !== "YOUTUBE" ||
     !isYouTubeConfigured()
   ) {
-    await db.listing.update({
-      where: { id: listing.id },
-      data: { status: "CODE_CHECK" },
-    });
-    revalidatePath(`/dashboard/listings/${listing.id}`);
+    // Nothing to write: the listing is already waiting on the code, or
+    // already with a moderator. This used to set CODE_CHECK, which knocked
+    // a listing in review back a step.
     return {
       ok: false,
       manual: true,
@@ -284,8 +304,10 @@ export async function checkOwnershipCode(
       };
     }
 
-    await db.listing.update({
-      where: { id: listing.id },
+    // Compare-and-set on the status checked above, so a listing withdrawn
+    // or taken down while YouTube was answering stays where it went.
+    const { count } = await db.listing.updateMany({
+      where: { id: listing.id, status: listing.status },
       data: {
         ownershipVerifiedAt: new Date(),
         status: "ADMIN_REVIEW",
@@ -303,6 +325,13 @@ export async function checkOwnershipCode(
         avatarUrl: facts.avatarUrl ?? undefined,
       },
     });
+    if (count === 0) {
+      return {
+        ok: false,
+        error:
+          "This listing changed while we were checking it. Reload the page and try again.",
+      };
+    }
     await recordAudit({
       actorId: user.id,
       action: "listing.ownership_verified",

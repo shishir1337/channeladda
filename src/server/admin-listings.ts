@@ -453,7 +453,7 @@ export async function removeListing(id: string, reason: string) {
 
   const existing = await db.listing.findUnique({
     where: { id },
-    select: { id: true, status: true },
+    select: { id: true, status: true, sellerId: true },
   });
   if (!existing) return { ok: false as const, reason: "not-found" as const };
   if (existing.status === "SOLD" || existing.status === "RESERVED") {
@@ -461,9 +461,34 @@ export async function removeListing(id: string, reason: string) {
     return { ok: false as const, reason: "wrong-status" as const };
   }
 
-  await db.listing.update({
-    where: { id },
+  // Compare-and-set on the status that was checked. A buyer can reserve the
+  // listing between the read and this write, and an unconditional update
+  // overwrote RESERVED with REMOVED under a deal that had money in it.
+  const { count } = await db.listing.updateMany({
+    where: { id, status: existing.status },
     data: { status: "REMOVED", rejectionReason: trimmed },
+  });
+  if (count === 0) {
+    return { ok: false as const, reason: "wrong-status" as const };
+  }
+
+  await notify({
+    userId: existing.sellerId,
+    kind: "LISTING",
+    title: "Your listing was taken down",
+    body: trimmed,
+    href: `/dashboard/listings/${id}`,
+    email: {
+      subject: "Your Channel Adda listing was taken down",
+      body: [
+        "A moderator has taken your listing off the marketplace.",
+        "",
+        "Why:",
+        trimmed,
+        "",
+        "If you think this is a mistake, reply through support and a moderator can send it back to review.",
+      ].join("\n"),
+    },
   });
 
   return {

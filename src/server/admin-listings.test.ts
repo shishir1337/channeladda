@@ -1,4 +1,4 @@
-import { expect, test } from "vitest";
+import { expect, test, vi } from "vitest";
 import type { ListingStatus } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
 import {
@@ -57,8 +57,10 @@ test(
       after: { status: "ADMIN_REVIEW", reason: BACK },
     });
 
+    // The takedown sent one notice already; this is the second, about the
+    // way back.
     const told = await db.notification.findMany({
-      where: { userId: seller.id },
+      where: { userId: seller.id, body: BACK },
     });
     expect(told).toHaveLength(1);
     expect(told[0]).toMatchObject({
@@ -84,8 +86,9 @@ test(
     });
     expect(row.status).toBe("REMOVED");
     expect(await db.auditLog.count()).toBe(0);
+    // Only the takedown notice; nothing about a reopening that did not happen.
     expect(await db.notification.count({ where: { userId: seller.id } })).toBe(
-      0,
+      1,
     );
   }),
 );
@@ -283,5 +286,54 @@ test(
     expect((await getListingForReview(listing.id))?.whatsapp).toBe(
       "+8801712345678",
     );
+  }),
+);
+
+// ------------------------------------------------------------- takedowns
+
+test(
+  "taking a listing down tells the seller why",
+  withCleanDb(async () => {
+    // The listing vanished from the marketplace and from nowhere else: the
+    // seller found out when a buyer asked where it had gone.
+    const { listing, seller } = await removedListing();
+
+    const told = await db.notification.findMany({
+      where: { userId: seller.id, kind: "LISTING" },
+    });
+    expect(told).toHaveLength(1);
+    expect(told[0]?.body).toContain(TAKEDOWN);
+    expect(told[0]?.href).toBe(`/dashboard/listings/${listing.id}`);
+  }),
+);
+
+test(
+  "a takedown that read a listing just before a buyer reserved it changes nothing",
+  withCleanDb(async () => {
+    // Read LIVE, write REMOVED: if a buyer reserved it in between, the write
+    // overwrote RESERVED and stranded a deal with money in it. The stale read
+    // is simulated by answering the first lookup with the old status.
+    const seeded = await seedListing();
+    await db.listing.update({
+      where: { id: seeded.listing.id },
+      data: { status: "RESERVED" },
+    });
+    const stale = vi.spyOn(db.listing, "findUnique").mockResolvedValueOnce({
+      id: seeded.listing.id,
+      status: "LIVE",
+      sellerId: seeded.seller.id,
+    } as never);
+
+    const result = await removeListing(seeded.listing.id, TAKEDOWN);
+    stale.mockRestore();
+
+    expect(result).toEqual({ ok: false, reason: "wrong-status" });
+    const row = await db.listing.findUniqueOrThrow({
+      where: { id: seeded.listing.id },
+    });
+    expect(row.status).toBe("RESERVED");
+    expect(
+      await db.notification.count({ where: { userId: seeded.seller.id } }),
+    ).toBe(0);
   }),
 );

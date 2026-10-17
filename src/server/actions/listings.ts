@@ -142,16 +142,18 @@ export async function setPaused(
   const user = await requireUser();
   const result = await repo.setPaused(user.id, id, paused);
   if (!result.ok) {
-    return result.reason === "not-found"
-      ? NOT_YOURS
-      : {
-          ok: false,
-          errors: {
-            form: paused
+    if (result.reason === "not-found") return NOT_YOURS;
+    return {
+      ok: false,
+      errors: {
+        form:
+          result.reason === "in-deal"
+            ? "A deal on this listing is still running. It can go back on sale once that deal is finished."
+            : paused
               ? "Only a live listing can be paused."
               : "Only a paused listing can be resumed.",
-          },
-        };
+      },
+    };
   }
   refreshFor(id);
   // A pause changes what buyers see.

@@ -3,6 +3,7 @@ import "server-only";
 import { randomBytes } from "node:crypto";
 import type { ListingStatus, Platform } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
+import { TERMINAL_STATUSES } from "@/lib/deal-machine";
 import {
   fromCents,
   fromEngagementBp,
@@ -427,10 +428,26 @@ export async function setPaused(sellerId: string, id: string, paused: boolean) {
   if (existing.status !== from) {
     return { ok: false as const, reason: "wrong-status" as const };
   }
-  await db.listing.update({
-    where: { id },
+
+  // A suspension pauses reserved listings too, and their deals keep going.
+  // Resuming one of those mid-deal put the channel back on sale while the
+  // first buyer was still paying for it. It resumes once the deal is over.
+  if (!paused) {
+    const running = await db.order.count({
+      where: { listingId: id, status: { notIn: [...TERMINAL_STATUSES] } },
+    });
+    if (running > 0) {
+      return { ok: false as const, reason: "in-deal" as const };
+    }
+  }
+
+  const { count } = await db.listing.updateMany({
+    where: { id, status: from },
     data: { status: paused ? "PAUSED" : "LIVE" },
   });
+  if (count === 0) {
+    return { ok: false as const, reason: "wrong-status" as const };
+  }
   return { ok: true as const };
 }
 
