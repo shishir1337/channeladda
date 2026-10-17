@@ -31,6 +31,8 @@ const MESSAGES: Record<repo.OfferFailure, string> = {
   taken: "Someone else got there first — this listing is no longer available.",
   closed:
     "Channel Adda closed this conversation, so the offer can't carry a note. Send it without one.",
+  "too-high":
+    "At or above the asking price the buyer can simply buy. Offer less, or leave the price as it is.",
 };
 
 function fail(reason: repo.OfferFailure): OfferResult {
@@ -146,6 +148,57 @@ export async function counterOffer(
 
   refresh(side.offer.listingSlug);
   return { ok: true, message: "Counter sent." };
+}
+
+/**
+ * A seller putting a price to the buyer in one of their conversations.
+ *
+ * Which conversation is named by the request; whether the signed-in person is
+ * its seller is checked by the repository, never assumed.
+ */
+export async function proposePrice(
+  conversationId: string,
+  amount: number,
+  message: string,
+): Promise<OfferResult> {
+  const user = await requireUser();
+  if (!user.emailVerified) {
+    return {
+      ok: false,
+      error: "Confirm your email address before offering a price.",
+    };
+  }
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return { ok: false, error: "Enter the price you are offering." };
+  }
+
+  const settings = await getSettings();
+  const result = await repo.proposePrice({
+    sellerId: user.id,
+    conversationId,
+    amountCents: toCents(amount),
+    message: message.trim() || null,
+    expiryHours: settings.offerExpiryHours,
+  });
+  if (!result.ok) {
+    // The shared wording speaks to a buyer. A seller with an offer waiting
+    // is being asked to answer it, not to withdraw anything.
+    if (result.reason === "already-open") {
+      return {
+        ok: false,
+        error:
+          "There is an offer open in this conversation already. Answer that one first.",
+      };
+    }
+    return fail(result.reason);
+  }
+
+  refresh();
+  return {
+    ok: true,
+    message: `Price sent. The buyer has ${settings.offerExpiryHours} hours to answer.`,
+    conversationId,
+  };
 }
 
 export async function withdrawOffer(offerId: string): Promise<OfferResult> {

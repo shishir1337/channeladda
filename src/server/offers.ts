@@ -209,7 +209,9 @@ export type OfferFailure =
   | "wrong-turn"
   | "taken"
   /** A note, into a conversation Channel Adda closed. */
-  | "closed";
+  | "closed"
+  /** A seller's price at or above asking: the buyer can simply buy. */
+  | "too-high";
 
 type Result<T = undefined> =
   | ({ ok: true } & (T extends undefined ? object : { value: T }))
@@ -784,29 +786,157 @@ export async function counterOffer(input: {
   return { ok: true, value: created };
 }
 
-/** The buyer pulling their own offer back. */
+/**
+ * A seller putting a price to a buyer who wrote to them.
+ *
+ * Only in a conversation the buyer started: there is no way for a seller to
+ * reach a buyer who never made contact, and this is not one. It is an offer
+ * like any other — stored under the buyer, `bySeller` so the buyer answers —
+ * so one open offer at a time, the expiry, and accepting reserving the
+ * listing all hold without a line of new code. Below the asking price only:
+ * at or above it the buyer can simply buy.
+ */
+export async function proposePrice(input: {
+  sellerId: string;
+  conversationId: string;
+  amountCents: number;
+  message: string | null;
+  expiryHours: number;
+}): Promise<Result<{ offerId: string }>> {
+  const thread = await db.conversation.findUnique({
+    where: { id: input.conversationId },
+    select: {
+      id: true,
+      buyerId: true,
+      sellerId: true,
+      closedAt: true,
+      seller: { select: { name: true } },
+      listing: {
+        select: {
+          id: true,
+          status: true,
+          sellerId: true,
+          priceUsd: true,
+          handle: true,
+          title: true,
+        },
+      },
+    },
+  });
+  // The thread's seller and the listing's seller are the same person; both
+  // are checked so a transferred listing could not let the old one in.
+  if (
+    !thread ||
+    thread.sellerId !== input.sellerId ||
+    thread.listing.sellerId !== input.sellerId
+  ) {
+    return { ok: false, reason: "not-found" };
+  }
+  const { listing } = thread;
+  if (listing.status !== "LIVE") return { ok: false, reason: "not-live" };
+  if (input.amountCents >= listing.priceUsd) {
+    return { ok: false, reason: "too-high" };
+  }
+  if (input.amountCents < listing.priceUsd * MIN_OFFER_FRACTION) {
+    return { ok: false, reason: "too-low" };
+  }
+
+  const note = filterNote(input.message, listing.handle);
+  if (note.text && thread.closedAt) return { ok: false, reason: "closed" };
+
+  const open = await db.offer.findFirst({
+    where: {
+      listingId: listing.id,
+      buyerId: thread.buyerId,
+      status: "OPEN",
+      expiresAt: { gt: new Date() },
+    },
+    select: { id: true },
+  });
+  if (open) return { ok: false, reason: "already-open" };
+
+  const now = new Date();
+  const offerId = await db.$transaction(async (tx) => {
+    const offer = await tx.offer.create({
+      data: {
+        listingId: listing.id,
+        buyerId: thread.buyerId,
+        amountUsd: input.amountCents,
+        message: note.text,
+        bySeller: true,
+        expiresAt: new Date(now.getTime() + input.expiryHours * 3_600_000),
+      },
+      select: { id: true },
+    });
+    await postEvent(tx, {
+      conversationId: thread.id,
+      kind: "OFFER",
+      event: {
+        type: "offer-made",
+        name: thread.seller.name,
+        amountCents: input.amountCents,
+        bySeller: true,
+      },
+      senderId: input.sellerId,
+      offerId: offer.id,
+      at: now,
+    });
+    await flagForNote(tx, thread.id, note, now);
+    return offer.id;
+  });
+
+  const amount = asMoney(input.amountCents);
+  const title = `${thread.seller.name || "The seller"} offered to sell for ${amount}`;
+  const body = `On ${listing.title || "the listing you asked about"}. Accept it, counter, or turn it down. It lapses on its own if nobody answers.`;
+  await notify({
+    userId: thread.buyerId,
+    kind: "OFFER",
+    title,
+    body,
+    href: threadHref(thread.id),
+    email: { subject: title, body },
+  });
+
+  return { ok: true, value: { offerId } };
+}
+
+/**
+ * Pulling back an offer you made.
+ *
+ * Whoever made it, and only them: a buyer withdraws their own offers, a
+ * seller their own prices and counters. Neither may withdraw the other's —
+ * declining is how you say no to the other side, and that tells them. A
+ * seller's counter is stored under the buyer's id, so "made it" is read from
+ * `bySeller` and the listing, never from whose id is on the row: scoped on
+ * buyerId alone, a buyer could once mark the seller's counter WITHDRAWN.
+ */
 export async function withdrawOffer(
   offerId: string,
-  buyerId: string,
+  userId: string,
 ): Promise<Result> {
-  // bySeller: false, because a seller's counter is stored under the buyer's
-  // id. Scoped on buyerId alone, a buyer could mark the seller's counter
-  // WITHDRAWN — recorded as though they had retracted their own offer, with
-  // no notification — rather than declining it, which tells the seller.
-  const row = await db.offer.findFirst({
-    where: { id: offerId, buyerId, bySeller: false },
+  const row = await db.offer.findUnique({
+    where: { id: offerId },
     select: {
       id: true,
       status: true,
       listingId: true,
+      buyerId: true,
+      bySeller: true,
       amountUsd: true,
       buyer: { select: { name: true } },
-      listing: { select: { sellerId: true } },
+      listing: {
+        select: { sellerId: true, seller: { select: { name: true } } },
+      },
     },
   });
-  if (!row) return { ok: false, reason: "not-found" };
+  const madeIt =
+    row !== null &&
+    (row.bySeller ? row.listing.sellerId === userId : row.buyerId === userId);
+  if (!row || !madeIt) return { ok: false, reason: "not-found" };
   if (row.status !== "OPEN") return { ok: false, reason: "wrong-turn" };
 
+  const name = row.bySeller ? row.listing.seller.name : row.buyer.name;
+  const otherId = row.bySeller ? row.buyerId : row.listing.sellerId;
   const now = new Date();
   let conversationId: string;
   try {
@@ -814,7 +944,7 @@ export async function withdrawOffer(
       await claimOpen(tx, offerId, "WITHDRAWN", now);
       const conversationId = await ensureConversation(tx, {
         listingId: row.listingId,
-        buyerId,
+        buyerId: row.buyerId,
         sellerId: row.listing.sellerId,
       });
       await postEvent(tx, {
@@ -822,10 +952,10 @@ export async function withdrawOffer(
         kind: "EVENT",
         event: {
           type: "offer-withdrawn",
-          name: row.buyer.name,
+          name,
           amountCents: row.amountUsd,
         },
-        senderId: buyerId,
+        senderId: userId,
         offerId,
         at: now,
       });
@@ -836,11 +966,11 @@ export async function withdrawOffer(
     throw error;
   }
 
-  // The seller may have been about to answer it.
+  // The other side may have been about to answer it.
   await notify({
-    userId: row.listing.sellerId,
+    userId: otherId,
     kind: "OFFER",
-    title: `${row.buyer.name || "The buyer"} withdrew their offer of ${asMoney(row.amountUsd)}`,
+    title: `${name || "Someone"} withdrew their offer of ${asMoney(row.amountUsd)}`,
     body: "There is nothing to answer now.",
     href: threadHref(conversationId),
   });
