@@ -528,7 +528,7 @@ model Order {
   /// something checkable rather than one party's word against the other's.
   buyerPaymentRef   String?
   sellerConfirmedAt DateTime? // safest: seller says the money arrived
-  handoverAt        DateTime? // final transfer confirmed by the agent
+  handoverAt        DateTime? // Fastest: the BUYER confirmed access (step 5); starts the recovery hold
 
   confirmedAt DateTime? // buyer pressed confirm
   /// Set from the platform's own recovery window when the buyer confirms.

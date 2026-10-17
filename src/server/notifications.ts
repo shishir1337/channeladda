@@ -163,3 +163,33 @@ export async function markAllRead(userId: string): Promise<void> {
     data: { readAt: new Date() },
   });
 }
+
+/**
+ * Everyone at a desk.
+ *
+ * The bell reached buyers and sellers, and nothing told the people who have
+ * to act: a payout sat held against a seller's balance until somebody
+ * happened to open the queue, and a dispute waited for a moderator to
+ * notice a red row. SUPERADMIN is always included — they own every desk.
+ * Suspended staff are not.
+ */
+export async function notifyStaff(
+  roles: readonly ("MODERATOR" | "FINANCE")[],
+  build: (userId: string) => NotifyInput,
+): Promise<void> {
+  try {
+    const staff = await db.user.findMany({
+      where: {
+        role: { in: [...roles, "SUPERADMIN"] },
+        bannedAt: null,
+      },
+      select: { id: true },
+    });
+    await notifyAll(
+      staff.map((s) => s.id),
+      build,
+    );
+  } catch (error) {
+    console.error("[notify] staff", error);
+  }
+}

@@ -118,36 +118,6 @@ export const serviceMap = Object.fromEntries(
   services.map((s) => [s.slug, s]),
 ) as Record<string, Service>;
 
-export const testimonials = [
-  {
-    quote:
-      "I had two failed deals on Telegram before this. Here the money stayed put until the channel was actually in my Google account. Released it the same evening.",
-    name: "Daniel Osei",
-    role: "Bought a 428K YouTube channel",
-    initials: "DO",
-    avatar: "daniel-osei",
-    rating: 5,
-  },
-  {
-    quote:
-      "Listing took ten minutes, the verification code check was instant, and I had four offers by the next morning. Payout hit my Cryptomus wallet in under an hour.",
-    name: "Meera Raghavan",
-    role: "Sold 3 Instagram pages",
-    initials: "MR",
-    avatar: "meera-raghavan",
-    rating: 5,
-  },
-  {
-    quote:
-      "The dispute team actually reads the chat log. Seller went quiet mid-transfer, I opened a dispute, and it was settled in my favour within 48 hours.",
-    name: "Tomas Neubauer",
-    role: "Buyer since 2022",
-    initials: "TN",
-    avatar: "tomas-neubauer",
-    rating: 5,
-  },
-];
-
 export const faqs = [
   {
     q: "How does Channel Adda protect my money?",
@@ -167,7 +137,7 @@ export const faqs = [
   },
   {
     q: "What fees does Channel Adda charge?",
-    a: "Buyers pay a 3% platform fee, set by us and shown before you commit. On a Safest deal that fee is the only thing you pay us — the price goes directly to the seller. Sellers pay a success fee only on a Fastest deal, where the money passes through us; there is no cost to create an account or publish a listing.",
+    a: "Buyers pay a platform fee, set by us and shown in full on every listing and on the fees page before you commit. On a Safest deal that fee is the only thing you pay us — the price goes directly to the seller. Sellers pay a success fee only on a Fastest deal, where the money passes through us; there is no cost to create an account or publish a listing.",
   },
   {
     q: "What happens if a transfer goes wrong?",

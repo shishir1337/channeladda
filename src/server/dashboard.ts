@@ -107,17 +107,33 @@ export async function getBuyerSummary(userId: string): Promise<BuyerSummary> {
       where: { buyerId: userId, status: "OPEN", expiresAt: { gt: now } },
     }),
     db.offer.count({ where: { buyerId: userId, status: "ACCEPTED" } }),
-    db.order.aggregate({
+    // Grouped by mode, because the two count different things as paid.
+    db.order.groupBy({
+      by: ["mode"],
       where: { buyerId: userId, status: "COMPLETED" },
       _count: { _all: true },
-      _sum: { totalUsd: true },
+      _sum: { totalUsd: true, priceUsd: true },
     }),
   ]);
+
+  // On a Fastest deal totalUsd is everything the buyer paid. On a Safest
+  // deal it is only our fee — the price went to the seller directly — so
+  // summing totalUsd showed a buyer who had just completed a $10,000
+  // purchase “Spent on purchases: $3”, while the seller's mirror tile read
+  // $10,000 for the same deal. A completed Safest deal means the seller
+  // confirmed the payment arrived, so the price counts.
+  let count = 0;
+  let spentCents = 0;
+  for (const row of bought) {
+    count += row._count._all;
+    spentCents += row._sum.totalUsd ?? 0;
+    if (row.mode === "SAFEST") spentCents += row._sum.priceUsd ?? 0;
+  }
 
   return {
     openOffers,
     accepted,
-    bought: bought._count._all,
-    spent: (bought._sum.totalUsd ?? 0) / 100,
+    bought: count,
+    spent: spentCents / 100,
   };
 }

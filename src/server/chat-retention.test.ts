@@ -95,11 +95,16 @@ test(
 );
 
 test(
-  "media is removed even on a deal thread",
+  "media is removed from a deal thread once the deal is over",
   withCleanDb(async () => {
     // The 48 hour clock is about not hoarding people's screenshots, and that
-    // applies to a deal as much as to a question. The message survives.
+    // applies to a deal as much as to a question — once the deal has ended
+    // and nothing can be disputed any more. The message survives.
     const t = await thread({ withDeal: true });
+    await db.order.updateMany({
+      where: { listingId: t.listing.id },
+      data: { status: "COMPLETED" },
+    });
     const m = await message(t.conversationId, t.buyer.id, hoursAgo(50), {
       url: "/uploads/message/deal.png",
       expiresAt: hoursAgo(1),
@@ -239,5 +244,36 @@ test(
     expect(
       await db.message.findUnique({ where: { id: recent.id } }),
     ).not.toBeNull();
+  }),
+);
+
+test(
+  "an attachment in a live deal's thread outlives the 48-hour clock",
+  withCleanDb(async () => {
+    // The owner's rule was "clear messages after 10 days without the deal
+    // part", and messages honour it. Media did not: a bank receipt posted in
+    // a deal thread on day 0 was deleted on day 2, and a dispute raised on
+    // day 4 had to be decided on a free-text reference with the receipt gone
+    // — on a deal whose Google holds alone run seven days each.
+    const t = await thread({ withDeal: true });
+    await message(t.conversationId, t.buyer.id, hoursAgo(72), {
+      url: `/uploads/message/${"e".repeat(32)}.png`,
+      expiresAt: hoursAgo(24),
+    });
+
+    expect(await purgeExpiredMedia()).toBe(0);
+  }),
+);
+
+test(
+  "and so does one in a thread staff flagged",
+  withCleanDb(async () => {
+    const t = await thread({ flagged: true });
+    await message(t.conversationId, t.buyer.id, hoursAgo(72), {
+      url: `/uploads/message/${"f".repeat(32)}.png`,
+      expiresAt: hoursAgo(24),
+    });
+
+    expect(await purgeExpiredMedia()).toBe(0);
   }),
 );

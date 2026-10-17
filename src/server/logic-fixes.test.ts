@@ -280,3 +280,25 @@ test(
     expect(counter.status).toBe("OPEN");
   }),
 );
+
+// ------------------------------------------- what a buyer has actually spent
+
+test(
+  "a completed safest purchase counts the price the buyer paid the seller",
+  withCleanDb(async () => {
+    // totalUsd on a Safest deal is only our fee, so a buyer who completed a
+    // $100 purchase was shown "Spent on purchases: $3" while the seller's
+    // mirror tile read $100 for the same deal.
+    const { getBuyerSummary } = await import("@/server/dashboard");
+    const o = await open("SAFEST");
+    await db.order.update({
+      where: { id: o.orderId },
+      data: { status: "COMPLETED", paymentRef: o.reference },
+    });
+
+    const summary = await getBuyerSummary(o.buyer.id);
+    expect(summary.bought).toBe(1);
+    // $100 to the seller and $3 to us.
+    expect(summary.spent).toBe(103);
+  }),
+);

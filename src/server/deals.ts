@@ -21,6 +21,7 @@ import {
   releaseLapsedOfferReservations,
 } from "@/server/offers";
 import { getSettings } from "@/server/settings";
+import { notifyStaff } from "@/server/notifications";
 import { markUploadsAttached } from "@/server/upload-access";
 
 /**
@@ -1244,6 +1245,7 @@ export async function resolveDeal(input: {
       sellerConfirmedAt: true,
       buyerPaidAt: true,
       handoverAt: true,
+      reference: true,
     },
   });
 
@@ -1468,6 +1470,15 @@ export async function resolveDeal(input: {
 
   if (input.to === "DISPUTED") {
     await notifyDealEnded(order.id, "Dispute raised");
+    // The people who decide it. A disputed deal used to be a red row in a
+    // list that somebody had to happen to look at.
+    await notifyStaff(["MODERATOR"], (staffId) => ({
+      userId: staffId,
+      kind: "DISPUTE",
+      title: `Dispute raised on ${order.reference}`,
+      body: input.note.slice(0, 200),
+      href: "/admin/disputes",
+    }));
   } else {
     await notifyDealEnded(order.id, RESOLUTION_LABELS[input.to]);
   }

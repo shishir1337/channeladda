@@ -6,7 +6,7 @@ import { canTransition } from "@/lib/deal-machine";
 import { OPENING_STATUS } from "@/lib/deal-templates";
 import { isSerializationFailure } from "@/lib/serialization-failure";
 import { recordAudit } from "@/server/audit";
-import { notify } from "@/server/notifications";
+import { notify, notifyStaff } from "@/server/notifications";
 import { getSettings } from "@/server/settings";
 
 /**
@@ -434,6 +434,18 @@ export async function requestWithdrawal(
     after: { amountUsd, network: address.network },
   });
 
+  // Finance is who acts on this, and nothing used to tell them.
+  const amount = (amountUsd / 100).toLocaleString("en-US", {
+    style: "currency",
+    currency: "USD",
+  });
+  await notifyStaff(["FINANCE"], (staffId) => ({
+    userId: staffId,
+    kind: "PAYOUT",
+    title: `${amount} payout requested`,
+    body: "Waiting on the finance desk. The amount is held against the seller’s balance until it is sent or refused.",
+    href: "/admin/payouts",
+  }));
   return { ok: true, withdrawalId };
 }
 

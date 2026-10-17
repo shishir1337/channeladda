@@ -1,6 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db";
+import { TERMINAL_STATUSES } from "@/lib/deal-machine";
 import { isChatAttachmentKey, keyFromUrl } from "@/lib/upload-keys";
 import { deleteUpload } from "@/server/storage";
 
@@ -42,6 +43,9 @@ export function mediaExpiryFrom(now = new Date()): Date {
 /**
  * Deletes expired attachment files and forgets their URLs.
  *
+ * Not while the deal a thread belongs to is still live, and never in a thread
+ * staff flagged: see the query for why the two rules meet where they do.
+ *
  * The row is updated after the file is gone, not before: if deletion fails the
  * sweep leaves the row alone and tries again next time, rather than pointing
  * the UI at a file that is still on disk with nothing referencing it.
@@ -52,6 +56,24 @@ export async function purgeExpiredMedia(now = new Date()): Promise<number> {
       attachmentUrl: { not: null },
       attachmentRemovedAt: null,
       attachmentExpiresAt: { lte: now },
+      // Two rules meet here. The owner asked for media to go after 48 hours
+      // — nobody's screenshots hoarded, a deal's no more than a question's.
+      // But a receipt posted in a deal thread is the evidence a dispute is
+      // decided on, and 48 hours is shorter than every other clock it has to
+      // survive, two seven-day Google holds among them: a receipt from day 0
+      // was gone by the dispute on day 4.
+      //
+      // So a deal thread's media waits for the deal to end — exactly as long
+      // as a dispute can still be raised — and then the normal clock takes
+      // it. A thread staff flagged keeps its media: that is evidence about a
+      // person, not a deal.
+      conversation: {
+        flaggedAt: null,
+        OR: [
+          { orderId: null },
+          { order: { status: { in: [...TERMINAL_STATUSES] } } },
+        ],
+      },
     },
     select: { id: true, attachmentUrl: true },
     take: 500,

@@ -135,12 +135,17 @@ export function formatIn(
   opts?: { compact?: boolean },
 ) {
   const amount = usd * currency.rate;
-  // High-rate currencies would otherwise show noisy trailing digits.
-  const maximumFractionDigits = amount >= 100 || !opts?.compact ? 0 : 2;
+  // Cents only where they say something. Every non-compact price used to be
+  // whole units, so a $10 listing quoted its Safest fee as "$0" and the buyer
+  // was then invoiced $0.30. Large amounts stay whole: a listing price with
+  // trailing cents is noise, and high-rate currencies would show a lot of it.
+  const hasCents = Math.round(amount * 100) % 100 !== 0;
+  const showCents = amount < 100 && hasCents;
+  const maximumFractionDigits = showCents ? 2 : 0;
 
   const numberOpts: Intl.NumberFormatOptions = {
     maximumFractionDigits,
-    minimumFractionDigits: 0,
+    minimumFractionDigits: showCents ? 2 : 0,
     ...(opts?.compact && amount >= 10_000
       ? { notation: "compact" as const, maximumFractionDigits: 1 }
       : {}),

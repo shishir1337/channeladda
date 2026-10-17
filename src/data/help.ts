@@ -56,7 +56,7 @@ export const helpArticles: HelpArticle[] = [
     category: "buying",
     summary: "The buyer fee, when it is charged, and what happens on a refund.",
     body: [
-      "Buyers pay the listing price plus a 3% platform fee. The total is shown in full on the listing page before you commit to anything — there is never a number that appears for the first time at checkout.",
+      "Buyers pay the listing price plus a platform fee — the current rate is on the fees page, and it can differ between Safest and Fastest. The total is shown in full on the listing page before you commit to anything — there is never a number that appears for the first time at checkout.",
       "The fee is charged when the deal opens. On a Fastest deal a full refund returns the fee with it. On a Safest deal the fee comes back on its own if the deal dies before one of our agents takes custody of the account; after that it has paid for work that was actually done. A partial settlement adjusts it to match the amount settled.",
     ],
   },

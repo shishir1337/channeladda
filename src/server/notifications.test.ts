@@ -160,3 +160,54 @@ test(
     expect(rows[0].title).toBe("Thing 4");
   }),
 );
+
+test(
+  "a payout request reaches the finance desk",
+  withCleanDb(async () => {
+    // The bell reached buyers and sellers, and nothing told the people who
+    // have to act. A seller's money sat held against their balance until
+    // somebody happened to open the payouts queue.
+    const { requestWithdrawal, creditDeposit } = await import("@/server/wallet");
+    const seller = await seedUser();
+    const finance = await seedUser("FINANCE");
+    const moderator = await seedUser("MODERATOR");
+    await db.payoutAddress.create({
+      data: { userId: seller.id, address: "TXyz1234567890abcdef", network: "TRON" },
+    });
+    await creditDeposit(seller.id, 50_000, "dep-notify", "USDT");
+
+    const result = await requestWithdrawal(seller.id, 20_000);
+    expect(result).toMatchObject({ ok: true });
+
+    expect(await unreadCount(finance.id)).toBe(1);
+    // Payouts are finance's, so a moderator is not interrupted by one.
+    expect(await unreadCount(moderator.id)).toBe(0);
+  }),
+);
+
+test(
+  "a dispute reaches the moderators",
+  withCleanDb(async () => {
+    const { seedListing } = await import("@/test/db");
+    const { createDeal, resolveDeal } = await import("@/server/deals");
+    const seeded = await seedListing();
+    const moderator = await seedUser("MODERATOR");
+    const created = await createDeal({
+      listingId: seeded.listing.id,
+      buyerId: seeded.buyer.id,
+      mode: "FASTEST",
+    });
+    if (!created.ok) throw new Error(created.reason);
+
+    await resolveDeal({
+      orderId: created.orderId,
+      to: "DISPUTED",
+      byUserId: seeded.buyer.id,
+      note: "the seller stopped replying",
+    });
+
+    expect(await unreadCount(moderator.id)).toBe(1);
+    const [row] = await listNotifications(moderator.id);
+    expect(row.kind).toBe("DISPUTE");
+  }),
+);
