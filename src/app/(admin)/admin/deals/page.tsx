@@ -1,5 +1,29 @@
+import {
+  ArrowLeftRightIcon,
+  ShieldAlertIcon,
+  ShieldCheckIcon,
+  UserRoundIcon,
+  WalletIcon,
+  ZapIcon,
+} from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
+import {
+  AllClear,
+  Amount,
+  ConsoleHeader,
+  ConsoleSection,
+  MetaItem,
+  Metric,
+  MetricGrid,
+  Panel,
+  RowHead,
+  RowItem,
+  Rows,
+  TableScroller,
+  Td,
+  Th,
+} from "@/components/admin/console";
 import {
   AssignAgent,
   ClaimDeal,
@@ -7,8 +31,14 @@ import {
   RecordPayment,
 } from "@/components/admin/deal-controls";
 import { StuckDeals } from "@/components/admin/stuck-deals";
-import { Badge } from "@/components/ui/badge";
-import { Price } from "@/components/ui/price";
+import {
+  auditLabel,
+  DEAL_MODE,
+  DealModeBadge,
+  elapsed,
+  OrderStatusBadge,
+  Waited,
+} from "@/components/admin/vocab";
 import { db } from "@/lib/db";
 import {
   listDealActivity,
@@ -23,24 +53,14 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-const ACTION_LABELS: Record<string, string> = {
-  "deal.created": "Deal opened",
-  "deal.fee_paid": "Opening payment cleared",
-  "deal.agent_assigned": "Agent assigned",
-  "deal.step_completed": "Step completed",
-  "deal.completed": "Deal completed",
-  "deal.returned": "Channel returned to seller",
-  "deal.refunded": "Buyer refunded",
-  "deal.cancelled": "Deal cancelled",
-  "deal.disputed": "Dispute raised",
-};
-
 /**
  * The deal desk.
  *
- * Three things a human has to do, in the order they block on: record a
- * payment that has landed, put an agent on a deal that has none, and move a
- * deal that is stuck. Then the trail of everything that has happened.
+ * Ordered by what blocks: a channel stranded with a suspended agent, then a
+ * payment that has landed and is holding up every later step, then the deals
+ * nobody is holding, then everything in flight, then the trail of what has
+ * happened. Each queue says how many are in it and how long the oldest has
+ * waited, because a count on its own does not tell you where to start.
  *
  * Agents reach this page; `requireStaff` guards every other admin page, so an
  * agent who wanders to the listing queue gets the same 404 a stranger would.
@@ -65,7 +85,12 @@ export default async function AdminDealsPage({
 
   const [activity, needingAgent, needingReassignment, awaitingPayment, mine] =
     await Promise.all([
-      listDealActivity(50),
+      // Staff only, and not fetched otherwise. The platform-wide trail used
+      // to be queried for everybody and then hidden from agents with a CSS
+      // class, which is not access control: the rows were sitting in the
+      // HTML, so an agent could read every deal on the marketplace from
+      // view-source. An agent gets an empty list and no section at all.
+      isStaff ? listDealActivity(50) : Promise.resolve([]),
       listDealsNeedingAgent(),
       listDealsNeedingReassignment(),
       isFinance
@@ -78,6 +103,7 @@ export default async function AdminDealsPage({
               reference: true,
               mode: true,
               totalUsd: true,
+              createdAt: true,
               listing: { select: { title: true } },
             },
           })
@@ -85,206 +111,389 @@ export default async function AdminDealsPage({
       mineOnly ? listDealsForAgent(viewer.id) : Promise.resolve([]),
     ]);
 
+  const oldestUnheld = needingAgent.at(0)?.createdAt;
+  const oldestUnpaid = awaitingPayment.at(0)?.createdAt;
+  const owed = awaitingPayment.reduce((sum, order) => sum + order.totalUsd, 0);
+
   return (
     <>
-      <p className="text-xs font-semibold tracking-[0.14em] text-subtle uppercase">
-        Transfers
-      </p>
-      <h1 className="mt-2 font-display text-3xl font-black tracking-tight text-fg sm:text-4xl">
-        Deals
-      </h1>
+      <ConsoleHeader
+        eyebrow="Transfers"
+        title="Deal desk"
+        description={
+          isStaff
+            ? "Every transfer in flight, and the controls to move or end one. Nothing here times out on its own yet, so a deal that has sat for days is waiting on somebody reading this page."
+            : "The deals you are holding, and the ones nobody has taken yet. Open a deal to work its steps."
+        }
+        meta={
+          <>
+            <MetaItem label="Signed in as">{viewer.name}</MetaItem>
+            <MetaItem label="Desk">
+              {viewer.role.toLowerCase().replace("_", " ")}
+            </MetaItem>
+            <MetaItem label="Read">
+              {new Date().toLocaleString("en-GB")}
+            </MetaItem>
+          </>
+        }
+      />
+
+      <MetricGrid className="mt-6">
+        <Metric
+          label="Needs an agent"
+          value={needingAgent.length}
+          icon={UserRoundIcon}
+          tone={needingAgent.length > 0 ? "primary" : "neutral"}
+          chip={
+            oldestUnheld ? (
+              <Waited since={oldestUnheld} prefix="oldest" lateAfter={48} />
+            ) : null
+          }
+          note="Live deals with nobody holding them."
+        />
+        <Metric
+          label="Suspended agent"
+          value={needingReassignment.length}
+          icon={ShieldAlertIcon}
+          tone={needingReassignment.length > 0 ? "danger" : "neutral"}
+          note="Channels held by an account that can no longer act."
+        />
+        {isFinance ? (
+          <Metric
+            label="Awaiting payment"
+            value={awaitingPayment.length}
+            icon={WalletIcon}
+            tone={awaitingPayment.length > 0 ? "primary" : "neutral"}
+            chip={
+              oldestUnpaid ? (
+                <Waited since={oldestUnpaid} prefix="oldest" lateAfter={48} />
+              ) : null
+            }
+            note="Opening payments not yet cleared."
+          />
+        ) : null}
+        {mineOnly ? (
+          <Metric
+            label="Yours"
+            value={mine.length}
+            icon={ArrowLeftRightIcon}
+            note="Deals you are the agent of record on."
+          />
+        ) : null}
+      </MetricGrid>
+
+      {/* The two modes are mirror images and staff get the asymmetry wrong
+          under pressure, so the difference stays on the page rather than in
+          somebody's memory. */}
+      <div className="mt-4 grid gap-2.5 sm:grid-cols-2">
+        <Panel className="flex gap-3 p-3.5" padded={false}>
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-surface-2 text-muted sm:size-9">
+            <ShieldCheckIcon aria-hidden="true" className="size-4" />
+          </span>
+          <p className="min-w-0 text-xs leading-relaxed text-muted">
+            <span className="font-semibold text-fg">
+              {DEAL_MODE.SAFEST.label}
+            </span>{" "}
+            — {DEAL_MODE.SAFEST.blurb}
+          </p>
+        </Panel>
+        <Panel className="flex gap-3 p-3.5" padded={false}>
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-surface-2 text-muted sm:size-9">
+            <ZapIcon aria-hidden="true" className="size-4" />
+          </span>
+          <p className="min-w-0 text-xs leading-relaxed text-muted">
+            <span className="font-semibold text-fg">
+              {DEAL_MODE.FASTEST.label}
+            </span>{" "}
+            — {DEAL_MODE.FASTEST.blurb}
+          </p>
+        </Panel>
+      </div>
 
       {needingReassignment.length > 0 ? (
-        <section className="mt-8 rounded-panel border border-danger/30 bg-danger-soft p-5">
-          <h2 className="font-display text-lg font-bold text-fg">
-            Held by a suspended agent
-          </h2>
-          <p className="mt-1.5 text-sm leading-relaxed text-muted">
-            These channels are still owned by an account that can no longer act
-            on them. Nothing moves until somebody else takes them on.
-          </p>
-          <ul className="mt-4 flex flex-col gap-3">
+        <ConsoleSection
+          id="reassign"
+          title="Held by a suspended agent"
+          count={needingReassignment.length}
+          tone="danger"
+          description="These channels are still owned by an account that can no longer act on them. Nothing moves until somebody else takes them on, or they go back to the seller."
+        >
+          <Rows>
             {needingReassignment.map((order) => (
-              <li
-                key={order.id}
-                className="rounded-card border border-line bg-surface p-4"
-              >
-                <p className="text-sm font-semibold text-fg">
-                  {order.listing.title}
-                </p>
-                <p className="mt-1 text-xs text-subtle">
-                  {order.reference} · was {order.agent?.name} ({order.status})
-                </p>
-                {isStaff ? <AssignAgent orderId={order.id} /> : null}
-                <EndDeal orderId={order.id} />
-              </li>
+              <RowItem key={order.id} flag="danger">
+                <div className="p-4 pl-5">
+                  <RowHead
+                    title={order.listing.title}
+                    reference={order.reference}
+                    tags={
+                      <>
+                        <DealModeBadge mode="SAFEST" />
+                        <OrderStatusBadge status={order.status} />
+                        <span className="text-xs text-subtle">
+                          was {order.agent?.name ?? "an agent"}
+                        </span>
+                      </>
+                    }
+                  />
+                  {isStaff ? <AssignAgent orderId={order.id} /> : null}
+                  <EndDeal
+                    orderId={order.id}
+                    mode="SAFEST"
+                    status={order.status}
+                  />
+                </div>
+              </RowItem>
             ))}
-          </ul>
-        </section>
+          </Rows>
+        </ConsoleSection>
       ) : null}
 
-      {isFinance && awaitingPayment.length > 0 ? (
-        <section className="mt-8">
-          <h2 className="font-display text-lg font-bold text-fg">
-            Waiting on payment
-          </h2>
-          <p className="mt-1.5 text-sm leading-relaxed text-muted">
-            Cryptomus tells us when one of these clears, and the sweep picks
-            up anything that callback misses. Record one by hand only when
-            the money reached us some other way — every later step of the
-            deal unlocks behind it.
-          </p>
-          <ul className="mt-4 flex flex-col gap-3">
-            {awaitingPayment.map((order) => (
-              <li
-                key={order.id}
-                className="rounded-card border border-line bg-surface p-4"
-              >
-                <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                  <p className="text-sm font-semibold text-fg">
-                    {order.listing.title}
-                  </p>
-                  <p className="tnum text-xs text-subtle">{order.reference}</p>
-                </div>
-                <p className="mt-1 text-xs text-muted">
-                  {order.mode === "SAFEST" ? "Safest" : "Fastest"} · buyer owes{" "}
-                  <Price usd={order.totalUsd / 100} className="text-fg" />
-                </p>
-                <RecordPayment orderId={order.id} />
-              </li>
-            ))}
-          </ul>
-        </section>
+      {isFinance ? (
+        <ConsoleSection
+          id="awaiting-payment"
+          title="Waiting on payment"
+          count={awaitingPayment.length}
+          tone={awaitingPayment.length > 0 ? "primary" : "neutral"}
+          description="Cryptomus tells us when one of these clears, and the sweep picks up anything that callback misses. Record one by hand only when the money reached us some other way — every later step of the deal unlocks behind it."
+          actions={
+            awaitingPayment.length > 0 ? (
+              <span className="text-xs text-subtle">
+                <Amount cents={owed} caption="owed in total" size="sm" />
+              </span>
+            ) : null
+          }
+        >
+          {awaitingPayment.length === 0 ? (
+            <AllClear
+              title="Every opening payment has cleared"
+              body="Nothing is blocked on money reaching us. The sweep is still watching for callbacks that go missing."
+            />
+          ) : (
+            <Rows>
+              {awaitingPayment.map((order) => (
+                <RowItem key={order.id}>
+                  <div className="p-4">
+                    <RowHead
+                      title={order.listing.title}
+                      reference={order.reference}
+                      tags={
+                        <>
+                          <DealModeBadge mode={order.mode} />
+                          <OrderStatusBadge status="AWAITING_PAYMENT" />
+                          <Waited since={order.createdAt} prefix="open" />
+                        </>
+                      }
+                      right={
+                        <Amount
+                          cents={order.totalUsd}
+                          caption={
+                            order.mode === "SAFEST"
+                              ? "admin fee due"
+                              : "price + fee due"
+                          }
+                        />
+                      }
+                    />
+                    <RecordPayment orderId={order.id} />
+                  </div>
+                </RowItem>
+              ))}
+            </Rows>
+          )}
+        </ConsoleSection>
       ) : null}
 
       {mineOnly ? (
-        <section className="mt-8">
-          <h2 className="font-display text-lg font-bold text-fg">Your deals</h2>
+        <ConsoleSection
+          id="mine"
+          title="Your deals"
+          count={mine.length}
+          description="You are the agent of record on these. Open one to work its steps in order."
+        >
           {mine.length === 0 ? (
-            <p className="mt-1.5 text-sm text-muted">
-              You are not holding anything right now.
-            </p>
+            <AllClear
+              title="You are not holding anything"
+              body="Nothing is waiting on you. Take the next unheld deal below when you are ready."
+            />
           ) : (
-            <ul className="mt-4 flex flex-col gap-3">
+            <Rows>
               {mine.map((order) => (
-                <li
-                  key={order.id}
-                  className="rounded-card border border-line bg-surface p-4"
-                >
-                  <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                    <p className="text-sm font-semibold text-fg">
-                      {order.listing.title}
-                    </p>
-                    <p className="tnum text-xs text-subtle">
-                      {order.reference}
-                    </p>
-                  </div>
-                  <p className="mt-1 text-xs text-muted">
-                    {order.mode === "SAFEST" ? "Safest" : "Fastest"} ·{" "}
-                    <Price usd={order.priceUsd / 100} className="text-fg" /> ·{" "}
-                    {order.status}
-                  </p>
+                <RowItem key={order.id}>
                   <Link
                     href={`/dashboard/deals/${order.id}`}
-                    className="mt-2 inline-flex text-xs text-primary-text underline"
+                    className="block p-4 transition-colors hover:bg-surface-2"
                   >
-                    Open the deal and work the steps
+                    <RowHead
+                      title={order.listing.title}
+                      reference={order.reference}
+                      tags={
+                        <>
+                          <DealModeBadge mode={order.mode} />
+                          <OrderStatusBadge status={order.status} />
+                          <Waited since={order.createdAt} prefix="open" />
+                        </>
+                      }
+                      right={
+                        <Amount
+                          cents={order.priceUsd}
+                          caption="channel price"
+                        />
+                      }
+                    />
+                    <p className="mt-2 text-xs font-medium text-primary-text">
+                      Open the deal and work the steps →
+                    </p>
                   </Link>
-                </li>
+                </RowItem>
               ))}
-            </ul>
+            </Rows>
           )}
-        </section>
+        </ConsoleSection>
       ) : null}
 
-      <section className="mt-8">
-        <h2 className="font-display text-lg font-bold text-fg">
-          Needs an agent
-        </h2>
+      <ConsoleSection
+        id="needs-agent"
+        title="Needs an agent"
+        count={needingAgent.length}
+        tone={needingAgent.length > 0 ? "primary" : "neutral"}
+        description="Live deals nobody is holding, oldest first. Until one is claimed, neither side can do anything."
+      >
         {needingAgent.length === 0 ? (
-          <p className="mt-1.5 text-sm text-muted">
-            Nothing waiting. Every live deal has somebody on it.
-          </p>
+          <AllClear
+            title="Every live deal has somebody on it"
+            body="Nothing is waiting to be claimed. New deals land here the moment their opening payment clears."
+          />
         ) : (
-          <ul className="mt-4 flex flex-col gap-3">
-            {needingAgent.map((order) => (
-              <li
-                key={order.id}
-                className="rounded-card border border-line bg-surface p-4"
-              >
-                <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                  <p className="text-sm font-semibold text-fg">
-                    {order.listing.title}
-                  </p>
-                  <p className="tnum text-xs text-subtle">{order.reference}</p>
-                </div>
-                <p className="mt-1 text-xs text-muted">
-                  {order.mode === "SAFEST" ? "Safest" : "Fastest"} ·{" "}
-                  <Price usd={order.priceUsd / 100} className="text-fg" /> ·{" "}
-                  {order.status}
-                </p>
-                {isAgent ? (
-                  <ClaimDeal
-                    orderId={order.id}
-                    defaultEmail={viewer.email}
-                    defaultBrand="Channel Adda Transfers"
-                  />
-                ) : (
-                  <p className="mt-2 text-xs text-subtle">
-                    An agent claims this from their own queue.
-                  </p>
-                )}
-                <EndDeal orderId={order.id} />
-              </li>
-            ))}
-          </ul>
+          <Rows>
+            {needingAgent.map((order) => {
+              const age = elapsed(order.createdAt);
+              return (
+                <RowItem
+                  key={order.id}
+                  flag={age.hours >= 48 ? "danger" : undefined}
+                >
+                  <div className="p-4 pl-5">
+                    <RowHead
+                      title={order.listing.title}
+                      reference={order.reference}
+                      tags={
+                        <>
+                          <DealModeBadge mode={order.mode} />
+                          <OrderStatusBadge status={order.status} />
+                          <Waited
+                            since={order.createdAt}
+                            prefix="unheld"
+                            lateAfter={48}
+                          />
+                        </>
+                      }
+                      right={
+                        <Amount
+                          cents={order.priceUsd}
+                          caption="channel price"
+                        />
+                      }
+                    />
+                    {isAgent ? (
+                      <ClaimDeal
+                        orderId={order.id}
+                        defaultEmail={viewer.email}
+                        defaultBrand="Channel Adda Transfers"
+                      />
+                    ) : (
+                      <p className="mt-2.5 text-xs text-subtle">
+                        An agent claims this from their own queue. You can still
+                        end it below.
+                      </p>
+                    )}
+                    <EndDeal
+                      orderId={order.id}
+                      mode={order.mode}
+                      status={order.status}
+                    />
+                  </div>
+                </RowItem>
+              );
+            })}
+          </Rows>
         )}
-      </section>
+      </ConsoleSection>
 
       {isStaff ? <StuckDeals /> : null}
 
-      {/* Staff only. An agent can open the deals they hold and nothing
-          else, so every reference here was a 404 that threw them out of
-          the staff area onto the public marketing page. */}
-      <section className={isStaff ? "mt-10" : "hidden"} aria-hidden={!isStaff}>
-        <h2 className="font-display text-lg font-bold text-fg">
-          Everything that has happened
-        </h2>
-        <p className="mt-1.5 text-sm leading-relaxed text-muted">
-          Read from the audit trail, so it is the same record a dispute is
-          settled from.
-        </p>
-        {activity.length === 0 ? (
-          <p className="mt-4 text-sm text-muted">No deal activity yet.</p>
-        ) : (
-          <ul className="mt-4 flex flex-col divide-y divide-line">
-            {activity.map((row) => (
-              <li
-                key={row.id}
-                className="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-3"
-              >
-                <Badge className="text-subtle">{row.orderStatus}</Badge>
-                <span className="text-sm text-fg">
-                  {ACTION_LABELS[row.action] ?? row.action}
-                </span>
-                <Link
-                  href={`/dashboard/deals/${row.orderId}`}
-                  className="tnum text-xs text-primary-text underline"
-                >
-                  {row.orderReference}
-                </Link>
-                <span className="min-w-0 truncate text-xs text-muted">
-                  {row.listingTitle}
-                </span>
-                <span className="ml-auto text-xs text-subtle">
-                  {row.actorName ?? "Channel Adda"} ·{" "}
-                  {row.createdAt.toLocaleString("en-GB")}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      {/* Staff only — and genuinely not rendered, rather than rendered and
+          hidden. Every reference in here links somewhere an agent gets a 404
+          for, and the trail is the whole marketplace's deal history. */}
+      {isStaff ? (
+        <ConsoleSection
+          id="activity"
+          title="Everything that has happened"
+          count={activity.length}
+          description="Read from the audit trail, so it is the same record a dispute is settled from. The fifty most recent events."
+        >
+          {activity.length === 0 ? (
+            <AllClear
+              title="No deal activity yet"
+              body="Every deal event — opened, paid, assigned, stepped, ended — lands here as it happens."
+            />
+          ) : (
+            <TableScroller>
+              <table className="w-full min-w-[46rem] text-sm">
+                <caption className="sr-only">
+                  Deal activity from the audit trail, newest first
+                </caption>
+                <thead>
+                  <tr>
+                    <Th>When</Th>
+                    <Th>What happened</Th>
+                    <Th>Deal</Th>
+                    <Th>Status now</Th>
+                    <Th>Listing</Th>
+                    <Th>By</Th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {activity.map((row) => (
+                    <tr key={row.id} className="border-t border-line">
+                      <Td className="whitespace-nowrap">
+                        <time
+                          dateTime={row.createdAt.toISOString()}
+                          title={row.createdAt.toLocaleString("en-GB")}
+                          className="tnum text-xs text-subtle"
+                        >
+                          {elapsed(row.createdAt).label}
+                        </time>
+                      </Td>
+                      <Td className="font-medium text-fg">
+                        {auditLabel(row.action)}
+                      </Td>
+                      <Td>
+                        <Link
+                          href={`/dashboard/deals/${row.orderId}`}
+                          className="tnum text-xs text-primary-text underline-offset-4 hover:underline"
+                        >
+                          {row.orderReference}
+                        </Link>
+                      </Td>
+                      <Td>
+                        <OrderStatusBadge status={row.orderStatus} />
+                      </Td>
+                      <Td className="max-w-[16rem]">
+                        <span className="block truncate text-xs text-muted">
+                          {row.listingTitle}
+                        </span>
+                      </Td>
+                      <Td className="text-xs whitespace-nowrap text-subtle">
+                        {row.actorName ?? "Channel Adda"}
+                      </Td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </TableScroller>
+          )}
+        </ConsoleSection>
+      ) : null}
     </>
   );
 }

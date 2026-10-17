@@ -1,7 +1,9 @@
 "use client";
 
+import { CheckCircle2Icon, TriangleAlertIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useId, useState, useTransition } from "react";
+import { Panel, TableScroller, Td, Th } from "@/components/admin/console";
 import { FormNotice, TextField } from "@/components/auth/fields";
 import { Button } from "@/components/ui/button";
 import { formatRate, quote } from "@/lib/fees";
@@ -79,18 +81,67 @@ export function SettingsForm({
     Number.isFinite(draft.buyerFeeBpFastest) &&
     Number.isFinite(draft.sellerFeeBp);
 
-  const changed =
-    draft.buyerFeeBpSafest !== current.buyerFeeBpSafest ||
-    draft.buyerFeeBpFastest !== current.buyerFeeBpFastest ||
-    draft.sellerFeeBp !== current.sellerFeeBp ||
-    Number(holds) !== current.maxHoldsPerAgent ||
-    Math.round(Number(approval) * 100) !== current.secondApprovalAboveUsd ||
-    Number(offerHours) !== current.offerExpiryHours ||
-    Math.round(Number(minWithdrawal) * 100) !== current.minWithdrawalUsd;
+  /**
+   * What is about to change, in words.
+   *
+   * These numbers decide what every future buyer and seller is charged, so
+   * the save button is not allowed to be the only thing that says a change is
+   * pending: the differences are listed next to it first.
+   */
+  const pendingChanges: { label: string; from: string; to: string }[] = [
+    {
+      label: "Buyer fee, Safest",
+      from: `${formatRate(current.buyerFeeBpSafest)}%`,
+      to: `${safest}%`,
+      changed: draft.buyerFeeBpSafest !== current.buyerFeeBpSafest,
+    },
+    {
+      label: "Buyer fee, Fastest",
+      from: `${formatRate(current.buyerFeeBpFastest)}%`,
+      to: `${fastest}%`,
+      changed: draft.buyerFeeBpFastest !== current.buyerFeeBpFastest,
+    },
+    {
+      label: "Seller fee",
+      from: `${formatRate(current.sellerFeeBp)}%`,
+      to: `${seller}%`,
+      changed: draft.sellerFeeBp !== current.sellerFeeBp,
+    },
+    {
+      label: "Channels one agent may hold",
+      from: String(current.maxHoldsPerAgent),
+      to: holds,
+      changed: Number(holds) !== current.maxHoldsPerAgent,
+    },
+    {
+      label: "Second approval above",
+      from: usd(current.secondApprovalAboveUsd / 100),
+      to: usd(Number(approval) || 0),
+      changed:
+        Math.round(Number(approval) * 100) !== current.secondApprovalAboveUsd,
+    },
+    {
+      label: "Offers expire after",
+      from: `${current.offerExpiryHours}h`,
+      to: `${offerHours}h`,
+      changed: Number(offerHours) !== current.offerExpiryHours,
+    },
+    {
+      label: "Smallest withdrawal",
+      from: usd(current.minWithdrawalUsd / 100),
+      to: usd(Number(minWithdrawal) || 0),
+      changed:
+        Math.round(Number(minWithdrawal) * 100) !== current.minWithdrawalUsd,
+    },
+  ]
+    .filter((row) => row.changed)
+    .map(({ label, from, to }) => ({ label, from, to }));
+
+  const changed = pendingChanges.length > 0;
 
   return (
     <form
-      className="flex flex-col gap-5"
+      className="flex flex-col gap-4"
       onSubmit={(e) => {
         e.preventDefault();
         setErrors({});
@@ -116,19 +167,23 @@ export function SettingsForm({
     >
       {errors.form ? <FormNotice>{errors.form}</FormNotice> : null}
       {saved ? (
-        <output className="rounded-xl border border-verified/30 bg-verified-soft px-4 py-3 text-sm text-fg">
+        <output className="flex items-start gap-2 rounded-card border border-verified/30 bg-verified-soft px-4 py-3 text-sm text-fg">
+          <CheckCircle2Icon
+            aria-hidden="true"
+            className="mt-0.5 size-4 shrink-0 text-verified"
+          />
           {saved}
         </output>
       ) : null}
 
-      <section className="rounded-panel border border-line bg-surface p-5 sm:p-6">
-        <h2 className="font-display text-lg font-bold text-fg">Fees</h2>
-        <p className="mt-1.5 text-sm leading-relaxed text-muted">
+      <Panel>
+        <h2 className="font-display text-base font-bold text-fg">Fees</h2>
+        <p className="mt-1.5 max-w-[72ch] text-sm leading-relaxed text-muted">
           These apply to sales made from now on. Orders already placed keep the
           fee they were charged, so changing this never rewrites a past sale.
         </p>
 
-        <div className="mt-5 grid gap-5 sm:grid-cols-2">
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <TextField
             id={ids.safest}
             name="buyerFeeBpSafest"
@@ -155,7 +210,7 @@ export function SettingsForm({
             id={ids.seller}
             name="sellerFeeBp"
             label="Seller fee (%)"
-            hint="Fastest only - a Safest price never reaches us."
+            hint="Fastest only — a Safest price never reaches us."
             inputMode="decimal"
             value={seller}
             onChange={(e) => setSeller(e.target.value)}
@@ -163,18 +218,18 @@ export function SettingsForm({
             required
           />
         </div>
-      </section>
+      </Panel>
 
-      <section className="rounded-panel border border-line bg-surface p-5 sm:p-6">
-        <h2 className="font-display text-lg font-bold text-fg">
+      <Panel>
+        <h2 className="font-display text-base font-bold text-fg">
           Agent safeguards
         </h2>
-        <p className="mt-1.5 text-sm leading-relaxed text-muted">
+        <p className="mt-1.5 max-w-[72ch] text-sm leading-relaxed text-muted">
           On a Safest deal the agent genuinely owns the channel while they hold
           it. Google limits how many channels one account can own, and an agent
           account that gets locked freezes every deal it is holding.
         </p>
-        <div className="mt-5 grid gap-5 sm:grid-cols-2">
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <TextField
             id={ids.holds}
             name="maxHoldsPerAgent"
@@ -198,11 +253,11 @@ export function SettingsForm({
             required
           />
         </div>
-      </section>
+      </Panel>
 
-      <section className="rounded-panel border border-line bg-surface p-5 sm:p-6">
-        <h2 className="font-display text-lg font-bold text-fg">Offers</h2>
-        <p className="mt-1.5 text-sm leading-relaxed text-muted">
+      <Panel>
+        <h2 className="font-display text-base font-bold text-fg">Offers</h2>
+        <p className="mt-1.5 max-w-[72ch] text-sm leading-relaxed text-muted">
           How long an offer stands before it lapses. Short enough that listings
           do not fill up with stale interest, long enough that someone in
           another time zone gets a fair chance to answer.
@@ -215,14 +270,14 @@ export function SettingsForm({
           value={offerHours}
           onChange={(e) => setOfferHours(e.target.value)}
           error={errors.offerExpiryHours}
-          className="mt-5 max-w-xs"
+          className="mt-4 max-w-xs"
           required
         />
-      </section>
+      </Panel>
 
-      <section className="rounded-panel border border-line bg-surface p-5 sm:p-6">
-        <h2 className="font-display text-lg font-bold text-fg">Payouts</h2>
-        <p className="mt-1.5 text-sm leading-relaxed text-muted">
+      <Panel>
+        <h2 className="font-display text-base font-bold text-fg">Payouts</h2>
+        <p className="mt-1.5 max-w-[72ch] text-sm leading-relaxed text-muted">
           The smallest withdrawal we will send. A crypto payout pays the
           chain&rsquo;s fee whatever its size, so below some figure the seller
           loses money by collecting it. Raise this when network fees do.
@@ -235,61 +290,102 @@ export function SettingsForm({
           value={minWithdrawal}
           onChange={(e) => setMinWithdrawal(e.target.value)}
           error={errors.minWithdrawal}
-          className="mt-5 max-w-xs"
+          className="mt-4 max-w-xs"
           required
         />
-      </section>
+      </Panel>
 
       {previewable ? (
-        <section className="rounded-panel border border-line bg-surface p-5 sm:p-6">
-          <h2 className="font-display text-lg font-bold text-fg">
+        <Panel>
+          <h2 className="font-display text-base font-bold text-fg">
             What that means
           </h2>
           <p className="mt-1.5 text-sm text-muted">
-            Worked through at the rates typed above.
+            Worked through at the rates typed above, on a Fastest deal — the
+            mode where both fees apply, so it shows the full effect of a change.
+            Figures in US dollars.
           </p>
-          <div className="mt-4 overflow-x-auto">
+          <TableScroller className="mt-4">
             <table className="w-full min-w-[30rem] text-sm">
+              <caption className="sr-only">
+                Worked examples at the rates currently typed
+              </caption>
               <thead>
-                <tr className="border-b border-line text-left text-xs text-subtle uppercase">
-                  <th className="py-2 pr-4 font-semibold">Listed at</th>
-                  <th className="py-2 pr-4 font-semibold">Buyer pays</th>
-                  <th className="py-2 pr-4 font-semibold">Seller gets</th>
-                  <th className="py-2 font-semibold">We keep</th>
+                <tr>
+                  <Th>Listed at</Th>
+                  <Th numeric>Buyer pays</Th>
+                  <Th numeric>Seller gets</Th>
+                  <Th numeric>We keep</Th>
                 </tr>
               </thead>
               <tbody>
                 {EXAMPLES.map((price) => {
-                  // FASTEST, because it is the mode where both fees apply
-                  // and so the one that shows the full effect of a change.
                   const q = quote(price, draft, "FASTEST");
                   return (
-                    <tr key={price} className="border-b border-line-soft">
-                      <td className="py-3 pr-4 tabular-nums">{usd(price)}</td>
-                      <td className="py-3 pr-4 tabular-nums">{usd(q.total)}</td>
-                      <td className="py-3 pr-4 tabular-nums text-verified">
+                    <tr key={price} className="border-t border-line">
+                      <Td className="tnum">{usd(price)}</Td>
+                      <Td numeric>{usd(q.total)}</Td>
+                      <Td numeric className="text-verified">
                         {usd(q.payout)}
-                      </td>
-                      <td className="py-3 font-medium tabular-nums text-primary-text">
+                      </Td>
+                      <Td numeric className="font-medium text-primary-text">
                         {usd(q.buyerFee + q.sellerFee)}
-                      </td>
+                      </Td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
-          </div>
-        </section>
+          </TableScroller>
+        </Panel>
       ) : null}
 
-      <div className="flex flex-wrap items-center gap-3">
-        <Button type="submit" size="md" disabled={pending || !changed}>
-          {pending ? "Saving…" : "Save fees"}
+      <Panel tone={changed ? "primary" : "neutral"}>
+        <h2 className="font-display text-base font-bold text-fg">
+          {changed ? "About to change" : "Nothing has changed yet"}
+        </h2>
+        {changed ? (
+          <>
+            <ul className="mt-3 flex flex-col gap-1.5 text-sm">
+              {pendingChanges.map((row) => (
+                <li key={row.label} className="flex flex-wrap gap-x-2">
+                  <span className="text-muted">{row.label}</span>
+                  <span className="tnum text-subtle line-through">
+                    {row.from}
+                  </span>
+                  <span aria-hidden="true" className="text-subtle">
+                    →
+                  </span>
+                  <span className="tnum font-semibold text-fg">{row.to}</span>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-3 flex items-start gap-1.5 text-xs leading-relaxed text-muted">
+              <TriangleAlertIcon
+                aria-hidden="true"
+                className="mt-px size-3.5 shrink-0 text-primary"
+              />
+              <span>
+                Applies to every sale made after you save, and is recorded in
+                the change history below under your name.
+              </span>
+            </p>
+          </>
+        ) : (
+          <p className="mt-1.5 text-sm text-muted">
+            Edit a figure above and the difference will be listed here before
+            you commit it.
+          </p>
+        )}
+        <Button
+          type="submit"
+          size="md"
+          className="mt-4"
+          disabled={pending || !changed}
+        >
+          {pending ? "Saving…" : "Save these settings"}
         </Button>
-        {!changed && !saved ? (
-          <span className="text-sm text-subtle">Nothing has changed yet.</span>
-        ) : null}
-      </div>
+      </Panel>
     </form>
   );
 }

@@ -1,6 +1,15 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import {
+  AllClear,
+  ConsoleHeader,
+  ConsoleSection,
+  FilterBar,
+  FilterLink,
+  MetaItem,
+  Nothing,
+} from "@/components/admin/console";
 import { TicketCard, type TicketView } from "@/components/admin/ticket-card";
+import { elapsed } from "@/components/admin/vocab";
 import { requireStaff } from "@/server/session";
 import { listTickets } from "@/server/support";
 
@@ -23,7 +32,7 @@ const TABS = [
 export default async function AdminSupportPage({
   searchParams,
 }: PageProps<"/admin/support">) {
-  await requireStaff();
+  const staff = await requireStaff();
   const params = await searchParams;
   const raw = typeof params.status === "string" ? params.status : "OPEN";
   const status =
@@ -35,50 +44,73 @@ export default async function AdminSupportPage({
     createdAt: ticket.createdAt.toISOString(),
   }));
 
+  // `listTickets` returns newest first, so the last row is the oldest.
+  const oldest = rows.at(-1)?.createdAt;
+  const showing = TABS.find((tab) => (status ?? "") === tab.value);
+
   return (
     <>
-      <p className="text-xs font-semibold tracking-[0.14em] text-subtle uppercase">
-        Inbox
-      </p>
-      <h1 className="mt-2 font-display text-3xl font-black tracking-tight text-fg sm:text-4xl">
-        Support
-      </h1>
-      <p className="mt-2 max-w-prose text-muted">
-        Everything sent through the contact form. People who cannot sign in end
-        up here too, so this is where a locked-out seller gets found.
-      </p>
+      <ConsoleHeader
+        eyebrow="Inbox"
+        title="Support"
+        description="Everything sent through the contact form. People who cannot sign in end up here too, so this is where a locked-out seller gets found."
+        meta={
+          <>
+            <MetaItem label="Signed in as">{staff.name}</MetaItem>
+            <MetaItem label="Showing">
+              {rows.length.toLocaleString("en-US")}{" "}
+              {rows.length === 1 ? "ticket" : "tickets"}
+            </MetaItem>
+            {oldest && status === "OPEN" ? (
+              <MetaItem label="Oldest open">
+                {elapsed(new Date(oldest)).label}
+              </MetaItem>
+            ) : null}
+          </>
+        }
+      />
 
-      <div className="mt-5 flex flex-wrap gap-2">
-        {TABS.map((tab) => {
-          const active = (status ?? "") === tab.value;
-          return (
-            <Link
+      <div className="mt-5">
+        <FilterBar label="Filter by status">
+          {TABS.map((tab) => (
+            <FilterLink
               key={tab.label}
               href={tab.href}
-              aria-current={active ? "page" : undefined}
-              className={`rounded-full border px-3.5 py-1.5 text-sm transition-colors ${
-                active
-                  ? "border-primary/40 bg-primary-soft font-medium text-primary-text"
-                  : "border-line text-muted hover:text-fg"
-              }`}
+              active={(status ?? "") === tab.value}
             >
               {tab.label}
-            </Link>
-          );
-        })}
+            </FilterLink>
+          ))}
+        </FilterBar>
       </div>
 
-      {rows.length === 0 ? (
-        <p className="mt-6 rounded-panel border border-dashed border-line bg-surface p-10 text-center text-sm text-muted">
-          Nothing here.
-        </p>
-      ) : (
-        <ul className="mt-6 grid gap-px overflow-hidden rounded-panel border border-line bg-line">
-          {rows.map((ticket) => (
-            <TicketCard key={ticket.id} ticket={ticket} />
-          ))}
-        </ul>
-      )}
+      <ConsoleSection
+        id="tickets"
+        title={showing?.label ?? "Tickets"}
+        count={rows.length}
+        tone={status === "OPEN" && rows.length > 0 ? "primary" : "neutral"}
+        description="A note is saved when you move a ticket, so whoever picks it up next can see what was already tried."
+      >
+        {rows.length === 0 ? (
+          status === "OPEN" ? (
+            <AllClear
+              title="Nothing open"
+              body="Every support request has been answered or closed. New ones arrive from the contact form."
+            />
+          ) : (
+            <Nothing
+              title="Nothing in this view"
+              body="No ticket has that status right now. Try another filter above."
+            />
+          )
+        ) : (
+          <ul className="grid gap-px overflow-hidden rounded-card border border-line bg-line">
+            {rows.map((ticket) => (
+              <TicketCard key={ticket.id} ticket={ticket} />
+            ))}
+          </ul>
+        )}
+      </ConsoleSection>
     </>
   );
 }

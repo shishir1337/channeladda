@@ -1,5 +1,11 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import {
+  ConsoleHeader,
+  ConsoleSection,
+  FilterBar,
+  FilterLink,
+  MetaItem,
+} from "@/components/admin/console";
 import { ThreadList, type ThreadRow } from "@/components/messages/thread-list";
 import { listStaffThreads } from "@/server/messages";
 import { requireStaff } from "@/server/session";
@@ -14,16 +20,23 @@ export const metadata: Metadata = {
  *
  * Flagged threads sort to the top. A flag means someone tried to move the deal
  * off Channel Adda, which is the single strongest predictor that one of the
- * two is about to be defrauded.
+ * two is about to be defrauded — so the flagged count is on the filter itself
+ * rather than something you find by clicking.
  */
 export default async function AdminMessagesPage({
   searchParams,
 }: PageProps<"/admin/messages">) {
-  await requireStaff();
+  const staff = await requireStaff();
   const { filter } = await searchParams;
   const flaggedOnly = filter === "flagged";
 
   const threads = await listStaffThreads({ flaggedOnly });
+
+  // Counted from the list already fetched rather than with another query:
+  // when the filter is on, every row in it is flagged by definition.
+  const flaggedCount = flaggedOnly
+    ? threads.length
+    : threads.filter((thread) => thread.flagged).length;
 
   const rows: ThreadRow[] = threads.map((thread) => ({
     id: thread.id,
@@ -40,59 +53,64 @@ export default async function AdminMessagesPage({
 
   return (
     <>
-      <p className="text-xs font-semibold tracking-[0.14em] text-subtle uppercase">
-        Moderation
-      </p>
-      <h1 className="mt-2 font-display text-3xl font-black tracking-tight text-fg sm:text-4xl">
-        Conversations
-      </h1>
-      <p className="mt-2 max-w-prose text-muted">
-        Every thread between a buyer and a seller. You can read all of them and
-        write into any of them as Channel Adda.
-      </p>
-
-      <div className="mt-5 flex gap-2">
-        <Tab href="/admin/messages" active={!flaggedOnly}>
-          All
-        </Tab>
-        <Tab href="/admin/messages?filter=flagged" active={flaggedOnly}>
-          Flagged
-        </Tab>
-      </div>
-
-      <ThreadList
-        threads={rows}
-        basePath="/admin/messages"
-        empty={
-          flaggedOnly
-            ? "Nothing flagged. Nobody has tried to swap contact details."
-            : "No conversations yet."
+      <ConsoleHeader
+        eyebrow="Moderation"
+        title="Conversations"
+        description="Every thread between a buyer and a seller. You can read all of them and write into any of them as Channel Adda."
+        meta={
+          <>
+            <MetaItem label="Signed in as">{staff.name}</MetaItem>
+            <MetaItem label="Showing">
+              {rows.length.toLocaleString("en-US")}{" "}
+              {rows.length === 1 ? "thread" : "threads"}
+            </MetaItem>
+            {flaggedCount > 0 ? (
+              <span className="font-semibold text-danger">
+                {flaggedCount} flagged
+              </span>
+            ) : (
+              <span className="text-verified">nothing flagged</span>
+            )}
+          </>
         }
       />
-    </>
-  );
-}
 
-function Tab({
-  href,
-  active,
-  children,
-}: {
-  href: string;
-  active: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <Link
-      href={href}
-      aria-current={active ? "page" : undefined}
-      className={`rounded-full border px-3.5 py-1.5 text-sm transition-colors ${
-        active
-          ? "border-primary/40 bg-primary-soft font-medium text-primary-text"
-          : "border-line text-muted hover:text-fg"
-      }`}
-    >
-      {children}
-    </Link>
+      <div className="mt-5">
+        <FilterBar label="Filter conversations">
+          <FilterLink href="/admin/messages" active={!flaggedOnly}>
+            All
+          </FilterLink>
+          <FilterLink
+            href="/admin/messages?filter=flagged"
+            active={flaggedOnly}
+            count={flaggedCount}
+          >
+            Flagged
+          </FilterLink>
+        </FilterBar>
+      </div>
+
+      <ConsoleSection
+        id="threads"
+        title={flaggedOnly ? "Flagged threads" : "All conversations"}
+        count={rows.length}
+        tone={flaggedOnly && rows.length > 0 ? "danger" : "neutral"}
+        description={
+          flaggedOnly
+            ? "Each of these contains an attempt to swap contact details or settle off-platform. Read it, then warn or suspend."
+            : "Newest activity first, with flagged threads above the rest."
+        }
+      >
+        <ThreadList
+          threads={rows}
+          basePath="/admin/messages"
+          empty={
+            flaggedOnly
+              ? "Nothing flagged. Nobody has tried to swap contact details."
+              : "No conversations yet."
+          }
+        />
+      </ConsoleSection>
+    </>
   );
 }

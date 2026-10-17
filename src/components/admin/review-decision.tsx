@@ -1,8 +1,10 @@
 "use client";
 
+import { TriangleAlertIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useId, useState, useTransition } from "react";
-import { FormNotice } from "@/components/auth/fields";
+import { Panel } from "@/components/admin/console";
+import { FormNotice, TextArea } from "@/components/auth/fields";
 import { Button } from "@/components/ui/button";
 import {
   approveListing,
@@ -17,6 +19,9 @@ const MIN_REASON = 10;
  *
  * Rejecting deliberately cannot be done in one click. The seller reads what is
  * typed here and has to act on it, so a bare "no" is not on offer.
+ *
+ * Approving is one click, and says what that click does: the listing becomes
+ * public and buyers can open a deal on it immediately.
  */
 export function ReviewDecision({ listingId }: { listingId: string }) {
   const router = useRouter();
@@ -40,8 +45,22 @@ export function ReviewDecision({ listingId }: { listingId: string }) {
   }
 
   return (
-    <div className="rounded-panel border border-line bg-surface p-5 sm:p-6">
-      <h2 className="font-display text-lg font-bold text-fg">Your decision</h2>
+    <Panel className="border-primary/35">
+      <div className="flex flex-wrap items-start justify-between gap-x-5 gap-y-2">
+        <div className="min-w-0">
+          <h2 className="font-display text-base font-bold text-fg">
+            Your decision
+          </h2>
+          <p className="mt-1.5 max-w-[62ch] text-sm leading-relaxed text-muted">
+            Recorded against your name in the audit trail either way. Approving
+            publishes the listing to the marketplace at once and lets buyers
+            open a deal on it.
+          </p>
+        </div>
+        <span className="rounded-full border border-line bg-surface-2 px-2 py-0.5 text-[0.6875rem] font-semibold text-muted">
+          Logged
+        </span>
+      </div>
 
       {error ? (
         <div className="mt-4">
@@ -50,7 +69,7 @@ export function ReviewDecision({ listingId }: { listingId: string }) {
       ) : null}
 
       {mode === "idle" ? (
-        <div className="mt-5 flex flex-wrap gap-3">
+        <div className="mt-4 flex flex-wrap gap-3">
           <Button
             type="button"
             size="md"
@@ -70,24 +89,17 @@ export function ReviewDecision({ listingId }: { listingId: string }) {
           </Button>
         </div>
       ) : (
-        <div className="mt-5">
-          <label
-            htmlFor={reasonId}
-            className="block text-sm font-medium text-fg"
-          >
-            What needs changing?
-          </label>
-          <p className="mt-1 text-xs text-subtle">
-            The seller sees this word for word. Be specific enough to act on.
-          </p>
-          <textarea
+        <div className="mt-4">
+          <TextArea
             id={reasonId}
             name="reason"
+            label="What needs changing?"
+            hint="The seller sees this word for word. Be specific enough to act on."
             rows={4}
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             placeholder="The revenue screenshot is from a different channel than the one in the listing."
-            className="mt-2 w-full rounded-xl border border-line bg-surface-2 p-3.5 text-base text-fg placeholder:text-subtle focus:border-primary/60 focus:outline-none sm:text-[0.9375rem]"
+            required
           />
           <div className="mt-3 flex flex-wrap items-center gap-3">
             <Button
@@ -118,7 +130,7 @@ export function ReviewDecision({ listingId }: { listingId: string }) {
           </div>
         </div>
       )}
-    </div>
+    </Panel>
   );
 }
 
@@ -133,36 +145,50 @@ export function RemoveListing({ listingId }: { listingId: string }) {
 
   if (!open) {
     return (
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="inline-flex min-h-11 cursor-pointer items-center rounded-xl border border-line px-4 text-sm text-muted transition-colors hover:border-danger/50 hover:text-danger"
-      >
-        Take this listing down
-      </button>
+      <div>
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          aria-expanded={false}
+          className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border border-line px-4 text-sm font-medium text-muted transition-colors hover:border-danger/50 hover:text-danger"
+        >
+          <TriangleAlertIcon aria-hidden="true" className="size-4" />
+          Take this listing down
+        </button>
+      </div>
     );
   }
 
   return (
-    <div className="rounded-panel border border-danger/30 bg-danger-soft p-5">
-      {error ? <FormNotice>{error}</FormNotice> : null}
-      <label htmlFor={reasonId} className="block text-sm font-medium text-fg">
-        Why is this coming down?
-      </label>
-      <p className="mt-1 text-xs text-muted">
-        Recorded against your name in the audit trail.
+    <Panel tone="danger">
+      <h2 className="font-display text-base font-bold text-fg">
+        Take this listing down
+      </h2>
+      <p className="mt-1.5 max-w-[62ch] text-sm leading-relaxed text-muted">
+        It disappears from the marketplace and from search. Open offers and
+        deals on it are not undone by this — end those on the deal desk.
       </p>
-      <textarea
+      {error ? (
+        <div className="mt-4">
+          <FormNotice>{error}</FormNotice>
+        </div>
+      ) : null}
+      <TextArea
         id={reasonId}
+        name="reason"
+        label="Why is this coming down?"
+        hint="Recorded against your name in the audit trail."
         rows={3}
         value={reason}
         onChange={(e) => setReason(e.target.value)}
-        className="mt-2 w-full rounded-xl border border-line bg-surface p-3.5 text-base text-fg focus:border-danger/60 focus:outline-none sm:text-[0.9375rem]"
+        className="mt-4"
+        required
       />
-      <div className="mt-3 flex flex-wrap gap-3">
+      <div className="mt-3 flex flex-wrap items-center gap-3">
         <Button
           type="button"
           size="md"
+          variant="danger"
           disabled={pending || reason.trim().length < MIN_REASON}
           onClick={() => {
             setError(null);
@@ -183,11 +209,17 @@ export function RemoveListing({ listingId }: { listingId: string }) {
           type="button"
           variant="ghost"
           size="md"
+          disabled={pending}
           onClick={() => setOpen(false)}
         >
           Cancel
         </Button>
+        {reason.trim().length > 0 && reason.trim().length < MIN_REASON ? (
+          <span className="text-xs text-subtle">
+            A few more words — this is the record.
+          </span>
+        ) : null}
       </div>
-    </div>
+    </Panel>
   );
 }

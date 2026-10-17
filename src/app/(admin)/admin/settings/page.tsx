@@ -1,5 +1,15 @@
 import type { Metadata } from "next";
+import {
+  AllClear,
+  ConsoleHeader,
+  ConsoleSection,
+  MetaItem,
+  TableScroller,
+  Td,
+  Th,
+} from "@/components/admin/console";
 import { SettingsForm } from "@/components/admin/settings-form";
+import { elapsed } from "@/components/admin/vocab";
 import { getAuditTrail } from "@/server/audit";
 import { requireSuperadmin } from "@/server/session";
 import { getSettings } from "@/server/settings";
@@ -9,8 +19,59 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
+/** What each stored setting is called in the change history. */
+const FIELD_LABEL: Record<string, string> = {
+  buyerFeeBp: "Buyer fee (single rate, since split)",
+  buyerFeeBpSafest: "Buyer fee, Safest",
+  buyerFeeBpFastest: "Buyer fee, Fastest",
+  sellerFeeBp: "Seller fee",
+  maxHoldsPerAgent: "Channels one agent may hold",
+  secondApprovalAboveUsd: "Second approval above",
+  offerExpiryHours: "Offers expire after",
+  minWithdrawalUsd: "Smallest withdrawal",
+};
+
+/** Basis points as a percentage, cents as dollars, everything else as typed. */
+function formatValue(key: string, value: unknown): string {
+  if (value === null || value === undefined) return "not set";
+  if (typeof value !== "number") return String(value);
+  if (key.includes("Bp")) return `${value / 100}%`;
+  if (key.endsWith("Usd")) {
+    return (value / 100).toLocaleString("en-US", {
+      style: "currency",
+      currency: "USD",
+      maximumFractionDigits: 2,
+    });
+  }
+  if (key === "offerExpiryHours") return `${value} hours`;
+  return value.toLocaleString("en-US");
+}
+
+/**
+ * What actually moved between two audit snapshots.
+ *
+ * The history used to print `before.buyerFeeBp → after.buyerFeeBp` from a
+ * hard-coded pair of keys. That key stopped existing when the buyer fee was
+ * split per mode, so every row since has read "buyer 0% → 0%, seller 0% → 0%"
+ * — a change log that reports nothing changed. Diffing whatever keys the
+ * snapshots actually carry survives the next such split too.
+ */
+function diffOf(before: unknown, after: unknown) {
+  const from = (before ?? {}) as Record<string, unknown>;
+  const to = (after ?? {}) as Record<string, unknown>;
+  const keys = [...new Set([...Object.keys(from), ...Object.keys(to)])];
+  return keys
+    .filter((key) => from[key] !== to[key])
+    .map((key) => ({
+      key,
+      label: FIELD_LABEL[key] ?? key,
+      from: formatValue(key, from[key]),
+      to: formatValue(key, to[key]),
+    }));
+}
+
 export default async function AdminSettingsPage() {
-  await requireSuperadmin();
+  const staff = await requireSuperadmin();
   const settings = await getSettings();
   const trail = await getAuditTrail(
     { entity: "user", entityId: "platform-settings" },
@@ -19,19 +80,23 @@ export default async function AdminSettingsPage() {
 
   return (
     <>
-      <p className="text-xs font-semibold tracking-[0.14em] text-subtle uppercase">
-        Superadmin only
-      </p>
-      <h1 className="mt-2 font-display text-3xl font-black tracking-tight text-fg">
-        Platform settings
-      </h1>
-      <p className="mt-2 text-muted">
-        {settings.updatedAt && settings.updatedByName
-          ? `Last changed by ${settings.updatedByName} on ${settings.updatedAt.toLocaleDateString("en-GB")}.`
-          : "Never changed since launch."}
-      </p>
+      <ConsoleHeader
+        eyebrow="Superadmin only"
+        title="Platform settings"
+        description="The figures every future deal is priced and policed by. Nothing here rewrites a past sale: an order keeps the fee it was charged, and a deal in flight keeps the safeguards it started under."
+        meta={
+          <>
+            <MetaItem label="Signed in as">{staff.name}</MetaItem>
+            <MetaItem label="Last changed">
+              {settings.updatedAt && settings.updatedByName
+                ? `${settings.updatedByName}, ${elapsed(settings.updatedAt).label} ago`
+                : "never since launch"}
+            </MetaItem>
+          </>
+        }
+      />
 
-      <div className="mt-8">
+      <div className="mt-6">
         <SettingsForm
           current={{
             buyerFeeBpSafest: settings.buyerFeeBpSafest,
@@ -45,45 +110,87 @@ export default async function AdminSettingsPage() {
         />
       </div>
 
-      {trail.length > 0 ? (
-        <section className="mt-10">
-          <h2 className="font-display text-lg font-bold text-fg">
-            Change history
-          </h2>
-          <ul className="mt-3 grid gap-px overflow-hidden rounded-panel border border-line bg-line">
-            {trail.map((row) => {
-              const before = row.before as {
-                buyerFeeBp?: number;
-                sellerFeeBp?: number;
-              } | null;
-              const after = row.after as {
-                buyerFeeBp?: number;
-                sellerFeeBp?: number;
-              } | null;
-              return (
-                <li key={row.id} className="bg-surface px-4 py-3 text-sm">
-                  <span className="font-medium text-fg">
-                    {row.actorName ?? "Someone"}
-                  </span>{" "}
-                  <span className="text-muted">changed the fees</span>
-                  {before && after ? (
-                    <span className="text-subtle tabular-nums">
-                      {" "}
-                      — buyer {(before.buyerFeeBp ?? 0) / 100}% →{" "}
-                      {(after.buyerFeeBp ?? 0) / 100}%, seller{" "}
-                      {(before.sellerFeeBp ?? 0) / 100}% →{" "}
-                      {(after.sellerFeeBp ?? 0) / 100}%
-                    </span>
-                  ) : null}
-                  <span className="block text-xs text-subtle">
-                    {row.createdAt.toLocaleString("en-GB")}
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-      ) : null}
+      <ConsoleSection
+        id="history"
+        title="Change history"
+        count={trail.length}
+        description="The last ten changes, read from the audit trail. Rows are never edited or deleted."
+      >
+        {trail.length === 0 ? (
+          <AllClear
+            title="Never changed since launch"
+            body="The platform is running on its original figures. Every change you make here is written to this list under your name."
+          />
+        ) : (
+          <TableScroller>
+            <table className="w-full min-w-[34rem] text-sm">
+              <caption className="sr-only">
+                Platform settings changes, newest first
+              </caption>
+              <thead>
+                <tr>
+                  <Th>When</Th>
+                  <Th>Who</Th>
+                  <Th>What moved</Th>
+                </tr>
+              </thead>
+              <tbody>
+                {trail.map((row) => {
+                  const diff = diffOf(row.before, row.after);
+                  return (
+                    <tr key={row.id} className="border-t border-line">
+                      <Td className="align-top whitespace-nowrap">
+                        <time
+                          dateTime={row.createdAt.toISOString()}
+                          title={row.createdAt.toLocaleString("en-GB")}
+                          className="tnum text-xs text-subtle"
+                        >
+                          {row.createdAt.toLocaleDateString("en-GB")}
+                        </time>
+                      </Td>
+                      <Td className="align-top font-medium whitespace-nowrap text-fg">
+                        {row.actorName ?? "Someone"}
+                      </Td>
+                      <Td className="align-top">
+                        {diff.length === 0 ? (
+                          <span className="text-xs text-subtle">
+                            no recorded difference
+                          </span>
+                        ) : (
+                          <ul className="flex flex-col gap-1">
+                            {diff.map((change) => (
+                              <li
+                                key={change.key}
+                                className="flex flex-wrap gap-x-2 text-xs"
+                              >
+                                <span className="text-muted">
+                                  {change.label}
+                                </span>
+                                <span className="tnum text-subtle line-through">
+                                  {change.from}
+                                </span>
+                                <span
+                                  aria-hidden="true"
+                                  className="text-subtle"
+                                >
+                                  →
+                                </span>
+                                <span className="tnum font-semibold text-fg">
+                                  {change.to}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </Td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </TableScroller>
+        )}
+      </ConsoleSection>
     </>
   );
 }

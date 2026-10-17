@@ -35,7 +35,7 @@ export default async function AdminLayout({ children }: LayoutProps<"/">) {
             label: null,
             items: [
               {
-                label: "Deals",
+                label: "Deal desk",
                 // The query is what filters the page to this agent, but the
                 // nav compares against the pathname, which has no query —
                 // so with it here the item never highlighted and the header
@@ -69,7 +69,7 @@ export default async function AdminLayout({ children }: LayoutProps<"/">) {
       label: "Transfers",
       items: [
         {
-          label: "Deals",
+          label: "Deal desk",
           href: "/admin/deals",
           icon: "transfer",
           section: true,

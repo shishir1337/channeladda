@@ -1,15 +1,24 @@
+import { ImageIcon, TriangleAlertIcon } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ListingStatusBadge } from "@/components/dashboard/listing-status";
 import {
-  Empty,
-  PageHead,
-  Row,
-  Rows,
-  Section,
-} from "@/components/dashboard/page-parts";
+  AllClear,
+  ConsoleHeader,
+  ConsoleSection,
+  FilterBar,
+  FilterLink,
+  MetaItem,
+  Nothing,
+} from "@/components/admin/console";
+import {
+  elapsed,
+  LISTING_STATUS,
+  ListingStatusTag,
+  Waited,
+} from "@/components/admin/vocab";
+import { Price } from "@/components/ui/price";
 import type { ListingStatus } from "@/generated/prisma/enums";
-import { getReviewQueue } from "@/server/admin-listings";
+import { getQueueCounts, getReviewQueue } from "@/server/admin-listings";
 import { requireStaff } from "@/server/session";
 
 export const metadata: Metadata = {
@@ -17,135 +26,184 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-const TABS: { label: string; status: ListingStatus }[] = [
-  { label: "For review", status: "ADMIN_REVIEW" },
-  { label: "Placing code", status: "CODE_CHECK" },
-  { label: "Live", status: "LIVE" },
-  { label: "Sent back", status: "REJECTED" },
+const TABS: { label: string; status: ListingStatus; key: string }[] = [
+  { label: "For review", status: "ADMIN_REVIEW", key: "awaitingReview" },
+  { label: "Placing code", status: "CODE_CHECK", key: "awaitingCode" },
+  { label: "Live", status: "LIVE", key: "live" },
+  { label: "Sent back", status: "REJECTED", key: "rejected" },
 ];
 
-function waited(since: Date) {
-  const hours = (Date.now() - since.getTime()) / 3_600_000;
-  if (hours < 1) return { text: "just now", late: false };
-  if (hours < 24) return { text: `${Math.round(hours)}h`, late: hours > 12 };
-  const days = Math.round(hours / 24);
-  return { text: `${days}d`, late: true };
-}
+/** Hours a listing may sit in review before the row is marked. */
+const WARN_AFTER = 12;
+const LATE_AFTER = 24;
 
 export default async function AdminListingsPage({
   searchParams,
 }: PageProps<"/admin/listings">) {
-  await requireStaff();
+  const staff = await requireStaff();
   const params = await searchParams;
 
   const requested = typeof params.status === "string" ? params.status : "";
   const active =
     TABS.find((t) => t.status === requested)?.status ?? "ADMIN_REVIEW";
 
-  const queue = await getReviewQueue(active);
+  const [queue, counts] = await Promise.all([
+    getReviewQueue(active),
+    getQueueCounts(),
+  ]);
+
+  const reviewing = active === "ADMIN_REVIEW";
+  // Ageing only means something in the review queue: on the other tabs the
+  // timestamp is the last change, not the start of a wait.
+  const late = reviewing
+    ? queue.filter((item) => elapsed(item.waitingSince).hours >= LATE_AFTER)
+        .length
+    : 0;
+  const noProof = queue.filter((item) => item.proofCount === 0).length;
+  const oldest = queue.at(0)?.waitingSince;
 
   return (
     <>
-      <PageHead
-        title="Listings"
-        description={
-          queue.length === 0
-            ? "Nothing in this queue."
-            : queue.length === 100
-              ? "Showing the 100 oldest."
-              : `${queue.length} listing${queue.length === 1 ? "" : "s"}, oldest first — so nobody sits at the bottom forever.`
+      <ConsoleHeader
+        eyebrow="Moderation"
+        title="Listing queue"
+        description="Worked oldest first, so nobody sits at the bottom for ever. Open a listing to see the ownership code, what the seller claims, and the proof they attached."
+        meta={
+          <>
+            <MetaItem label="Signed in as">{staff.name}</MetaItem>
+            {oldest && reviewing ? (
+              <MetaItem label="Oldest wait">{elapsed(oldest).label}</MetaItem>
+            ) : null}
+            {late > 0 ? (
+              <span className="inline-flex items-center gap-1.5 font-semibold text-danger">
+                <TriangleAlertIcon aria-hidden="true" className="size-3.5" />
+                {late} over {LATE_AFTER}h
+              </span>
+            ) : null}
+            {noProof > 0 ? (
+              <span className="inline-flex items-center gap-1.5 text-muted">
+                <ImageIcon aria-hidden="true" className="size-3.5" />
+                {noProof} with no proof attached
+              </span>
+            ) : null}
+          </>
         }
       />
 
-      <nav
-        aria-label="Filter by status"
-        className="mt-6 flex flex-wrap gap-2 border-b border-line pb-4"
-      >
-        {TABS.map((tab) => (
-          <Link
-            key={tab.status}
-            href={
-              tab.status === "ADMIN_REVIEW"
-                ? "/admin/listings"
-                : `/admin/listings?status=${tab.status}`
-            }
-            aria-current={tab.status === active ? "page" : undefined}
-            className={`inline-flex min-h-11 items-center rounded-xl border px-4 text-sm font-medium transition-colors ${
-              tab.status === active
-                ? "border-primary bg-primary-soft text-primary-text"
-                : "border-line bg-surface text-muted hover:border-line-strong hover:text-fg"
-            }`}
-          >
-            {tab.label}
-          </Link>
-        ))}
-      </nav>
+      <div className="mt-5">
+        <FilterBar label="Filter by status">
+          {TABS.map((tab) => (
+            <FilterLink
+              key={tab.status}
+              href={
+                tab.status === "ADMIN_REVIEW"
+                  ? "/admin/listings"
+                  : `/admin/listings?status=${tab.status}`
+              }
+              active={tab.status === active}
+              count={counts[tab.key as keyof typeof counts]}
+            >
+              {tab.label}
+            </FilterLink>
+          ))}
+        </FilterBar>
+      </div>
 
-      {queue.length === 0 ? (
-        <Section>
-          <Empty
-            title="Nothing here"
-            body="When a seller sends a listing for review it lands in this queue, oldest first."
-          />
-        </Section>
-      ) : (
-        <Section>
-          <Rows>
+      <ConsoleSection
+        id="queue"
+        title={LISTING_STATUS[active].label}
+        count={queue.length}
+        tone={reviewing && queue.length > 0 ? "primary" : "neutral"}
+        description={
+          queue.length === 100
+            ? "Showing the 100 oldest. Clear some and the rest will appear."
+            : LISTING_STATUS[active].note
+        }
+      >
+        {queue.length === 0 ? (
+          reviewing ? (
+            <AllClear
+              title="The review queue is clear"
+              body="Nothing is waiting on a moderator. A listing lands here the moment a seller sends it for review."
+            />
+          ) : (
+            <Nothing
+              title="Nothing in this view"
+              body={`No listing is currently ${LISTING_STATUS[active].label.toLowerCase()}. Try another filter above.`}
+            />
+          )
+        ) : (
+          <ul className="grid gap-px overflow-hidden rounded-card border border-line bg-line">
             {queue.map((item) => {
-              const wait = waited(item.waitingSince);
+              const urgent =
+                reviewing && elapsed(item.waitingSince).hours >= LATE_AFTER;
               return (
-                <Row key={item.id}>
+                <li key={item.id} className="relative bg-surface">
+                  {urgent ? (
+                    <span
+                      aria-hidden="true"
+                      className="absolute inset-y-0 left-0 w-[3px] bg-danger"
+                    />
+                  ) : null}
                   <Link
                     href={`/admin/listings/${item.id}`}
-                    className="flex flex-wrap items-center gap-x-4 gap-y-2 p-4 transition-colors hover:bg-surface-2"
+                    className="flex flex-wrap items-center gap-x-4 gap-y-2.5 p-4 pl-5 transition-colors hover:bg-surface-2"
                   >
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <ListingStatusBadge status={item.status} size="sm" />
-                        <span className="text-xs text-subtle capitalize">
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-semibold text-fg">
+                        {item.title || item.handle}
+                      </span>
+                      <span className="mt-0.5 block truncate text-xs text-subtle">
+                        {item.handle} · {item.sellerName}
+                      </span>
+                      <span className="mt-1.5 flex flex-wrap items-center gap-2">
+                        <ListingStatusTag status={item.status} />
+                        <span className="text-[0.6875rem] text-subtle capitalize">
                           {item.platform}
                         </span>
                         {item.proofCount === 0 ? (
-                          <span className="text-xs font-medium text-danger">
-                            no proof attached
+                          <span className="inline-flex items-center gap-1 rounded-full border border-danger/30 bg-danger-soft px-1.5 py-0.5 text-[0.625rem] font-semibold text-danger">
+                            <TriangleAlertIcon
+                              aria-hidden="true"
+                              className="size-3"
+                            />
+                            no proof
                           </span>
                         ) : (
-                          <span className="text-xs text-subtle">
+                          <span className="inline-flex items-center gap-1 text-[0.6875rem] text-subtle">
+                            <ImageIcon aria-hidden="true" className="size-3" />
                             {item.proofCount} screenshot
                             {item.proofCount === 1 ? "" : "s"}
                           </span>
                         )}
-                      </div>
-                      <p className="mt-1.5 truncate font-medium text-fg">
-                        {item.title || item.handle}
-                      </p>
-                      <p className="truncate text-sm text-subtle">
-                        {item.handle} · {item.sellerName}
-                      </p>
-                    </div>
-                    <div className="shrink-0 text-right">
-                      <p className="font-display font-bold text-fg tabular-nums">
-                        {item.price.toLocaleString("en-US", {
-                          style: "currency",
-                          currency: "USD",
-                          maximumFractionDigits: 0,
-                        })}
-                      </p>
-                      <p
-                        className={`text-xs tabular-nums ${
-                          wait.late ? "text-danger" : "text-subtle"
-                        }`}
-                      >
-                        waiting {wait.text}
-                      </p>
-                    </div>
+                      </span>
+                    </span>
+                    <span className="flex shrink-0 flex-col items-end gap-1">
+                      <Price
+                        usd={item.price}
+                        className="font-display text-base font-bold text-fg"
+                      />
+                      <span className="text-[0.625rem] tracking-wide text-subtle uppercase">
+                        asking
+                      </span>
+                      <Waited
+                        since={item.waitingSince}
+                        prefix={reviewing ? "waiting" : "changed"}
+                        warnAfter={
+                          reviewing ? WARN_AFTER : Number.POSITIVE_INFINITY
+                        }
+                        lateAfter={
+                          reviewing ? LATE_AFTER : Number.POSITIVE_INFINITY
+                        }
+                      />
+                    </span>
                   </Link>
-                </Row>
+                </li>
               );
             })}
-          </Rows>
-        </Section>
-      )}
+          </ul>
+        )}
+      </ConsoleSection>
     </>
   );
 }

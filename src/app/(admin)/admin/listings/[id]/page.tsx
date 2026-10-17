@@ -1,16 +1,22 @@
 import {
-  AlertTriangleIcon,
   ArrowLeftIcon,
   ExternalLinkIcon,
+  FingerprintIcon,
+  ImageIcon,
+  TriangleAlertIcon,
 } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import type { ReactNode } from "react";
+import { Fact, Facts, Panel } from "@/components/admin/console";
 import {
   RemoveListing,
   ReviewDecision,
 } from "@/components/admin/review-decision";
-import { ListingStatusBadge } from "@/components/dashboard/listing-status";
+import { auditLabel, ListingStatusTag, Waited } from "@/components/admin/vocab";
+import { Badge } from "@/components/ui/badge";
+import { Price } from "@/components/ui/price";
 import { platforms } from "@/data/platforms";
 import { getListingForReview } from "@/server/admin-listings";
 import { getAuditTrail } from "@/server/audit";
@@ -21,12 +27,10 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-function usd(value: number) {
-  return value.toLocaleString("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 0,
-  });
+function SubHeading({ children }: { children: ReactNode }) {
+  return (
+    <h2 className="font-display text-base font-bold text-fg">{children}</h2>
+  );
 }
 
 export default async function ReviewListingPage({
@@ -41,8 +45,9 @@ export default async function ReviewListingPage({
   const trail = await getAuditTrail({ entity: "listing", entityId: id }, 10);
   const platform = platforms.find((p) => p.id === listing.platform);
   const duplicates = listing.proofs.filter((p) => p.alsoUsedOn.length > 0);
+  const inReview = listing.status === "ADMIN_REVIEW";
 
-  const facts: [string, string][] = [
+  const facts: [string, ReactNode][] = [
     [
       platform?.metricLabel ?? "Audience",
       listing.audience.toLocaleString("en-US"),
@@ -52,8 +57,8 @@ export default async function ReviewListingPage({
     ["Niche", listing.niche],
     ["Audience country", listing.country],
     ["Monetized", listing.monetized ? "Yes" : "No"],
-    ["Monthly revenue", usd(listing.monthlyRevenue)],
-    ["Asking price", usd(listing.price)],
+    ["Monthly revenue", <Price key="rev" usd={listing.monthlyRevenue} />],
+    ["Asking price", <Price key="price" usd={listing.price} />],
   ];
 
   return (
@@ -63,36 +68,53 @@ export default async function ReviewListingPage({
         className="inline-flex min-h-11 items-center gap-1.5 text-sm text-muted transition-colors hover:text-fg"
       >
         <ArrowLeftIcon aria-hidden="true" className="size-4" />
-        Queue
+        Listing queue
       </Link>
 
-      <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0">
-          <ListingStatusBadge status={listing.status} />
-          <h1 className="mt-3 font-display text-2xl font-black tracking-tight text-fg sm:text-3xl">
-            {listing.title}
-          </h1>
-          <p className="mt-1 text-sm text-subtle">
-            {listing.handle} · {platform?.name ?? listing.platform}
-          </p>
+      <header className="mt-2 border-b border-line pb-5">
+        <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-4">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <ListingStatusTag status={listing.status} size="md" />
+              <Badge className="capitalize">
+                {platform?.name ?? listing.platform}
+              </Badge>
+              {inReview ? (
+                <Waited
+                  since={listing.updatedAt}
+                  warnAfter={12}
+                  lateAfter={24}
+                />
+              ) : null}
+            </div>
+            <h1 className="mt-3 font-display text-[1.6rem] leading-[1.1] font-black tracking-tight text-fg sm:text-[1.9rem]">
+              {listing.title}
+            </h1>
+            <p className="mt-1.5 text-sm text-subtle">
+              {listing.handle} · submitted{" "}
+              {listing.createdAt.toLocaleDateString("en-GB")}
+            </p>
+          </div>
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            {listing.status === "LIVE" ? (
+              <Link
+                href={`/listing/${listing.slug}`}
+                className="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-line px-4 text-sm text-muted transition-colors hover:border-line-strong hover:text-fg"
+              >
+                View live
+                <ExternalLinkIcon aria-hidden="true" className="size-4" />
+              </Link>
+            ) : null}
+          </div>
         </div>
-        {listing.status === "LIVE" ? (
-          <Link
-            href={`/listing/${listing.slug}`}
-            className="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-line px-4 text-sm text-muted transition-colors hover:border-line-strong hover:text-fg"
-          >
-            View live
-            <ExternalLinkIcon aria-hidden="true" className="size-4" />
-          </Link>
-        ) : null}
-      </div>
+      </header>
 
       {duplicates.length > 0 ? (
-        <div className="mt-6 rounded-panel border border-danger/40 bg-danger-soft p-5">
+        <Panel tone="danger" className="mt-5">
           <h2 className="flex items-center gap-2 font-display text-base font-bold text-fg">
-            <AlertTriangleIcon
+            <TriangleAlertIcon
               aria-hidden="true"
-              className="size-5 text-danger"
+              className="size-5 shrink-0 text-danger"
             />
             The same screenshot appears on another listing
           </h2>
@@ -118,75 +140,94 @@ export default async function ReviewListingPage({
               )),
             )}
           </ul>
-        </div>
+        </Panel>
       ) : null}
 
-      <div className="mt-6 grid gap-5 lg:grid-cols-[1fr_20rem]">
-        <div className="flex flex-col gap-5">
+      <div className="mt-5 grid gap-4 lg:grid-cols-[1fr_20rem] lg:items-start">
+        <div className="flex min-w-0 flex-col gap-4">
           {/* ---- ownership ---- */}
-          <section className="rounded-panel border border-line bg-surface p-5 sm:p-6">
-            <h2 className="font-display text-lg font-bold text-fg">
-              Ownership check
-            </h2>
-            <p className="mt-1.5 text-sm text-muted">
+          <Panel>
+            <SubHeading>
+              <span className="flex items-center gap-2">
+                <FingerprintIcon
+                  aria-hidden="true"
+                  className="size-4 shrink-0 text-subtle"
+                />
+                Ownership check
+              </span>
+            </SubHeading>
+            <p className="mt-1.5 text-sm leading-relaxed text-muted">
               Open the account and look for this code. If it is not there, send
               the listing back — a seller who cannot post to the profile does
               not control it.
             </p>
             <div className="mt-4 flex flex-wrap items-center gap-3">
-              <code className="rounded-xl border border-line bg-surface-2 px-4 py-3 font-mono text-base font-semibold tracking-wider text-fg">
+              <code className="rounded-card border border-line-strong bg-surface-2 px-4 py-3 font-mono text-base font-semibold tracking-wider text-fg select-all">
                 {listing.ownershipCode ?? "not issued"}
               </code>
               {listing.ownershipVerifiedAt ? (
-                <span className="text-sm text-verified">
+                <Badge variant="verified" size="md">
                   Confirmed{" "}
                   {listing.ownershipVerifiedAt.toLocaleDateString("en-GB")}
-                </span>
-              ) : null}
+                </Badge>
+              ) : (
+                <Badge size="md">Not confirmed yet</Badge>
+              )}
             </div>
-          </section>
+          </Panel>
 
           {/* ---- what they claim ---- */}
-          <section className="rounded-panel border border-line bg-surface p-5 sm:p-6">
-            <h2 className="font-display text-lg font-bold text-fg">
-              What the seller claims
-            </h2>
-            <dl className="mt-4 grid gap-x-6 gap-y-3 sm:grid-cols-2">
+          <Panel>
+            <SubHeading>What the seller claims</SubHeading>
+            <p className="mt-1.5 text-sm text-muted">
+              Unverified until the proof below backs it up. Money is shown in
+              whichever currency the header is set to.
+            </p>
+            <Facts className="mt-3">
               {facts.map(([label, value]) => (
-                <div
-                  key={label}
-                  className="flex justify-between gap-4 border-b border-line-soft pb-2"
-                >
-                  <dt className="text-sm text-subtle">{label}</dt>
-                  <dd className="text-sm font-medium text-fg tabular-nums">
-                    {value}
-                  </dd>
-                </div>
+                <Fact key={label} label={label}>
+                  {value}
+                </Fact>
               ))}
-            </dl>
+            </Facts>
             {listing.transferProfile ? (
-              <p className="mt-4 text-sm text-muted">
+              <p className="mt-4 text-sm leading-relaxed text-muted">
                 <span className="text-subtle">Handover notes: </span>
                 {listing.transferProfile}
               </p>
             ) : null}
-          </section>
+          </Panel>
 
           {/* ---- proof ---- */}
-          <section className="rounded-panel border border-line bg-surface p-5 sm:p-6">
-            <h2 className="font-display text-lg font-bold text-fg">
-              Proof ({listing.proofs.length})
-            </h2>
+          <Panel>
+            <SubHeading>
+              <span className="flex items-center gap-2">
+                <ImageIcon
+                  aria-hidden="true"
+                  className="size-4 shrink-0 text-subtle"
+                />
+                Proof ({listing.proofs.length})
+              </span>
+            </SubHeading>
             {listing.proofs.length === 0 ? (
-              <p className="mt-3 text-sm text-danger">
+              <p className="mt-3 flex items-start gap-2 rounded-card border border-danger/30 bg-danger-soft p-3 text-sm text-fg">
+                <TriangleAlertIcon
+                  aria-hidden="true"
+                  className="mt-0.5 size-4 shrink-0 text-danger"
+                />
                 Nothing attached. There is nothing here to check the numbers
-                against.
+                against, so there is nothing to approve.
               </p>
             ) : (
               <ul className="mt-4 grid gap-4 sm:grid-cols-2">
                 {listing.proofs.map((proof) => (
                   <li key={proof.id}>
-                    <a href={proof.url} target="_blank" rel="noreferrer">
+                    <a
+                      href={proof.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="block"
+                    >
                       {/* biome-ignore lint/performance/noImgElement: seller
                           uploads reviewed at full size; the optimiser adds
                           nothing here. */}
@@ -195,37 +236,36 @@ export default async function ReviewListingPage({
                         alt={proof.label || "Proof screenshot"}
                         width={400}
                         height={240}
-                        className={`w-full rounded-xl border object-cover ${
+                        className={`w-full rounded-card border object-cover ${
                           proof.alsoUsedOn.length > 0
                             ? "border-danger"
                             : "border-line"
                         }`}
                       />
                     </a>
-                    <p className="mt-1.5 text-sm text-muted">
+                    <p className="mt-1.5 flex flex-wrap items-center gap-2 text-sm text-muted">
                       {proof.label || (
                         <span className="text-subtle">no label</span>
                       )}
+                      {proof.alsoUsedOn.length > 0 ? (
+                        <Badge variant="danger">reused elsewhere</Badge>
+                      ) : null}
                     </p>
                   </li>
                 ))}
               </ul>
             )}
-          </section>
+          </Panel>
 
-          {listing.status === "ADMIN_REVIEW" ? (
-            <ReviewDecision listingId={listing.id} />
-          ) : null}
+          {inReview ? <ReviewDecision listingId={listing.id} /> : null}
 
           {listing.status === "REJECTED" && listing.rejectionReason ? (
-            <section className="rounded-panel border border-line bg-surface p-5">
-              <h2 className="font-display text-base font-bold text-fg">
-                Sent back with
-              </h2>
-              <p className="mt-2 text-sm text-muted">
+            <Panel>
+              <SubHeading>Sent back with</SubHeading>
+              <p className="mt-2 text-sm leading-relaxed text-muted">
                 {listing.rejectionReason}
               </p>
-            </section>
+            </Panel>
           ) : null}
 
           {listing.status === "LIVE" || listing.status === "PAUSED" ? (
@@ -234,15 +274,20 @@ export default async function ReviewListingPage({
         </div>
 
         {/* ---- who is selling ---- */}
-        <aside className="flex flex-col gap-5">
-          <section className="rounded-panel border border-line bg-surface p-5">
-            <h2 className="font-display text-base font-bold text-fg">
-              The seller
-            </h2>
+        <aside className="flex min-w-0 flex-col gap-4">
+          <Panel>
+            <SubHeading>The seller</SubHeading>
             <dl className="mt-3 flex flex-col gap-2.5 text-sm">
               <div>
                 <dt className="text-xs text-subtle">Name</dt>
-                <dd className="font-medium text-fg">{listing.seller.name}</dd>
+                <dd className="font-medium text-fg">
+                  <Link
+                    href={`/admin/users/${listing.seller.id}`}
+                    className="text-primary-text underline-offset-4 hover:underline"
+                  >
+                    {listing.seller.name}
+                  </Link>
+                </dd>
               </div>
               <div>
                 <dt className="text-xs text-subtle">Email</dt>
@@ -250,56 +295,70 @@ export default async function ReviewListingPage({
               </div>
               <div>
                 <dt className="text-xs text-subtle">Identity check</dt>
-                <dd
-                  className={
-                    listing.seller.kycStatus === "APPROVED"
-                      ? "text-verified"
-                      : "text-muted"
-                  }
-                >
-                  {listing.seller.kycStatus.toLowerCase().replace("_", " ")}
+                <dd>
+                  <Badge
+                    variant={
+                      listing.seller.kycStatus === "APPROVED"
+                        ? "verified"
+                        : listing.seller.kycStatus === "REJECTED"
+                          ? "danger"
+                          : "neutral"
+                    }
+                  >
+                    {listing.seller.kycStatus.toLowerCase().replace("_", " ")}
+                  </Badge>
                 </dd>
               </div>
               <div>
                 <dt className="text-xs text-subtle">Member since</dt>
-                <dd className="text-fg tabular-nums">
+                <dd className="tnum text-fg">
                   {listing.seller.joinedAt.toLocaleDateString("en-GB")}
                 </dd>
               </div>
               <div>
                 <dt className="text-xs text-subtle">Track record</dt>
-                <dd className="text-fg tabular-nums">
+                <dd className="tnum text-fg">
                   {listing.seller.completedSales} sold ·{" "}
                   {listing.seller.liveListings} live
                 </dd>
               </div>
             </dl>
-          </section>
+            {listing.seller.slug ? (
+              <Link
+                href={`/seller/${listing.seller.slug}`}
+                className="mt-3 inline-flex min-h-11 items-center gap-1.5 text-sm text-primary-text underline-offset-4 hover:underline"
+              >
+                Public seller page
+                <ExternalLinkIcon aria-hidden="true" className="size-3.5" />
+              </Link>
+            ) : null}
+          </Panel>
 
-          <section className="rounded-panel border border-line bg-surface p-5">
-            <h2 className="font-display text-base font-bold text-fg">
-              History
-            </h2>
+          <Panel>
+            <SubHeading>History</SubHeading>
             {trail.length === 0 ? (
               <p className="mt-3 text-sm text-subtle">
                 No staff action on this listing yet.
               </p>
             ) : (
-              <ul className="mt-3 flex flex-col gap-2.5 text-sm">
+              <ul className="mt-3 flex flex-col gap-3 text-sm">
                 {trail.map((row) => (
-                  <li key={row.id}>
-                    <p className="text-fg">
-                      {row.action.replace("listing.", "")}
-                    </p>
-                    <p className="text-xs text-subtle">
+                  <li
+                    key={row.id}
+                    className="border-b border-line pb-3 last:border-b-0 last:pb-0"
+                  >
+                    <p className="text-fg">{auditLabel(row.action)}</p>
+                    <p className="mt-0.5 text-xs text-subtle">
                       {row.actorName ?? "unknown"} ·{" "}
-                      {row.createdAt.toLocaleString("en-GB")}
+                      <time dateTime={row.createdAt.toISOString()}>
+                        {row.createdAt.toLocaleString("en-GB")}
+                      </time>
                     </p>
                   </li>
                 ))}
               </ul>
             )}
-          </section>
+          </Panel>
         </aside>
       </div>
     </>

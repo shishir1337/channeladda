@@ -1,13 +1,20 @@
 "use client";
 
+import { TriangleAlertIcon } from "lucide-react";
 import Link from "next/link";
 import { useState, useTransition } from "react";
+import { Waited } from "@/components/admin/vocab";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { setTicketStatus } from "@/server/actions/support";
 
 /**
  * One support request, with the two things a moderator does to it: write down
  * what was done, and move it out of the queue.
+ *
+ * The note is saved by the same call that moves the ticket, so the buttons say
+ * so — somebody who types a note and never presses anything has saved nothing,
+ * and used to have no way of knowing that.
  */
 
 export type TicketView = {
@@ -27,7 +34,7 @@ export type TicketView = {
 const STATUS_STYLES = {
   OPEN: "border-primary/30 bg-primary-soft text-primary-text",
   ANSWERED: "border-verified/30 bg-verified-soft text-verified",
-  CLOSED: "border-line text-subtle",
+  CLOSED: "border-line bg-surface-2 text-subtle",
 } as const;
 
 const STATUS_LABELS = {
@@ -41,6 +48,8 @@ export function TicketCard({ ticket }: { ticket: TicketView }) {
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
+  const dirty = note.trim() !== (ticket.staffNote ?? "").trim();
+
   function move(status: TicketView["status"]) {
     setError(null);
     startTransition(async () => {
@@ -50,26 +59,35 @@ export function TicketCard({ ticket }: { ticket: TicketView }) {
   }
 
   return (
-    <li className="bg-surface p-5">
-      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+    <li className="relative bg-surface p-4 sm:p-5">
+      {ticket.status === "OPEN" ? (
         <span
-          className={`rounded-full border px-2 py-0.5 text-xs font-medium ${STATUS_STYLES[ticket.status]}`}
+          aria-hidden="true"
+          className="absolute inset-y-0 left-0 w-[3px] bg-primary"
+        />
+      ) : null}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+        <span
+          className={cn(
+            "rounded-full border px-2 py-0.5 text-[0.6875rem] font-semibold",
+            STATUS_STYLES[ticket.status],
+          )}
         >
           {STATUS_LABELS[ticket.status]}
         </span>
-        <span className="font-medium text-fg">{ticket.topic}</span>
+        <span className="text-sm font-semibold text-fg">{ticket.topic}</span>
         {ticket.orderRef ? (
-          <span className="tnum text-xs text-subtle">
-            Order {ticket.orderRef}
+          <span className="tnum rounded-md bg-surface-2 px-1.5 py-0.5 text-[0.6875rem] text-muted">
+            {ticket.orderRef}
           </span>
         ) : null}
-        <span className="ml-auto text-xs text-subtle">
-          {new Date(ticket.createdAt).toLocaleString("en-US", {
-            month: "short",
-            day: "numeric",
-            hour: "numeric",
-            minute: "2-digit",
-          })}
+        <span className="ml-auto">
+          <Waited
+            since={new Date(ticket.createdAt)}
+            prefix="sent"
+            warnAfter={24}
+            lateAfter={72}
+          />
         </span>
       </div>
 
@@ -84,16 +102,19 @@ export function TicketCard({ ticket }: { ticket: TicketView }) {
         ) : (
           <span>Not signed in</span>
         )}
-        {" · "}
-        {ticket.email}
+        <span className="text-subtle/70"> · </span>
+        <span className="break-all">{ticket.email}</span>
         {ticket.handledBy ? ` · handled by ${ticket.handledBy}` : ""}
       </p>
 
-      <p className="mt-3 text-sm leading-relaxed whitespace-pre-wrap text-fg">
+      <p className="mt-3 rounded-card border border-line bg-surface-2 p-3 text-sm leading-relaxed whitespace-pre-wrap text-fg">
         {ticket.message}
       </p>
 
-      <label htmlFor={`note-${ticket.id}`} className="sr-only">
+      <label
+        htmlFor={`note-${ticket.id}`}
+        className="mt-3 block text-xs font-medium text-fg"
+      >
         What was done about it
       </label>
       <textarea
@@ -102,8 +123,13 @@ export function TicketCard({ ticket }: { ticket: TicketView }) {
         value={note}
         onChange={(event) => setNote(event.target.value)}
         placeholder="What you did about it, for whoever picks this up next"
-        className="mt-3 w-full rounded-lg border border-line bg-surface-2 p-2.5 text-xs text-fg placeholder:text-subtle focus:border-primary/60 focus:outline-none"
+        className="mt-1.5 w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-base text-fg placeholder:text-subtle focus:border-primary/60 focus:outline-none sm:text-xs"
       />
+      <p className="mt-1 text-[0.6875rem] text-subtle">
+        {dirty
+          ? "Unsaved — the note is written when you move the ticket."
+          : "Saved with the ticket."}
+      </p>
 
       <div className="mt-2.5 flex flex-wrap gap-2">
         {ticket.status !== "ANSWERED" ? (
@@ -113,7 +139,7 @@ export function TicketCard({ ticket }: { ticket: TicketView }) {
             disabled={pending}
             onClick={() => move("ANSWERED")}
           >
-            Mark answered
+            {pending ? "Saving…" : "Mark answered"}
           </Button>
         ) : null}
         {ticket.status !== "CLOSED" ? (
@@ -124,7 +150,7 @@ export function TicketCard({ ticket }: { ticket: TicketView }) {
             disabled={pending}
             onClick={() => move("CLOSED")}
           >
-            Close
+            Close it
           </Button>
         ) : null}
         {ticket.status !== "OPEN" ? (
@@ -141,8 +167,15 @@ export function TicketCard({ ticket }: { ticket: TicketView }) {
       </div>
 
       {error ? (
-        <p role="alert" className="mt-2 text-xs text-danger">
-          {error}
+        <p
+          role="alert"
+          className="mt-2 flex items-start gap-1.5 text-xs text-danger"
+        >
+          <TriangleAlertIcon
+            aria-hidden="true"
+            className="mt-px size-3.5 shrink-0"
+          />
+          <span>{error}</span>
         </p>
       ) : null}
     </li>

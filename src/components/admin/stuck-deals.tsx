@@ -1,5 +1,18 @@
+import {
+  AllClear,
+  Amount,
+  ConsoleSection,
+  RowHead,
+  RowItem,
+  Rows,
+} from "@/components/admin/console";
 import { EndDeal } from "@/components/admin/deal-controls";
-import { Price } from "@/components/ui/price";
+import {
+  DealModeBadge,
+  elapsed,
+  OrderStatusBadge,
+  Waited,
+} from "@/components/admin/vocab";
 import { db } from "@/lib/db";
 
 /**
@@ -12,7 +25,9 @@ import { db } from "@/lib/db";
  *
  * Deliberately a flat list rather than a filtered view: there is no scheduler
  * yet, so a human reading down this list is the only thing that unsticks a
- * deal, and a deal hidden behind a filter is a deal nobody unsticks.
+ * deal, and a deal hidden behind a filter is a deal nobody unsticks. What the
+ * list does carry is severity — a disputed deal and a deal that has sat for a
+ * week are marked, so "read all of it" and "start here" are both possible.
  */
 const LIVE_STATUSES = [
   "AWAITING_PAYMENT",
@@ -24,6 +39,10 @@ const LIVE_STATUSES = [
   "AWAITING_RELEASE",
   "DISPUTED",
 ] as const;
+
+/** Days a deal may sit before the row is flagged. */
+const STALE_DAYS = 7;
+const AGEING_DAYS = 3;
 
 export async function StuckDeals() {
   const deals = await db.order.findMany({
@@ -48,53 +67,125 @@ export async function StuckDeals() {
     },
   });
 
-  if (deals.length === 0) return null;
-
-  const days = (from: Date) =>
-    Math.floor((Date.now() - from.getTime()) / 86_400_000);
+  const disputed = deals.filter((d) => d.status === "DISPUTED").length;
+  const stale = deals.filter(
+    (d) => elapsed(d.createdAt).hours >= STALE_DAYS * 24,
+  ).length;
 
   return (
-    <section className="mt-10">
-      <h2 className="font-display text-lg font-bold text-fg">
-        Deals in flight
-      </h2>
-      <p className="mt-1.5 text-sm leading-relaxed text-muted">
-        Every live deal, oldest first, with the controls to end one. Nothing
-        here times out on its own yet, so a deal that has sat for days is
-        waiting on somebody reading this list.
-      </p>
-      <ul className="mt-4 flex flex-col gap-3">
-        {deals.map((order) => {
-          const next = order.steps[0];
-          const age = days(order.createdAt);
-          return (
-            <li
-              key={order.id}
-              className="rounded-card border border-line bg-surface p-4"
-            >
-              <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                <p className="text-sm font-semibold text-fg">
-                  {order.listing.title}
-                </p>
-                <p className="tnum text-xs text-subtle">{order.reference}</p>
-              </div>
-              <p className="mt-1 text-xs text-muted">
-                {order.mode === "SAFEST" ? "Safest" : "Fastest"} ·{" "}
-                <Price usd={order.priceUsd / 100} className="text-fg" /> ·{" "}
-                {order.status}
-                {order.agent ? ` · ${order.agent.name}` : " · no agent"}
-                {age > 0 ? ` · opened ${age}d ago` : null}
-              </p>
-              {next ? (
-                <p className="mt-1 text-xs text-subtle">
-                  Waiting on {next.actor}: {next.label}
-                </p>
-              ) : null}
-              <EndDeal orderId={order.id} />
-            </li>
-          );
-        })}
-      </ul>
-    </section>
+    <ConsoleSection
+      id="in-flight"
+      title="Deals in flight"
+      count={deals.length}
+      tone={disputed > 0 || stale > 0 ? "danger" : "neutral"}
+      description="Every live deal, oldest first. Nothing here times out on its own, so a deal that has sat for days is waiting on somebody reading this list."
+      actions={
+        deals.length > 0 ? (
+          <p className="text-xs text-subtle">
+            {disputed > 0 ? (
+              <span className="font-semibold text-danger">
+                {disputed} disputed
+              </span>
+            ) : (
+              "none disputed"
+            )}
+            {" · "}
+            {stale > 0 ? (
+              <span className="font-semibold text-danger">
+                {stale} over {STALE_DAYS} days
+              </span>
+            ) : (
+              `none over ${STALE_DAYS} days`
+            )}
+          </p>
+        ) : null
+      }
+    >
+      {deals.length === 0 ? (
+        <AllClear
+          title="Nothing is in flight"
+          body="Every deal on the platform has either finished or not started. There is nothing to unstick."
+        />
+      ) : (
+        <Rows>
+          {deals.map((order) => {
+            const next = order.steps[0];
+            const age = elapsed(order.createdAt);
+            const flag =
+              order.status === "DISPUTED" || age.hours >= STALE_DAYS * 24
+                ? "danger"
+                : age.hours >= AGEING_DAYS * 24
+                  ? "primary"
+                  : undefined;
+            return (
+              <RowItem key={order.id} flag={flag}>
+                <div className="p-4 pl-5">
+                  <RowHead
+                    title={order.listing.title}
+                    reference={order.reference}
+                    tags={
+                      <>
+                        <DealModeBadge mode={order.mode} />
+                        <OrderStatusBadge status={order.status} />
+                        <Waited
+                          since={order.createdAt}
+                          prefix="open"
+                          warnAfter={AGEING_DAYS * 24}
+                          lateAfter={STALE_DAYS * 24}
+                        />
+                      </>
+                    }
+                    right={
+                      <Amount
+                        cents={order.priceUsd}
+                        caption={
+                          order.mode === "SAFEST"
+                            ? "paid off-platform"
+                            : "we hold this"
+                        }
+                      />
+                    }
+                  />
+                  <dl className="mt-2.5 flex flex-wrap gap-x-5 gap-y-1 text-xs">
+                    <div className="flex gap-1.5">
+                      <dt className="text-subtle">Agent</dt>
+                      <dd
+                        className={
+                          order.agent ? "text-fg" : "font-medium text-danger"
+                        }
+                      >
+                        {order.agent?.name ?? "nobody"}
+                      </dd>
+                    </div>
+                    {next ? (
+                      <div className="flex min-w-0 gap-1.5">
+                        <dt className="shrink-0 text-subtle">
+                          Step {next.position}, waiting on {next.actor}
+                        </dt>
+                        <dd className="min-w-0 truncate text-fg">
+                          {next.label}
+                        </dd>
+                      </div>
+                    ) : (
+                      <div className="flex gap-1.5">
+                        <dt className="text-subtle">Next step</dt>
+                        <dd className="text-fg">
+                          none outstanding on the template
+                        </dd>
+                      </div>
+                    )}
+                  </dl>
+                  <EndDeal
+                    orderId={order.id}
+                    mode={order.mode}
+                    status={order.status}
+                  />
+                </div>
+              </RowItem>
+            );
+          })}
+        </Rows>
+      )}
+    </ConsoleSection>
   );
 }
