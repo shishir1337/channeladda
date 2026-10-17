@@ -114,6 +114,23 @@ deal. Three protections the help centre promised did not exist in code.
   to $500 per member per rolling 24 hours, $100,000 per correction for
   anyone; above the first, a superadmin makes it. A two-person approval
   would be stronger and is a feature, not a fix.
+- **Every dependency to its latest stable release, with three exceptions.**
+  The prisma CLI stays on 7.10.1 to match @prisma/client, because its
+  `latest` tag points at 8.0.0-rc.23. @types/node is ^22, the Node this
+  runs on, not 26. TypeScript is 7.0.2: `next build` 16.4 runs the
+  project's `tsc`, which supports it. Cost if wrong: TypeScript 6.0.3 is
+  the fallback and needs no code change.
+- **Account.issuer is dropped, not relaxed.** Better Auth 1.7.3 went back
+  to (providerId, accountId), and upstream says the v1 core schema will
+  not change again. A unique index on that pair replaces it, because
+  1.7.10 refuses a sign-in when two rows share the key. Cost if wrong:
+  a return to Better Auth 1.7.0–1.7.2 would need the column back.
+- **A payment reference names one invoice, not the deal.** Pressing Pay
+  reuses the latest invoice while Cryptomus has it open, books it if it
+  was paid, refuses while it is held for review, and raises a fresh one
+  once it is dead. Cost if wrong: an expired-but-paid-late invoice is
+  credited to the buyer's balance by the existing second-payment path
+  rather than to the deal.
 
 - [x] **A fourth review, of the fix pass itself.** Three Criticals, two of
       them regressions the fix pass introduced: a `handoverAt` guard that made
@@ -155,18 +172,32 @@ deal. Three protections the help centre promised did not exist in code.
       testimonials replaced by real reviews.
 - [x] **Lint is a gate now.** Biome's own config, clean across `src` and
       `scripts`.
+- [x] **Cryptomus with the live keys.** Signed requests, invoice create and
+      lookup, and the 404 for an unknown invoice all confirmed. One real bug
+      found that no fake could have shown: Cryptomus answers a reused
+      order_id with the same invoice, cancelled once its hour is up, so a
+      buyer who came back after an hour could never pay. Fixed with a
+      reference per attempt.
+- [x] **Dependencies to latest.** Next 16.4.2, React 19.3.1, TypeScript
+      7.0.2, Biome 2.5.15, Better Auth 1.7.10 (with the account migration it
+      needs), Prisma 7.10.1, dotenv 18, and the rest. `.gitattributes` makes
+      checkouts LF, so a fresh clone passes lint.
+- [x] **Two dev-only errors.** A running dev server kept a Prisma client
+      built from the old schema after `prisma generate` ("Unknown field
+      `paymentWindowHours`"); it now rebuilds itself. next-themes' script
+      no longer trips React 19's "Encountered a script tag" warning.
 
 ## Verification, as of the last commit
 
 | Check | Result |
 |---|---|
-| `pnpm test` | 382 passing, 36 files |
-| `pnpm typecheck` | clean |
-| `pnpm lint` | clean |
-| `pnpm build` | clean |
-| `scripts/e2e-routes.sh` | 131/131 against the production build: every page, every role, including the team, money and dispute desks and both CSV exports |
+| `pnpm test` | 392 passing, 40 files |
+| `pnpm typecheck` | clean, TypeScript 7.0.2 |
+| `pnpm lint` | clean, Biome 2.5.15, on a fresh checkout too |
+| `pnpm build` | clean, Next.js 16.4.2 |
+| `scripts/e2e-routes.sh` | 131/131 against the production build of the upgraded packages: every page, every role, including the team, money and dispute desks and both CSV exports |
 | `pnpm verify:integrations` | database ok; YouTube, Google and email correctly reported unconfigured; the sweep reported broken only because `CRON_SECRET` is unset on this machine |
-| Cryptomus, live keys (2026-10-17) | signed requests accepted; a $1.00 invoice raised and read back by `order_id` (status `check`); an unknown invoice is HTTP 404; every field the code reads exists under the name it reads. Webhook registration fails only because this machine is not a public https origin |
+| Cryptomus, live keys (2026-10-17) | signed requests accepted; a $1.00 invoice raised and read back by `order_id` (status `check`); an unknown invoice is HTTP 404; every field the code reads exists under the name it reads; a reused order_id returns the same invoice, `cancel` and final once expired, which is the bug fixed above. Webhook registration fails only because this machine is not a public https origin |
 | Browser | checkout, listing wizard and `/fees` driven by hand in an earlier round; the new desks not yet |
 | Final review | a fresh reviewer read this round's commits; two Important findings fixed with tests (a second payment the sweep confirmed was booked nowhere; a demoted agent kept their deals), two Minor deferred below |
 
