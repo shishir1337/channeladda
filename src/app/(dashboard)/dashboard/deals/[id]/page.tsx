@@ -22,6 +22,7 @@ import {
   RaiseDispute,
 } from "@/components/deals/deal-timeline";
 import { PayNow } from "@/components/deals/pay-now";
+import { PayToCard } from "@/components/deals/pay-to";
 import { Badge } from "@/components/ui/badge";
 import { Price } from "@/components/ui/price";
 import { db } from "@/lib/db";
@@ -200,6 +201,9 @@ export default async function DealPage({
           ) : (
             <DealNextStep deal={deal} staffIds={staffIds} />
           )}
+
+          {/* Safest only: where the buyer pays the seller directly. */}
+          <PayToCard deal={deal} />
 
           {/*
             The seller has to invite a specific Google account as channel owner,

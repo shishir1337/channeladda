@@ -12,12 +12,13 @@ import {
 } from "@/lib/deal-machine";
 import { OPENING_STATUS, templateFor } from "@/lib/deal-templates";
 import { orderAmounts } from "@/lib/fees";
+import { BUYER_PAYS_AFTER_STEP, payToVisibleTo } from "@/lib/pay-to";
 import { isSerializationFailure } from "@/lib/serialization-failure";
 import { keyFromUrl } from "@/lib/upload-keys";
 import { recordAudit } from "@/server/audit";
 import { ensureConversation, postEvent } from "@/server/chat-events";
 import { notifyDealEnded, notifyNextActor } from "@/server/deal-notify";
-import { notifyStaff } from "@/server/notifications";
+import { notify, notifyStaff } from "@/server/notifications";
 import {
   heldByAcceptedOffer,
   notifyClosedOffers,
@@ -985,6 +986,7 @@ export async function advanceStep(input: {
       totalUsd: true,
       holdUntil: true,
       conversationId: true,
+      sellerPayTo: true,
       listing: { select: { platform: true } },
       steps: {
         where: { completedAt: null },
@@ -1170,6 +1172,29 @@ export async function advanceStep(input: {
   }
 
   await notifyNextActor(order.id);
+
+  // The buyer has checked the channel and pays the seller next. A seller
+  // who never said where is reminded — once, because this step completes
+  // once — or the buyer arrives at their turn with nowhere to send it.
+  if (
+    order.mode === "SAFEST" &&
+    input.position === BUYER_PAYS_AFTER_STEP &&
+    !order.sellerPayTo
+  ) {
+    const title = `${doer?.name || "The buyer"} is ready to pay you — add where to be paid`;
+    const body =
+      "They have checked the channel and pay you next. Say where they should send the money, on the deal.";
+    await notify({
+      userId: order.sellerId,
+      kind: "ORDER",
+      title,
+      body,
+      href: order.conversationId
+        ? `/dashboard/messages/${order.conversationId}`
+        : `/dashboard/deals/${order.id}`,
+      email: { subject: title, body },
+    });
+  }
 
   await recordAudit({
     actorId: input.userId,
@@ -1839,6 +1864,17 @@ export type DealView = {
   steps: DealStepView[];
   /** The lowest incomplete step, or null once the deal has stopped. */
   nextStep: DealStepView | null;
+  /**
+   * Safest only: where the buyer pays the seller, in the seller's words.
+   * Null when this viewer may not see it yet — the buyer, before their turn
+   * to pay — as well as when nothing has been said.
+   */
+  sellerPayTo: string | null;
+  sellerPayToAt: Date | null;
+  /** Changed after the buyer could see it: the buyer is warned. */
+  payToChangedWhileVisible: boolean;
+  /** The buyer's turn to pay the seller has come (it stays come). */
+  buyerPayStepReached: boolean;
 };
 
 /**
@@ -1871,6 +1907,9 @@ export async function getDealFor(
       agentEmail: true,
       agentBrand: true,
       conversationId: true,
+      sellerPayTo: true,
+      sellerPayToAt: true,
+      sellerPayToChangedAt: true,
       listing: { select: { title: true, slug: true } },
       buyer: { select: { name: true } },
       seller: { select: { name: true } },
@@ -1883,6 +1922,18 @@ export async function getDealFor(
 
   const viewerRole = await roleOnDeal(order, userId);
   if (!viewerRole) return null;
+
+  // The seller's payment details, for whoever may see them by now. The
+  // buyer's turn is read from the step, not the status, because it stays
+  // reached through a dispute or an ending.
+  const payStep =
+    order.mode === "SAFEST"
+      ? order.steps.find((s) => s.position === BUYER_PAYS_AFTER_STEP)
+      : undefined;
+  const payStepDoneAt = payStep?.completedAt ?? null;
+  const canSeePayTo =
+    order.mode === "SAFEST" &&
+    payToVisibleTo(viewerRole, payStepDoneAt !== null);
 
   const steps: DealStepView[] = order.steps.map((s) => ({
     position: s.position,
@@ -1918,5 +1969,13 @@ export async function getDealFor(
     nextStep: isTerminal(order.status)
       ? null
       : (steps.find((s) => s.completedAt === null) ?? null),
+    sellerPayTo: canSeePayTo ? order.sellerPayTo : null,
+    sellerPayToAt: canSeePayTo ? order.sellerPayToAt : null,
+    payToChangedWhileVisible:
+      canSeePayTo &&
+      payStepDoneAt !== null &&
+      order.sellerPayToChangedAt !== null &&
+      order.sellerPayToChangedAt > payStepDoneAt,
+    buyerPayStepReached: payStepDoneAt !== null,
   };
 }

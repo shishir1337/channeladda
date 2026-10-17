@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import type { DealMode } from "@/generated/prisma/enums";
 import { agentIdentity } from "@/server/admin-users";
 import * as repo from "@/server/deals";
+import { type PayToFailure, saveSellerPayTo } from "@/server/pay-to";
 import { requireRole, requireUser } from "@/server/session";
 
 /**
@@ -56,6 +57,8 @@ function fail(reason: repo.DealFailure): DealResult {
 function refresh(orderId?: string) {
   revalidatePath("/dashboard/deals");
   revalidatePath("/admin/deals");
+  // A deal writes into its conversation, and is run from it too.
+  revalidatePath("/dashboard/messages", "layout");
   if (orderId) revalidatePath(`/dashboard/deals/${orderId}`);
 }
 
@@ -272,4 +275,34 @@ export async function endDeal(
     COMPLETED: "Deal completed.",
   } as const;
   return { ok: true, message: messages[to] };
+}
+
+const PAY_TO_MESSAGES: Record<PayToFailure, string> = {
+  "not-found": "That deal is no longer available.",
+  "wrong-actor": "Only the seller says where they are paid.",
+  "not-safest":
+    "On a Fastest deal Channel Adda pays you into your wallet, so there is nothing to add here.",
+  terminal: "This deal is already closed.",
+  locked:
+    "The buyer has already recorded paying you, so these details can no longer change.",
+  empty: "Say where the buyer should send the money.",
+  "too-long": "Keep it under 500 characters.",
+  "has-link":
+    "Payment details cannot include a web address. Write the account or wallet details out instead.",
+};
+
+/** A Safest seller saying where the buyer should pay them. */
+export async function savePayTo(
+  orderId: string,
+  text: string,
+): Promise<DealResult> {
+  const user = await requireUser();
+  const result = await saveSellerPayTo({ orderId, userId: user.id, text });
+  if (!result.ok) return { ok: false, error: PAY_TO_MESSAGES[result.reason] };
+
+  refresh(orderId);
+  return {
+    ok: true,
+    message: "Saved. The buyer sees this when it is their turn to pay you.",
+  };
 }

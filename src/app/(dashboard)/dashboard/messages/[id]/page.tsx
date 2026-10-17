@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { STATUS_LABELS, STATUS_TONE } from "@/components/deals/deal-status";
 import { DealNextStep, RaiseDispute } from "@/components/deals/deal-timeline";
 import { PayNow } from "@/components/deals/pay-now";
+import { PayToCard } from "@/components/deals/pay-to";
 import { StartDeal } from "@/components/listing/start-deal";
 import { DealPanel } from "@/components/messages/deal-panel";
 import { LiveRefresh } from "@/components/messages/live-refresh";
@@ -170,8 +171,13 @@ export default async function ThreadPage({
             ) : panel.kind === "step" && deal ? (
               <div className="flex flex-col gap-4">
                 <DealNextStep deal={deal} />
+                <PayToCard deal={deal} />
                 {deal.nextStep ? <RaiseDispute deal={deal} /> : null}
               </div>
+            ) : panel.kind === "waiting-for-payment" && deal ? (
+              // A Safest seller can say where to be paid from the moment the
+              // deal opens, rather than at the step that needs it.
+              <PayToCard deal={deal} />
             ) : null}
           </DealPanel>
         </div>
