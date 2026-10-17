@@ -23,9 +23,16 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
+/**
+ * `TEAM` rather than `STAFF`: the narrower set leaves out AGENT, so filtering
+ * for the people who work here hid the agents — the role the product runs on.
+ * Agents get a filter of their own too, because "which of my agents is free"
+ * is a question somebody asks several times a day.
+ */
 const FILTERS = [
   { label: "Everyone", role: undefined, status: undefined },
-  { label: "Staff", role: "STAFF", status: undefined },
+  { label: "With access", role: "TEAM", status: undefined },
+  { label: "Agents", role: "AGENT", status: undefined },
   { label: "Suspended", role: undefined, status: "banned" },
 ] as const;
 
@@ -48,7 +55,7 @@ export default async function AdminUsersPage({
 
   const { rows, total, pages } = await listUsers({
     query,
-    role: role as UserRole | "STAFF" | undefined,
+    role: role as UserRole | "STAFF" | "TEAM" | undefined,
     status: status as "banned" | "active" | undefined,
     page,
   });
@@ -70,6 +77,17 @@ export default async function AdminUsersPage({
         eyebrow="Accounts"
         title="People"
         description="Everyone with an account, members and staff alike. Suspending someone signs them out and pauses their listings; only a superadmin can change what someone can reach."
+        actions={
+          staff.role === "SUPERADMIN" ? (
+            <Link
+              href="/admin/team"
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-line px-4 text-sm font-medium text-muted transition-colors hover:border-line-strong hover:text-fg"
+            >
+              <ShieldCheckIcon aria-hidden="true" className="size-4" />
+              The team
+            </Link>
+          ) : null
+        }
         meta={
           <>
             <MetaItem label="Signed in as">{staff.name}</MetaItem>

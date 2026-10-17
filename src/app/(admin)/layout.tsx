@@ -1,9 +1,9 @@
 import type { NavGroup } from "@/components/dashboard/app-shell";
 import { AppShell } from "@/components/dashboard/app-shell";
 import { NotificationBell } from "@/components/dashboard/notification-bell";
-import { listNotifications, unreadCount } from "@/server/notifications";
 import { getQueueCounts } from "@/server/admin-listings";
 import { countFlaggedThreads } from "@/server/messages";
+import { listNotifications, unreadCount } from "@/server/notifications";
 import { requireAdminArea } from "@/server/session";
 import { countOpenTickets } from "@/server/support";
 
@@ -155,6 +155,19 @@ export default async function AdminLayout({ children }: LayoutProps<"/">) {
       label: "Platform",
       items: [
         { label: "People", href: "/admin/users", icon: "people" as const },
+        // Superadmin-only, like Payouts and Settings above: the page appoints
+        // staff and hands out invitation links. Drawn only for the role that
+        // can open it, because the 404 the others would get throws them out of
+        // the staff shell onto the public marketing page.
+        ...(staff.role === "SUPERADMIN"
+          ? [
+              {
+                label: "Team",
+                href: "/admin/team",
+                icon: "staff" as const,
+              },
+            ]
+          : []),
       ],
     },
     ...(staff.role === "SUPERADMIN"
