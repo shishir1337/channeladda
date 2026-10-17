@@ -45,6 +45,8 @@ export function OfferForm({
   const [message, setMessage] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState<string | null>(null);
+  // Where the offer's card now sits, so the buyer can carry on talking there.
+  const [thread, setThread] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   // Must match the server's markup exactly on the first client render.
@@ -90,9 +92,16 @@ export function OfferForm({
     return (
       <div className="rounded-xl border border-verified/30 bg-verified-soft p-4">
         <p className="text-sm text-fg">{sent}</p>
-        <Button asChild variant="secondary" size="md" className="mt-4">
-          <Link href="/dashboard/offers">Track it in your offers</Link>
-        </Button>
+        <div className="mt-4 flex flex-wrap gap-3">
+          {thread ? (
+            <Button asChild size="md">
+              <Link href={`/dashboard/messages/${thread}`}>Open the chat</Link>
+            </Button>
+          ) : null}
+          <Button asChild variant="secondary" size="md">
+            <Link href="/dashboard/offers">Track it in your offers</Link>
+          </Button>
+        </div>
       </div>
     );
   }
@@ -113,6 +122,7 @@ export function OfferForm({
             return;
           }
           setSent(result.message);
+          setThread(result.conversationId ?? null);
           router.refresh();
         });
       }}

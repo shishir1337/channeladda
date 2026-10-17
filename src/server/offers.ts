@@ -58,6 +58,10 @@ export type OfferView = {
   sellerName: string;
   /** Whose move it is, or null when the offer is closed. */
   awaiting: "buyer" | "seller" | null;
+  /** The offer this one countered; null for an opening offer or price. */
+  counterOf: string | null;
+  /** Where its card sits, so a list can send people to the conversation. */
+  conversationId: string | null;
 };
 
 const select = {
@@ -71,7 +75,14 @@ const select = {
   expiresAt: true,
   createdAt: true,
   respondedAt: true,
+  counterOf: true,
   buyer: { select: { name: true } },
+  // The offer's card: every offer since the deal chat has one.
+  messages: {
+    where: { kind: "OFFER" as const },
+    take: 1,
+    select: { conversationId: true },
+  },
   listing: {
     select: {
       slug: true,
@@ -96,7 +107,9 @@ type Row = {
   expiresAt: Date;
   createdAt: Date;
   respondedAt: Date | null;
+  counterOf: string | null;
   buyer: { name: string };
+  messages: { conversationId: string }[];
   listing: {
     slug: string;
     title: string;
@@ -155,6 +168,8 @@ function toView(row: Row, now = new Date()): OfferView {
     sellerId: row.listing.sellerId,
     sellerName: row.listing.seller.name,
     awaiting: turn.awaiting,
+    counterOf: row.counterOf,
+    conversationId: row.messages[0]?.conversationId ?? null,
   };
 }
 

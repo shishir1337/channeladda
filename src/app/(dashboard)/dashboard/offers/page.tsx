@@ -34,6 +34,8 @@ function toCard(offer: OfferView): OfferCardData {
     buyerName: offer.buyerName,
     sellerName: offer.sellerName,
     awaiting: offer.awaiting,
+    counterOf: offer.counterOf,
+    conversationId: offer.conversationId,
   };
 }
 

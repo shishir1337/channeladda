@@ -21,6 +21,10 @@ export type OfferCardData = {
   buyerName: string;
   sellerName: string;
   awaiting: "buyer" | "seller" | null;
+  /** The offer this one countered; null for an opening offer or price. */
+  counterOf: string | null;
+  /** Where the negotiation is happening, when it has a conversation. */
+  conversationId: string | null;
 };
 
 const STATUS: Record<
@@ -119,7 +123,9 @@ export function OfferCard({
             }
           >
             {offer.bySeller
-              ? "their counter"
+              ? offer.counterOf
+                ? "their counter"
+                : "their price"
               : atAskingPrice
                 ? "full asking price"
                 : "offered"}
@@ -136,6 +142,15 @@ export function OfferCard({
       <div className="mt-4 empty:hidden">
         <OfferActions offer={offer} viewingAs={viewingAs} />
       </div>
+
+      {offer.conversationId ? (
+        <Link
+          href={`/dashboard/messages/${offer.conversationId}`}
+          className="mt-3 inline-flex min-h-9 items-center text-sm font-medium text-primary-text underline-offset-4 hover:underline"
+        >
+          Open the chat
+        </Link>
+      ) : null}
 
       {offer.effectiveStatus === "ACCEPTED" ? (
         <p className="mt-4 rounded-xl border border-verified/30 bg-verified-soft p-3 text-sm text-fg">
