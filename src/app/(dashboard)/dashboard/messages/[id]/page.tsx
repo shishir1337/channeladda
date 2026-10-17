@@ -2,11 +2,17 @@ import { ArrowLeftIcon } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { DealPanel } from "@/components/messages/deal-panel";
 import { LiveRefresh } from "@/components/messages/live-refresh";
-import { toMessageViews } from "@/components/messages/serialize";
+import type { OfferComposerConfig } from "@/components/messages/offer-composer";
+import { toMessageViews, toPanelView } from "@/components/messages/serialize";
 import { ThreadView } from "@/components/messages/thread-view";
+import { dealPanelState } from "@/lib/deal-panel";
+import { fromCents } from "@/lib/listing-form";
+import { loadPanelInput } from "@/server/deal-panel";
 import { getThread, markThreadRead } from "@/server/messages";
 import { requireUser } from "@/server/session";
+import { getSettings } from "@/server/settings";
 import { threadFingerprint } from "@/server/thread-fingerprint";
 
 export const metadata: Metadata = {
@@ -14,6 +20,13 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
+/**
+ * One conversation: the people, the negotiation and the deal, in one place.
+ *
+ * Above the timeline sits the one thing the reader can do next, worked out
+ * on the server from the same records every other page reads. Nothing here
+ * decides what is allowed; each button calls an action that checks again.
+ */
 export default async function ThreadPage({
   params,
 }: PageProps<"/dashboard/messages/[id]">) {
@@ -31,8 +44,29 @@ export default async function ThreadPage({
 
   await markThreadRead(id, user);
 
+  const [panelInput, settings] = await Promise.all([
+    loadPanelInput(id, thread.viewerRole),
+    getSettings(),
+  ]);
+  const panel = panelInput ? dealPanelState(panelInput) : null;
+
   const otherSide =
     thread.viewerRole === "buyer" ? thread.sellerName : thread.buyerName;
+  const closed = thread.closedAt !== null;
+
+  // The message box offers a number only when the panel says one can be put
+  // on the table now, and never in a conversation staff closed — an offer
+  // made elsewhere still lands here, but this box is for writing.
+  const offerComposer: OfferComposerConfig | null =
+    !closed && (panel?.kind === "buy" || panel?.kind === "propose")
+      ? {
+          mode: panel.kind === "buy" ? "offer" : "price",
+          conversationId: thread.id,
+          listingId: thread.listingId,
+          askingPrice: fromCents(thread.listingPrice),
+          expiryHours: settings.offerExpiryHours,
+        }
+      : null;
 
   return (
     <>
@@ -57,12 +91,28 @@ export default async function ThreadPage({
         </Link>
       </div>
 
+      {panel ? (
+        <div className="mt-5">
+          <DealPanel
+            // Remounted when the situation changes, so on a phone it opens
+            // again the moment it becomes the reader's move.
+            key={`${panel.kind}:${"yourMove" in panel ? panel.yourMove : ""}`}
+            state={toPanelView(panel)}
+            viewerRole={thread.viewerRole}
+            otherName={otherSide.split(/\s+/)[0] || otherSide}
+            listingSlug={thread.listingSlug}
+            dealReference={panelInput?.deal?.reference ?? null}
+          />
+        </div>
+      ) : null}
+
       <div className="mt-6">
         <ThreadView
           conversationId={thread.id}
           otherSide={otherSide}
-          closed={thread.closedAt !== null}
+          closed={closed}
           viewerRole={thread.viewerRole}
+          offerComposer={offerComposer}
           messages={toMessageViews(thread.messages)}
         />
       </div>

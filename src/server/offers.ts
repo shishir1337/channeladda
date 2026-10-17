@@ -989,10 +989,11 @@ export async function withdrawOffer(
 export async function heldByAcceptedOffer(
   listingId: string,
   buyerId: string,
-): Promise<{ id: string; amountUsd: number } | null> {
+): Promise<{ id: string; amountUsd: number; heldUntil: Date } | null> {
   const { paymentWindowHours } = await getSettings();
-  const since = new Date(Date.now() - paymentWindowHours * 3_600_000);
-  return db.offer.findFirst({
+  const windowMs = paymentWindowHours * 3_600_000;
+  const since = new Date(Date.now() - windowMs);
+  const held = await db.offer.findFirst({
     where: {
       listingId,
       buyerId,
@@ -1001,8 +1002,15 @@ export async function heldByAcceptedOffer(
       order: null,
     },
     orderBy: { respondedAt: "desc" },
-    select: { id: true, amountUsd: true },
+    select: { id: true, amountUsd: true, respondedAt: true },
   });
+  if (!held?.respondedAt) return null;
+  // When the hold lapses, so the people waiting on it can be told.
+  return {
+    id: held.id,
+    amountUsd: held.amountUsd,
+    heldUntil: new Date(held.respondedAt.getTime() + windowMs),
+  };
 }
 
 /**

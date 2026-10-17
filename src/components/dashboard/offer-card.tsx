@@ -1,18 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
-import { FormNotice } from "@/components/auth/fields";
+import { OfferActions } from "@/components/offers/offer-actions";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import type { OfferStatus } from "@/generated/prisma/enums";
-import {
-  acceptOffer,
-  counterOffer,
-  declineOffer,
-  withdrawOffer,
-} from "@/server/actions/offers";
+import { timeLeft } from "@/lib/chat-time";
 
 export type OfferCardData = {
   id: string;
@@ -54,15 +46,6 @@ function usd(value: number) {
   });
 }
 
-function timeLeft(expiresAt: string) {
-  const ms = new Date(expiresAt).getTime() - Date.now();
-  if (ms <= 0) return "expired";
-  const hours = Math.floor(ms / 3_600_000);
-  if (hours >= 24) return `${Math.floor(hours / 24)}d left`;
-  if (hours >= 1) return `${hours}h left`;
-  return `${Math.max(1, Math.round(ms / 60_000))}m left`;
-}
-
 /**
  * One offer, from whichever side is looking at it.
  *
@@ -78,13 +61,6 @@ export function OfferCard({
   offer: OfferCardData;
   viewingAs: "buyer" | "seller";
 }) {
-  const router = useRouter();
-  const [countering, setCountering] = useState(false);
-  const [counterAmount, setCounterAmount] = useState("");
-  const [counterMessage, setCounterMessage] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [pending, startTransition] = useTransition();
-
   const status = STATUS[offer.effectiveStatus];
   // Someone taking the asking price is not haggling, and a seller should be
   // able to see that at a glance rather than comparing two numbers.
@@ -92,23 +68,8 @@ export function OfferCard({
   const yourTurn = offer.awaiting === viewingAs;
   const theirName = viewingAs === "seller" ? offer.buyerName : offer.sellerName;
 
-  function run(fn: () => Promise<{ ok: boolean; error?: string }>) {
-    setError(null);
-    startTransition(async () => {
-      const result = await fn();
-      if (!result.ok) {
-        setError(result.error ?? "That did not work. Try again.");
-        return;
-      }
-      setCountering(false);
-      router.refresh();
-    });
-  }
-
   return (
     <li className="bg-surface p-4 sm:p-5">
-      {error ? <FormNotice>{error}</FormNotice> : null}
-
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
@@ -172,100 +133,9 @@ export function OfferCard({
         </p>
       ) : null}
 
-      {yourTurn && !countering ? (
-        <div className="mt-4 flex flex-wrap gap-2.5">
-          <Button
-            type="button"
-            size="sm"
-            disabled={pending}
-            onClick={() => run(() => acceptOffer(offer.id))}
-          >
-            {pending ? "Working…" : `Accept ${usd(offer.amount)}`}
-          </Button>
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            disabled={pending}
-            onClick={() => {
-              setCounterAmount(String(Math.round(offer.amount)));
-              setCountering(true);
-            }}
-          >
-            Counter
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            disabled={pending}
-            onClick={() => run(() => declineOffer(offer.id))}
-          >
-            Decline
-          </Button>
-        </div>
-      ) : null}
-
-      {countering ? (
-        <div className="mt-4 rounded-xl border border-line bg-surface-2 p-4">
-          <label className="block text-sm font-medium text-fg">
-            Counter with (USD)
-            <input
-              inputMode="decimal"
-              value={counterAmount}
-              onChange={(e) => setCounterAmount(e.target.value)}
-              className="mt-2 h-11 w-full max-w-xs rounded-xl border border-line bg-surface px-3.5 text-base text-fg focus:border-primary/60 focus:outline-none sm:text-[0.9375rem]"
-            />
-          </label>
-          <label className="mt-3 block text-sm font-medium text-fg">
-            Message (optional)
-            <textarea
-              rows={2}
-              value={counterMessage}
-              onChange={(e) => setCounterMessage(e.target.value)}
-              className="mt-2 w-full rounded-xl border border-line bg-surface p-3 text-base text-fg focus:border-primary/60 focus:outline-none sm:text-[0.9375rem]"
-            />
-          </label>
-          <div className="mt-3 flex flex-wrap gap-2.5">
-            <Button
-              type="button"
-              size="sm"
-              disabled={pending || !counterAmount.trim()}
-              onClick={() =>
-                run(() =>
-                  counterOffer(offer.id, Number(counterAmount), counterMessage),
-                )
-              }
-            >
-              {pending ? "Sending…" : "Send counter"}
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => setCountering(false)}
-            >
-              Cancel
-            </Button>
-          </div>
-        </div>
-      ) : null}
-
-      {viewingAs === "buyer" &&
-      offer.effectiveStatus === "OPEN" &&
-      offer.awaiting === "seller" ? (
-        <div className="mt-4">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            disabled={pending}
-            onClick={() => run(() => withdrawOffer(offer.id))}
-          >
-            Withdraw offer
-          </Button>
-        </div>
-      ) : null}
+      <div className="mt-4 empty:hidden">
+        <OfferActions offer={offer} viewingAs={viewingAs} />
+      </div>
 
       {offer.effectiveStatus === "ACCEPTED" ? (
         <p className="mt-4 rounded-xl border border-verified/30 bg-verified-soft p-3 text-sm text-fg">

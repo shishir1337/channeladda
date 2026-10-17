@@ -9,6 +9,7 @@ import {
   ScissorsIcon,
   SendIcon,
   ShieldCheckIcon,
+  TagIcon,
   XIcon,
 } from "lucide-react";
 import { useEffect, useRef, useState, useTransition } from "react";
@@ -17,6 +18,11 @@ import {
   type ThreadOfferView,
 } from "@/components/messages/chat-offer-card";
 import { EventLine } from "@/components/messages/event-line";
+import {
+  type OfferComposerConfig,
+  OfferComposerForm,
+} from "@/components/messages/offer-composer";
+import { OfferActions } from "@/components/offers/offer-actions";
 import { Button } from "@/components/ui/button";
 import { chatTime } from "@/lib/chat-time";
 import { MAX_MESSAGE } from "@/lib/messages";
@@ -218,6 +224,7 @@ export function ThreadView({
   closed,
   otherSide,
   viewerRole,
+  offerComposer = null,
 }: {
   conversationId: string;
   messages: ThreadMessageView[];
@@ -226,7 +233,14 @@ export function ThreadView({
   otherSide: string;
   /** How the reader is involved, so an offer card can say whose move it is. */
   viewerRole: "buyer" | "seller" | "agent" | "staff";
+  /**
+   * Set when the reader can put a number on the table right now: a buyer's
+   * offer or a seller's price. Null hides the button, so nobody is offered
+   * something the server would refuse.
+   */
+  offerComposer?: OfferComposerConfig | null;
 }) {
+  const [offering, setOffering] = useState(false);
   const [draft, setDraft] = useState("");
   const [note, setNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -354,6 +368,21 @@ export function ThreadView({
                 senderName={message.mine ? "You" : displayName(message)}
                 mine={message.mine}
                 createdAt={message.createdAt}
+                actions={
+                  (viewerRole === "buyer" || viewerRole === "seller") &&
+                  message.offer.effectiveStatus === "OPEN" ? (
+                    <OfferActions
+                      offer={{
+                        id: message.offer.id,
+                        amount: message.offer.amountCents / 100,
+                        awaiting: message.offer.awaiting,
+                        bySeller: message.offer.bySeller,
+                        effectiveStatus: message.offer.effectiveStatus,
+                      }}
+                      viewingAs={viewerRole}
+                    />
+                  ) : undefined
+                }
               />
             ) : (
               <Bubble key={message.id} message={message} />
@@ -375,6 +404,14 @@ export function ThreadView({
         </p>
       ) : (
         <div className="mt-6 rounded-panel border border-line bg-surface p-3.5 focus-within:border-primary/50 sm:p-4">
+          {offering && offerComposer ? (
+            <div className="mb-3.5">
+              <OfferComposerForm
+                config={offerComposer}
+                onDone={() => setOffering(false)}
+              />
+            </div>
+          ) : null}
           <label htmlFor="composer" className="sr-only">
             Write a message
           </label>
@@ -461,6 +498,20 @@ export function ThreadView({
                 )}
                 {uploading ? "Attaching…" : "Photo or clip"}
               </Button>
+              {offerComposer ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  aria-expanded={offering}
+                  onClick={() => setOffering((was) => !was)}
+                >
+                  <TagIcon aria-hidden="true" className="size-4" />
+                  {offerComposer.mode === "price"
+                    ? "Offer a price"
+                    : "Make an offer"}
+                </Button>
+              ) : null}
               <p
                 className={cn(
                   "min-w-0 text-xs",
