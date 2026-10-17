@@ -96,105 +96,21 @@ export async function reconcileInvoices(limit = 25): Promise<number> {
   // Give the callback a few minutes to arrive before chasing it.
   const cutoff = new Date(Date.now() - 5 * 60 * 1000);
 
+  // Least recently looked at first, and every invoice looked at is touched,
+  // so the queue rotates. Ordering by createdAt meant the 25 oldest
+  // unresolvable invoices sat at the front for ever and every paid invoice
+  // behind them was never reached.
   const pending = await db.invoice.findMany({
     where: { appliedAt: null, createdAt: { lt: cutoff } },
-    orderBy: { createdAt: "asc" },
+    orderBy: { updatedAt: "asc" },
     take: limit,
-    select: {
-      id: true,
-      reference: true,
-      purpose: true,
-      userId: true,
-      orderId: true,
-    },
+    select: INVOICE_FOR_RECONCILE,
   });
 
   let applied = 0;
   for (const invoice of pending) {
     try {
-      const confirmed = await getInvoice(invoice.reference);
-      if (!confirmed) continue;
-
-      const outcome = classifyStatus(confirmed.status, confirmed.isFinal);
-      if (outcome !== "settled") {
-        // Dead invoices stop being chased; a pending one is looked at again.
-        if (outcome === "dead") await markApplied(invoice.reference);
-
-        // A refund is neither. The money reached us and went back, so if we
-        // applied it there is a hold on the books that is no longer real.
-        if (outcome === "refunded") {
-          await recordAudit({
-            actorId: null,
-            action: "payment.refunded_by_processor",
-            entity: invoice.orderId ? "order" : "user",
-            entityId: invoice.orderId ?? invoice.userId,
-            after: {
-              reference: invoice.reference,
-              status: confirmed.status,
-              via: "reconcile",
-            },
-          });
-          await markApplied(invoice.reference);
-        }
-        continue;
-      }
-
-      if (invoice.purpose === "TOPUP") {
-        if (confirmed.paidAmountUsd === null || confirmed.paidAmountUsd <= 0) {
-          continue;
-        }
-        await creditDeposit(
-          invoice.userId,
-          confirmed.paidAmountUsd,
-          invoice.reference,
-          confirmed.payerCurrency ?? "USDT",
-        );
-      } else if (invoice.orderId) {
-        // The same tolerance check the webhook makes. Without it, the
-        // cheapest way to get an agent to take custody of a channel was to
-        // underpay and make sure the callback never arrived — this is the
-        // path that runs when it does not.
-        const order = await db.order.findUnique({
-          where: { id: invoice.orderId },
-          select: { totalUsd: true },
-        });
-        if (!order) continue;
-        if (
-          confirmed.paidAmountUsd !== null &&
-          confirmed.paidAmountUsd < order.totalUsd
-        ) {
-          await recordAudit({
-            actorId: null,
-            action: "payment.underpaid",
-            entity: "order",
-            entityId: invoice.orderId,
-            after: {
-              paid: confirmed.paidAmountUsd,
-              owed: order.totalUsd,
-              via: "reconcile",
-            },
-          });
-          continue;
-        }
-
-        await recordOpeningPayment(
-          invoice.orderId,
-          invoice.reference,
-          confirmed.payerCurrency ?? "USDT",
-        );
-      } else {
-        continue;
-      }
-
-      await markApplied(invoice.reference);
-      await recordAudit({
-        actorId: null,
-        action: "payment.reconciled",
-        entity: invoice.purpose === "TOPUP" ? "user" : "order",
-        entityId: invoice.orderId ?? invoice.userId,
-        after: { reference: invoice.reference, status: confirmed.status },
-      });
-      applied += 1;
+      if (await reconcileOne(invoice)) applied += 1;
     } catch (error) {
       // One bad invoice must not stop the sweep.
       console.error(`[invoices] reconciling ${invoice.reference}`, error);
@@ -202,4 +118,157 @@ export async function reconcileInvoices(limit = 25): Promise<number> {
   }
 
   return applied;
+}
+
+const INVOICE_FOR_RECONCILE = {
+  id: true,
+  reference: true,
+  purpose: true,
+  userId: true,
+  orderId: true,
+  lastStatus: true,
+  createdAt: true,
+} as const;
+
+/**
+ * How long an invoice can go unheard-of at the processor before it is
+ * taken to have never existed there. Cryptomus invoices live one hour, so
+ * after two days with no callback and no record, there is nothing to pay.
+ */
+const NEVER_REGISTERED_AFTER_MS = 2 * 24 * 60 * 60 * 1000;
+
+/**
+ * One invoice, by reference, whenever somebody asks.
+ *
+ * For the money desk: a buyer says they paid and the deal says they did
+ * not. Without this the only remedy was waiting for the sweep to reach it,
+ * and a missed top-up had no remedy a person could use at all.
+ */
+export async function reconcileInvoice(
+  reference: string,
+): Promise<"applied" | "not-yet" | "not-found" | "already-applied"> {
+  const invoice = await db.invoice.findUnique({
+    where: { reference },
+    select: { ...INVOICE_FOR_RECONCILE, appliedAt: true },
+  });
+  if (!invoice) return "not-found";
+  if (invoice.appliedAt) return "already-applied";
+  return (await reconcileOne(invoice)) ? "applied" : "not-yet";
+}
+
+async function reconcileOne(invoice: {
+  id: string;
+  reference: string;
+  purpose: InvoicePurpose;
+  userId: string;
+  orderId: string | null;
+  lastStatus: string | null;
+  createdAt: Date;
+}): Promise<boolean> {
+  // Touched first, so whatever happens below this goes to the back of the
+  // queue rather than blocking the front.
+  await db.invoice.update({
+    where: { id: invoice.id },
+    data: { updatedAt: new Date() },
+  });
+
+  const confirmed = await getInvoice(invoice.reference);
+  if (!confirmed) {
+    // Never heard of, never called back about, and old enough that it
+    // could not still be paid: it was never created at the processor.
+    // Usually a top-up whose page the buyer never reached.
+    const age = Date.now() - invoice.createdAt.getTime();
+    if (!invoice.lastStatus && age > NEVER_REGISTERED_AFTER_MS) {
+      await markApplied(invoice.reference);
+      await recordAudit({
+        actorId: null,
+        action: "payment.never_registered",
+        entity: invoice.orderId ? "order" : "user",
+        entityId: invoice.orderId ?? invoice.userId,
+        after: { reference: invoice.reference },
+      });
+    }
+    return false;
+  }
+
+  const outcome = classifyStatus(confirmed.status, confirmed.isFinal);
+  if (outcome !== "settled") {
+    // Dead invoices stop being chased; a pending one is looked at again.
+    if (outcome === "dead") await markApplied(invoice.reference);
+
+    // A refund is neither. The money reached us and went back, so if we
+    // applied it there is a hold on the books that is no longer real.
+    if (outcome === "refunded") {
+      await recordAudit({
+        actorId: null,
+        action: "payment.refunded_by_processor",
+        entity: invoice.orderId ? "order" : "user",
+        entityId: invoice.orderId ?? invoice.userId,
+        after: {
+          reference: invoice.reference,
+          status: confirmed.status,
+          via: "reconcile",
+        },
+      });
+      await markApplied(invoice.reference);
+    }
+    return false;
+  }
+
+  if (invoice.purpose === "TOPUP") {
+    if (confirmed.paidAmountUsd === null || confirmed.paidAmountUsd <= 0) {
+      return false;
+    }
+    await creditDeposit(
+      invoice.userId,
+      confirmed.paidAmountUsd,
+      invoice.reference,
+      confirmed.payerCurrency ?? "USDT",
+    );
+  } else if (invoice.orderId) {
+    // The same tolerance check the webhook makes. Without it, the
+    // cheapest way to get an agent to take custody of a channel was to
+    // underpay and make sure the callback never arrived — this is the
+    // path that runs when it does not.
+    const order = await db.order.findUnique({
+      where: { id: invoice.orderId },
+      select: { totalUsd: true },
+    });
+    if (!order) return false;
+    if (
+      confirmed.paidAmountUsd !== null &&
+      confirmed.paidAmountUsd < order.totalUsd
+    ) {
+      await recordAudit({
+        actorId: null,
+        action: "payment.underpaid",
+        entity: "order",
+        entityId: invoice.orderId,
+        after: {
+          paid: confirmed.paidAmountUsd,
+          owed: order.totalUsd,
+          via: "reconcile",
+        },
+      });
+      return false;
+    }
+
+    await recordOpeningPayment(
+      invoice.orderId,
+      invoice.reference,
+      confirmed.payerCurrency ?? "USDT",
+    );
+  } else {
+    return false;
+  }
+
+  await markApplied(invoice.reference);
+  await recordAudit({
+    actorId: null,
+    action: "payment.reconciled",
+    entity: invoice.purpose === "TOPUP" ? "user" : "order",
+    entityId: invoice.orderId ?? invoice.userId,
+    after: { reference: invoice.reference, status: confirmed.status },
+  });
+  return true;
 }

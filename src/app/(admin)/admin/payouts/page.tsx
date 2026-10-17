@@ -79,7 +79,7 @@ export default async function AdminPayoutsPage() {
           label="Held in total"
           value={<Price usd={total / 100} className="text-[1.4rem]" />}
           icon={LockIcon}
-          note="Already deducted from balances. Not yet sent."
+          note="Held against the sellers’ available balances, so it cannot be spent twice. Debited only when you send it."
         />
         <Metric
           label="Largest single"

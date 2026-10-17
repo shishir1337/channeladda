@@ -1,4 +1,5 @@
 import {
+  ActivityIcon,
   ArrowRightIcon,
   BadgeCheckIcon,
   CoinsIcon,
@@ -7,6 +8,7 @@ import {
   MessageSquareIcon,
   StoreIcon,
   TagIcon,
+  TriangleAlertIcon,
 } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -37,6 +39,7 @@ import { getAuditTrail } from "@/server/audit";
 import { countFlaggedThreads } from "@/server/messages";
 import { getOpenReports } from "@/server/reports";
 import { requireStaff } from "@/server/session";
+import { getSettings } from "@/server/settings";
 import { countOpenTickets } from "@/server/support";
 import { listPendingWithdrawals } from "@/server/wallet";
 
@@ -44,6 +47,172 @@ export const metadata: Metadata = {
   title: "Admin",
   robots: { index: false, follow: false },
 };
+
+/**
+ * How long the sweep may be silent before the overview shouts.
+ *
+ * The documented crontab runs it every ten minutes, so this is three missed
+ * runs — not one late tick, but long enough that something is wrong.
+ */
+const SWEEP_STALE_MINUTES = 30;
+
+/** What each job in the sweep does, in words, keyed as the cron writes them. */
+const SWEEP_JOBS: Record<
+  string,
+  { label: string; did: (n: number) => string }
+> = {
+  reconciled: {
+    label: "Applying payments whose callback was lost",
+    did: (n) => `${n} lost ${n === 1 ? "payment" : "payments"} applied`,
+  },
+  deals: {
+    label: "Expiring unpaid deals",
+    did: (n) => `${n} unpaid ${n === 1 ? "deal" : "deals"} expired`,
+  },
+  offers: {
+    label: "Lapsing old offers",
+    did: (n) => `${n} ${n === 1 ? "offer" : "offers"} lapsed`,
+  },
+  media: {
+    label: "Deleting expired chat files",
+    did: (n) => `${n} chat ${n === 1 ? "file" : "files"} deleted`,
+  },
+  messages: {
+    label: "Deleting old chat messages",
+    did: (n) => `${n} old ${n === 1 ? "message" : "messages"} deleted`,
+  },
+  orphans: {
+    label: "Collecting unused uploads",
+    did: (n) => `${n} unused ${n === 1 ? "upload" : "uploads"} collected`,
+  },
+};
+
+/**
+ * The scheduled sweep's heartbeat.
+ *
+ * `POST /api/cron` writes `lastSweepAt` and what each job did on every run.
+ * Before that a dead crontab was silent, and its documented consequence is
+ * listings reserved for ever and paid invoices never applied — so a stale or
+ * failing sweep is the loudest thing on this page, and a healthy one is a
+ * single quiet line.
+ */
+function SweepHeartbeat({
+  at,
+  result,
+}: {
+  at: Date | null;
+  result: Record<string, number | string> | null;
+}) {
+  const minutes =
+    at === null ? null : Math.floor((Date.now() - at.getTime()) / 60_000);
+  const stale = minutes === null || minutes > SWEEP_STALE_MINUTES;
+  const jobs = Object.entries(result ?? {}).filter(([name]) => name !== "ms");
+  const failed = jobs.filter(([, value]) => typeof value === "string");
+
+  const when = at ? (
+    <time
+      dateTime={at.toISOString()}
+      title={at.toLocaleString("en-GB")}
+      className="tnum"
+    >
+      {elapsed(at).label === "just now"
+        ? "just now"
+        : `${elapsed(at).label} ago`}
+    </time>
+  ) : null;
+
+  if (!stale && failed.length === 0) {
+    return (
+      <p className="mt-5 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-card border border-verified/25 bg-verified-soft px-3.5 py-2.5 text-xs text-muted">
+        <ActivityIcon
+          aria-hidden="true"
+          className="size-3.5 shrink-0 text-verified"
+        />
+        <span className="font-semibold text-fg">Scheduled sweep</span>
+        <span>ran {when}, every job fine.</span>
+        <span className="text-subtle">
+          {jobs
+            .flatMap(([name, value]) =>
+              typeof value === "number" && value > 0
+                ? [SWEEP_JOBS[name]?.did(value) ?? `${name}: ${value}`]
+                : [],
+            )
+            .join(" · ") || "Nothing needed doing."}
+        </span>
+      </p>
+    );
+  }
+
+  return (
+    <div
+      role="alert"
+      className="mt-5 rounded-card border border-danger/40 bg-danger-soft p-4 sm:p-5"
+    >
+      <p className="flex items-start gap-2 font-display text-base font-bold text-fg">
+        <TriangleAlertIcon
+          aria-hidden="true"
+          className="mt-0.5 size-5 shrink-0 text-danger"
+        />
+        <span>
+          {at === null
+            ? "The scheduled sweep has never run"
+            : stale
+              ? `The scheduled sweep has not run for ${elapsed(at).label}`
+              : `The last sweep ran ${elapsed(at).label === "just now" ? "just now" : `${elapsed(at).label} ago`}, but ${failed.length === 1 ? "one job" : `${failed.length} jobs`} failed`}
+        </span>
+      </p>
+
+      {stale ? (
+        <>
+          <p className="mt-2 max-w-[72ch] text-sm leading-relaxed text-fg">
+            It should run every ten minutes. Until it does, unpaid deals never
+            expire — so their listings stay reserved for ever — payments whose
+            callback went missing are never applied, old offers stay open and
+            expired chat files are not deleted.
+          </p>
+          <p className="mt-2 max-w-[72ch] text-xs leading-relaxed text-muted">
+            The server&rsquo;s crontab calls <code>POST /api/cron</code> with
+            the cron secret; the setup is in the deployment guide. Whoever looks
+            after the server needs to know about this today.
+            {at ? (
+              <>
+                {" "}
+                Last run:{" "}
+                <time dateTime={at.toISOString()} className="tnum">
+                  {at.toLocaleString("en-GB")}
+                </time>
+                .
+              </>
+            ) : null}
+          </p>
+        </>
+      ) : null}
+
+      {failed.length > 0 ? (
+        <ul className="mt-3 grid gap-1.5">
+          {failed.map(([name, message]) => (
+            <li key={name} className="text-xs leading-relaxed">
+              <span className="font-semibold text-fg">
+                {SWEEP_JOBS[name]?.label ?? name}
+              </span>
+              <span className="text-muted"> failed: </span>
+              <span className="font-mono break-all text-danger">
+                {String(message)}
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {failed.length > 0 ? (
+        <p className="mt-2 max-w-[72ch] text-xs leading-relaxed text-muted">
+          The other jobs still ran. A failing job is retried on the next run, so
+          one failure can be a blip; the same one twice in a row needs somebody
+          to look at the server logs.
+        </p>
+      ) : null}
+    </div>
+  );
+}
 
 /** The oldest of a set of timestamps, or null when the set is empty. */
 function oldestOf(dates: readonly Date[]): Date | null {
@@ -67,18 +236,27 @@ export default async function AdminOverviewPage() {
   const staff = await requireStaff();
   const isFinance = staff.role === "FINANCE" || staff.role === "SUPERADMIN";
 
-  const [counts, review, trail, reports, flagged, openTickets, payouts] =
-    await Promise.all([
-      getQueueCounts(),
-      getReviewQueue("ADMIN_REVIEW"),
-      getAuditTrail({}, 12),
-      getOpenReports(),
-      countFlaggedThreads(),
-      countOpenTickets(),
-      // FINANCE and SUPERADMIN only, matching the nav and the page's own
-      // `requireRole("FINANCE")`. A moderator never sees a payout figure.
-      isFinance ? listPendingWithdrawals() : Promise.resolve([]),
-    ]);
+  const [
+    counts,
+    review,
+    trail,
+    reports,
+    flagged,
+    openTickets,
+    payouts,
+    settings,
+  ] = await Promise.all([
+    getQueueCounts(),
+    getReviewQueue("ADMIN_REVIEW"),
+    getAuditTrail({}, 12),
+    getOpenReports(),
+    countFlaggedThreads(),
+    countOpenTickets(),
+    // FINANCE and SUPERADMIN only, matching the nav and the page's own
+    // `requireRole("FINANCE")`. A moderator never sees a payout figure.
+    isFinance ? listPendingWithdrawals() : Promise.resolve([]),
+    getSettings(),
+  ]);
 
   const waiting =
     counts.awaitingReview +
@@ -135,6 +313,11 @@ export default async function AdminOverviewPage() {
             </MetaItem>
           </>
         }
+      />
+
+      <SweepHeartbeat
+        at={settings.lastSweepAt}
+        result={settings.lastSweepResult}
       />
 
       <ConsoleSection

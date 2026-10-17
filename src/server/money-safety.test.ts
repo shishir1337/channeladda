@@ -342,3 +342,73 @@ test(
     expect(settings.lastSweepResult).toMatchObject({ deals: 2, offers: 0 });
   }),
 );
+
+// ---------------------------------------- the sweep cannot be starved
+
+test(
+  "an invoice the processor never heard of does not block the queue for ever",
+  withCleanDb(async () => {
+    // reconcileInvoices took the 25 oldest unapplied invoices, oldest first.
+    // A top-up whose page was never reached is never registered at the
+    // processor, so its lookup fails on every run and the row never clears —
+    // and 25 of those blocked every paid invoice behind them, permanently.
+    const { reconcileInvoices } = await import("@/server/invoices");
+    const user = await seedUser();
+    const old = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
+    await db.invoice.create({
+      data: {
+        reference: "TOPUP-NEVER-SEEN",
+        purpose: "TOPUP",
+        amountUsd: 5_000,
+        userId: user.id,
+        createdAt: old,
+        updatedAt: old,
+      },
+    });
+
+    // No credentials here, so the processor says nothing about any of them:
+    // exactly the never-registered case.
+    await reconcileInvoices();
+
+    const row = await db.invoice.findUniqueOrThrow({
+      where: { reference: "TOPUP-NEVER-SEEN" },
+    });
+    expect(row.appliedAt).not.toBeNull();
+  }),
+);
+
+test(
+  "a recent invoice the processor has not answered for is kept and moved to the back",
+  withCleanDb(async () => {
+    const { reconcileInvoices } = await import("@/server/invoices");
+    const user = await seedUser();
+    const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
+    await db.invoice.create({
+      data: {
+        reference: "TOPUP-RECENT",
+        purpose: "TOPUP",
+        amountUsd: 5_000,
+        userId: user.id,
+        createdAt: tenMinutesAgo,
+        updatedAt: tenMinutesAgo,
+      },
+    });
+
+    await reconcileInvoices();
+
+    const row = await db.invoice.findUniqueOrThrow({
+      where: { reference: "TOPUP-RECENT" },
+    });
+    // Still being chased, but no longer at the front.
+    expect(row.appliedAt).toBeNull();
+    expect(row.updatedAt.getTime()).toBeGreaterThan(tenMinutesAgo.getTime());
+  }),
+);
+
+test(
+  "one invoice can be retried by reference",
+  withCleanDb(async () => {
+    const { reconcileInvoice } = await import("@/server/invoices");
+    expect(await reconcileInvoice("CA-00000")).toBe("not-found");
+  }),
+);
