@@ -475,8 +475,12 @@ export async function withdrawOffer(
   offerId: string,
   buyerId: string,
 ): Promise<Result> {
+  // bySeller: false, because a seller's counter is stored under the buyer's
+  // id. Scoped on buyerId alone, a buyer could mark the seller's counter
+  // WITHDRAWN — recorded as though they had retracted their own offer, with
+  // no notification — rather than declining it, which tells the seller.
   const row = await db.offer.findFirst({
-    where: { id: offerId, buyerId },
+    where: { id: offerId, buyerId, bySeller: false },
     select: { id: true, status: true },
   });
   if (!row) return { ok: false, reason: "not-found" };

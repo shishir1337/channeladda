@@ -20,7 +20,7 @@ import {
   requestWithdrawal,
   settleWithdrawal,
 } from "@/server/wallet";
-import { seedListing, seedUser, withCleanDb } from "@/test/db";
+import { passHold, seedListing, seedUser, withCleanDb } from "@/test/db";
 
 /**
  * The whole thing, end to end.
@@ -66,6 +66,7 @@ async function drive(mode: "SAFEST" | "FASTEST", priceUsd = 10_000) {
 
   for (const step of templateFor(mode)) {
     if (step.position < 2) continue;
+    await passHold(orderId);
     const result = await advanceStep({
       orderId,
       position: step.position,

@@ -33,6 +33,10 @@ const MESSAGES: Record<repo.DealFailure, string> = {
   disputed: "This deal is with Channel Adda while the dispute is open.",
   "needs-dispute":
     "One side says this already happened, so reversing it is a decision, not a correction. Pause it for review first — then it can be decided with both accounts of it on the record.",
+  "needs-reference":
+    "Add the transaction reference or bank receipt number. It is the only record that you paid the seller, and the first thing a moderator asks for if they say you did not.",
+  "on-hold":
+    "This deal is in its recovery hold: the window in which an old owner could still reclaim the account. The seller is paid when it ends — the deal page shows the date.",
   "in-custody":
     "One of our agents is holding this channel. Give it back to the seller rather than cancelling — cancelling would close the deal and leave the channel in a staff account.",
   "needs-finance":

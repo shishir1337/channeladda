@@ -230,7 +230,15 @@ export async function payFromWallet(
         if (available < order.totalUsd) throw new WalletAbort("insufficient");
 
         const took = await tx.order.updateMany({
-          where: { id: order.id, paymentRef: null },
+          where: {
+          id: order.id,
+          paymentRef: null,
+          // As recordOpeningPayment does. Without the status, an order the
+          // sweep expired mid-payment was written back to life with its
+          // listing already reserved for somebody else: two live deals, one
+          // channel, and a second seller payout for an account already gone.
+          status: order.status,
+        },
           data: {
             status: target,
             paymentRef: `wallet:${order.reference}`,

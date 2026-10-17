@@ -32,6 +32,14 @@ export type StepTemplate = {
    * cannot misdirect a channel or a payout.
    */
   needsApprovalAbove?: boolean;
+  /**
+   * The seller's irreversible act on a Fastest deal: making the buyer the
+   * owner. It stamps nothing on the order, so without this a refund could
+   * not tell “the seller has given the channel away” from “nothing has
+   * happened yet” — and a buyer who held the channel and never pressed
+   * confirm could be refunded in full with one click.
+   */
+  handsOver?: boolean;
 };
 
 /**
@@ -111,7 +119,12 @@ const FASTEST_STEPS: readonly StepTemplate[] = Object.freeze([
     actor: "agent",
     entersStatus: "AWAITING_HANDOVER",
   },
-  { position: 4, label: "Promote the buyer to primary owner", actor: "seller" },
+  {
+    position: 4,
+    label: "Promote the buyer to primary owner",
+    actor: "seller",
+    handsOver: true,
+  },
   {
     position: 5,
     label: "Confirm access received",

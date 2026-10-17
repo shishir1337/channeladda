@@ -10,7 +10,7 @@ import {
   recordOpeningPayment,
   resolveDeal,
 } from "@/server/deals";
-import { seedListing, seedUser, withCleanDb } from "@/test/db";
+import { passHold, seedListing, seedUser, withCleanDb } from "@/test/db";
 
 type Mode = "SAFEST" | "FASTEST";
 
@@ -59,6 +59,7 @@ async function runTo(
 
   for (const step of templateFor(mode)) {
     if (step.position < 2 || step.position >= stopBefore) continue;
+    await passHold(orderId);
     const result = await advanceStep({
       orderId,
       position: step.position,

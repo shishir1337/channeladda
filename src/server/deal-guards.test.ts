@@ -9,7 +9,7 @@ import {
   recordOpeningPayment,
   resolveDeal,
 } from "@/server/deals";
-import { seedListing, seedUser, withCleanDb } from "@/test/db";
+import { passHold, seedListing, seedUser, withCleanDb } from "@/test/db";
 
 type Mode = "SAFEST" | "FASTEST";
 
@@ -39,6 +39,7 @@ async function runTo(mode: Mode, stopBefore: number, priceUsd?: number) {
   };
   for (const step of templateFor(mode)) {
     if (step.position < 2 || step.position >= stopBefore) continue;
+    await passHold(o.orderId);
     const r = await advanceStep({
       orderId: o.orderId,
       position: step.position,
@@ -95,6 +96,7 @@ test(
   withCleanDb(async () => {
     const { orderId, actors, seller } = await runTo("FASTEST", 6);
 
+    await passHold(orderId);
     const results = await Promise.all([
       advanceStep({ orderId, position: 6, userId: actors.agent }),
       advanceStep({ orderId, position: 6, userId: actors.agent }),

@@ -12,7 +12,7 @@ import {
 import { openConversation, sendMessage } from "@/server/messages";
 import type { CurrentUser } from "@/server/session";
 import { creditDeposit, getWallet, payFromWallet } from "@/server/wallet";
-import { seedListing, seedUser, withCleanDb } from "@/test/db";
+import { passHold, seedListing, seedUser, withCleanDb } from "@/test/db";
 
 function asUser(id: string): CurrentUser {
   return {
@@ -348,6 +348,7 @@ test(
     const { templateFor } = await import("@/lib/deal-templates");
     for (const step of templateFor("FASTEST")) {
       if (step.position < 2) continue;
+      await passHold(created.orderId);
       const r = await advanceStep({
         orderId: created.orderId,
         position: step.position,

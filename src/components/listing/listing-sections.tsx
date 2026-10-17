@@ -163,9 +163,10 @@ export function TransferPanel({ platform }: { platform: Platform }) {
         ))}
       </ol>
       <p className="mt-5 rounded-xl border border-line bg-surface-2 p-4 text-xs leading-relaxed text-muted">
-        The hold period on this platform is{" "}
+        On a Fastest deal the seller is paid{" "}
         <span className="font-semibold text-fg">{platform.holdDays} days</span>{" "}
-        after you confirm every step above.{" "}
+        after you confirm every step above — the window in which an old owner
+        could still reclaim the account.{" "}
         <Link
           href="/how-it-works"
           className="text-primary-text underline-offset-4 hover:underline"

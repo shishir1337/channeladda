@@ -76,7 +76,13 @@ export function DealNextStep({
   // A dispute freezes every step, so the person whose turn it nominally is
   // must not be offered a button the server will refuse.
   const frozen = deal.status === "DISPUTED";
-  const mine = !frozen && step.actor === deal.viewerRole;
+  // The recovery hold: the release step exists, and is not available yet.
+  // Offering the button would only produce a refusal.
+  const heldUntil =
+    deal.holdUntil && new Date(deal.holdUntil) > new Date()
+      ? new Date(deal.holdUntil)
+      : null;
+  const mine = !frozen && !heldUntil && step.actor === deal.viewerRole;
   const help = stepHelp(step.label);
   const hold = isHoldStep(step.label);
   // Step 1 is completed by the payment clearing and by nothing else, so the
@@ -128,6 +134,23 @@ export function DealNextStep({
           {frozen
             ? "This step is where the deal stopped. It stays here until a moderator decides the dispute."
             : "Nothing is needed from you right now. Your deals list flags this one under “Waiting on you” the moment it is your turn."}
+        </p>
+      ) : null}
+
+      {heldUntil ? (
+        <p className="mt-3 flex items-start gap-2.5 rounded-card border border-primary/30 bg-primary-soft px-3.5 py-3 text-sm leading-relaxed text-fg">
+          <ClockIcon aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-primary-text" />
+          <span>
+            <span className="font-semibold">Recovery hold until{" "}
+            {heldUntil.toLocaleDateString("en-GB", {
+              day: "numeric",
+              month: "long",
+            })}
+            .</span>{" "}
+            That is the window in which an old owner could still try to
+            reclaim the account. The seller is paid when it ends; until
+            then the money stays with Channel Adda.
+          </span>
         </p>
       ) : null}
 

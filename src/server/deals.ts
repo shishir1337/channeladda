@@ -10,6 +10,7 @@ import {
   TERMINAL_STATUSES,
 } from "@/lib/deal-machine";
 import { OPENING_STATUS, templateFor } from "@/lib/deal-templates";
+import { platformMap } from "@/data/platforms";
 import { orderAmounts } from "@/lib/fees";
 import { isSerializationFailure } from "@/lib/serialization-failure";
 import { keyFromUrl } from "@/lib/upload-keys";
@@ -61,6 +62,10 @@ export type DealFailure =
   | "needs-finance"
   /** The channel is ours to give back, so it cannot just be abandoned. */
   | "in-custody"
+  /** Paying a seller directly is recorded with how, or not at all. */
+  | "needs-reference"
+  /** The recovery hold on this platform has not ended yet. */
+  | "on-hold"
   | "bad-proof";
 
 export type DealOutcome<T = Record<never, never>> =
@@ -710,7 +715,14 @@ export async function holdsFor(agentId: string): Promise<number> {
     where: {
       agentId,
       mode: "SAFEST",
-      status: { in: [...AGENT_HOLD_STATUSES] },
+      // A dispute does not hand the channel back. DISPUTED is not in
+      // AGENT_HOLDS and a buyer may dispute for free, so leaving it out let
+      // an agent at their cap take as many channels again as they had
+      // disputes — while still owning the first lot.
+      OR: [
+        { status: { in: [...AGENT_HOLD_STATUSES] } },
+        { status: "DISPUTED", custodyAt: { not: null } },
+      ],
     },
   });
 }
@@ -785,7 +797,11 @@ export async function assignAgent(input: {
           where: {
             agentId: input.agentId,
             mode: "SAFEST",
-            status: { in: [...AGENT_HOLD_STATUSES] },
+            // Same rule as countHeld: a disputed channel is still held.
+            OR: [
+              { status: { in: [...AGENT_HOLD_STATUSES] } },
+              { status: "DISPUTED", custodyAt: { not: null } },
+            ],
             // Reassigning this very order is not a new channel to hold.
             id: { not: order.id },
           },
@@ -851,6 +867,8 @@ export async function advanceStep(input: {
       sellerFeeUsd: true,
       buyerFeeUsd: true,
       totalUsd: true,
+      holdUntil: true,
+      listing: { select: { platform: true } },
       steps: {
         where: { completedAt: null },
         orderBy: { position: "asc" },
@@ -920,6 +938,27 @@ export async function advanceStep(input: {
   const stamp = STEP_TIMESTAMP[order.mode]?.[input.position];
   const completing = template.entersStatus === "COMPLETED";
 
+  // A Safest buyer saying they paid the seller. The reference is the only
+  // evidence that payment happened, and the requirement lived only in the
+  // browser — so buyerPaidAt could be stamped blank, which then forces any
+  // return of the channel through a dispute with nothing to decide it on.
+  if (stamp === "buyerPaidAt" && !input.paymentRef?.trim()) {
+    return { ok: false, reason: "needs-reference" };
+  }
+
+  // Every listing page promises a recovery hold: the seller's money is not
+  // released until the window in which an old owner can reclaim the account
+  // has passed. Nothing implemented it — Order.holdUntil was written by
+  // nothing — so a Fastest seller was credited the minute the buyer
+  // confirmed, and a recovery on day six left the buyer with neither.
+  if (completing && order.mode === "FASTEST" && order.holdUntil && order.holdUntil > now) {
+    return { ok: false, reason: "on-hold" };
+  }
+  const startsHold = order.mode === "FASTEST" && stamp === "handoverAt";
+  const holdDays =
+    platformMap[order.listing.platform.toLowerCase() as keyof typeof platformMap]
+      ?.holdDays ?? 14;
+
   try {
     await db.$transaction(async (tx) => {
       // Compare-and-set, not update: two overlapping clicks on the same step
@@ -950,6 +989,9 @@ export async function advanceStep(input: {
         data: {
           ...(template.entersStatus ? { status: template.entersStatus } : {}),
           ...(stamp ? { [stamp]: now } : {}),
+          ...(startsHold
+            ? { holdUntil: new Date(now.getTime() + holdDays * 86_400_000) }
+            : {}),
           ...(input.paymentRef ? { buyerPaymentRef: input.paymentRef } : {}),
           ...(completing ? { completedAt: now } : {}),
         },
@@ -1274,9 +1316,23 @@ export async function resolveDeal(input: {
   // moderator sees what each side claims and the decision is on the record.
   // What a single staff member must not be able to do is reverse either one
   // with one click from a running deal.
+  // On a Fastest deal the seller's handover is the other claim a refund
+  // reverses. It stamps nothing on the order, so it is read from the step.
+  const handsOverStep = templateFor(order.mode).find((s) => s.handsOver);
+  const sellerHandedOver =
+    input.to === "REFUNDED" && handsOverStep
+      ? (await db.transferStep.count({
+          where: {
+            orderId: order.id,
+            position: handsOverStep.position,
+            completedAt: { not: null },
+          },
+        })) > 0
+      : false;
+
   const reversingSomethingClaimed =
     (input.to === "RETURNED_TO_SELLER" && order.buyerPaidAt !== null) ||
-    (input.to === "REFUNDED" && order.handoverAt !== null);
+    (input.to === "REFUNDED" && (order.handoverAt !== null || sellerHandedOver));
   if (reversingSomethingClaimed && order.status !== "DISPUTED") {
     return { ok: false, reason: "needs-dispute" };
   }
@@ -1539,6 +1595,8 @@ export type DealView = {
    *  the only evidence the payment happened, so both sides can see it. */
   buyerPaymentRef: string | null;
   buyerPaidAt: Date | null;
+  /** Fastest only: the seller is not released before this. */
+  holdUntil: Date | null;
   listingTitle: string;
   listingSlug: string;
   buyerName: string;
@@ -1575,6 +1633,7 @@ export async function getDealFor(
       sellerFeeUsd: true,
       buyerPaymentRef: true,
       buyerPaidAt: true,
+      holdUntil: true,
       buyerId: true,
       sellerId: true,
       agentId: true,
@@ -1613,6 +1672,7 @@ export async function getDealFor(
     payoutUsd: order.priceUsd - order.sellerFeeUsd,
     buyerPaymentRef: order.buyerPaymentRef,
     buyerPaidAt: order.buyerPaidAt,
+    holdUntil: order.holdUntil,
     listingTitle: order.listing.title,
     listingSlug: order.listing.slug,
     buyerName: order.buyer.name,
