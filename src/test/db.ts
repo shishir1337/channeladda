@@ -30,6 +30,7 @@ const TABLES = [
   "Dispute",
   "Withdrawal",
   "LedgerEntry",
+  "ConversationRead",
   "Message",
   "Conversation",
   "TransferStep",

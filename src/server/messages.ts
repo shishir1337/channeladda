@@ -368,6 +368,34 @@ export async function roleInThread(
   return null;
 }
 
+/**
+ * How many entries in each of these threads this person has not read.
+ *
+ * Unread means written by somebody else — never by the reader, never by the
+ * platform itself (a payment clearing is told by its own notification) —
+ * after the reader's own marker, or ever when they have none. One query for
+ * all of them: a per-thread threshold is not something Prisma's filters can
+ * say, and an inbox of fifty threads should not be fifty queries.
+ */
+async function unreadByThread(
+  userId: string,
+  conversationIds: string[],
+): Promise<Map<string, number>> {
+  if (conversationIds.length === 0) return new Map();
+  const rows = await db.$queryRaw<{ conversationId: string; unread: number }[]>`
+    SELECT m."conversationId", COUNT(*)::int AS unread
+    FROM "Message" AS m
+    LEFT JOIN "ConversationRead" AS r
+      ON r."conversationId" = m."conversationId" AND r."userId" = ${userId}
+    WHERE m."conversationId" = ANY(${conversationIds})
+      AND m."senderId" IS NOT NULL
+      AND m."senderId" <> ${userId}
+      AND (r."readAt" IS NULL OR m."createdAt" > r."readAt")
+    GROUP BY m."conversationId"
+  `;
+  return new Map(rows.map((row) => [row.conversationId, row.unread]));
+}
+
 /** Everything this person is part of, newest first. */
 export async function listThreads(
   viewer: CurrentUser,
@@ -403,13 +431,12 @@ export async function listThreads(
         take: 1,
         select: { body: true, fromStaff: true },
       },
-      _count: {
-        select: {
-          messages: { where: { readAt: null, senderId: { not: viewer.id } } },
-        },
-      },
     },
   });
+  const unread = await unreadByThread(
+    viewer.id,
+    rows.map((row) => row.id),
+  );
 
   return rows.map((row) => {
     const iAmBuyer = row.buyerId === viewer.id;
@@ -429,7 +456,7 @@ export async function listThreads(
       preview: row.messages[0]
         ? `${row.messages[0].fromStaff ? "Channel Adda: " : ""}${row.messages[0].body}`
         : "No messages yet.",
-      unread: row._count.messages,
+      unread: unread.get(row.id) ?? 0,
       flagged: row.flaggedAt !== null,
       closed: row.closedAt !== null,
     };
@@ -438,12 +465,22 @@ export async function listThreads(
 
 /** How many threads are waiting on this person. Drives the sidebar badge. */
 export async function countUnreadThreads(userId: string): Promise<number> {
-  return db.conversation.count({
+  const asAgent = await stillAnAgent(userId);
+  const threads = await db.conversation.findMany({
     where: {
-      OR: [{ buyerId: userId }, { sellerId: userId }],
-      messages: { some: { readAt: null, senderId: { not: userId } } },
+      OR: [
+        { buyerId: userId },
+        { sellerId: userId },
+        ...(asAgent ? [{ orders: runningDealsOf(userId) }] : []),
+      ],
     },
+    select: { id: true },
   });
+  const unread = await unreadByThread(
+    userId,
+    threads.map((row) => row.id),
+  );
+  return [...unread.values()].filter((n) => n > 0).length;
 }
 
 export type StaffThread = ThreadSummary & {
@@ -643,16 +680,20 @@ export async function sendMessage(input: {
     await markUploadsAttached([urlForKey(input.attachmentKey)]);
   }
 
-  // The other side of the thread. Collapsed per conversation, because a
-  // burst of ten lines should say “there is something to read in here” and
-  // it stops saying that the moment the bell shows ten. No email: chat
-  // arrives in bursts and an inbox is the wrong place for it.
-  const otherId = input.sender.id === row.buyerId ? row.sellerId : row.buyerId;
-  if (otherId !== input.sender.id) {
+  // Everyone else in the thread: both sides, and the agent of a deal running
+  // here. Not staff, who work from their own queue. Worked out as "everyone
+  // but the sender" rather than "the other side", which used to send a staff
+  // note to the buyer alone. Collapsed per conversation, because a burst of
+  // ten lines should say "there is something to read in here" and it stops
+  // saying that the moment the bell shows ten. No email: chat arrives in
+  // bursts and an inbox is the wrong place for it.
+  for (const userId of await readersOf(row)) {
+    if (userId === input.sender.id) continue;
     await notify({
-      userId: otherId,
+      userId,
       kind: "MESSAGE",
-      title: `${input.sender.name ?? "Someone"} sent you a message`,
+      // Staff speak as Channel Adda here too, never by name.
+      title: `${role === "staff" ? "Channel Adda" : (input.sender.name ?? "Someone")} sent you a message`,
       body: body.slice(0, 140) || "Sent an attachment.",
       href: `/dashboard/messages/${row.id}`,
       collapseKey: `thread:${row.id}`,
@@ -662,7 +703,33 @@ export async function sendMessage(input: {
   return { ok: true, redactedKinds: kinds };
 }
 
-/** Mark everything the other side said as read. */
+/**
+ * Who reads a thread as part of it: the buyer, the seller, and the agent of
+ * each deal running in it who still holds the desk.
+ */
+async function readersOf(row: {
+  id: string;
+  buyerId: string;
+  sellerId: string;
+}): Promise<string[]> {
+  const running = await db.order.findMany({
+    where: { conversationId: row.id, agentId: { not: null } },
+    select: { agentId: true },
+  });
+  const agents: string[] = [];
+  for (const { agentId } of running) {
+    if (agentId && (await agentOnThread(agentId, row.id))) agents.push(agentId);
+  }
+  return [...new Set([row.buyerId, row.sellerId, ...agents])];
+}
+
+/**
+ * Everything in the thread up to now counts as read, for this reader.
+ *
+ * One marker per person per thread: with the deal's agent in a conversation
+ * there are three readers, and a flag on each message could only ever say
+ * whether "the other side" had read it.
+ */
 export async function markThreadRead(
   conversationId: string,
   viewer: CurrentUser,
@@ -673,13 +740,11 @@ export async function markThreadRead(
   });
   if (!row || !(await roleInThread(viewer, row))) return;
 
-  await db.message.updateMany({
-    where: {
-      conversationId,
-      senderId: { not: viewer.id },
-      readAt: null,
-    },
-    data: { readAt: new Date() },
+  const now = new Date();
+  await db.conversationRead.upsert({
+    where: { conversationId_userId: { conversationId, userId: viewer.id } },
+    create: { conversationId, userId: viewer.id, readAt: now },
+    update: { readAt: now },
   });
 }
 

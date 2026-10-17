@@ -185,6 +185,7 @@ model User {
   buyerThreads   Conversation[]     @relation("ConversationBuyer")
   sellerThreads  Conversation[]     @relation("ConversationSeller")
   staffThreads   Conversation[]     @relation("ConversationStaff")
+  threadReads    ConversationRead[]
   reviewsGiven   Review[]           @relation("ReviewAuthor")
   reviewsGot     Review[]           @relation("ReviewSubject")
   favourites     Favourite[]
@@ -559,12 +560,12 @@ model Order {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  steps        TransferStep[]
-  messages     Message[]
-  dispute      Dispute?
-  ledger       LedgerEntry[]
-  invoices     Invoice[]
-  review       Review?
+  steps    TransferStep[]
+  messages Message[]
+  dispute  Dispute?
+  ledger   LedgerEntry[]
+  invoices Invoice[]
+  review   Review?
 
   @@index([buyerId, status])
   @@index([sellerId, status])
@@ -626,6 +627,8 @@ model Conversation {
   createdAt     DateTime  @default(now())
 
   messages Message[]
+  /// Where each reader has read up to.
+  reads    ConversationRead[]
 
   /// One thread per buyer per listing — not one per question.
   @@unique([listingId, buyerId])
@@ -688,15 +691,32 @@ model Message {
   redactedKinds String?
 
   /// True for a note written by staff, which both sides can see.
-  fromStaff Boolean   @default(false)
-  readAt    DateTime?
-  createdAt DateTime  @default(now())
+  fromStaff Boolean  @default(false)
+  createdAt DateTime @default(now())
 
   @@index([conversationId, createdAt])
   @@index([attachmentExpiresAt])
   @@index([createdAt])
   @@index([offerId])
   @@index([orderId])
+}
+
+/// How far one person has read one conversation.
+///
+/// One marker per reader, not a flag per message: a conversation can have
+/// three readers — the buyer, the seller and the deal's agent — and a flag on
+/// the message could only say whether "the other side" had read it, so
+/// whoever opened the thread first marked it read for everyone else.
+model ConversationRead {
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// Everything written up to here has been read.
+  readAt         DateTime
+
+  @@id([conversationId, userId])
+  @@index([userId])
 }
 
 model Dispute {
