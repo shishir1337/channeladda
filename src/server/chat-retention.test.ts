@@ -26,9 +26,9 @@ async function thread(opts: { withDeal?: boolean; flagged?: boolean } = {}) {
       mode: "SAFEST",
     });
     if (!created.ok) throw new Error(created.reason);
-    await db.conversation.update({
-      where: { id: conversation.id },
-      data: { orderId: created.orderId },
+    await db.order.update({
+      where: { id: created.orderId },
+      data: { conversationId: conversation.id },
     });
   }
 

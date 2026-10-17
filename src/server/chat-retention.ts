@@ -67,12 +67,12 @@ export async function purgeExpiredMedia(now = new Date()): Promise<number> {
       // as a dispute can still be raised — and then the normal clock takes
       // it. A thread staff flagged keeps its media: that is evidence about a
       // person, not a deal.
+      //
+      // A conversation can hold several deals — one lapses, the buyer opens
+      // another — so it waits for every one of them, not just the first.
       conversation: {
         flaggedAt: null,
-        OR: [
-          { orderId: null },
-          { order: { status: { in: [...TERMINAL_STATUSES] } } },
-        ],
+        orders: { none: { status: { notIn: [...TERMINAL_STATUSES] } } },
       },
     },
     select: { id: true, attachmentUrl: true },
@@ -143,7 +143,7 @@ export async function purgeOldMessages(now = new Date()): Promise<number> {
       // Staff notes outlive the thread they are in.
       fromStaff: false,
       conversation: {
-        orderId: null,
+        orders: { none: {} },
         flaggedAt: null,
       },
     },

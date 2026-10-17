@@ -163,10 +163,10 @@ test(
     });
     if (!created.ok) throw new Error(created.reason);
 
-    const conversation = await db.conversation.findUniqueOrThrow({
-      where: { id: opened.id },
+    const order = await db.order.findUniqueOrThrow({
+      where: { id: created.orderId },
     });
-    expect(conversation.orderId).toBe(created.orderId);
+    expect(order.conversationId).toBe(opened.id);
   }),
 );
 
@@ -188,9 +188,9 @@ test(
     if (!opened.ok) throw new Error(opened.reason);
 
     expect(
-      (await db.conversation.findUniqueOrThrow({ where: { id: opened.id } }))
-        .orderId,
-    ).toBe(created.orderId);
+      (await db.order.findUniqueOrThrow({ where: { id: created.orderId } }))
+        .conversationId,
+    ).toBe(opened.id);
   }),
 );
 

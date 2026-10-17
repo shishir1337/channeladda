@@ -30,6 +30,13 @@ export { MAX_MESSAGE };
 
 export type ThreadRole = "buyer" | "seller" | "staff";
 
+/**
+ * Who wrote an entry. Wider than the reader's role: the deal's agent writes
+ * in the thread, and the platform writes the events nobody did by hand — a
+ * payment clearing, a window lapsing — with no sender at all.
+ */
+export type SenderRole = "buyer" | "seller" | "staff" | "agent" | "system";
+
 export type ThreadMessage = {
   id: string;
   body: string;
@@ -37,7 +44,7 @@ export type ThreadMessage = {
   mine: boolean;
   fromStaff: boolean;
   senderName: string;
-  senderRole: ThreadRole;
+  senderRole: SenderRole;
   /** What was taken out, shown to everyone so the gap is never a mystery. */
   redactedKinds: string | null;
   attachmentUrl: string | null;
@@ -127,22 +134,12 @@ export async function openConversation(input: {
   });
   if (existing) return { ok: true, id: existing.id };
 
-  // A deal may already exist — the buyer can pay first and ask questions
-  // after. Found here so the thread is part of the record from the moment it
-  // is created, rather than waiting for a sweep to notice.
-  const order = await db.order.findFirst({
-    where: { listingId: listing.id, buyerId: input.buyerId },
-    orderBy: { createdAt: "desc" },
-    select: { id: true },
-  });
-
   try {
     const created = await db.conversation.create({
       data: {
         listingId: listing.id,
         buyerId: input.buyerId,
         sellerId: listing.sellerId,
-        orderId: order?.id ?? null,
         // Written as the buyer, so the thread arrives in the seller's inbox
         // as a question rather than as an empty row. An empty thread tells
         // the seller somebody looked and nothing more, and it gives the buyer
@@ -156,6 +153,20 @@ export async function openConversation(input: {
       },
       select: { id: true },
     });
+
+    // Deals may already exist — the buyer can pay first and ask questions
+    // after. Linked here so the thread is part of their record from the
+    // moment it is created, rather than waiting for a sweep to notice. Every
+    // one of them, not the latest: each needs its conversation.
+    await db.order.updateMany({
+      where: {
+        listingId: listing.id,
+        buyerId: input.buyerId,
+        conversationId: null,
+      },
+      data: { conversationId: created.id },
+    });
+
     return { ok: true, id: created.id };
   } catch {
     const raced = await db.conversation.findUnique({
@@ -243,14 +254,7 @@ export async function getThread(
       createdAt: message.createdAt,
       mine: message.senderId === viewer.id,
       fromStaff: message.fromStaff,
-      // Staff speak as Channel Adda, not as a named person. A buyer should not
-      // learn which moderator is reading their dispute.
-      senderName: message.fromStaff ? "Channel Adda" : message.sender.name,
-      senderRole: message.fromStaff
-        ? "staff"
-        : message.senderId === row.buyerId
-          ? "buyer"
-          : "seller",
+      ...senderOf(message, row),
       redactedKinds: message.redactedKinds,
       attachmentUrl: message.attachmentUrl,
       attachmentKind: message.attachmentKind,
@@ -258,6 +262,37 @@ export async function getThread(
       attachmentRemoved: message.attachmentRemovedAt !== null,
     })),
   };
+}
+
+/**
+ * Who an entry is from, as the thread shows it.
+ *
+ * Staff speak as Channel Adda, not as a named person: a buyer should not
+ * learn which moderator is reading their dispute. The platform's own events
+ * have no sender and read as Channel Adda too. Anyone else who is neither
+ * side is the deal's agent, the only other person who can write here.
+ */
+function senderOf(
+  message: {
+    senderId: string | null;
+    fromStaff: boolean;
+    sender: { name: string } | null;
+  },
+  row: { buyerId: string; sellerId: string },
+): { senderName: string; senderRole: SenderRole } {
+  if (message.fromStaff) {
+    return { senderName: "Channel Adda", senderRole: "staff" };
+  }
+  if (message.senderId === null || message.sender === null) {
+    return { senderName: "Channel Adda", senderRole: "system" };
+  }
+  const senderRole: SenderRole =
+    message.senderId === row.buyerId
+      ? "buyer"
+      : message.senderId === row.sellerId
+        ? "seller"
+        : "agent";
+  return { senderName: message.sender.name, senderRole };
 }
 
 function roleOf(

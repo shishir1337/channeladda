@@ -255,12 +255,32 @@ export async function createDeal(input: {
           data: { status: "REJECTED", respondedAt: new Date() },
         });
 
+        // The 10-day chat purge carves out threads with an order on them, and
+        // nothing ever wrote that link — so the carve-out could never fire,
+        // and every deal's conversation was deleted after ten days. That
+        // conversation is what the dispute process and the refund policy both
+        // call the only account of what was agreed.
+        //
+        // The link lives on the deal, not the thread, so a second deal opened
+        // in the same conversation after the first lapsed is linked too.
+        // Inside the transaction: if the order rolls back, the link does too.
+        const thread = await tx.conversation.findUnique({
+          where: {
+            listingId_buyerId: {
+              listingId: listing.id,
+              buyerId: input.buyerId,
+            },
+          },
+          select: { id: true },
+        });
+
         const order = await tx.order.create({
           data: {
             reference,
             listingId: listing.id,
             buyerId: input.buyerId,
             sellerId: listing.sellerId,
+            conversationId: thread?.id ?? null,
             mode: input.mode,
             status: "AWAITING_PAYMENT",
             offerId: offer?.id ?? null,
@@ -285,22 +305,6 @@ export async function createDeal(input: {
             },
           },
           select: { id: true },
-        });
-
-        // The 10-day chat purge carves out threads with an order on them, and
-        // nothing ever wrote that link — so the carve-out could never fire,
-        // and every deal's conversation was deleted after ten days. That
-        // conversation is what the dispute process and the refund policy both
-        // call the only account of what was agreed.
-        //
-        // Inside the transaction: if the order rolls back, the claim does too.
-        await tx.conversation.updateMany({
-          where: {
-            listingId: listing.id,
-            buyerId: input.buyerId,
-            orderId: null,
-          },
-          data: { orderId: order.id },
         });
 
         return order.id;

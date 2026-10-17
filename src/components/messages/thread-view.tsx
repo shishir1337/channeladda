@@ -33,7 +33,7 @@ export type ThreadMessageView = {
   mine: boolean;
   fromStaff: boolean;
   senderName: string;
-  senderRole: "buyer" | "seller" | "staff";
+  senderRole: "buyer" | "seller" | "staff" | "agent" | "system";
   redactedKinds: string | null;
   attachmentUrl: string | null;
   attachmentKind: "IMAGE" | "VIDEO" | null;

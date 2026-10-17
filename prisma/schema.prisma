@@ -477,6 +477,8 @@ model Offer {
   respondedAt DateTime?
   /// The deal an accepted offer became, if it became one.
   order       Order?
+  /// Its card in the conversation, and the events about it.
+  messages    Message[]
 
   @@index([listingId, status])
   @@index([buyerId])
@@ -507,6 +509,23 @@ model Order {
   agentEmail String?
   /// Display name beside agentEmail, e.g. "Channel Adda Transfers".
   agentBrand String?
+
+  /// The conversation this deal belongs to. Every deal has one: opening a
+  /// deal creates it when the buyer never wrote to the seller.
+  conversationId String?
+  conversation   Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+
+  /// Safest only: where the buyer pays the seller directly, in the seller's
+  /// words. Not filtered for contact details, because a bank account number
+  /// is exactly what the chat filter removes — which is why this field
+  /// exists. Shown to the buyer only once it is their turn to pay.
+  sellerPayTo          String?
+  /// When the seller last saved it.
+  sellerPayToAt        DateTime?
+  /// When the seller last replaced it with something different. A change
+  /// after the buyer could see it is how a hijacked account redirects a
+  /// payment, so the buyer is warned about one.
+  sellerPayToChangedAt DateTime?
 
   priceUsd     Int // cents, agreed price
   buyerFeeUsd  Int // cents
@@ -541,7 +560,7 @@ model Order {
   updatedAt DateTime @updatedAt
 
   steps        TransferStep[]
-  conversation Conversation?
+  messages     Message[]
   dispute      Dispute?
   ledger       LedgerEntry[]
   invoices     Invoice[]
@@ -551,6 +570,7 @@ model Order {
   @@index([sellerId, status])
   @@index([agentId, status])
   @@index([status])
+  @@index([conversationId])
 }
 
 model TransferStep {
@@ -588,9 +608,11 @@ model Conversation {
   sellerId  String
   seller    User    @relation("ConversationSeller", fields: [sellerId], references: [id], onDelete: Cascade)
 
-  /// Set once a deal exists, so the thread and the order stay together.
-  orderId String? @unique
-  order   Order?  @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  /// Every deal opened in this conversation, oldest first by createdAt. A
+  /// deal that lapses leaves the buyer free to open another here, so this is
+  /// many deals to one thread — a single link on the thread could hold only
+  /// the first, and the second then had no conversation at all.
+  orders Order[]
 
   /// The staff member handling it. Any staff can read; this one owns it.
   staffId String?
@@ -612,12 +634,36 @@ model Conversation {
   @@index([flaggedAt])
 }
 
+/// What an entry in a conversation is.
+///
+/// The conversation is the record of a deal, so an offer and every step of
+/// the deal appear in it at the moment they happened, whichever page they
+/// were done from — written by the server function that made the change.
+enum MessageKind {
+  TEXT // somebody typed it
+  OFFER // an offer card; it reads its live state from `offerId`
+  EVENT // one line of history: "accepted", "payment received", a step done
+}
+
 model Message {
   id             String       @id @default(cuid())
   conversationId String
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  senderId       String
-  sender         User         @relation(fields: [senderId], references: [id])
+  /// Null for what the platform does by itself — a payment clearing, a
+  /// window lapsing — where there is nobody to attribute it to. Restrict, as
+  /// when the column was required: SetNull, the default for an optional
+  /// relation, would quietly turn a deleted user's messages into ones that
+  /// read as Channel Adda's own.
+  senderId       String?
+  sender         User?        @relation(fields: [senderId], references: [id], onDelete: Restrict)
+
+  kind    MessageKind @default(TEXT)
+  /// The offer an OFFER card shows, or an EVENT is about.
+  offerId String?
+  offer   Offer?      @relation(fields: [offerId], references: [id], onDelete: SetNull)
+  /// The deal an EVENT is about. A conversation can hold several.
+  orderId String?
+  order   Order?      @relation(fields: [orderId], references: [id], onDelete: SetNull)
 
   /// What everyone sees. Contact details are already stripped out of this.
   body String
@@ -649,6 +695,8 @@ model Message {
   @@index([conversationId, createdAt])
   @@index([attachmentExpiresAt])
   @@index([createdAt])
+  @@index([offerId])
+  @@index([orderId])
 }
 
 model Dispute {
