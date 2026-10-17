@@ -2,13 +2,20 @@ import "server-only";
 
 import type { DealMode, OrderStatus, UserRole } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
-import { canTransition, type DealActor, isTerminal } from "@/lib/deal-machine";
+import {
+  AGENT_HOLDS,
+  canTransition,
+  type DealActor,
+  isTerminal,
+} from "@/lib/deal-machine";
 import { OPENING_STATUS, templateFor } from "@/lib/deal-templates";
 import { orderAmounts } from "@/lib/fees";
 import { isSerializationFailure } from "@/lib/serialization-failure";
+import { keyFromUrl } from "@/lib/upload-keys";
 import { recordAudit } from "@/server/audit";
 import { notifyDealEnded, notifyNextActor } from "@/server/deal-notify";
 import { getSettings } from "@/server/settings";
+import { markUploadsAttached } from "@/server/upload-access";
 
 /**
  * Deals.
@@ -73,7 +80,9 @@ function isUniqueViolation(error: unknown): boolean {
  * `data:` in that position are script execution, not a screenshot.
  */
 function isSafeProofUrl(url: string): boolean {
-  if (url.startsWith("/uploads/")) return true;
+  // Our own uploads have to be a key we actually serve, not merely a
+  // string beginning `/uploads/`.
+  if (url.startsWith("/uploads/")) return keyFromUrl(url) !== null;
   try {
     return new URL(url).protocol === "https:";
   } catch {
@@ -601,12 +610,8 @@ export async function holdsFor(agentId: string): Promise<number> {
   });
 }
 
-const AGENT_HOLD_STATUSES: readonly OrderStatus[] = [
-  "AWAITING_CUSTODY",
-  "IN_CUSTODY",
-  "AWAITING_BUYER_PAYMENT",
-  "AWAITING_HANDOVER",
-];
+/** The same list the transition table uses, so the two cannot drift. */
+const AGENT_HOLD_STATUSES = AGENT_HOLDS;
 
 /**
  * Put an agent on a deal.
@@ -829,6 +834,11 @@ export async function advanceStep(input: {
         },
       });
       if (claimed.count !== 1) throw new DealAbort("wrong-step");
+
+      // Dispute evidence. Without the stamp the orphan sweep collects it an
+      // hour later, because it only knows about listing proofs, messages
+      // and listing artwork.
+      if (input.proofUrl) await markUploadsAttached([input.proofUrl]);
 
       const moved = await tx.order.updateMany({
         where: { id: order.id, status: order.status },

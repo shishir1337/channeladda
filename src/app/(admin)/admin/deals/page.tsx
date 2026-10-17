@@ -49,7 +49,6 @@ export default async function AdminDealsPage({
   searchParams,
 }: PageProps<"/admin/deals">) {
   const params = await searchParams;
-  const mineOnly = params.agent === "me";
 
   // Staff and agents both belong here, and the role decides what is shown.
   // The guard deliberately does not depend on the query string: an agent
@@ -59,6 +58,10 @@ export default async function AdminDealsPage({
   const isAgent = viewer.role === "AGENT" || viewer.role === "SUPERADMIN";
   const isFinance = viewer.role === "FINANCE" || viewer.role === "SUPERADMIN";
   const isStaff = viewer.role !== "AGENT";
+  // An agent sees their own queue by default rather than only when the
+  // query says so: the nav link cannot carry a query without the item
+  // failing to highlight, and a bookmark to the bare path is the same page.
+  const mineOnly = params.agent === "me" || viewer.role === "AGENT";
 
   const [activity, needingAgent, needingReassignment, awaitingPayment, mine] =
     await Promise.all([

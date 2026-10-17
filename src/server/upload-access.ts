@@ -134,7 +134,7 @@ export async function collectOrphanUploads(): Promise<number> {
   let removed = 0;
   for (const orphan of orphans) {
     // Referenced after all? Mark it and move on rather than deleting it.
-    const [proof, message, listing] = await Promise.all([
+    const [proof, message, listing, step] = await Promise.all([
       db.listingProof.findFirst({
         where: { url: urlForKey(orphan.key) },
         select: { id: true },
@@ -152,9 +152,14 @@ export async function collectOrphanUploads(): Promise<number> {
         },
         select: { id: true },
       }),
+      // A step's proof is the evidence a dispute is decided from.
+      db.transferStep.findFirst({
+        where: { proofUrl: urlForKey(orphan.key) },
+        select: { id: true },
+      }),
     ]);
 
-    if (proof || message || listing) {
+    if (proof || message || listing || step) {
       await db.upload.update({
         where: { id: orphan.id },
         data: { attachedAt: new Date() },

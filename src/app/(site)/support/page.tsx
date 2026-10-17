@@ -48,7 +48,11 @@ export default async function SupportPage({
   // requireUser sends a suspended account here with this reason, and the
   // page used to ignore it entirely — so someone ejected from their own
   // dashboard landed on a generic contact page with no idea why.
-  const suspended = (await searchParams).reason === "account-suspended";
+  const params = await searchParams;
+  const suspended = params.reason === "account-suspended";
+  // Pages link here with a topic preselected — the two-factor page does —
+  // and the form used to ignore it.
+  const topic = typeof params.topic === "string" ? params.topic : undefined;
 
   return (
     <>
@@ -88,7 +92,7 @@ export default async function SupportPage({
           </ul>
 
           <div className="mt-10 lg:grid lg:grid-cols-[1fr_20rem] lg:gap-10">
-            <SupportForm />
+            <SupportForm topic={topic} />
 
             <aside className="mt-8 lg:mt-0">
               <div className="rounded-card border border-line bg-surface p-5">

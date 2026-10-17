@@ -354,6 +354,10 @@ test(
       "javascript:alert(document.cookie)",
       "data:text/html,<script>alert(1)</script>",
       "vbscript:msgbox",
+      // Shaped like one of ours but not a key we serve. It used to pass on
+      // the prefix alone, which made the whole check a string comparison.
+      "/uploads/custody-proof.png",
+      "/uploads/../../etc/passwd",
     ]) {
       expect(
         await advanceStep({
@@ -380,7 +384,7 @@ test(
         orderId,
         position: 3,
         userId: actors.agent,
-        proofUrl: "/uploads/custody-proof.png",
+        proofUrl: "/uploads/proof/cccccccccccccccccccccccccccccccc.png",
       }),
     ).toMatchObject({ ok: true });
   }),

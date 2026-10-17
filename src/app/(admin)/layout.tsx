@@ -29,13 +29,19 @@ export default async function AdminLayout({ children }: LayoutProps<"/">) {
   if (staff.role === "AGENT") {
     return (
       <AppShell
+        staff
         groups={[
           {
             label: null,
             items: [
               {
                 label: "Deals",
-                href: "/admin/deals?agent=me",
+                // The query is what filters the page to this agent, but the
+                // nav compares against the pathname, which has no query —
+                // so with it here the item never highlighted and the header
+                // fell back to "Your account" on every page of the staff
+                // area. The filter is applied by the page from the role.
+                href: "/admin/deals",
                 icon: "transfer",
                 section: true,
               },

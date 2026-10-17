@@ -35,8 +35,20 @@ export function isTerminal(status: OrderStatus): boolean {
   return TERMINAL_STATUSES.includes(status);
 }
 
-/** Every state in which a Safest agent is holding the seller's channel. */
-const AGENT_HOLDS: readonly OrderStatus[] = Object.freeze([
+/**
+ * Every state in which a Safest agent is holding the seller's channel.
+ *
+ * Exported because the per-agent cap counts the same thing, and two lists
+ * of it disagreed: the cap counted `AWAITING_CUSTODY` and this one did not,
+ * so a deal where the seller had already invited the agent as owner but
+ * Google had not finished counted against the cap while having no way back
+ * to the seller — only CANCELLED, which also refunds the fee.
+ *
+ * `AWAITING_CUSTODY` is in: the invitation has been sent, so the seller is
+ * already exposed and must be able to get the channel back.
+ */
+export const AGENT_HOLDS: readonly OrderStatus[] = Object.freeze([
+  "AWAITING_CUSTODY",
   "IN_CUSTODY",
   "AWAITING_BUYER_PAYMENT",
   "AWAITING_HANDOVER",

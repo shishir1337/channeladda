@@ -14,7 +14,7 @@ import { sendSupportMessage } from "@/server/actions/support";
  * ticket now, a moderator sees it in their queue, and the sender gets a
  * reference they can quote back.
  */
-export function SupportForm() {
+export function SupportForm({ topic }: { topic?: string }) {
   const [reference, setReference] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [failed, setFailed] = useState<string | null>(null);
@@ -116,7 +116,11 @@ export function SupportForm() {
           <select
             id={topicId}
             name="topic"
-            defaultValue={SUPPORT_TOPICS[0]}
+            defaultValue={
+              topic && SUPPORT_TOPICS.includes(topic as (typeof SUPPORT_TOPICS)[number])
+                ? topic
+                : SUPPORT_TOPICS[0]
+            }
             className="mt-2 h-12 w-full cursor-pointer appearance-none rounded-xl border border-line bg-surface-2 px-3.5 text-[0.9375rem] text-fg focus:border-primary/60 focus:outline-none"
           >
             {SUPPORT_TOPICS.map((topic) => (

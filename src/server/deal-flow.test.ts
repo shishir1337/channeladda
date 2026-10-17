@@ -231,12 +231,12 @@ test(
       orderId,
       position: 3,
       userId: actors.agent,
-      proofUrl: "/uploads/custody.png",
+      proofUrl: "/uploads/proof/cccccccccccccccccccccccccccccccc.png",
     });
     const step = await db.transferStep.findFirstOrThrow({
       where: { orderId, position: 3 },
     });
-    expect(step.proofUrl).toBe("/uploads/custody.png");
+    expect(step.proofUrl).toBe("/uploads/proof/cccccccccccccccccccccccccccccccc.png");
   }),
 );
 
