@@ -147,6 +147,34 @@ for p in /admin /admin/deals /admin/payouts /admin/listings /admin/users \
   check admin "$p" 200
 done
 
+echo "--- disputes: every staff desk, not agents or members ---"
+for j in mod fin admin; do check "$j" /admin/disputes 200; done
+for j in agent seller buyer; do check "$j" /admin/disputes 404; done
+check - /admin/disputes 307
+
+echo "--- money desk and exports: finance and superadmin only ---"
+# The CSVs carry every member's email, so they get the same 404 wall as
+# the page that links to them.
+for p in /admin/money /admin/money/adjust \
+         "/api/admin/export/ledger?month=2026-10" \
+         "/api/admin/export/payouts?month=2026-10"; do
+  check fin "$p" 200
+  check admin "$p" 200
+  for j in mod agent buyer; do check "$j" "$p" 404; done
+  check - "$p" 307
+done
+
+echo "--- team: superadmin only; an invitation link opens for anyone ---"
+check admin /admin/team 200
+for j in mod fin agent buyer; do check "$j" /admin/team 404; done
+# 200 whatever the token: the page must not say whether a guess was real.
+check - "/invite?token=x" 200
+
+echo "--- finished deals and taken-down listings ---"
+check fin "/admin/deals?view=finished" 200
+check mod "/admin/deals?view=finished" 200
+check mod "/admin/listings?status=REMOVED" 200
+
 echo "--- webhooks and the sweep refuse the unauthenticated ---"
 check - /api/webhooks/cryptomus 405
 code=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$BASE/api/cron")
