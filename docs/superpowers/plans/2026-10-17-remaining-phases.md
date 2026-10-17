@@ -96,6 +96,24 @@ deal. Three protections the help centre promised did not exist in code.
 - **A second payment is credited only against a settled `Invoice` row.** A
   genuine second payment with no invoice is audited and otherwise ignored, for
   finance to handle. Cost if wrong: a rare real duplicate needs a human.
+- **Cancelling a paid deal is finance's only on Fastest.** On Fastest we
+  hold the whole price, so Cancel is a refund under another name and sits
+  behind the same gate. On Safest it returns the admin fee at most, and
+  stays with moderators like every other fee-sized move. Cost if wrong: a
+  moderator can return a buyer's fee without finance.
+- **An invoice is given up only on an HTTP 404 from Cryptomus.** Not tested
+  against the live API. If Cryptomus answers an unknown invoice some other
+  way, those invoices are retried for ever — one lookup each per sweep —
+  rather than written off. The safe way to be wrong.
+- **Suspending a seller pauses their reserved listings too**, and their
+  deals carry on for staff to finish. Resume is refused while a deal on the
+  listing is still running, so lifting a suspension mid-deal cannot put
+  the channel back on sale. Cost if wrong: a seller whose suspension was
+  lifted waits for the deal to end before relisting.
+- **Balance corrections are capped, not approved.** Finance can credit up
+  to $500 per member per rolling 24 hours, $100,000 per correction for
+  anyone; above the first, a superadmin makes it. A two-person approval
+  would be stronger and is a feature, not a fix.
 
 - [x] **A fourth review, of the fix pass itself.** Three Criticals, two of
       them regressions the fix pass introduced: a `handoverAt` guard that made
@@ -115,35 +133,61 @@ deal. Three protections the help centre promised did not exist in code.
       `SMTP_HOST` the behaviour is exactly what it was.
 - [x] **`pnpm verify:integrations`.** One command that proves the credentials
       in front of you work, rather than that the code matches the contract.
+- [x] **Notifications for everyone.** A bell and a page for every member and
+      every desk: offers, messages (folded per thread), listing decisions,
+      deal turns, payouts, disputes. Staff are told when a desk has work.
+      Email only for things that stall if ignored, and only with SMTP set.
+- [x] **An admin a non-technical operator can run.** Team (invitations by
+      link, roles, an agent's one transfer identity), member support (identity
+      check, two-step reset, email verification, sign out everywhere), a
+      money desk (position, balances, CSV exports, capped corrections, retry
+      one invoice), a dispute desk (both sides' evidence, staff notes,
+      contact), listing moderation that can be undone (reopen, feature), a
+      reassign pick-list of real agents, and the sweep's last run on the
+      overview. Operator settings: payment window, minimum withdrawal.
+- [x] **Business-logic review and fixes.** An accepted offer now becomes a
+      deal at the agreed price and lapses if unpaid; the Fastest recovery hold
+      is enforced; the agent cap counts disputed custody; cancelling a paid
+      Fastest deal is finance's; the reconcile sweep rotates and never writes
+      off an invoice it could not ask about; checking an ownership code can no
+      longer undo a takedown or skip review; a takedown cannot overwrite a
+      reservation; a suspension cannot be used to relist mid-deal; fake
+      testimonials replaced by real reviews.
+- [x] **Lint is a gate now.** Biome's own config, clean across `src` and
+      `scripts`.
 
 ## Verification, as of the last commit
 
 | Check | Result |
 |---|---|
-| `pnpm test` | 274 passing, 23 files |
+| `pnpm test` | 382 passing, 36 files |
 | `pnpm typecheck` | clean |
+| `pnpm lint` | clean |
 | `pnpm build` | clean |
-| `scripts/e2e-routes.sh` | 89/89, every route as every role |
-| `pnpm verify:integrations` | database ok; four integrations correctly reported unconfigured |
-| Browser | checkout, listing wizard and `/fees` driven by hand |
+| `scripts/e2e-routes.sh` | 131/131 against the production build: every page, every role, including the team, money and dispute desks and both CSV exports |
+| `pnpm verify:integrations` | database ok; Cryptomus, YouTube, Google and email correctly reported unconfigured; the sweep reported broken only because `CRON_SECRET` is unset on this machine |
+| Browser | checkout, listing wizard and `/fees` driven by hand in an earlier round; the new desks not yet |
+| Final review | a fresh reviewer read this round's commits; two Important findings fixed with tests (a second payment the sweep confirmed was booked nowhere; a demoted agent kept their deals), two Minor deferred below |
 
-`pnpm lint` fails repo-wide on CRLF vs Biome's LF and is **not** a gate.
 
 ## Still to do
 
-- **Notification rows are rendered nowhere.** They are written on every turn
-  and every ending, and the only thing that reaches a person today is the
-  email. A bell with a list is the other half.
 - **The dev password is in this branch's history.** `scripts/e2e-routes.sh`
   hardcoded it and was committed; it is out of HEAD but present in the trees
   of ~19 commits from `58a63cf` on. Rewriting history needs a force push and
   is the owner's call before merging.
-- **`AGENT` cannot be granted from any screen.** The role picker omits it
-  while the labels define it, so agents can only be minted by
-  `scripts/create-admin.ts`. Left alone deliberately: changing who can be
-  granted what is a decision, not a fix.
-- Eight proof screenshots is eight trips through the file picker;
-  `image-upload.tsx` has no error prop and no multi-select.
+- **Nothing has met a live third party.** Cryptomus, Google sign-in, the
+  YouTube API and SMTP are written to their published contracts and tested
+  against fakes. Each needs one real run with the owner's credentials —
+  `pnpm verify:integrations` first, then a £1 invoice end to end.
+- **A browser pass over the new desks.** They are covered by tests and the
+  route sweep (every page, every role), not yet clicked through by hand.
+- **Deferred from the final review (Minor).** The last-superadmin guard is
+  read-then-write, so two superadmins demoting or suspending each other at
+  the same instant could leave none (`scripts/create-admin.ts` recovers).
+  And a moderator can suspend or sign out an agent, which halts their
+  custody work until a superadmin reverses it — audited and reversible, but
+  whether moderators should hold that power is the owner's call.
 
 ## What needs the owner, and cannot be faked
 
