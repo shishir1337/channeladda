@@ -9,6 +9,7 @@ const VALID: SettingsInput = {
   secondApprovalAbove: 5_000,
   offerExpiryHours: 48,
   minWithdrawal: 20,
+  paymentWindowHours: 48,
 };
 
 const fields = (input: SettingsInput) =>

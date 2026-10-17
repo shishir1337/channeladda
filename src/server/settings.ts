@@ -27,6 +27,12 @@ export type PlatformSettings = FeeSettings & {
   secondApprovalAboveUsd: number;
   /** Cents. The smallest withdrawal finance will send. */
   minWithdrawalUsd: number;
+  /** How long an unpaid deal holds its listing before it lapses. */
+  paymentWindowHours: number;
+  /** When the scheduled sweep last finished. Null if it never has. */
+  lastSweepAt: Date | null;
+  /** What it did, per job: a count, or the error it hit. */
+  lastSweepResult: Record<string, number | string> | null;
   updatedAt: Date | null;
   updatedByName: string | null;
 };
@@ -35,6 +41,7 @@ const DEFAULT_OFFER_EXPIRY_HOURS = 48;
 const DEFAULT_MAX_HOLDS_PER_AGENT = 10;
 const DEFAULT_SECOND_APPROVAL_ABOVE_USD = 500_000;
 const DEFAULT_MIN_WITHDRAWAL_USD = 2_000;
+const DEFAULT_PAYMENT_WINDOW_HOURS = 48;
 
 /**
  * Throws away the cached row.
@@ -61,6 +68,9 @@ export async function getSettings(): Promise<PlatformSettings> {
       secondApprovalAboveUsd: true,
       offerExpiryHours: true,
       minWithdrawalUsd: true,
+      paymentWindowHours: true,
+      lastSweepAt: true,
+      lastSweepResult: true,
       updatedAt: true,
       updatedBy: { select: { name: true } },
     },
@@ -78,6 +88,11 @@ export async function getSettings(): Promise<PlatformSettings> {
         secondApprovalAboveUsd: row.secondApprovalAboveUsd,
         offerExpiryHours: row.offerExpiryHours,
         minWithdrawalUsd: row.minWithdrawalUsd,
+        paymentWindowHours: row.paymentWindowHours,
+        lastSweepAt: row.lastSweepAt,
+        lastSweepResult:
+          (row.lastSweepResult as Record<string, number | string> | null) ??
+          null,
         updatedAt: row.updatedAt,
         updatedByName: row.updatedBy?.name ?? null,
       }
@@ -87,6 +102,9 @@ export async function getSettings(): Promise<PlatformSettings> {
         secondApprovalAboveUsd: DEFAULT_SECOND_APPROVAL_ABOVE_USD,
         offerExpiryHours: DEFAULT_OFFER_EXPIRY_HOURS,
         minWithdrawalUsd: DEFAULT_MIN_WITHDRAWAL_USD,
+        paymentWindowHours: DEFAULT_PAYMENT_WINDOW_HOURS,
+        lastSweepAt: null,
+        lastSweepResult: null,
         updatedAt: null,
         updatedByName: null,
       };
@@ -112,6 +130,7 @@ export type SettingsInput = {
   offerExpiryHours: number;
   /** Dollars, as typed into the form. Stored as cents. */
   minWithdrawal: number;
+  paymentWindowHours: number;
 };
 
 export type SettingsError = { field: string; message: string };
@@ -175,6 +194,19 @@ export function validateSettings(input: SettingsInput): SettingsError[] {
     });
   }
 
+  // Long enough for a buyer to get crypto together, short enough that a
+  // buyer who walked away does not hold a listing off the market for a week.
+  if (
+    !Number.isInteger(input.paymentWindowHours) ||
+    input.paymentWindowHours < 1 ||
+    input.paymentWindowHours > 168
+  ) {
+    errors.push({
+      field: "paymentWindowHours",
+      message: "Between 1 hour and 7 days.",
+    });
+  }
+
   if (!Number.isFinite(input.minWithdrawal) || input.minWithdrawal < 0) {
     errors.push({
       field: "minWithdrawal",
@@ -199,6 +231,7 @@ export async function updateSettings(input: SettingsInput, actorId: string) {
       secondApprovalAboveUsd: true,
       offerExpiryHours: true,
       minWithdrawalUsd: true,
+      paymentWindowHours: true,
     },
   });
 
@@ -210,6 +243,7 @@ export async function updateSettings(input: SettingsInput, actorId: string) {
     secondApprovalAboveUsd: Math.round(input.secondApprovalAbove * 100),
     offerExpiryHours: input.offerExpiryHours,
     minWithdrawalUsd: Math.round(input.minWithdrawal * 100),
+    paymentWindowHours: input.paymentWindowHours,
     updatedById: actorId,
   };
 
@@ -222,4 +256,23 @@ export async function updateSettings(input: SettingsInput, actorId: string) {
   globalForSettings.settingsCache = undefined;
 
   return { ok: true as const, before, after: data };
+}
+
+/**
+ * The scheduled sweep saying it ran.
+ *
+ * Written on every run by POST /api/cron and read by the staff overview, so a
+ * dead crontab stops being silent. An upsert, because a fresh database has
+ * no settings row until somebody saves the settings form.
+ */
+export async function recordSweep(
+  result: Record<string, number | string>,
+): Promise<void> {
+  const now = new Date();
+  await db.platformSettings.upsert({
+    where: { id: "singleton" },
+    create: { id: "singleton", lastSweepAt: now, lastSweepResult: result },
+    update: { lastSweepAt: now, lastSweepResult: result },
+  });
+  globalForSettings.settingsCache = undefined;
 }

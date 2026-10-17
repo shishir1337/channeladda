@@ -1047,7 +1047,7 @@ async function completeOrder(
  * a timer, the way stale offers already are in `@/server/offers`; the
  * scheduler that would do it properly is a later phase.
  */
-const PAYMENT_WINDOW_HOURS = 48;
+// The window itself is PlatformSettings.paymentWindowHours, set by an admin.
 
 /** The same sweep, narrowed to one listing someone is trying to buy. */
 export async function expireStaleDealsForListing(
@@ -1061,7 +1061,8 @@ export async function expireStaleDeals(): Promise<number> {
 }
 
 async function expireStale(scope: { listingId?: string }): Promise<number> {
-  const cutoff = new Date(Date.now() - PAYMENT_WINDOW_HOURS * 60 * 60 * 1000);
+  const { paymentWindowHours } = await getSettings();
+  const cutoff = new Date(Date.now() - paymentWindowHours * 60 * 60 * 1000);
   const stale = await db.order.findMany({
     where: {
       // A dispute raised before anyone paid belongs here too. Opening a

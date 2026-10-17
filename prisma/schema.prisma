@@ -153,6 +153,17 @@ model User {
   /// Better Auth's two-factor plugin owns this. Name matches its default.
   twoFactorEnabled Boolean @default(false)
 
+  // ---- An agent's transfer identity. Only ever set on an AGENT.
+  //
+  // Order.agentEmail and Order.agentBrand were typed in per deal by whoever
+  // assigned it, so the same agent reached different sellers under different
+  // names and a seller inviting the wrong address hands a channel to nobody.
+  // These are the agent's stored default, copied onto the deal at assignment.
+  /// The Google account a seller is told to invite as channel owner.
+  agentEmail String?
+  /// Display name shown beside agentEmail, e.g. "Channel Adda Transfers".
+  agentBrand String?
+
   kycStatus  KycStatus @default(NOT_STARTED)
   // Hash of the identity document, so a banned seller cannot re-register.
   kycDocHash String?
@@ -186,6 +197,7 @@ model User {
   settingsEdits  PlatformSettings[] @relation("SettingsEditor")
   supportSent    SupportTicket[]    @relation("SupportRequester")
   supportHandled SupportTicket[]    @relation("SupportHandler")
+  invitesSent    StaffInvite[]      @relation("StaffInviteAuthor")
   ordersAgented  Order[]            @relation("OrderAgent")
   stepsApproved  TransferStep[]     @relation("StepApprover")
   twoFactors     TwoFactor[]
@@ -265,6 +277,45 @@ model Verification {
   updatedAt  DateTime @updatedAt
 
   @@index([identifier])
+}
+
+/// An invitation to join the team.
+///
+/// How a teammate gets an account without a developer. A superadmin names the
+/// address and the role; the invitee sets their own password, so no password
+/// is ever shared, typed for somebody else or known to two people — which is
+/// what makes "who sent that payout" answerable on a FINANCE account.
+///
+/// The token itself is not stored. Only a SHA-256 fingerprint of it is, so a
+/// leaked copy of this table cannot be turned into an accepted invitation.
+/// The raw token is returned once, to the superadmin who created it, and is
+/// handed over out of band — there may be no mail provider configured, and a
+/// link that only works once and expires is not a password.
+model StaffInvite {
+  id    String   @id @default(cuid())
+  email String
+  role  UserRole
+
+  /// SHA-256 of the raw token, hex. Unique, so accepting is one index hit.
+  tokenHash String @unique
+
+  expiresAt DateTime
+
+  invitedById String
+  invitedBy   User   @relation("StaffInviteAuthor", fields: [invitedById], references: [id])
+
+  acceptedAt DateTime?
+  /// The account the invitation produced. Scalar rather than a relation: it is
+  /// a historical record, and nothing reads the team from this side.
+  acceptedUserId String?
+
+  revokedAt   DateTime?
+  revokedById String?
+
+  createdAt DateTime @default(now())
+
+  @@index([email])
+  @@index([acceptedAt, revokedAt])
 }
 
 model KycSubmission {
@@ -865,6 +916,17 @@ model PlatformSettings {
   /// paying more to receive the money than the money is worth — and the
   /// figure depends on the network, so it is a setting, not a constant.
   minWithdrawalUsd Int @default(2000)
+
+  /// How long an unpaid deal holds its listing before it lapses. Was a
+  /// constant, and it is the one most likely to need tuning: it decides how
+  /// long a buyer who walked away keeps a listing off the market.
+  paymentWindowHours Int @default(48)
+
+  /// When the scheduled sweep last finished, and what it did. A dead
+  /// crontab was silent before this, and its documented consequence is
+  /// listings reserved for ever and payments never reconciled.
+  lastSweepAt     DateTime?
+  lastSweepResult Json?
 
   updatedAt   DateTime @updatedAt
   updatedById String?

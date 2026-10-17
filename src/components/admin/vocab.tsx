@@ -7,7 +7,7 @@ import type {
   OrderStatus,
   UserRole,
 } from "@/generated/prisma/enums";
-import { AGENT_HOLDS, isTerminal } from "@/lib/deal-machine";
+import { AGENT_HOLDS, isTerminal, PLATFORM_HOLDS } from "@/lib/deal-machine";
 import { cn } from "@/lib/utils";
 
 /**
@@ -193,18 +193,6 @@ export function DealModeBadge({
   );
 }
 
-/**
- * Statuses in which a Fastest buyer's money is sitting with the platform.
- *
- * Mirrors `PLATFORM_HOLDS` in `deal-machine`, which is not exported. Used for
- * wording only, never to decide whether something may happen, so drift here
- * mislabels a panel rather than mis-routing money.
- */
-const MONEY_WITH_PLATFORM: readonly OrderStatus[] = [
-  "AGENT_VERIFYING",
-  "AWAITING_HANDOVER",
-  "AWAITING_RELEASE",
-];
 
 /**
  * What is in whose hands right now, and what can still be undone.
@@ -213,44 +201,67 @@ const MONEY_WITH_PLATFORM: readonly OrderStatus[] = [
  * pressure: on a Safest deal the purchase price goes buyer-to-seller
  * off-platform, so there is no price for us to refund however angry the buyer
  * is — only the admin fee, and only before the agent took custody.
+ *
+ * `facts` matters most for DISPUTED, which is the only status staff decide
+ * a deal from — and the one the status alone cannot describe, because a
+ * dispute can be raised at any point. Worked out from status only, a
+ * disputed Fastest deal read “nothing has cleared to us yet” while we held
+ * the full price, and a disputed Safest deal read “the seller still owns the
+ * channel” while a staff agent did. Without the facts, a disputed deal now
+ * says so rather than guessing.
  */
-export function custodyFacts(mode: DealMode, status: OrderStatus) {
+export function custodyFacts(
+  mode: DealMode,
+  status: OrderStatus,
+  facts?: { paid?: boolean; inCustody?: boolean },
+) {
   const finished = isTerminal(status);
-  const agentHolds = mode === "SAFEST" && AGENT_HOLDS.includes(status);
+  const disputed = status === "DISPUTED";
+  const agentHolds =
+    mode === "SAFEST" &&
+    (AGENT_HOLDS.includes(status) || (disputed && facts?.inCustody === true));
   const platformHolds =
-    mode === "FASTEST" && MONEY_WITH_PLATFORM.includes(status);
+    mode === "FASTEST" &&
+    (PLATFORM_HOLDS.includes(status) || (disputed && facts?.paid === true));
+  const unknown = disputed && facts === undefined;
   const beforeAnything = status === "AWAITING_PAYMENT";
 
-  const asset = agentHolds
-    ? "The agent owns the channel."
-    : mode === "SAFEST"
-      ? "The seller still owns the channel."
-      : "The seller owns the channel until the handover.";
+  const asset = unknown
+    ? "Paused. Check the step list for who holds the channel."
+    : agentHolds
+      ? "The agent owns the channel."
+      : mode === "SAFEST"
+        ? "The seller still owns the channel."
+        : "The seller owns the channel until the handover.";
 
-  const money = platformHolds
-    ? "We are holding the price and the fee."
-    : mode === "SAFEST"
-      ? "We only ever hold the admin fee. The price goes buyer to seller off-platform."
-      : "Nothing has cleared to us yet.";
+  const money = unknown
+    ? "Paused. Check whether the opening payment cleared."
+    : platformHolds
+      ? "We are holding the price and the fee."
+      : mode === "SAFEST"
+        ? "We only ever hold the admin fee. The price goes buyer to seller off-platform."
+        : "Nothing has cleared to us yet.";
 
   let recoverable: string;
   if (finished) {
     recoverable = "Finished. There is nothing left to recover.";
+  } else if (unknown) {
+    recoverable =
+      "Disputed. Read the record before deciding: what can be returned depends on how far the deal got.";
   } else if (beforeAnything) {
     recoverable = "Nothing has moved. Cancelling costs nobody anything.";
   } else if (agentHolds) {
     recoverable =
-      "The channel can be returned to the seller. There is no price to refund — we never held it.";
+      "The channel has to go back to the seller, or on to the buyer. There is no price to refund — we never held it.";
   } else if (platformHolds) {
     recoverable =
-      "We hold the full amount. A refund returns all of it to the buyer.";
+      "We hold the full amount. Refunding or cancelling returns all of it to the buyer; finance decides which.";
   } else if (mode === "SAFEST") {
     recoverable =
       "The price never passed through us, so only the admin fee is ours to return.";
   } else {
-    recoverable = "We are still holding the buyer's money: refund or release.";
+    recoverable = "Nothing has cleared to us, so there is nothing of the buyer’s to return.";
   }
-
   return { finished, agentHolds, platformHolds, asset, money, recoverable };
 }
 
@@ -387,6 +398,10 @@ export const AUDIT_LABEL: Record<string, string> = {
   "payment.unsettled": "left a payment unsettled",
   "report.resolve": "handled a report",
   "settings.update": "changed the platform settings",
+  "staff.invite_accepted": "accepted an invitation to the team",
+  "staff.invite_revoked": "withdrew an invitation",
+  "staff.invited": "invited somebody onto the team",
+  "user.agent_identity": "set an agent's transfer identity",
   "user.restore": "restored an account",
   "user.role": "changed someone's role",
   "user.suspend": "suspended an account",

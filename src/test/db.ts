@@ -19,6 +19,7 @@ import { clearSettingsCache } from "@/server/settings";
 /** Every table the schema owns, children before parents. */
 const TABLES = [
   "AuditLog",
+  "StaffInvite",
   "Upload",
   "Invoice",
   "TwoFactor",
@@ -128,6 +129,7 @@ export type TestSettings = {
   secondApprovalAboveUsd: number;
   offerExpiryHours: number;
   minWithdrawalUsd: number;
+  paymentWindowHours: number;
 };
 
 // Annotated rather than `as const`: an override of { sellerFeeBp: 500 } has to
@@ -140,6 +142,7 @@ export const TEST_SETTINGS: TestSettings = {
   secondApprovalAboveUsd: 500_000,
   offerExpiryHours: 48,
   minWithdrawalUsd: 2_000,
+  paymentWindowHours: 48,
 };
 
 export type SeedOverrides = {

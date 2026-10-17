@@ -60,6 +60,9 @@ export async function StuckDeals({
       status: true,
       priceUsd: true,
       createdAt: true,
+      // What a dispute cannot say on its own: how far the deal had got.
+      paymentRef: true,
+      custodyAt: true,
       agent: { select: { name: true } },
       listing: { select: { title: true } },
       steps: {
@@ -184,6 +187,8 @@ export async function StuckDeals({
                     mode={order.mode}
                     status={order.status}
                     canMoveMoney={canMoveMoney}
+                    paid={order.paymentRef !== null}
+                    inCustody={order.custodyAt !== null}
                   />
                 </div>
               </RowItem>

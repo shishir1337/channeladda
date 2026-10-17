@@ -355,6 +355,7 @@ test(
         secondApprovalAbove: 5_000,
         offerExpiryHours: 48,
         minWithdrawal: 3,
+        paymentWindowHours: 48,
       },
       admin.id,
     );

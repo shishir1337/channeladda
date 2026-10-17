@@ -3,6 +3,7 @@ import { after } from "next/server";
 import { purgeExpiredMedia, purgeOldMessages } from "@/server/chat-retention";
 import { expireStaleDeals } from "@/server/deals";
 import { reconcileInvoices } from "@/server/invoices";
+import { recordSweep } from "@/server/settings";
 import { expireOffers } from "@/server/offers";
 import { collectOrphanUploads } from "@/server/upload-access";
 
@@ -73,6 +74,14 @@ export async function POST(request: Request) {
       console.error(`[cron] ${name}`, error);
       results[name] = error instanceof Error ? error.message : "failed";
     }
+  }
+
+  // Written every run, so the staff overview can say when the sweep last
+  // ran. A dead crontab used to be silent until listings stayed reserved.
+  try {
+    await recordSweep({ ...results, ms: Date.now() - started });
+  } catch (error) {
+    console.error("[cron] could not record the sweep", error);
   }
 
   after(() => {

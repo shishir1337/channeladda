@@ -416,8 +416,14 @@ export function EndDeal({
   mode,
   status,
   canMoveMoney = false,
+  paid,
+  inCustody,
 }: {
   orderId: string;
+  /** Whether the opening payment cleared. Needed to describe a dispute. */
+  paid?: boolean;
+  /** Whether a Safest agent took the channel. Needed to describe a dispute. */
+  inCustody?: boolean;
   /** Known for every row except reassignment, where the query is SAFEST-only. */
   mode?: DealMode;
   status?: OrderStatus;
@@ -438,7 +444,16 @@ export function EndDeal({
   const [ok, setOk] = useState(false);
   const [pending, startTransition] = useTransition();
 
-  const facts = mode && status ? custodyFacts(mode, status) : null;
+  const facts =
+    mode && status
+      ? custodyFacts(
+          mode,
+          status,
+          paid === undefined && inCustody === undefined
+            ? undefined
+            : { paid, inCustody },
+        )
+      : null;
   const selected = ENDINGS.find((e) => e.to === choice) ?? null;
   const ready = selected !== null && note.trim() !== "";
 

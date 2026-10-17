@@ -305,3 +305,40 @@ test(
     expect(await balanceOf(seeded.buyer.id)).toBe(0);
   }),
 );
+
+test(
+  "the payment window is the admin's setting, not a constant",
+  withCleanDb(async () => {
+    // It was PAYMENT_WINDOW_HOURS = 48 in deals.ts. Tuning how long a buyer
+    // who walked away holds a listing off the market meant a deploy.
+    const seeded = await seedListing({ settings: { paymentWindowHours: 2 } });
+    const created = await createDeal({
+      listingId: seeded.listing.id,
+      buyerId: seeded.buyer.id,
+      mode: "FASTEST",
+    });
+    if (!created.ok) throw new Error(created.reason);
+    await db.order.update({
+      where: { id: created.orderId },
+      data: { createdAt: new Date(Date.now() - 3 * 60 * 60 * 1000) },
+    });
+
+    // Three hours old: inside the old 48h, outside the 2h the admin set.
+    expect(await expireStaleDeals()).toBe(1);
+  }),
+);
+
+test(
+  "the sweep says when it last ran",
+  withCleanDb(async () => {
+    const { recordSweep, getSettings, clearSettingsCache } = await import(
+      "@/server/settings"
+    );
+    await recordSweep({ deals: 2, offers: 0 });
+    clearSettingsCache();
+
+    const settings = await getSettings();
+    expect(settings.lastSweepAt).not.toBeNull();
+    expect(settings.lastSweepResult).toMatchObject({ deals: 2, offers: 0 });
+  }),
+);

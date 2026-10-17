@@ -39,6 +39,7 @@ export function SettingsForm({
     offerExpiryHours: number;
     /** Cents, as stored. Shown and typed in dollars. */
     minWithdrawalUsd: number;
+    paymentWindowHours: number;
   };
 }) {
   const router = useRouter();
@@ -50,6 +51,7 @@ export function SettingsForm({
     approval: useId(),
     offer: useId(),
     minWithdrawal: useId(),
+    paymentWindow: useId(),
   };
 
   const [safest, setSafest] = useState(formatRate(current.buyerFeeBpSafest));
@@ -61,6 +63,9 @@ export function SettingsForm({
   );
   const [offerHours, setOfferHours] = useState(
     String(current.offerExpiryHours),
+  );
+  const [paymentWindow, setPaymentWindow] = useState(
+    String(current.paymentWindowHours),
   );
   const [minWithdrawal, setMinWithdrawal] = useState(
     String(current.minWithdrawalUsd / 100),
@@ -131,7 +136,8 @@ export function SettingsForm({
       from: usd(current.minWithdrawalUsd / 100),
       to: usd(Number(minWithdrawal) || 0),
       changed:
-        Math.round(Number(minWithdrawal) * 100) !== current.minWithdrawalUsd,
+        Math.round(Number(minWithdrawal) * 100) !== current.minWithdrawalUsd ||
+    Number(paymentWindow) !== current.paymentWindowHours,
     },
   ]
     .filter((row) => row.changed)
@@ -155,6 +161,7 @@ export function SettingsForm({
             secondApprovalAbove: Number(approval),
             offerExpiryHours: Number(offerHours),
             minWithdrawal: Number(minWithdrawal),
+            paymentWindowHours: Number(paymentWindow),
           });
           if (!result.ok) {
             setErrors(result.errors);
@@ -270,6 +277,18 @@ export function SettingsForm({
           value={offerHours}
           onChange={(e) => setOfferHours(e.target.value)}
           error={errors.offerExpiryHours}
+          className="mt-4 max-w-xs"
+          required
+        />
+        <TextField
+          id={ids.paymentWindow}
+          name="paymentWindowHours"
+          label="Unpaid deals lapse after (hours)"
+          hint="How long a buyer has to pay before the listing goes back on sale. A buyer who walks away holds it off the market this long."
+          inputMode="numeric"
+          value={paymentWindow}
+          onChange={(e) => setPaymentWindow(e.target.value)}
+          error={errors.paymentWindowHours}
           className="mt-4 max-w-xs"
           required
         />

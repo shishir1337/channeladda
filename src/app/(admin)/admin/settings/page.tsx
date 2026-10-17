@@ -106,6 +106,7 @@ export default async function AdminSettingsPage() {
             sellerFeeBp: settings.sellerFeeBp,
             offerExpiryHours: settings.offerExpiryHours,
             minWithdrawalUsd: settings.minWithdrawalUsd,
+            paymentWindowHours: settings.paymentWindowHours,
           }}
         />
       </div>
