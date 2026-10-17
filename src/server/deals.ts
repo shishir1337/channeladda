@@ -253,13 +253,57 @@ export async function createDeal(input: {
  * that fires twice must not charge two fees or write two ledger rows.
  */
 /**
- * A payment that arrived for a deal somebody had already paid.
+ * Finance recording a payment that reached us outside Cryptomus.
+ *
+ * The clerk types a transaction id, and that used to become the order's
+ * payment reference. It cannot: the webhook and the reconciliation sweep both
+ * name a payment by our own `CA-#####` reference, so a typed txid created a
+ * third name for the same money — and the next caller to arrive saw an
+ * unfamiliar reference, decided a second payment had landed, and credited the
+ * buyer the whole deal. Mis-key the txid once and the deal pays for itself.
+ *
+ * The order's own reference is the payment's name. What the clerk typed is
+ * kept in the audit trail, where a reconciliation needs it and nothing
+ * branches on it.
+ */
+export async function recordManualPayment(
+  orderId: string,
+  txid: string,
+  asset: string,
+): Promise<void> {
+  const order = await db.order.findUnique({
+    where: { id: orderId },
+    select: { reference: true },
+  });
+  if (!order) throw new Error(`No such order: ${orderId}`);
+
+  await recordAudit({
+    actorId: null,
+    action: "payment.recorded_by_hand",
+    entity: "order",
+    entityId: orderId,
+    after: { txid, asset, reference: order.reference },
+  });
+
+  await recordOpeningPayment(orderId, order.reference, asset);
+}
+/**
+ * A second payment that arrived for a deal somebody had already paid.
  *
  * Credited to the payer's balance rather than refused, because the money is
- * real and it is theirs. Idempotent on the reference, so a retried callback
- * does not credit twice.
+ * real and it is theirs — a buyer can open an invoice, pay the deal from
+ * their balance while it is still open, and then pay the invoice too.
+ *
+ * What it will **not** do is credit on the strength of an unfamiliar
+ * reference. Three callers used to reach `recordOpeningPayment` with three
+ * different names for the same payment — the webhook with Cryptomus's uuid,
+ * the sweep with our own CA-##### reference, a clerk with a typed txid — so
+ * whichever ran second saw a reference it did not recognise, decided a second
+ * payment had arrived, and credited the buyer the whole deal out of nothing.
+ * A credit now needs a settled invoice of its own to point at. No invoice
+ * means the reference is wrong, not that money appeared.
  */
-async function creditOverpayment(
+async function creditSecondPayment(
   order: {
     id: string;
     buyerId: string;
@@ -269,6 +313,23 @@ async function creditOverpayment(
   ref: string,
   asset: string,
 ): Promise<void> {
+  const invoice = await db.invoice.findUnique({
+    where: { reference: ref },
+    select: { orderId: true, amountUsd: true, settledAt: true },
+  });
+
+  if (!invoice || invoice.orderId !== order.id || !invoice.settledAt) {
+    // The same payment under another name. Record it and change nothing.
+    await recordAudit({
+      actorId: null,
+      action: "payment.reference_mismatch",
+      entity: "order",
+      entityId: order.id,
+      after: { offered: ref, alreadyPaidUnder: order.paymentRef },
+    });
+    return;
+  }
+
   const externalRef = `overpay:${ref}`;
   try {
     await db.ledgerEntry.create({
@@ -276,7 +337,7 @@ async function creditOverpayment(
         userId: order.buyerId,
         orderId: order.id,
         kind: "DEPOSIT",
-        amountUsd: order.totalUsd,
+        amountUsd: invoice.amountUsd,
         note: `Paid twice for this deal; credited to your balance (${asset})`,
         externalRef,
       },
@@ -294,8 +355,50 @@ async function creditOverpayment(
     after: {
       reference: ref,
       alreadyPaidUnder: order.paymentRef,
-      amountUsd: order.totalUsd,
+      amountUsd: invoice.amountUsd,
     },
+  });
+}
+
+/**
+ * A payment that cleared after the deal had stopped waiting for it.
+ *
+ * The buyer pays at 47h55m and the network confirms at 48h05m; by then the
+ * sweep has moved the order to PAYMENT_EXPIRED, which is terminal. This used
+ * to throw: the webhook answered 500 for ever, the reconciliation sweep
+ * re-threw on every tick, and the money was never written down anywhere —
+ * no ledger row, no deposit, no refund, nothing but a log line.
+ *
+ * It becomes the buyer's balance instead, which is recoverable and visible.
+ * Idempotent on the reference, so a retry does not credit twice.
+ */
+async function creditUnusablePayment(
+  order: { id: string; buyerId: string; totalUsd: number; status: string },
+  ref: string,
+  asset: string,
+): Promise<void> {
+  try {
+    await db.ledgerEntry.create({
+      data: {
+        userId: order.buyerId,
+        orderId: order.id,
+        kind: "DEPOSIT",
+        amountUsd: order.totalUsd,
+        note: `Paid after this deal stopped; credited to your balance (${asset})`,
+        externalRef: `late:${ref}`,
+      },
+    });
+  } catch (error) {
+    if (isUniqueViolation(error)) return;
+    throw error;
+  }
+
+  await recordAudit({
+    actorId: null,
+    action: "payment.arrived_too_late",
+    entity: "order",
+    entityId: order.id,
+    after: { reference: ref, status: order.status, amountUsd: order.totalUsd },
   });
 }
 
@@ -329,15 +432,16 @@ export async function recordOpeningPayment(
   // refund row and no audit trail. It becomes a wallet credit instead, which
   // is both recoverable and visible.
   if (order.paymentRef) {
-    await creditOverpayment(order, ref, asset);
+    await creditSecondPayment(order, ref, asset);
     return;
   }
 
   const target = OPENING_STATUS[order.mode];
   if (!canTransition(order.mode, order.status, target, "system")) {
-    throw new Error(
-      `Cannot record payment on ${order.id}: ${order.status} does not lead to ${target}.`,
-    );
+    // Real money that the deal can no longer accept. It becomes balance
+    // rather than an exception nobody can clear.
+    await creditUnusablePayment(order, ref, asset);
+    return;
   }
 
   // Safest records only the platform's fee. The channel price goes straight
@@ -358,7 +462,12 @@ export async function recordOpeningPayment(
     // twice the money held. Claiming the null paymentRef inside the
     // transaction is what makes the second one a no-op.
     const took = await tx.order.updateMany({
-      where: { id: order.id, paymentRef: null },
+      // The status belongs in the predicate as well as the reference. The
+      // transition was decided above, outside the transaction, and the
+      // expiry sweep can commit between the two: its own CAS keys on the
+      // status, and without the same key here a terminal order was quietly
+      // resurrected — with the listing already back on the market.
+      where: { id: order.id, paymentRef: null, status: order.status },
       data: {
         status: target,
         paymentRef: ref,

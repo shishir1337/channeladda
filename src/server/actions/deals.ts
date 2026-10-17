@@ -157,7 +157,7 @@ export async function markOpeningPaymentReceived(
   }
 
   try {
-    await repo.recordOpeningPayment(orderId, reference, asset.trim() || "USDT");
+    await repo.recordManualPayment(orderId, reference, asset.trim() || "USDT");
   } catch (error) {
     // recordOpeningPayment throws rather than returning a reason when the
     // order is already paid under a different reference — that means two

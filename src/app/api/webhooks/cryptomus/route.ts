@@ -93,8 +93,28 @@ export async function POST(request: Request) {
       status,
       typeof payload.uuid === "string" ? payload.uuid : null,
     );
-    await handle(orderId, status, outcome, payload);
-    await markApplied(orderId);
+    const result = await handle(orderId, status, outcome, payload);
+
+    // Only an invoice that was actually applied is marked applied.
+    // Marking it regardless disarmed the reconciliation sweep, which
+    // filters on a null appliedAt: a confirmation lookup that timed out
+    // returned 200, Cryptomus discarded the retry, the sweep never looked
+    // again, and the deal expired with the money sent. That is the exact
+    // failure the comment above says was fixed — re-created one line down.
+    if (result === "applied") {
+      await markApplied(orderId);
+      return Response.json({ ok: true });
+    }
+
+    // Transient: Cryptomus said paid, we could not confirm it. Ask for the
+    // retry and leave the invoice for the sweep.
+    if (result === "unconfirmed") {
+      return Response.json({ error: "retry" }, { status: 500 });
+    }
+
+    // A decision, not a failure: an underpayment, or a reference we do not
+    // know. Retrying changes nothing, and the invoice stays open so the
+    // sweep can see a later top-up.
     return Response.json({ ok: true });
   } catch (error) {
     console.error(`[cryptomus] handling ${orderId}`, error);
@@ -114,8 +134,8 @@ export async function POST(request: Request) {
 async function handleTopUp(
   reference: string,
   outcome: ReturnType<typeof classifyStatus>,
-) {
-  if (outcome !== "settled") return;
+): Promise<"applied" | "ignored" | "unconfirmed"> {
+  if (outcome !== "settled") return "ignored";
 
   // From the invoice we wrote when it was raised. This used to slice eight
   // characters off the reference and scan the user table for an id ending in
@@ -139,7 +159,7 @@ async function handleTopUp(
     confirmed.paidAmountUsd <= 0
   ) {
     console.warn(`[cryptomus] top-up ${reference} did not confirm`);
-    return;
+    return "unconfirmed";
   }
 
   // Credited at what actually arrived, not at what was asked for: an
@@ -150,6 +170,7 @@ async function handleTopUp(
     reference,
     confirmed.payerCurrency ?? "USDT",
   );
+  return "applied";
 }
 
 async function handle(
@@ -157,10 +178,9 @@ async function handle(
   status: string,
   outcome: ReturnType<typeof classifyStatus>,
   payload: Record<string, unknown>,
-) {
+): Promise<"applied" | "ignored" | "unconfirmed"> {
   if (orderId.startsWith("TOPUP-")) {
-    await handleTopUp(orderId, outcome);
-    return;
+    return handleTopUp(orderId, outcome);
   }
 
   const order = await db.order.findUnique({
@@ -170,7 +190,7 @@ async function handle(
 
   if (!order) {
     console.warn(`[cryptomus] callback for unknown reference ${orderId}`);
-    return;
+    return "ignored";
   }
 
   await recordAudit({
@@ -187,7 +207,7 @@ async function handle(
     },
   });
 
-  if (outcome !== "settled") return;
+  if (outcome !== "settled") return "ignored";
 
   // Confirm rather than trust. The signature says the body was not tampered
   // with in flight; this says Cryptomus genuinely considers it paid.
@@ -199,7 +219,7 @@ async function handle(
     console.warn(
       `[cryptomus] ${orderId} claimed ${status} but the API says ${confirmed?.status ?? "nothing"}`,
     );
-    return;
+    return "unconfirmed";
   }
 
   // An underpayment must not start a deal. Cryptomus has its own
@@ -219,11 +239,19 @@ async function handle(
       entityId: order.id,
       after: { paid: confirmed.paidAmountUsd, owed: order.totalUsd },
     });
-    return;
+    return "ignored";
   }
 
-  const uuid = typeof payload.uuid === "string" ? payload.uuid : orderId;
-  await recordOpeningPayment(order.id, uuid, confirmed.payerCurrency ?? "USDT");
+  // Our own reference, not Cryptomus's uuid. One payment must have one
+  // name: the sweep applies the same payment under `invoice.reference`, and
+  // two names for it meant the second caller saw an unfamiliar reference
+  // and credited the buyer the whole deal out of nothing.
+  await recordOpeningPayment(
+    order.id,
+    orderId,
+    confirmed.payerCurrency ?? "USDT",
+  );
+  return "applied";
 }
 
 /** Cryptomus only ever POSTs here; a GET is a probe or a misconfiguration. */

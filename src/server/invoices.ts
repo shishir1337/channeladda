@@ -57,8 +57,11 @@ export async function noteCallback(
     data: {
       lastStatus: status,
       externalId: externalId ?? undefined,
+      // Only ever set, never cleared. A refund or cancellation callback
+      // arriving after a payment settled must not erase the record that it
+      // settled — that is the evidence a second payment is weighed against.
       settledAt:
-        status === "paid" || status === "paid_over" ? new Date() : null,
+        status === "paid" || status === "paid_over" ? new Date() : undefined,
     },
   });
 }
@@ -123,6 +126,33 @@ export async function reconcileInvoices(limit = 25): Promise<number> {
           confirmed.payerCurrency ?? "USDT",
         );
       } else if (invoice.orderId) {
+        // The same tolerance check the webhook makes. Without it, the
+        // cheapest way to get an agent to take custody of a channel was to
+        // underpay and make sure the callback never arrived — this is the
+        // path that runs when it does not.
+        const order = await db.order.findUnique({
+          where: { id: invoice.orderId },
+          select: { totalUsd: true },
+        });
+        if (!order) continue;
+        if (
+          confirmed.paidAmountUsd !== null &&
+          confirmed.paidAmountUsd < order.totalUsd
+        ) {
+          await recordAudit({
+            actorId: null,
+            action: "payment.underpaid",
+            entity: "order",
+            entityId: invoice.orderId,
+            after: {
+              paid: confirmed.paidAmountUsd,
+              owed: order.totalUsd,
+              via: "reconcile",
+            },
+          });
+          continue;
+        }
+
         await recordOpeningPayment(
           invoice.orderId,
           invoice.reference,
