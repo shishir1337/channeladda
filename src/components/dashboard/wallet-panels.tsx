@@ -279,9 +279,12 @@ export function PayoutAddressForm({
 export function RequestPayout({
   availableUsd,
   hasAddress,
+  minimumUsd,
 }: {
   availableUsd: number;
   hasAddress: boolean;
+  /** Cents. The floor finance will send, set in the admin settings. */
+  minimumUsd: number;
 }) {
   const router = useRouter();
   const id = useId();
@@ -290,12 +293,19 @@ export function RequestPayout({
   const [bad, setBad] = useState(false);
   const [pending, startTransition] = useTransition();
 
+  const asMoney = (cents: number) =>
+    (cents / 100).toLocaleString("en-US", {
+      style: "currency",
+      currency: "USD",
+      maximumFractionDigits: 2,
+    });
+
   const max = availableUsd / 100;
-  const maxLabel = max.toLocaleString("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 2,
-  });
+  const maxLabel = asMoney(availableUsd);
+  // Stated up front rather than discovered by being refused: the only way
+  // to learn the floor used to be to ask for less than it.
+  const minLabel = asMoney(minimumUsd);
+  const belowMinimum = availableUsd < minimumUsd;
 
   return (
     <Panel
@@ -303,6 +313,21 @@ export function RequestPayout({
       title="Withdraw"
       blurb="Finance checks every payout, normally within one working day. The amount is held against your balance while they do, so it cannot be spent twice."
     >
+      {hasAddress && belowMinimum && minimumUsd > 0 ? (
+        <p className="mt-4 flex items-start gap-2.5 rounded-xl border border-line bg-surface-2 px-3.5 py-3 text-xs leading-relaxed text-muted">
+          <LockIcon
+            aria-hidden="true"
+            className="mt-0.5 size-4 shrink-0 text-subtle"
+          />
+          <span>
+            The smallest payout we can send is {minLabel}, and you have{" "}
+            {maxLabel} available. A crypto transfer pays the network&rsquo;s fee
+            whatever its size, so below that figure it would cost you more to
+            receive the money than the money is worth.
+          </span>
+        </p>
+      ) : null}
+
       {!hasAddress ? (
         <p className="mt-4 flex items-start gap-2.5 rounded-xl border border-line bg-surface-2 px-3.5 py-3 text-xs leading-relaxed text-muted">
           <LockIcon
@@ -322,7 +347,11 @@ export function RequestPayout({
           id={id}
           name="amount"
           label="Amount in US dollars"
-          hint={`You can take out up to ${maxLabel}.`}
+          hint={
+            minimumUsd > 0
+              ? `Between ${minLabel} and ${maxLabel}.`
+              : `You can take out up to ${maxLabel}.`
+          }
           inputMode="decimal"
           value={amount}
           onChange={(e) => setAmount(e.target.value)}

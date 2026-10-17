@@ -1,6 +1,7 @@
 import {
   ArrowUpRightIcon,
   BanknoteIcon,
+  CheckCircle2Icon,
   CoinsIcon,
   InfoIcon,
   LockIcon,
@@ -23,6 +24,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Price } from "@/components/ui/price";
 import { requireUser } from "@/server/session";
+import { getSettings } from "@/server/settings";
 import { getWallet } from "@/server/wallet";
 
 export const metadata: Metadata = {
@@ -104,10 +106,22 @@ function longDate(date: Date) {
  * who sees only one number and then cannot spend it has been misled by the
  * interface rather than by the rules.
  */
-export default async function WalletPage() {
+export default async function WalletPage({
+  searchParams,
+}: PageProps<"/dashboard/wallet">) {
   const user = await requireUser("/dashboard/wallet");
-  const wallet = await getWallet(user.id);
+  const [wallet, settings, params] = await Promise.all([
+    getWallet(user.id),
+    getSettings(),
+    searchParams,
+  ]);
   const held = wallet.pendingWithdrawalUsd > 0;
+
+  // startTopUp sends people back here with ?topped=1 and nothing read it,
+  // so somebody who had just paid landed on an unchanged page with no sign
+  // it had worked. The credit arrives by webhook and may well land after
+  // the redirect, so this says “on its way” rather than claiming it is in.
+  const justPaid = params.topped === "1";
 
   return (
     <>
@@ -115,6 +129,25 @@ export default async function WalletPage() {
         title="Wallet"
         description="Your money on Channel Adda: what is here, what is spendable right now, and what every movement was for."
       />
+
+      {justPaid ? (
+        <div
+          role="status"
+          className="mb-5 flex items-start gap-3 rounded-card border border-verified/40 bg-verified/5 p-4 text-sm leading-relaxed"
+        >
+          <CheckCircle2Icon
+            aria-hidden="true"
+            className="mt-0.5 size-5 shrink-0 text-verified"
+          />
+          <span>
+            <strong className="font-semibold text-fg">
+              Payment received by the processor.
+            </strong>{" "}
+            It reaches your balance as soon as the network confirms it —
+            usually a minute or two. Refresh this page if it is not here yet.
+          </span>
+        </div>
+      ) : null}
 
       {/* ---- the figures ------------------------------------------------- */}
       <Section>
@@ -225,6 +258,7 @@ export default async function WalletPage() {
           <RequestPayout
             availableUsd={wallet.availableUsd}
             hasAddress={wallet.payoutAddress !== null}
+            minimumUsd={settings.minWithdrawalUsd}
           />
         </div>
       </Section>
