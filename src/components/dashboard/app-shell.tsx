@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  BellIcon,
   ArrowLeftRightIcon,
   BadgeCheckIcon,
   ChevronsLeftIcon,
@@ -37,6 +38,7 @@ import { cn } from "@/lib/utils";
  * described with icon *names* and resolved to components here.
  */
 const ICONS = {
+  bell: BellIcon,
   overview: LayoutDashboardIcon,
   offers: HandshakeIcon,
   listings: StoreIcon,
@@ -249,11 +251,17 @@ const railFootLink =
 export function AppShell({
   groups,
   staff,
+  bell,
   children,
 }: {
   groups: NavGroup[];
   /** Shows the staff mark in the rail so the two areas are never confused. */
   staff?: boolean;
+  /**
+   * The notification bell, rendered by the layout that knows whose it is.
+   * Passed in rather than fetched here so this stays a frame.
+   */
+  bell?: React.ReactNode;
   children: React.ReactNode;
 }) {
   const [collapsed, setCollapsed] = useState(false);
@@ -464,6 +472,7 @@ export function AppShell({
             </p>
           </div>
 
+          {bell}
           <ThemeToggle />
           <AccountMenu />
         </header>

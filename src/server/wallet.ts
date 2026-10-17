@@ -6,6 +6,7 @@ import { canTransition } from "@/lib/deal-machine";
 import { OPENING_STATUS } from "@/lib/deal-templates";
 import { isSerializationFailure } from "@/lib/serialization-failure";
 import { recordAudit } from "@/server/audit";
+import { notify } from "@/server/notifications";
 import { getSettings } from "@/server/settings";
 
 /**
@@ -504,6 +505,45 @@ export async function settleWithdrawal(
     entityId: withdrawal.id,
     before: { status: withdrawal.status },
     after: { status: to, txHash, amountUsd: withdrawal.amountUsd },
+  });
+
+  // Somebody asked for their money and a human decided. Silence here is
+  // the single most alarming thing this product can do: the amount has
+  // been held against their balance since they asked, so from the outside
+  // an unanswered payout and a frozen account look identical.
+  const amount = (withdrawal.amountUsd / 100).toLocaleString("en-US", {
+    style: "currency",
+    currency: "USD",
+  });
+  const sent = to === "SENT";
+  await notify({
+    userId: withdrawal.userId,
+    kind: "PAYOUT",
+    title: sent ? `${amount} is on its way` : `Your ${amount} payout was not sent`,
+    body: sent
+      ? `Sent to your payout address.${txHash ? ` Transaction ${txHash}.` : ""} Blockchain confirmation times vary.`
+      : `${note?.trim() || "Finance could not send this one."} The amount is back in your available balance.`
+,
+    href: "/dashboard/wallet",
+    email: {
+      subject: sent ? `${amount} sent` : `${amount} payout not sent`,
+      body: sent
+        ? [
+            `Your withdrawal of ${amount} has been sent to your payout address.`,
+            txHash ? `Transaction: ${txHash}` : "",
+            "",
+            "How long it takes to appear depends on the network, not on us.",
+          ]
+            .filter(Boolean)
+            .join("\n")
+        : [
+            `Finance could not send your withdrawal of ${amount}.`,
+            "",
+            note?.trim() || "No reason was given.",
+            "",
+            "The amount is back in your available balance, so you can ask again.",
+          ].join("\n"),
+    },
   });
 
   return { ok: true };

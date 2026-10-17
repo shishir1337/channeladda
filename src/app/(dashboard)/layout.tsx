@@ -1,8 +1,13 @@
 import type { NavGroup } from "@/components/dashboard/app-shell";
 import { AppShell } from "@/components/dashboard/app-shell";
+import { NotificationBell } from "@/components/dashboard/notification-bell";
 import { getWaitingOnYou } from "@/server/dashboard";
 import { countDealsAwaiting } from "@/server/deals";
 import { countUnreadThreads } from "@/server/messages";
+import {
+  listNotifications,
+  unreadCount,
+} from "@/server/notifications";
 import { getCurrentUser } from "@/server/session";
 
 /**
@@ -16,6 +21,33 @@ import { getCurrentUser } from "@/server/session";
  * because everyone here is both a buyer and a seller. Forcing a mode switch
  * would hide half the product from someone who is using both halves.
  */
+/**
+ * The bell, built once for both areas.
+ *
+ * Dates cross the server/client boundary as strings so the component can
+ * render a relative time without the layout deciding what 'now' is.
+ */
+async function bellFor(userId: string) {
+  const [items, unread] = await Promise.all([
+    listNotifications(userId, 12),
+    unreadCount(userId),
+  ]);
+
+  return (
+    <NotificationBell
+      unread={unread}
+      items={items.map((n) => ({
+        id: n.id,
+        kind: n.kind,
+        title: n.title,
+        body: n.body,
+        href: n.href,
+        readAt: n.readAt?.toISOString() ?? null,
+        createdAt: n.createdAt.toISOString(),
+      }))}
+    />
+  );
+}
 export default async function DashboardLayout({ children }: LayoutProps<"/">) {
   // Deliberately not `requireUser()`.
   //
@@ -26,16 +58,24 @@ export default async function DashboardLayout({ children }: LayoutProps<"/">) {
   const user = await getCurrentUser();
   if (!user) return <>{children}</>;
 
-  const [waiting, unread, deals] = await Promise.all([
+  const [waiting, unread, deals, bell] = await Promise.all([
     getWaitingOnYou(user.id),
     countUnreadThreads(user.id),
     countDealsAwaiting(user.id),
+    bellFor(user.id),
   ]);
 
   const groups: NavGroup[] = [
     {
       label: null,
-      items: [{ label: "Overview", href: "/dashboard", icon: "overview" }],
+      items: [
+        { label: "Overview", href: "/dashboard", icon: "overview" },
+        {
+          label: "Notifications",
+          href: "/dashboard/notifications",
+          icon: "bell",
+        },
+      ],
     },
     {
       label: "Trading",
@@ -103,5 +143,9 @@ export default async function DashboardLayout({ children }: LayoutProps<"/">) {
     },
   ];
 
-  return <AppShell groups={groups}>{children}</AppShell>;
+  return (
+    <AppShell groups={groups} bell={bell}>
+      {children}
+    </AppShell>
+  );
 }

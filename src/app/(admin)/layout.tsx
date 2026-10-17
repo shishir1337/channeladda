@@ -1,5 +1,7 @@
 import type { NavGroup } from "@/components/dashboard/app-shell";
 import { AppShell } from "@/components/dashboard/app-shell";
+import { NotificationBell } from "@/components/dashboard/notification-bell";
+import { listNotifications, unreadCount } from "@/server/notifications";
 import { getQueueCounts } from "@/server/admin-listings";
 import { countFlaggedThreads } from "@/server/messages";
 import { requireAdminArea } from "@/server/session";
@@ -20,6 +22,34 @@ import { countOpenTickets } from "@/server/support";
  * them the same 404 a stranger would get. The moderation counts are skipped
  * for them too — they feed badges on pages an agent cannot open.
  */
+/**
+ * The same bell the member area has.
+ *
+ * Staff are notified like anybody else — a dispute, a payout request, a
+ * deal that needs an agent — and the rail badges only count queues, not
+ * things addressed to this person.
+ */
+async function bellFor(userId: string) {
+  const [items, unread] = await Promise.all([
+    listNotifications(userId, 12),
+    unreadCount(userId),
+  ]);
+
+  return (
+    <NotificationBell
+      unread={unread}
+      items={items.map((n) => ({
+        id: n.id,
+        kind: n.kind,
+        title: n.title,
+        body: n.body,
+        href: n.href,
+        readAt: n.readAt?.toISOString() ?? null,
+        createdAt: n.createdAt.toISOString(),
+      }))}
+    />
+  );
+}
 export default async function AdminLayout({ children }: LayoutProps<"/">) {
   const staff = await requireAdminArea();
 
@@ -144,7 +174,7 @@ export default async function AdminLayout({ children }: LayoutProps<"/">) {
   ];
 
   return (
-    <AppShell groups={groups} staff>
+    <AppShell groups={groups} staff bell={await bellFor(staff.id)}>
       {children}
     </AppShell>
   );

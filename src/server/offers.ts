@@ -2,6 +2,7 @@ import "server-only";
 
 import type { OfferStatus } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
+import { notify } from "@/server/notifications";
 import { fromCents } from "@/lib/listing-form";
 
 /**
@@ -186,6 +187,14 @@ type Result<T = undefined> =
  * seller under a hundred offers, and it becomes unclear which one accepting
  * refers to.
  */
+/** Cents as a person reads them. */
+function asMoney(cents: number): string {
+  return (cents / 100).toLocaleString("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  });
+}
 export async function createOffer(input: {
   buyerId: string;
   listingId: string;
@@ -228,6 +237,35 @@ export async function createOffer(input: {
     },
     select: { id: true },
   });
+
+  // The seller has to hear about it, or the offer sits until it lapses and
+  // the buyer concludes nobody is home.
+  const buyer = await db.user.findUnique({
+    where: { id: input.buyerId },
+    select: { name: true },
+  });
+  const listingTitle = await db.listing.findUnique({
+    where: { id: input.listingId },
+    select: { title: true },
+  });
+  const amount = asMoney(input.amountCents);
+  await notify({
+    userId: listing.sellerId,
+    kind: "OFFER",
+    title: `${buyer?.name ?? "Someone"} offered ${amount}`,
+    body: `On ${listingTitle?.title ?? "your listing"}. You can accept it, turn it down, or come back with a number of your own.`,
+    href: "/dashboard/offers",
+    email: {
+      subject: `${amount} offered on ${listingTitle?.title ?? "your listing"}`,
+      body: [
+        `${buyer?.name ?? "Someone"} has offered ${amount}.`,
+        "",
+        "You can accept it, turn it down, or counter with your own number.",
+        "It lapses on its own if nobody answers.",
+      ].join("\n"),
+    },
+  });
+
   return { ok: true, value: offer.id };
 }
 
@@ -282,6 +320,34 @@ async function loadRespondable(
  * sees zero rows affected and is told the listing is taken. Reading the status
  * first and writing second would let both through.
  */
+/**
+ * Who needs to hear about an answer to an offer.
+ *
+ * Whoever did not press the button. An offer can be made by either side,
+ * so this is worked out from the row rather than assumed.
+ */
+async function tellTheOtherSide(
+  row: {
+    id: string;
+    buyerId: string;
+    amountUsd: number;
+    listing: { sellerId: string };
+  },
+  responderId: string,
+  outcome: { title: string; body: string },
+) {
+  const otherId =
+    responderId === row.buyerId ? row.listing.sellerId : row.buyerId;
+  await notify({
+    userId: otherId,
+    kind: "OFFER",
+    title: outcome.title,
+    body: outcome.body,
+    href: "/dashboard/offers",
+    email: { subject: outcome.title, body: outcome.body },
+  });
+}
+
 export async function acceptOffer(
   offerId: string,
   responderId: string,
@@ -324,6 +390,11 @@ export async function acceptOffer(
     throw error;
   }
 
+  await tellTheOtherSide(row, responderId, {
+    title: `Your offer of ${asMoney(row.amountUsd)} was accepted`,
+    body: "The listing is held for you. Open it to start the deal — it does not stay held for ever.",
+  });
+
   return { ok: true };
 }
 
@@ -339,6 +410,12 @@ export async function declineOffer(
     where: { id: offerId },
     data: { status: "REJECTED", respondedAt: new Date() },
   });
+
+  await tellTheOtherSide(loaded.row, responderId, {
+    title: `Your offer of ${asMoney(loaded.row.amountUsd)} was turned down`,
+    body: "Nothing is lost. You can make another one, or look at something else.",
+  });
+
   return { ok: true };
 }
 

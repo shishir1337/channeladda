@@ -8,6 +8,7 @@ import {
   redactContactDetails,
 } from "@/lib/redact";
 import { isChatAttachmentKey, keyIsVideo, urlForKey } from "@/lib/upload-keys";
+import { notify } from "@/server/notifications";
 import { markUploadsAttached } from "@/server/upload-access";
 import { mediaExpiryFrom } from "@/server/chat-retention";
 import type { CurrentUser } from "@/server/session";
@@ -521,6 +522,23 @@ export async function sendMessage(input: {
 
   if (input.attachmentKey) {
     await markUploadsAttached([urlForKey(input.attachmentKey)]);
+  }
+
+  // The other side of the thread. Collapsed per conversation, because a
+  // burst of ten lines should say “there is something to read in here” and
+  // it stops saying that the moment the bell shows ten. No email: chat
+  // arrives in bursts and an inbox is the wrong place for it.
+  const otherId =
+    input.sender.id === row.buyerId ? row.sellerId : row.buyerId;
+  if (otherId !== input.sender.id) {
+    await notify({
+      userId: otherId,
+      kind: "MESSAGE",
+      title: `${input.sender.name ?? "Someone"} sent you a message`,
+      body: body.slice(0, 140) || "Sent an attachment.",
+      href: `/dashboard/messages/${row.id}`,
+      collapseKey: `thread:${row.id}`,
+    });
   }
 
   return { ok: true, redactedKinds: kinds };

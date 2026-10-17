@@ -2,6 +2,7 @@ import "server-only";
 
 import type { ListingStatus } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
+import { notify } from "@/server/notifications";
 import { fromCents, fromEngagementBp } from "@/lib/listing-form";
 
 /**
@@ -325,6 +326,18 @@ export async function approveListing(id: string) {
     select: { status: true, slug: true },
   });
 
+  await notify({
+    userId: existing.sellerId,
+    kind: "LISTING",
+    title: "Your listing is live",
+    body: "Buyers can find it and make offers on it now.",
+    href: `/listing/${updated.slug}`,
+    email: {
+      subject: "Your listing is live on Channel Adda",
+      body: "A moderator has checked it and it is on the marketplace. Buyers can find it and make offers on it now.",
+    },
+  });
+
   return {
     ok: true as const,
     before: existing.status,
@@ -341,7 +354,7 @@ export async function rejectListing(id: string, reason: string) {
 
   const existing = await db.listing.findUnique({
     where: { id },
-    select: { id: true, status: true },
+    select: { id: true, status: true, sellerId: true },
   });
   if (!existing) return { ok: false as const, reason: "not-found" as const };
   if (!REVIEWABLE.includes(existing.status)) {
@@ -351,6 +364,27 @@ export async function rejectListing(id: string, reason: string) {
   await db.listing.update({
     where: { id },
     data: { status: "REJECTED", rejectionReason: trimmed },
+  });
+
+  // The reason travels with it. A seller who is only told “rejected” has
+  // to come and ask, and most of them do not — they just leave.
+  await notify({
+    userId: existing.sellerId,
+    kind: "LISTING",
+    title: "Your listing needs a change before it can go live",
+    body: trimmed,
+    href: `/dashboard/listings/${id}`,
+    email: {
+      subject: "Your Channel Adda listing needs a change",
+      body: [
+        "A moderator has looked at your listing and it cannot go live as it is.",
+        "",
+        "What needs changing:",
+        trimmed,
+        "",
+        "Edit it and send it back for review — the note clears when you save.",
+      ].join("\n"),
+    },
   });
 
   return {
