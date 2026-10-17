@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { Price } from "@/components/ui/price";
 import { Container, Section, SectionHeading } from "@/components/ui/section";
+import { quote } from "@/lib/fees";
+import { getFeeSettings } from "@/server/settings";
 
 export const metadata: Metadata = {
   title: "Affiliate programme",
@@ -31,10 +33,17 @@ const steps = [
   },
 ];
 
-/** A real number beats a percentage — this is the fee on a $42,500 sale. */
-const EXAMPLE_FEE = 3_400;
+/** The sale the worked example is built on. */
+const EXAMPLE_PRICE = 42_500;
+const SHARE = 0.2;
 
-export default function AffiliatesPage() {
+export default async function AffiliatesPage() {
+  // Read, not hardcoded. This was frozen at a combined 8% — a stale 3% + 5% —
+  // which made the worked example 2.7 times the real figure, on the one page
+  // whose whole purpose is that figure.
+  const fees = await getFeeSettings();
+  const q = quote(EXAMPLE_PRICE, fees, "FASTEST");
+  const exampleFee = q.buyerFee + q.sellerFee;
   return (
     <>
       <PageHeader
@@ -81,7 +90,7 @@ export default function AffiliatesPage() {
               <SectionHeading
                 eyebrow="What it pays"
                 title="One referred sale, one real number"
-                description="A $42,500 channel sale earns Channel Adda $3,400 in combined buyer and seller fees. Your share of that is 20%."
+                description={`A ${EXAMPLE_PRICE.toLocaleString("en-US")} channel sale on a Fastest deal earns Channel Adda its buyer and seller fees combined. Your share of that is ${SHARE * 100}%.`}
               />
               <ul className="mt-7 flex flex-col gap-2.5">
                 {[
@@ -118,19 +127,19 @@ export default function AffiliatesPage() {
                 <div className="flex items-center justify-between gap-3">
                   <dt className="text-muted">Channel Adda fee</dt>
                   <dd className="font-medium">
-                    <Price usd={EXAMPLE_FEE} />
+                    <Price usd={exampleFee} />
                   </dd>
                 </div>
                 <div className="flex items-center justify-between gap-3 border-t border-line pt-3 text-base font-semibold">
                   <dt>Your share (20%)</dt>
                   <dd className="text-verified">
-                    <Price usd={EXAMPLE_FEE * 0.2} />
+                    <Price usd={exampleFee * SHARE} />
                   </dd>
                 </div>
               </dl>
               <p className="mt-4 border-t border-line pt-4 text-xs leading-relaxed text-subtle">
                 Refer ten people who each complete one deal that size and that
-                is <Price usd={EXAMPLE_FEE * 0.2 * 10} className="text-muted" />{" "}
+                is <Price usd={exampleFee * SHARE * 10} className="text-muted" />{" "}
                 in a year.
               </p>
             </div>

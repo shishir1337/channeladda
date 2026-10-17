@@ -363,3 +363,74 @@ test(
     expect(await requestWithdrawal(user.id, 500)).toMatchObject({ ok: true });
   }),
 );
+
+// ------------------------------------------- the payout address cooling-off
+
+test(
+  "a new payout address locks withdrawals for a day",
+  withCleanDb(async () => {
+    // The help centre promises this in so many words — "adding or changing a
+    // payout address locks withdrawals for 24 hours… address-change attacks
+    // are the most common way marketplace sellers lose money, and this delay
+    // is what stops them" — and nothing enforced it. The column was there,
+    // with a comment saying what it was for, and no code ever read or wrote
+    // it. A stolen session emptied the balance in one request.
+    const { setPayoutAddress } = await import("@/server/wallet");
+    const user = await seedUser();
+    await fund(user.id, 50_000);
+
+    await setPayoutAddress(user.id, "TXyz1234567890abcdef", "TRON");
+
+    expect(await requestWithdrawal(user.id, 20_000)).toMatchObject({
+      ok: false,
+      reason: "address-locked",
+    });
+  }),
+);
+
+test(
+  "the lock lifts, and re-saving the same address does not restart it",
+  withCleanDb(async () => {
+    const { setPayoutAddress } = await import("@/server/wallet");
+    const user = await seedUser();
+    await fund(user.id, 50_000);
+    await setPayoutAddress(user.id, "TXyz1234567890abcdef", "TRON");
+
+    // A day passes.
+    await db.payoutAddress.update({
+      where: { userId: user.id },
+      data: { lockedUntil: new Date(Date.now() - 1000) },
+    });
+    expect(await requestWithdrawal(user.id, 20_000)).toMatchObject({
+      ok: true,
+    });
+
+    // Saving the same address again is not a change, so it must not lock a
+    // seller out of their own money for another day.
+    await setPayoutAddress(user.id, "TXyz1234567890abcdef", "TRON");
+    expect(await requestWithdrawal(user.id, 10_000)).toMatchObject({
+      ok: true,
+    });
+  }),
+);
+
+test(
+  "changing the address locks withdrawals again",
+  withCleanDb(async () => {
+    const { setPayoutAddress } = await import("@/server/wallet");
+    const user = await seedUser();
+    await fund(user.id, 50_000);
+    await setPayoutAddress(user.id, "TXyz1234567890abcdef", "TRON");
+    await db.payoutAddress.update({
+      where: { userId: user.id },
+      data: { lockedUntil: new Date(Date.now() - 1000) },
+    });
+
+    await setPayoutAddress(user.id, "TAbc0987654321fedcba", "TRON");
+
+    expect(await requestWithdrawal(user.id, 20_000)).toMatchObject({
+      ok: false,
+      reason: "address-locked",
+    });
+  }),
+);

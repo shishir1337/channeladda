@@ -30,7 +30,7 @@ export const legalDocs: Record<string, LegalDoc> = {
           "Channel Adda is a marketplace and a supervised transfer service. We introduce buyers and sellers of social media accounts and content websites, and on every deal one side of the exchange is held by us while the other moves.",
           "On a Safest deal we hold the account. One of our agents takes ownership of it, the buyer pays the seller directly once it is verifiably in our hands, and we transfer it on to the buyer afterwards. The purchase price never passes through Channel Adda.",
           "On a Fastest deal we hold the money. The buyer pays us the price and our fee together, our agent supervises while the seller transfers the account to the buyer, and we pay the seller once the buyer confirms access.",
-          "We are not a party to the sale itself. The contract for the account is between the buyer and the seller. Our role is to hold the money, verify what we reasonably can, and decide disputes fairly on the record in front of us.",
+          "We are not a party to the sale itself. The contract for the account is between the buyer and the seller. Our role is to hold one side of the exchange — the money on a Fastest deal, the account on a Safest one — to verify what we reasonably can, and to decide disputes fairly on the record in front of us.",
         ],
       },
       {
@@ -50,7 +50,7 @@ export const legalDocs: Record<string, LegalDoc> = {
       {
         heading: "Fees",
         paragraphs: [
-          "Buyers pay 3% on top of the listing price. Sellers pay 5% of the sale price, deducted on completion. Listing is free, and no fee is charged on a deal that does not complete.",
+          "Buyers pay a percentage on top of the listing price, set by us and shown in full on the listing page and at /fees before you commit. A seller fee applies only on a Fastest deal, where the sale price passes through us; it is deducted on completion and is currently zero. On a Safest deal we are not in the payment path and charge the seller nothing. Listing is free, and no fee is charged on a deal that does not complete. The rates in force are always the ones shown at /fees.",
         ],
       },
       {

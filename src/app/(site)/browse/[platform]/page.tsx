@@ -113,11 +113,12 @@ export default async function PlatformBrowsePage({
                 {p.transferNote}
               </p>
               <p className="mt-4 text-[0.9375rem] leading-relaxed text-muted sm:text-base">
-                Your payment stays with Channel Adda for{" "}
+                The handover is held open for{" "}
                 <span className="font-semibold text-fg">{p.holdDays} days</span>{" "}
-                after you confirm the handover. If the previous owner recovers
-                the account in that window, the deal is reversed and you are not
-                left paying for it.
+                — long enough for the window in which a previous owner can still
+                attempt account recovery. On a Fastest deal we are holding your
+                payment through that window. On a Safest deal we are holding the
+                account itself, and you have paid us nothing but our fee.
               </p>
               <Link
                 href="/how-it-works"

@@ -90,66 +90,35 @@ export default async function FeesPage() {
             description="Every figure below follows the currency switcher in the header."
           />
 
-          <div className="mt-9 overflow-x-auto rounded-card border border-line bg-surface sm:mt-12">
-            <table className="w-full min-w-[38rem] text-sm">
-              <caption className="sr-only">
-                Buyer total and seller payout at three sale prices
-              </caption>
-              <thead>
-                <tr className="border-b border-line bg-surface-2">
-                  {[
-                    "Sale price",
-                    "Buyer fee",
-                    "Buyer pays",
-                    "Seller fee",
-                    "Seller receives",
-                    "Channel Adda earns",
-                  ].map((h) => (
-                    <th
-                      key={h}
-                      scope="col"
-                      className="px-4 py-3 text-left text-[0.6875rem] font-medium tracking-wide text-subtle uppercase whitespace-nowrap"
-                    >
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {EXAMPLES.map((price) => {
-                  const b = buyerTotal(price, fees, "SAFEST");
-                  const s = sellerPayout(price, fees, "FASTEST");
-                  return (
-                    <tr
-                      key={price}
-                      className="border-b border-line last:border-b-0"
-                    >
-                      <th
-                        scope="row"
-                        className="px-4 py-4 text-left font-semibold"
-                      >
-                        <Price usd={price} />
-                      </th>
-                      <td className="px-4 py-4 text-muted">
-                        <Price usd={b.fee} />
-                      </td>
-                      <td className="px-4 py-4 font-medium">
-                        <Price usd={b.total} />
-                      </td>
-                      <td className="px-4 py-4 text-muted">
-                        <Price usd={s.fee} />
-                      </td>
-                      <td className="px-4 py-4 font-medium text-verified">
-                        <Price usd={s.payout} />
-                      </td>
-                      <td className="px-4 py-4 font-semibold text-primary-text">
-                        <Price usd={b.fee + s.fee} />
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+          <div className="mt-9 flex flex-col gap-8 sm:mt-12">
+            <ModeTable
+              mode="FASTEST"
+              fees={fees}
+              title="Fastest — the money passes through us"
+              note="You pay Channel Adda the price and the fee together. We pay the seller once you confirm you have full control."
+              columns={[
+                "Sale price",
+                "Buyer fee",
+                "Buyer pays us",
+                "Seller fee",
+                "Seller receives",
+                "Channel Adda earns",
+              ]}
+            />
+            <ModeTable
+              mode="SAFEST"
+              fees={fees}
+              title="Safest — the account passes through us"
+              note="You pay Channel Adda the fee and nothing else. The price goes from you straight to the seller, once our agent holds the account."
+              columns={[
+                "Sale price",
+                "Our fee",
+                "Buyer pays us",
+                "Buyer pays the seller",
+                "Seller receives",
+                "Channel Adda earns",
+              ]}
+            />
           </div>
         </Container>
       </Section>
@@ -226,5 +195,89 @@ export default async function FeesPage() {
         </Container>
       </Section>
     </>
+  );
+}
+
+/**
+ * One worked example table per mode.
+ *
+ * It used to be a single table that took the buyer's figures from a Safest
+ * deal and the seller's from a Fastest one, so no row described a deal that
+ * could actually happen: at the shipped rates the first row read "$8,900
+ * channel, buyer pays $267". Two tables, each internally consistent.
+ */
+function ModeTable({
+  mode,
+  fees,
+  title,
+  note,
+  columns,
+}: {
+  mode: "SAFEST" | "FASTEST";
+  fees: Awaited<ReturnType<typeof getFeeSettings>>;
+  title: string;
+  note: string;
+  columns: string[];
+}) {
+  return (
+    <div>
+      <h3 className="font-display text-base font-semibold sm:text-lg">
+        {title}
+      </h3>
+      <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-muted">
+        {note}
+      </p>
+
+      <div className="mt-4 overflow-x-auto rounded-card border border-line bg-surface">
+        <table className="w-full min-w-[38rem] text-sm">
+          <caption className="sr-only">{title}</caption>
+          <thead>
+            <tr className="border-b border-line bg-surface-2">
+              {columns.map((h) => (
+                <th
+                  key={h}
+                  scope="col"
+                  className="px-4 py-3 text-left text-[0.6875rem] font-medium tracking-wide text-subtle uppercase whitespace-nowrap"
+                >
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {EXAMPLES.map((price) => {
+              const b = buyerTotal(price, fees, mode);
+              const s = sellerPayout(price, fees, mode);
+              return (
+                <tr key={price} className="border-b border-line last:border-b-0">
+                  <th scope="row" className="px-4 py-4 text-left font-semibold">
+                    <Price usd={price} />
+                  </th>
+                  <td className="px-4 py-4 text-muted">
+                    <Price usd={b.fee} />
+                  </td>
+                  <td className="px-4 py-4 font-medium">
+                    <Price usd={b.total} />
+                  </td>
+                  <td className="px-4 py-4 text-muted">
+                    {mode === "SAFEST" ? (
+                      <Price usd={price} />
+                    ) : (
+                      <Price usd={s.fee} />
+                    )}
+                  </td>
+                  <td className="px-4 py-4 font-medium text-verified">
+                    <Price usd={s.payout} />
+                  </td>
+                  <td className="px-4 py-4 font-semibold text-primary-text">
+                    <Price usd={b.fee + s.fee} />
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
   );
 }

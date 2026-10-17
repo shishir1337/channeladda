@@ -11,6 +11,8 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Container, Section, SectionHeading } from "@/components/ui/section";
+import { formatRate } from "@/lib/fees";
+import { getFeeSettings } from "@/server/settings";
 
 const steps = [
   {
@@ -21,7 +23,7 @@ const steps = [
   {
     icon: LockIcon,
     title: "Choose how to pay",
-    body: "Your crypto payment goes to Channel Adda, not the seller. The seller sees the funds are secured and starts the transfer.",
+    body: "Fastest: your crypto payment goes to Channel Adda, not the seller, and the seller starts the transfer knowing it is secured. Safest: you pay our fee only, and an agent takes the account into our hands first.",
   },
   {
     icon: HandshakeIcon,
@@ -40,15 +42,14 @@ const modes = [
     id: "quick",
     icon: ZapIcon,
     name: "Fastest",
-    tagline: "For small, instantly transferable accounts",
-    fee: "3%",
-    release: "Immediately",
+    tagline: "One waiting period instead of two",
+    release: "After you confirm",
     accent: false,
     points: [
-      "Credentials released the moment payment clears",
-      "Best for listings under $1,000",
-      "24-hour buyer protection window",
-      "Ownership code still verified before listing",
+      "We hold your money until you confirm you have full control",
+      "One waiting period, so it closes in days rather than weeks",
+      "The seller transfers the account to you directly, with an agent watching",
+      "Ownership code verified before the listing goes up",
     ],
   },
   {
@@ -56,19 +57,26 @@ const modes = [
     icon: LockIcon,
     name: "Safest",
     tagline: "Our default for every serious deal",
-    fee: "3%",
     release: "After you confirm",
     accent: true,
     points: [
       "We hold the account, not your money — you pay the seller once it is ours",
-      "7-day ownership window before payout",
+      "Two waiting periods: seller to us, then us to you",
       "Recovery email and 2FA reset supervised by an agent",
-      "Full refund and dispute review if anything breaks",
+      "If it breaks before you pay, you have paid only our fee — and we refund it",
     ],
   },
 ];
 
-export function HowItWorks() {
+export async function HowItWorks() {
+  // Read, not hardcoded: a superadmin changing the rate in /admin/settings
+  // used to leave the home page quoting the old one.
+  const fees = await getFeeSettings();
+  const rateFor = (id: string) =>
+    `${formatRate(
+      id === "safest" ? fees.buyerFeeBpSafest : fees.buyerFeeBpFastest,
+    )}%`;
+
   return (
     <Section id="how-it-works" className="scroll-mt-24">
       <Container>
@@ -157,15 +165,15 @@ export function HowItWorks() {
                   </div>
                 </div>
 
-                {/* Fee is identical across modes — what actually differs is
-                    when the seller gets the money, so both are shown. */}
+                {/* The two modes may be priced differently: Fastest carries
+                    the money and is more work, so it has its own rate. */}
                 <dl className="mt-5 grid grid-cols-2 gap-4 border-y border-line py-4">
                   <div>
                     <dt className="text-[0.6875rem] tracking-wide text-subtle uppercase">
                       Platform fee
                     </dt>
                     <dd className="tnum mt-1.5 font-sans text-base font-semibold">
-                      {mode.fee}
+                      {rateFor(mode.id)}
                     </dd>
                   </div>
                   <div>

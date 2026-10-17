@@ -43,10 +43,12 @@ export default function AboutPage() {
             </p>
             <p>
               We are not trying to be the biggest marketplace. We are trying to
-              be the one where the money is never at risk — where a payment sits
-              with us until the buyer can prove they hold the account, and where
-              the wait before payout is set by how long the platform actually
-              lets an old owner take it back.
+              be the one where neither side has to go first on trust — where
+              something real sits between the two of them until the handover is
+              done, and where the wait is set by how long the platform actually
+              lets an old owner take the account back. Sometimes that something
+              is the buyer&rsquo;s money. Sometimes it is the account itself. It
+              is never nothing.
             </p>
             <p className="text-fg">
               That is the whole product. Everything else — the search, the

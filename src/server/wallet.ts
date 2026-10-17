@@ -32,6 +32,8 @@ export type WalletFailure =
   | "insufficient"
   | "no-address"
   | "below-minimum"
+  /** The payout address was changed too recently to send to. */
+  | "address-locked"
   | "already-settled"
   | "not-payable";
 
@@ -294,6 +296,47 @@ export async function payFromWallet(
   return { ok: true };
 }
 
+/** How long a withdrawal is held after the payout address is touched. */
+export const PAYOUT_LOCK_HOURS = 24;
+
+/**
+ * Setting or changing where the money goes.
+ *
+ * Locks withdrawals for a day afterwards. Taking over an account and
+ * re-pointing the payout address is how marketplace sellers actually lose
+ * money, and the delay is the whole defence: the seller gets a window in
+ * which to notice, and whoever stole the session gets nothing to show for
+ * it. The help centre has promised this in so many words since launch; the
+ * column existed, with a comment saying what it was for, and nothing ever
+ * read or wrote it.
+ *
+ * Re-saving the same address is not a change and does not restart the clock,
+ * or confirming the address you already have would cost you a day.
+ */
+export async function setPayoutAddress(
+  userId: string,
+  address: string,
+  network: string,
+): Promise<{ locked: boolean }> {
+  const existing = await db.payoutAddress.findUnique({
+    where: { userId },
+    select: { address: true, network: true },
+  });
+
+  if (existing?.address === address && existing?.network === network) {
+    return { locked: false };
+  }
+
+  const lockedUntil = new Date(Date.now() + PAYOUT_LOCK_HOURS * 3_600_000);
+  await db.payoutAddress.upsert({
+    where: { userId },
+    create: { userId, address, network, lockedUntil },
+    update: { address, network, lockedUntil },
+  });
+
+  return { locked: true };
+}
+
 /**
  * Asking for money out.
  *
@@ -319,9 +362,14 @@ export async function requestWithdrawal(
 
   const address = await db.payoutAddress.findUnique({
     where: { userId },
-    select: { address: true, network: true },
+    select: { address: true, network: true, lockedUntil: true },
   });
   if (!address) return { ok: false, reason: "no-address" };
+
+  // The cooling-off after the address was last touched.
+  if (address.lockedUntil && address.lockedUntil > new Date()) {
+    return { ok: false, reason: "address-locked" };
+  }
 
   let withdrawalId = "";
   try {

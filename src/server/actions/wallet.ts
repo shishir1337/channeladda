@@ -24,6 +24,8 @@ const MESSAGES: Record<repo.WalletFailure, string> = {
   insufficient: "Your available balance does not cover that.",
   "no-address": "Add a payout address first.",
   "below-minimum": "That is below the smallest withdrawal we can send.",
+  "address-locked":
+    "Your payout address changed in the last 24 hours. Withdrawals are held for a day after a change — it is what stops somebody who gets into your account from emptying it.",
   "already-settled": "That withdrawal has already been dealt with.",
   "not-payable": "This deal is not waiting on a payment.",
 };
@@ -129,18 +131,17 @@ export async function savePayoutAddress(
     return { ok: false, error: "Pick a network." };
   }
 
-  await db.payoutAddress.upsert({
-    where: { userId: user.id },
-    create: { userId: user.id, address: trimmed, network: chain },
-    update: { address: trimmed, network: chain },
-  });
+  const { locked } = await repo.setPayoutAddress(user.id, trimmed, chain);
 
   revalidatePath("/dashboard/wallet");
   return {
     ok: true,
-    message:
-      "Saved. Check it carefully — a payout sent to the wrong address cannot " +
-      "be recovered by us or by anybody else.",
+    message: locked
+      ? "Saved. Withdrawals are held for 24 hours after an address change — " +
+        "that delay is what stops somebody who gets into your account from " +
+        "emptying it. Check the address carefully in the meantime: a payout " +
+        "sent to the wrong one cannot be recovered by us or by anybody else."
+      : "That is already your payout address, so nothing changed.",
   };
 }
 

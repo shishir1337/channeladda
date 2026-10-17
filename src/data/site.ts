@@ -171,7 +171,7 @@ export const faqs = [
   },
   {
     q: "What happens if a transfer goes wrong?",
-    a: "Open a dispute from the order page. Escrow stays frozen while our moderation team reviews the order-linked chat, proof uploads and transfer log, then either completes the handover or refunds you in full.",
+    a: "Open a dispute from the order page and the deal freezes where it stands while our moderation team reviews the order-linked chat, proof uploads and transfer log. What a decision can recover depends on the deal: on a Fastest deal we are holding your payment and can return it in full. On a Safest deal we are holding the account and can return that, but the price went from you straight to the seller — we never held it, and no decision of ours can reach it.",
   },
   {
     q: "Can I negotiate the listed price?",

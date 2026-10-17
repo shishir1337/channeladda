@@ -38,9 +38,9 @@ export const helpArticles: HelpArticle[] = [
     summary:
       "Where your payment sits between checkout and payout, and what triggers a refund.",
     body: [
-      "When you buy an account on Channel Adda, your payment goes to us — not to the seller. It stays there while the handover happens, and it is only released once you have confirmed you have full control and the cooling-off period for that platform has passed.",
-      "That gap is deliberate. Handing over a login is not the same as losing access forever: on several platforms a previous owner can attempt account recovery for days or weeks afterwards. If we paid the seller the moment you clicked confirm, that money would be gone before you discovered a problem.",
-      "If the handover fails at any point, you open a dispute and the money freezes where it is. Nothing is released until a moderator has read the order record and decided.",
+      "What protects you depends on which deal you chose, and the two work in opposite directions. On a Fastest deal your payment goes to us, not to the seller: it stays with us while the handover happens and reaches the seller only once you have confirmed you have full control. On a Safest deal we hold the account instead — one of our agents takes ownership of it before you pay anything but our fee, and you pay the seller directly once it is verifiably in our hands.",
+      "Either way the gap is deliberate. Handing over a login is not the same as losing access forever: on several platforms a previous owner can attempt account recovery for days or weeks afterwards. Something has to sit between the two sides until that window closes — on a Fastest deal it is your money, on a Safest deal it is the account itself.",
+      "If the handover fails at any point, you open a dispute and the deal freezes where it stands. Nothing moves until a moderator has read the order record and decided. Be clear about what that can recover: on a Fastest deal we are holding your money and can return it. On a Safest deal we are holding the account and can return that — but the price went straight from you to the seller and we were never holding it, so what a dispute can give you back is the channel, not the payment. That is the trade you are making when you choose to pay the seller direct.",
     ],
     steps: [
       "You pay — on a Fastest deal we hold the money; on a Safest deal just our fee, and the account is held instead",
@@ -97,7 +97,7 @@ export const helpArticles: HelpArticle[] = [
       "The one-time code you place in your bio or description, and why we check it more than once.",
     body: [
       "We generate a one-time code and ask you to paste it into your channel description or profile bio. Our system then reads the live account and checks the code is there. A screenshot can be edited; a live read cannot.",
-      "We check the code three times: when you submit, again just before the listing goes public, and again the moment a buyer opens an order. A code that passed three weeks ago proves nothing about today, and buyers are paying for certainty.",
+      "We check the code when you submit it, and a moderator checks the live account again before the listing goes public. Leave the code up until it is approved: a code that was there three weeks ago proves nothing about today.",
       "You can remove the code once the listing is approved.",
     ],
   },
@@ -107,7 +107,7 @@ export const helpArticles: HelpArticle[] = [
     category: "selling",
     summary: "Payout timing, the seller fee, and withdrawal security.",
     body: [
-      "When a buyer confirms the handover and the cooling-off period ends, the sale amount minus the 5% seller fee lands in your Channel Adda balance. You then withdraw to your own crypto wallet, usually within the hour.",
+      "This is a Fastest deal: the buyer paid us, so we pay you. When they confirm the handover and the cooling-off period ends, the sale amount — less the seller fee, if one is set, which you can check at /fees — lands in your Channel Adda balance. You then withdraw to your own crypto wallet, usually within the hour. On a Safest deal nothing lands here at all, because the buyer pays you directly.",
       "For your own protection, adding or changing a payout address locks withdrawals for 24 hours and sends you an email. Address-change attacks are the most common way marketplace sellers lose money, and this delay is what stops them.",
     ],
   },
@@ -151,7 +151,7 @@ export const helpArticles: HelpArticle[] = [
     category: "account",
     summary: "Two-factor, payout addresses, and how we will never contact you.",
     body: [
-      "Turn on two-factor authentication, especially if you sell. It is required before you can withdraw.",
+      "Turn on two-factor authentication, especially if you sell. It is the single thing that stops a leaked password becoming a withdrawal to somebody else's wallet.",
       "Channel Adda staff will never ask for your password, your two-factor codes, or your recovery email. We will never ask you to move a conversation to Telegram or WhatsApp to complete a deal — anyone who does is not from Channel Adda, and no deal arranged that way is protected.",
     ],
   },
