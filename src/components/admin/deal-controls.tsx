@@ -216,10 +216,14 @@ export function AssignAgent({ orderId }: { orderId: string }) {
 }
 
 const ENDINGS = [
+  // Pausing comes first because it is the way into the other three on a
+  // deal that is still running: finishing one is the last step's job, and
+  // resolveDeal only decides a deal that is actually in dispute.
+  { to: "DISPUTED", label: "Pause it for review" },
   { to: "RETURNED_TO_SELLER", label: "Return the channel to the seller" },
   { to: "REFUNDED", label: "Refund the buyer" },
   { to: "CANCELLED", label: "Cancel the deal" },
-  { to: "COMPLETED", label: "Complete it anyway" },
+  { to: "COMPLETED", label: "Decide it in the seller’s favour" },
 ] as const;
 
 /**
