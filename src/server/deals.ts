@@ -1405,6 +1405,14 @@ export type DealView = {
   priceUsd: number;
   totalUsd: number;
   buyerFeeUsd: number;
+  /** Deducted before a Fastest seller is credited. Always 0 on Safest. */
+  sellerFeeUsd: number;
+  /** What the seller ends up with. On Safest the buyer pays it directly. */
+  payoutUsd: number;
+  /** What the buyer recorded when they paid the seller. On Safest this is
+   *  the only evidence the payment happened, so both sides can see it. */
+  buyerPaymentRef: string | null;
+  buyerPaidAt: Date | null;
   listingTitle: string;
   listingSlug: string;
   buyerName: string;
@@ -1438,6 +1446,9 @@ export async function getDealFor(
       priceUsd: true,
       totalUsd: true,
       buyerFeeUsd: true,
+      sellerFeeUsd: true,
+      buyerPaymentRef: true,
+      buyerPaidAt: true,
       buyerId: true,
       sellerId: true,
       agentId: true,
@@ -1472,6 +1483,10 @@ export async function getDealFor(
     priceUsd: order.priceUsd,
     totalUsd: order.totalUsd,
     buyerFeeUsd: order.buyerFeeUsd,
+    sellerFeeUsd: order.sellerFeeUsd,
+    payoutUsd: order.priceUsd - order.sellerFeeUsd,
+    buyerPaymentRef: order.buyerPaymentRef,
+    buyerPaidAt: order.buyerPaidAt,
     listingTitle: order.listing.title,
     listingSlug: order.listing.slug,
     buyerName: order.buyer.name,

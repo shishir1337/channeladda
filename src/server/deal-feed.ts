@@ -169,6 +169,10 @@ export async function listDealsNeedingReassignment(limit = 50) {
       id: true,
       reference: true,
       status: true,
+      // A suspended agent holding somebody's channel is the most urgent
+      // thing on the staff desk, and without this it was the only queue
+      // that could not say how long it had been like that.
+      createdAt: true,
       agent: { select: { name: true, email: true } },
       listing: { select: { title: true } },
     },

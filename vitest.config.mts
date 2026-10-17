@@ -49,5 +49,11 @@ export default defineConfig({
     },
     // One database, shared. Parallel files would truncate each other mid-test.
     fileParallelism: false,
+    // Vitest defaults to 5s, which suits a unit test. Most of these open a
+    // transaction against real Postgres, and a few deliberately race two
+    // writers to prove a compare-and-set holds — so the slowest of them sit
+    // close enough to 5s that an unlucky run fails tests that are fine. A
+    // genuine hang still fails, three times slower.
+    testTimeout: 15_000,
   },
 });

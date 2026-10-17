@@ -55,7 +55,7 @@ export const AGENT_HOLDS: readonly OrderStatus[] = Object.freeze([
 ]);
 
 /** Every state in which a Fastest buyer's money is sitting with the platform. */
-const PLATFORM_HOLDS: readonly OrderStatus[] = Object.freeze([
+export const PLATFORM_HOLDS: readonly OrderStatus[] = Object.freeze([
   "AGENT_VERIFYING",
   "AWAITING_HANDOVER",
   "AWAITING_RELEASE",
