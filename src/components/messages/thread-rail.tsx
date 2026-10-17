@@ -1,6 +1,10 @@
 "use client";
 
-import { AlertTriangleIcon, SearchIcon } from "lucide-react";
+import {
+  AlertTriangleIcon,
+  MessagesSquareIcon,
+  SearchIcon,
+} from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useId, useMemo, useState } from "react";
@@ -60,12 +64,25 @@ export function ThreadRail({ threads }: { threads: RailThread[] }) {
     );
   }, [threads, query]);
 
+  const unreadCount = threads.filter((thread) => thread.unread).length;
+
   if (threads.length === 0) {
     return (
-      <p className="mt-4 text-sm leading-relaxed text-muted">
-        No conversations yet. Ask a question on any listing and the thread
-        starts here.
-      </p>
+      <div className="mt-4 rounded-card border border-dashed border-line-strong bg-surface p-5 text-center">
+        <span className="mx-auto flex size-10 items-center justify-center rounded-2xl bg-surface-2 text-subtle">
+          <MessagesSquareIcon aria-hidden="true" className="size-5" />
+        </span>
+        <p className="mt-3 text-sm font-semibold text-fg">No conversations</p>
+        <p className="mt-1.5 text-xs leading-relaxed text-muted">
+          Ask a question on any listing and the thread starts here.
+        </p>
+        <Link
+          href="/browse"
+          className="mt-3 inline-flex min-h-9 items-center text-xs font-medium text-primary-text underline-offset-4 hover:underline"
+        >
+          Browse accounts
+        </Link>
+      </div>
     );
   }
 
@@ -85,14 +102,24 @@ export function ThreadRail({ threads }: { threads: RailThread[] }) {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Filter by account or person"
-          className="h-10 w-full rounded-xl border border-line bg-surface pr-3 pl-9 text-sm text-fg placeholder:text-subtle focus:outline-none"
+          className="h-11 w-full rounded-xl border border-line bg-surface-2 pr-3 pl-9 text-base text-fg placeholder:text-subtle focus:border-primary/60 focus:outline-none sm:text-sm"
         />
       </div>
 
+      <p className="mt-2.5 px-1 text-[0.6875rem] tracking-wide text-subtle uppercase">
+        {query.trim()
+          ? `${shown.length} of ${threads.length} shown`
+          : unreadCount > 0
+            ? `${threads.length} total · ${unreadCount} unread`
+            : `${threads.length} ${threads.length === 1 ? "conversation" : "conversations"}`}
+      </p>
+
       {shown.length === 0 ? (
-        <p className="mt-4 text-sm text-muted">Nothing matches that.</p>
+        <p className="mt-3 rounded-card border border-dashed border-line px-3 py-4 text-sm text-muted">
+          Nothing matches that. Try the account handle or the person's name.
+        </p>
       ) : (
-        <ul className="mt-3 flex max-h-[60vh] flex-col gap-1 overflow-y-auto lg:max-h-[calc(100vh-16rem)]">
+        <ul className="mt-2 flex max-h-[60vh] flex-col gap-1 overflow-y-auto pb-1 lg:max-h-[calc(100vh-16rem)]">
           {shown.map((thread) => {
             const active = params?.id === thread.id;
             return (
@@ -101,19 +128,23 @@ export function ThreadRail({ threads }: { threads: RailThread[] }) {
                   href={`/dashboard/messages/${thread.id}`}
                   aria-current={active ? "page" : undefined}
                   className={cn(
-                    "block rounded-card border px-3 py-2.5 transition-colors duration-200",
+                    "block rounded-card border px-3 py-3 transition-colors duration-200",
                     active
                       ? "border-primary bg-primary-soft"
                       : "border-transparent hover:border-line hover:bg-surface-2",
                   )}
                 >
-                  <div className="flex items-baseline justify-between gap-2">
+                  <div className="flex items-baseline gap-2">
+                    {thread.unread ? (
+                      <span
+                        aria-hidden="true"
+                        className="size-1.5 shrink-0 rounded-full bg-primary"
+                      />
+                    ) : null}
                     <p
                       className={cn(
-                        "min-w-0 truncate text-sm",
-                        thread.unread
-                          ? "font-semibold text-fg"
-                          : "font-medium text-fg",
+                        "min-w-0 flex-1 truncate text-sm text-fg",
+                        thread.unread ? "font-bold" : "font-medium",
                       )}
                     >
                       {thread.withName}

@@ -1,5 +1,6 @@
 import { AlertTriangleIcon, MessageSquareIcon } from "lucide-react";
 import Link from "next/link";
+import { Badge } from "@/components/ui/badge";
 
 /**
  * A list of conversations.
@@ -44,9 +45,16 @@ export function ThreadList({
 }) {
   if (threads.length === 0) {
     return (
-      <p className="mt-6 rounded-panel border border-dashed border-line bg-surface p-10 text-center text-sm text-muted">
-        {empty}
-      </p>
+      <div className="mt-6 flex flex-col items-center rounded-panel border border-dashed border-line-strong bg-surface px-6 py-14 text-center">
+        <span className="flex size-12 items-center justify-center rounded-2xl bg-surface-2 text-subtle">
+          <MessageSquareIcon aria-hidden="true" className="size-5" />
+        </span>
+        <p className="mt-4 font-display text-base font-bold text-fg">{empty}</p>
+        <p className="mx-auto mt-1.5 max-w-[48ch] text-sm leading-relaxed text-muted">
+          A thread appears the moment a buyer asks a seller a question, and
+          stays readable here for as long as the deal behind it lasts.
+        </p>
+      </div>
     );
   }
 
@@ -56,27 +64,29 @@ export function ThreadList({
         <li key={thread.id} className="bg-surface">
           <Link
             href={`${basePath}/${thread.id}`}
-            className="flex items-start gap-3.5 p-4 transition-colors hover:bg-surface-2"
+            className="flex items-start gap-3.5 p-4 transition-colors duration-200 hover:bg-surface-2 sm:p-5"
           >
             <span
               aria-hidden="true"
-              className={`mt-0.5 grid size-9 shrink-0 place-items-center rounded-full ${
+              className={`mt-0.5 grid size-9 shrink-0 place-items-center rounded-xl ${
                 thread.flagged
                   ? "bg-danger-soft text-danger"
                   : "bg-surface-2 text-subtle"
               }`}
             >
               {thread.flagged ? (
-                <AlertTriangleIcon className="size-4" />
+                <AlertTriangleIcon className="size-[1.15rem]" />
               ) : (
-                <MessageSquareIcon className="size-4" />
+                <MessageSquareIcon className="size-[1.15rem]" />
               )}
             </span>
 
             <span className="min-w-0 flex-1">
               <span className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                <span className="font-medium text-fg">{thread.withName}</span>
-                <span className="truncate text-xs text-subtle">
+                <span className="text-[0.9375rem] font-semibold text-fg">
+                  {thread.withName}
+                </span>
+                <span className="min-w-0 truncate text-xs text-subtle">
                   {thread.listingHandle} · {thread.listingTitle}
                 </span>
                 <span className="ml-auto shrink-0 text-xs text-subtle">
@@ -84,26 +94,27 @@ export function ThreadList({
                 </span>
               </span>
 
-              <span className="mt-1 block truncate text-sm text-muted">
+              <span className="mt-1.5 block truncate text-sm text-muted">
                 {thread.preview}
               </span>
 
               {thread.flagged || thread.closed || thread.unread > 0 ? (
-                <span className="mt-2 flex flex-wrap items-center gap-2">
+                <span className="mt-2.5 flex flex-wrap items-center gap-2">
                   {thread.unread > 0 ? (
-                    <span className="rounded-full bg-primary px-2 py-0.5 text-xs font-semibold text-primary-fg">
+                    <Badge variant="solid" size="sm">
                       {thread.unread} new
-                    </span>
+                    </Badge>
                   ) : null}
                   {thread.flagged ? (
-                    <span className="rounded-full border border-danger/30 bg-danger-soft px-2 py-0.5 text-xs font-medium text-danger">
+                    <Badge variant="danger" size="sm">
+                      <AlertTriangleIcon aria-hidden="true" />
                       {thread.flagReason ?? "Flagged for review"}
-                    </span>
+                    </Badge>
                   ) : null}
                   {thread.closed ? (
-                    <span className="rounded-full border border-line px-2 py-0.5 text-xs text-subtle">
+                    <Badge variant="neutral" size="sm">
                       Closed
-                    </span>
+                    </Badge>
                   ) : null}
                 </span>
               ) : null}

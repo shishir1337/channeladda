@@ -27,11 +27,22 @@ export function TextField({
         {label}
         {props.required ? <span className="ml-0.5 text-danger">*</span> : null}
       </label>
-      {hint ? <p className="mt-1 text-xs text-subtle">{hint}</p> : null}
+      {hint ? (
+        <p id={`${id}-hint`} className="mt-1 text-xs text-subtle">
+          {hint}
+        </p>
+      ) : null}
       <input
         id={id}
         aria-invalid={Boolean(error)}
-        aria-describedby={error ? `${id}-error` : undefined}
+        aria-describedby={
+          // Both, in reading order. The hint was rendered and then never
+          // referenced, so a screen-reader user got the label and the error
+          // and never the sentence explaining what to type.
+          [hint ? `${id}-hint` : null, error ? `${id}-error` : null]
+            .filter(Boolean)
+            .join(" ") || undefined
+        }
         className={cn(
           // 16px base avoids iOS zooming the field on focus.
           "mt-2 h-12 w-full rounded-xl border bg-surface-2 px-3.5 text-base text-fg placeholder:text-subtle focus:outline-none sm:text-[0.9375rem]",
@@ -70,13 +81,24 @@ export function PasswordField({
         {label}
         {props.required ? <span className="ml-0.5 text-danger">*</span> : null}
       </label>
-      {hint ? <p className="mt-1 text-xs text-subtle">{hint}</p> : null}
+      {hint ? (
+        <p id={`${id}-hint`} className="mt-1 text-xs text-subtle">
+          {hint}
+        </p>
+      ) : null}
       <div className="relative mt-2">
         <input
           id={id}
           type={shown ? "text" : "password"}
           aria-invalid={Boolean(error)}
-          aria-describedby={error ? `${id}-error` : undefined}
+          aria-describedby={
+          // Both, in reading order. The hint was rendered and then never
+          // referenced, so a screen-reader user got the label and the error
+          // and never the sentence explaining what to type.
+          [hint ? `${id}-hint` : null, error ? `${id}-error` : null]
+            .filter(Boolean)
+            .join(" ") || undefined
+        }
           className={cn(
             "h-12 w-full rounded-xl border bg-surface-2 pr-12 pl-3.5 text-base text-fg placeholder:text-subtle focus:outline-none sm:text-[0.9375rem]",
             error
@@ -134,11 +156,22 @@ export function TextArea({
         {label}
         {props.required ? <span className="ml-0.5 text-danger">*</span> : null}
       </label>
-      {hint ? <p className="mt-1 text-xs text-subtle">{hint}</p> : null}
+      {hint ? (
+        <p id={`${id}-hint`} className="mt-1 text-xs text-subtle">
+          {hint}
+        </p>
+      ) : null}
       <textarea
         id={id}
         aria-invalid={Boolean(error)}
-        aria-describedby={error ? `${id}-error` : undefined}
+        aria-describedby={
+          // Both, in reading order. The hint was rendered and then never
+          // referenced, so a screen-reader user got the label and the error
+          // and never the sentence explaining what to type.
+          [hint ? `${id}-hint` : null, error ? `${id}-error` : null]
+            .filter(Boolean)
+            .join(" ") || undefined
+        }
         className={cn(
           "mt-2 w-full resize-y rounded-xl border bg-surface-2 p-3.5 text-base leading-relaxed text-fg placeholder:text-subtle focus:outline-none sm:text-[0.9375rem]",
           error

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import {
   containsOwnershipCode,
   handleFromUrl,
+  normaliseChannelUrl,
   newOwnershipCode,
   parseChannelUrl,
 } from "@/lib/channel-url";
@@ -109,7 +110,9 @@ export async function lookupChannel(url: string): Promise<LookupResult> {
       subscribersHidden: false,
       ageYears: 0,
       country: null,
-      canonicalUrl: url.trim(),
+      // Normalised, not echoed. The listing schema refuses a link with no
+      // scheme, and that error had no rendered home.
+      canonicalUrl: normaliseChannelUrl(url) ?? url.trim(),
       manual: true,
     };
   }

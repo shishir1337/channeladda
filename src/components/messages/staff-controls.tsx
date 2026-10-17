@@ -1,5 +1,6 @@
 "use client";
 
+import { LoaderCircleIcon, ShieldCheckIcon } from "lucide-react";
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -50,18 +51,19 @@ export function StaffControls({
   }
 
   return (
-    <div className="rounded-panel border border-line bg-surface-2 p-4">
-      <p className="text-xs font-semibold tracking-[0.14em] text-subtle uppercase">
+    <div className="rounded-panel border border-line bg-surface-2 p-4 sm:p-5">
+      <p className="flex items-center gap-2 font-mono text-[0.625rem] font-semibold tracking-[0.14em] text-subtle uppercase">
+        <ShieldCheckIcon aria-hidden="true" className="size-3.5" />
         Staff controls
       </p>
 
-      <p className="mt-2 text-sm text-muted">
+      <p className="mt-2.5 text-sm leading-relaxed text-muted">
         {claimedBy
           ? `${claimedBy} is handling this conversation.`
           : "Nobody has picked this up yet."}
       </p>
 
-      <div className="mt-3 flex flex-wrap gap-2">
+      <div className="mt-3.5 flex flex-wrap gap-2">
         {claimedBy ? null : (
           <Button
             type="button"
@@ -69,6 +71,12 @@ export function StaffControls({
             disabled={pending}
             onClick={() => run(() => claimThread(conversationId))}
           >
+            {pending ? (
+              <LoaderCircleIcon
+                aria-hidden="true"
+                className="size-4 animate-spin"
+              />
+            ) : null}
             Take this one
           </Button>
         )}
@@ -97,15 +105,15 @@ export function StaffControls({
       </div>
 
       {error ? (
-        <p role="alert" className="mt-2.5 text-xs text-danger">
+        <p role="alert" className="mt-3 text-sm font-medium text-danger">
           {error}
         </p>
       ) : null}
       {note ? (
-        <output className="mt-2.5 block text-xs text-verified">{note}</output>
+        <output className="mt-3 block text-sm text-verified">{note}</output>
       ) : null}
 
-      <p className="mt-3 border-t border-line pt-3 text-xs leading-relaxed text-subtle">
+      <p className="mt-4 border-t border-line pt-3.5 text-xs leading-relaxed text-subtle">
         Anything you send here is signed &ldquo;Channel Adda&rdquo; and both
         sides can read it. Your name is never shown to them.
       </p>

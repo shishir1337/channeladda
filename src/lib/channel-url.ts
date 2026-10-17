@@ -124,6 +124,34 @@ export function parseChannelUrl(input: string): ParsedChannel | null {
 }
 
 /**
+ * The link, with the scheme a seller did not type.
+ *
+ * People paste what their browser shows them, which is routinely
+ * “instagram.com/natgeo”. `parseChannelUrl` accepts that — it prepends the
+ * scheme for its own parsing — but the listing schema refuses anything that
+ * does not start `https://`, so handing the raw string back to the form
+ * produced an error whose key nothing rendered: both buttons did nothing,
+ * for ever, on an ordinary paste.
+ *
+ * A bare `@handle` comes back untouched, because the schema accepts it and
+ * turning it into a URL would be guessing at a platform.
+ */
+export function normaliseChannelUrl(input: string): string | null {
+  const trimmed = input.trim();
+  if (!trimmed) return null;
+  if (trimmed.startsWith("@")) {
+    return parseChannelUrl(trimmed) ? trimmed : null;
+  }
+
+  const url = asUrl(trimmed);
+  if (!url || !parseChannelUrl(trimmed)) return null;
+
+  // Rebuilt from the parsed URL rather than string-prefixed, so a stray
+  // trailing slash or an uppercase host comes back the same every time.
+  return `${url.protocol}//${url.host}${url.pathname.replace(/\/$/, "")}`;
+}
+
+/**
  * The handle a link carries, if it carries one.
  *
  * Separate from `parseChannelUrl` because that answers "how do I look this

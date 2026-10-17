@@ -2,6 +2,7 @@ import { expect, test } from "vitest";
 import {
   handleFromUrl,
   newOwnershipCode,
+  normaliseChannelUrl,
   parseChannelUrl,
 } from "@/lib/channel-url";
 
@@ -166,4 +167,24 @@ test("a link with no handle in it gives nothing rather than a guess", () => {
   expect(handleFromUrl("https://example.com")).toBeNull();
   expect(handleFromUrl("https://youtube.com/c/TechNestDaily")).toBeNull();
   expect(handleFromUrl("not a link")).toBeNull();
+});
+
+test("a link without a scheme is normalised rather than passed through", () => {
+  // Sellers paste what their browser shows them, which is often
+  // "instagram.com/natgeo" with no https://. parseChannelUrl accepts that —
+  // it prepends the scheme for its own parsing — but the value was handed
+  // back to the form raw, where the listing schema refuses anything not
+  // starting https://. The error key had no rendered home, so both buttons
+  // did nothing, for ever, on a very ordinary paste.
+  expect(normaliseChannelUrl("instagram.com/natgeo")).toBe(
+    "https://instagram.com/natgeo",
+  );
+  expect(normaliseChannelUrl("  youtube.com/@mkbhd  ")).toBe(
+    "https://youtube.com/@mkbhd",
+  );
+  expect(normaliseChannelUrl("https://t.me/durov")).toBe("https://t.me/durov");
+  // A bare handle is allowed through untouched: the schema accepts it, and
+  // turning it into a URL would guess at a platform.
+  expect(normaliseChannelUrl("@mkbhd")).toBe("@mkbhd");
+  expect(normaliseChannelUrl("not a link")).toBeNull();
 });

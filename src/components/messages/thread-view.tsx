@@ -4,13 +4,17 @@ import {
   ClockIcon,
   EyeIcon,
   ImageIcon,
+  LoaderCircleIcon,
+  MessageSquareIcon,
   ScissorsIcon,
+  SendIcon,
   ShieldCheckIcon,
   XIcon,
 } from "lucide-react";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { MAX_MESSAGE } from "@/lib/messages";
+import { cn } from "@/lib/utils";
 import { postMessage } from "@/server/actions/messages";
 
 /**
@@ -58,7 +62,7 @@ function expiresIn(iso: string): string | null {
 function Attachment({ message }: { message: ThreadMessageView }) {
   if (message.attachmentRemoved) {
     return (
-      <p className="mt-2.5 flex items-start gap-1.5 border-t border-line pt-2.5 text-xs text-subtle">
+      <p className="mt-2.5 flex items-start gap-1.5 border-t border-line pt-2.5 text-xs leading-relaxed text-subtle">
         <ClockIcon aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" />
         <span>
           An attachment here was removed automatically after 48 hours. Chat is
@@ -122,14 +126,14 @@ function Bubble({ message }: { message: ThreadMessageView }) {
     return (
       <li className="flex flex-col items-center">
         <div className="w-full max-w-2xl rounded-panel border border-primary/30 bg-primary-soft p-4">
-          <p className="flex items-center gap-1.5 text-xs font-semibold text-primary-text">
+          <p className="flex flex-wrap items-center gap-1.5 text-xs font-semibold text-primary-text">
             <ShieldCheckIcon aria-hidden="true" className="size-3.5" />
             Channel Adda
             <span className="ml-auto font-normal text-subtle">
               {when(message.createdAt)}
             </span>
           </p>
-          <p className="mt-1.5 text-sm leading-relaxed whitespace-pre-wrap text-fg">
+          <p className="mt-2 text-sm leading-relaxed whitespace-pre-wrap text-fg">
             {message.body}
           </p>
         </div>
@@ -139,42 +143,60 @@ function Bubble({ message }: { message: ThreadMessageView }) {
 
   return (
     <li className={message.mine ? "flex justify-end" : "flex justify-start"}>
-      <div className="max-w-[min(34rem,85%)]">
-        <p
-          className={`flex items-baseline gap-2 text-xs text-subtle ${
-            message.mine ? "justify-end" : ""
-          }`}
-        >
-          <span className="font-medium text-muted">
-            {message.mine ? "You" : message.senderName}
+      <div
+        className={cn(
+          "flex max-w-[min(34rem,92%)] gap-2.5",
+          message.mine && "flex-row-reverse",
+        )}
+      >
+        {!message.mine ? (
+          <span
+            aria-hidden="true"
+            className="mt-6 grid size-8 shrink-0 place-items-center rounded-full bg-surface-2 text-xs font-semibold text-muted"
+          >
+            {message.senderName.trim().charAt(0).toUpperCase()}
           </span>
-          <span>{when(message.createdAt)}</span>
-        </p>
-        <div
-          className={`mt-1 rounded-panel border p-3.5 ${
-            message.mine
-              ? "border-primary/25 bg-primary-soft"
-              : "border-line bg-surface"
-          }`}
-        >
-          {message.body ? (
-            <p className="text-sm leading-relaxed whitespace-pre-wrap text-fg">
-              {message.body}
-            </p>
-          ) : null}
-          <Attachment message={message} />
-          {message.redactedKinds ? (
-            <p className="mt-2.5 flex items-start gap-1.5 border-t border-line pt-2.5 text-xs text-subtle">
-              <ScissorsIcon
-                aria-hidden="true"
-                className="mt-0.5 size-3.5 shrink-0"
-              />
-              <span>
-                {message.redactedKinds} removed. Deals stay on Channel Adda so
-                we can stand behind them.
-              </span>
-            </p>
-          ) : null}
+        ) : null}
+
+        <div className="min-w-0">
+          <p
+            className={cn(
+              "flex items-baseline gap-2 text-xs text-subtle",
+              message.mine && "justify-end",
+            )}
+          >
+            <span className="font-medium text-muted">
+              {message.mine ? "You" : message.senderName}
+            </span>
+            <span>{when(message.createdAt)}</span>
+          </p>
+          <div
+            className={cn(
+              "mt-1 border p-3.5",
+              message.mine
+                ? "rounded-panel rounded-tr-md border-primary/25 bg-primary-soft"
+                : "rounded-panel rounded-tl-md border-line bg-surface",
+            )}
+          >
+            {message.body ? (
+              <p className="text-sm leading-relaxed whitespace-pre-wrap text-fg">
+                {message.body}
+              </p>
+            ) : null}
+            <Attachment message={message} />
+            {message.redactedKinds ? (
+              <p className="mt-2.5 flex items-start gap-1.5 border-t border-line pt-2.5 text-xs leading-relaxed text-subtle">
+                <ScissorsIcon
+                  aria-hidden="true"
+                  className="mt-0.5 size-3.5 shrink-0"
+                />
+                <span>
+                  {message.redactedKinds} removed. Deals stay on Channel Adda so
+                  we can stand behind them.
+                </span>
+              </p>
+            ) : null}
+          </div>
         </div>
       </div>
     </li>
@@ -216,6 +238,7 @@ export function ThreadView({
   }, []);
 
   const over = draft.length > MAX_MESSAGE;
+  const left = MAX_MESSAGE - draft.length;
 
   function send() {
     const body = draft.trim();
@@ -280,21 +303,32 @@ export function ThreadView({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <p className="flex items-start gap-2 rounded-panel border border-line bg-surface-2 px-3.5 py-2.5 text-xs leading-relaxed text-muted">
-        <EyeIcon aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" />
+      <p className="flex items-start gap-2.5 rounded-card border border-line bg-surface-2 px-3.5 py-3 text-xs leading-relaxed text-muted">
+        <EyeIcon aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
         <span>
-          Channel Adda can read this conversation and will step in if something
-          goes wrong. Phone numbers, emails and links are removed automatically.
-          Photos and clips are deleted after 48 hours, and a thread with no deal
-          on it clears after 10 days.
+          <strong className="font-semibold text-fg">
+            Channel Adda can read this conversation
+          </strong>{" "}
+          and will step in if something goes wrong. Phone numbers, emails and
+          links are removed automatically. Photos and clips are deleted after 48
+          hours, and a thread with no deal on it clears after 10 days.
         </span>
       </p>
 
       {messages.length === 0 ? (
-        <p className="mt-4 rounded-panel border border-dashed border-line bg-surface p-8 text-center text-sm text-muted">
-          No messages yet. Ask {otherSide} whatever you need to know before you
-          commit.
-        </p>
+        <div className="mt-4 flex flex-col items-center rounded-panel border border-dashed border-line-strong bg-surface px-6 py-12 text-center">
+          <span className="flex size-11 items-center justify-center rounded-2xl bg-surface-2 text-subtle">
+            <MessageSquareIcon aria-hidden="true" className="size-5" />
+          </span>
+          <p className="mt-3.5 font-display text-[0.9375rem] font-bold text-fg">
+            No messages yet
+          </p>
+          <p className="mx-auto mt-1.5 max-w-[46ch] text-sm leading-relaxed text-muted">
+            Ask {otherSide} whatever you need to know before you commit —
+            revenue, where the traffic comes from, strikes, why they are
+            selling.
+          </p>
+        </div>
       ) : (
         <ul className="mt-4 flex flex-col gap-4">
           {messages.map((message) => (
@@ -305,11 +339,17 @@ export function ThreadView({
       <div ref={endRef} />
 
       {closed ? (
-        <p className="mt-6 rounded-panel border border-line bg-surface-2 p-4 text-sm text-muted">
-          Channel Adda closed this conversation. Nothing further can be sent.
+        <p className="mt-6 flex items-start gap-2.5 rounded-panel border border-line bg-surface-2 p-4 text-sm leading-relaxed text-muted">
+          <ShieldCheckIcon
+            aria-hidden="true"
+            className="mt-0.5 size-4 shrink-0"
+          />
+          <span>
+            Channel Adda closed this conversation. Nothing further can be sent.
+          </span>
         </p>
       ) : (
-        <div className="mt-6">
+        <div className="mt-6 rounded-panel border border-line bg-surface p-3.5 focus-within:border-primary/50 sm:p-4">
           <label htmlFor="composer" className="sr-only">
             Write a message
           </label>
@@ -325,19 +365,9 @@ export function ThreadView({
               }
             }}
             placeholder="Ask about revenue, traffic sources, strikes…"
-            className="w-full resize-y rounded-panel border border-line bg-surface p-3.5 text-sm text-fg placeholder:text-subtle focus:border-primary/60 focus:outline-none"
+            aria-invalid={over}
+            className="w-full resize-y bg-transparent text-base leading-relaxed text-fg placeholder:text-subtle focus:outline-none sm:text-[0.9375rem]"
           />
-
-          {error ? (
-            <p role="alert" className="mt-2 text-xs text-danger">
-              {error}
-            </p>
-          ) : null}
-          {note ? (
-            <output className="mt-2 block text-xs text-primary-text">
-              {note}
-            </output>
-          ) : null}
 
           {attachment ? (
             <div className="mt-2.5 flex items-center gap-3 rounded-card border border-line bg-surface-2 p-2.5">
@@ -345,10 +375,10 @@ export function ThreadView({
                 <img
                   src={attachment.url}
                   alt=""
-                  className="size-12 rounded object-cover"
+                  className="size-12 rounded-lg object-cover"
                 />
               ) : (
-                <span className="flex size-12 items-center justify-center rounded bg-surface text-xs text-muted">
+                <span className="flex size-12 items-center justify-center rounded-lg bg-surface text-xs text-muted">
                   clip
                 </span>
               )}
@@ -368,15 +398,15 @@ export function ThreadView({
                   setAttachment(null);
                 }}
                 aria-label="Remove attachment"
-                className="cursor-pointer rounded p-1 text-subtle transition-colors duration-200 hover:text-fg"
+                className="inline-flex size-9 cursor-pointer items-center justify-center rounded-lg text-subtle transition-colors duration-200 hover:bg-surface hover:text-fg"
               >
                 <XIcon aria-hidden="true" className="size-4" />
               </button>
             </div>
           ) : null}
 
-          <div className="mt-2.5 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-3">
+            <div className="flex min-w-0 items-center gap-3">
               <input
                 ref={fileRef}
                 type="file"
@@ -395,13 +425,27 @@ export function ThreadView({
                 disabled={uploading || pending || attachment !== null}
                 onClick={() => fileRef.current?.click()}
               >
-                <ImageIcon aria-hidden="true" className="size-4" />
+                {uploading ? (
+                  <LoaderCircleIcon
+                    aria-hidden="true"
+                    className="size-4 animate-spin"
+                  />
+                ) : (
+                  <ImageIcon aria-hidden="true" className="size-4" />
+                )}
                 {uploading ? "Attaching…" : "Photo or clip"}
               </Button>
-              <p className="text-xs text-subtle">
+              <p
+                className={cn(
+                  "min-w-0 text-xs",
+                  over ? "font-medium text-danger" : "text-subtle",
+                )}
+              >
                 {over
                   ? `${(draft.length - MAX_MESSAGE).toLocaleString("en-US")} characters too many`
-                  : "Up to 25MB"}
+                  : left < 400
+                    ? `${left.toLocaleString("en-US")} characters left`
+                    : "Up to 25MB"}
               </p>
             </div>
             <Button
@@ -415,9 +459,28 @@ export function ThreadView({
               }
               onClick={send}
             >
+              {pending ? (
+                <LoaderCircleIcon
+                  aria-hidden="true"
+                  className="size-4 animate-spin"
+                />
+              ) : (
+                <SendIcon aria-hidden="true" className="size-4" />
+              )}
               {pending ? "Sending…" : "Send"}
             </Button>
           </div>
+
+          {error ? (
+            <p role="alert" className="mt-2.5 text-sm font-medium text-danger">
+              {error}
+            </p>
+          ) : null}
+          {note ? (
+            <output className="mt-2.5 block text-xs leading-relaxed text-primary-text">
+              {note}
+            </output>
+          ) : null}
         </div>
       )}
     </div>
