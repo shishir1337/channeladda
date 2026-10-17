@@ -15,8 +15,8 @@ import { requireRole } from "@/server/session";
  *    not access control.
  * 2. Every action writes an audit row naming the actor. A moderation decision
  *    that nobody can be held to is not a decision.
- * 3. Rejecting and removing both demand a reason. The seller sees it, so
- *    "no" without a reason is not an available option.
+ * 3. Rejecting, removing and reopening all demand a reason. The seller sees
+ *    it, so "no" without a reason is not an available option.
  */
 
 export type AdminResult =
@@ -126,4 +126,63 @@ export async function removeListing(
 
   refresh(id);
   return { ok: true, message: "Taken down." };
+}
+
+/**
+ * Undoing a takedown, as far as the review queue. The audit row is written by
+ * the repository function itself — see the note above `reopenListing`.
+ */
+export async function reopenListing(
+  id: string,
+  reason: string,
+): Promise<AdminResult> {
+  const actor = await requireRole("MODERATOR");
+
+  const result = await repo.reopenListing(id, actor.id, reason);
+  if (!result.ok) {
+    if (result.reason === "reason-too-short") {
+      return {
+        ok: false,
+        error:
+          "Say why it is coming back — the seller sees this, and it is the record.",
+      };
+    }
+    if (result.reason === "seller-suspended") {
+      return {
+        ok: false,
+        error:
+          "The seller is suspended. Restore their account first, or leave this down.",
+      };
+    }
+    return result.reason === "not-found" ? NOT_FOUND : WRONG_STATUS;
+  }
+
+  refresh(id);
+  return { ok: true, message: "Sent back to the review queue." };
+}
+
+export async function setListingFeatured(
+  id: string,
+  featured: boolean,
+): Promise<AdminResult> {
+  const actor = await requireRole("MODERATOR");
+
+  const result = await repo.setListingFeatured(id, actor.id, featured);
+  if (!result.ok) {
+    if (result.reason === "wrong-status") {
+      return {
+        ok: false,
+        error: "Only a live listing can be featured. Reload the page.",
+      };
+    }
+    return NOT_FOUND;
+  }
+
+  refresh(id);
+  return {
+    ok: true,
+    message: featured
+      ? "Featured. It leads the homepage showcase now."
+      : "No longer featured.",
+  };
 }

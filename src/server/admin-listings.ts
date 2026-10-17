@@ -2,8 +2,9 @@ import "server-only";
 
 import type { ListingStatus } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
-import { notify } from "@/server/notifications";
 import { fromCents, fromEngagementBp } from "@/lib/listing-form";
+import { recordAudit } from "@/server/audit";
+import { notify } from "@/server/notifications";
 
 /**
  * The moderation side of listings.
@@ -19,16 +20,37 @@ export type QueueCounts = {
   awaitingCode: number;
   live: number;
   rejected: number;
+  /** In a running deal. */
+  reserved: number;
+  /** Hidden by the seller, or by a suspension. */
+  paused: number;
+  sold: number;
+  /** Taken down by staff. */
+  removed: number;
 };
 
+/**
+ * One grouped count rather than a query per tab: the staff layout reads this
+ * on every page of the admin area, and the tabs went from four to eight.
+ */
 export async function getQueueCounts(): Promise<QueueCounts> {
-  const [awaitingReview, awaitingCode, live, rejected] = await Promise.all([
-    db.listing.count({ where: { status: "ADMIN_REVIEW" } }),
-    db.listing.count({ where: { status: "CODE_CHECK" } }),
-    db.listing.count({ where: { status: "LIVE" } }),
-    db.listing.count({ where: { status: "REJECTED" } }),
-  ]);
-  return { awaitingReview, awaitingCode, live, rejected };
+  const groups = await db.listing.groupBy({
+    by: ["status"],
+    _count: { _all: true },
+  });
+  const count = (status: ListingStatus) =>
+    groups.find((g) => g.status === status)?._count._all ?? 0;
+
+  return {
+    awaitingReview: count("ADMIN_REVIEW"),
+    awaitingCode: count("CODE_CHECK"),
+    live: count("LIVE"),
+    rejected: count("REJECTED"),
+    reserved: count("RESERVED"),
+    paused: count("PAUSED"),
+    sold: count("SOLD"),
+    removed: count("REMOVED"),
+  };
 }
 
 export type QueueItem = {
@@ -38,11 +60,25 @@ export type QueueItem = {
   platform: string;
   price: number;
   status: ListingStatus;
+  featured: boolean;
   sellerName: string;
   sellerSlug: string | null;
   proofCount: number;
   waitingSince: Date;
 };
+
+/**
+ * The archive views read newest first.
+ *
+ * Somebody opening "Taken down" is nearly always looking for the listing that
+ * came down this morning, and with the hundred-row cap an oldest-first archive
+ * would push exactly that one off the page for good.
+ */
+export const NEWEST_FIRST: readonly ListingStatus[] = [
+  "REMOVED",
+  "SOLD",
+  "PAUSED",
+];
 
 /**
  * Oldest first. A queue worked newest-first leaves the unlucky at the bottom
@@ -60,11 +96,12 @@ export async function getReviewQueue(
       platform: true,
       priceUsd: true,
       status: true,
+      featured: true,
       updatedAt: true,
       seller: { select: { name: true, slug: true } },
       _count: { select: { proofs: true } },
     },
-    orderBy: { updatedAt: "asc" },
+    orderBy: { updatedAt: NEWEST_FIRST.includes(status) ? "desc" : "asc" },
     take: 100,
   });
 
@@ -75,6 +112,7 @@ export async function getReviewQueue(
     platform: row.platform.toLowerCase(),
     price: fromCents(row.priceUsd),
     status: row.status,
+    featured: row.featured,
     sellerName: row.seller.name,
     sellerSlug: row.seller.slug,
     proofCount: row._count.proofs,
@@ -115,6 +153,14 @@ export type ListingForReview = {
   ownershipCode: string | null;
   ownershipVerifiedAt: Date | null;
   rejectionReason: string | null;
+  /** Editorial promotion: the homepage showcase and the Featured badge. */
+  featured: boolean;
+  /**
+   * The seller's WhatsApp, as they gave it on the listing. Staff-only — it is
+   * never rendered to a buyer — and the reason it is collected at all is so a
+   * transfer that stalls can be unstuck by somebody phoning the seller.
+   */
+  whatsapp: string | null;
   createdAt: Date;
   updatedAt: Date;
   seller: {
@@ -156,6 +202,8 @@ export async function getListingForReview(
       ownershipCode: true,
       ownershipVerifiedAt: true,
       rejectionReason: true,
+      featured: true,
+      whatsapp: true,
       createdAt: true,
       updatedAt: true,
       sellerId: true,
@@ -232,6 +280,8 @@ export async function getListingForReview(
     ownershipCode: row.ownershipCode,
     ownershipVerifiedAt: row.ownershipVerifiedAt,
     rejectionReason: row.rejectionReason,
+    featured: row.featured,
+    whatsapp: row.whatsapp,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     seller: {
@@ -421,4 +471,135 @@ export async function removeListing(id: string, reason: string) {
     before: existing.status,
     after: "REMOVED" as const,
   };
+}
+
+/*
+ * The two writes below record their own audit row, unlike the three above,
+ * whose server actions write it. Same rule, different place: the row is
+ * written by whatever does the work, so the work cannot be reached — from a
+ * test, a script, a later caller — without the row coming with it. That is how
+ * `resolveDeal` already does it.
+ */
+
+/**
+ * A listing taken down in error, sent back to the review queue.
+ *
+ * Not straight back to LIVE: putting something in front of buyers is the
+ * approval step's job, with its ownership check and its proof, and a takedown
+ * reversed by one click from the archive would walk around both. In the queue
+ * it is approved or sent back like any other listing.
+ *
+ * The reason is required for the same reason a takedown's is — it is the
+ * record — and the seller hears about it, because a listing that vanished and
+ * quietly reappeared in review is not something they can act on otherwise.
+ */
+export async function reopenListing(
+  id: string,
+  actorId: string,
+  reason: string,
+) {
+  const trimmed = reason.trim();
+  if (trimmed.length < 10) {
+    return { ok: false as const, reason: "reason-too-short" as const };
+  }
+
+  const existing = await db.listing.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      status: true,
+      rejectionReason: true,
+      sellerId: true,
+      seller: { select: { bannedAt: true } },
+    },
+  });
+  if (!existing) return { ok: false as const, reason: "not-found" as const };
+  if (existing.status !== "REMOVED") {
+    return { ok: false as const, reason: "wrong-status" as const };
+  }
+  // A suspended seller's listing in the queue is one approval away from
+  // being on sale while they cannot be reached or paid.
+  if (existing.seller.bannedAt) {
+    return { ok: false as const, reason: "seller-suspended" as const };
+  }
+
+  // Compare-and-set: two moderators reopening at once must not both notify.
+  const moved = await db.listing.updateMany({
+    where: { id, status: "REMOVED" },
+    data: { status: "ADMIN_REVIEW", rejectionReason: null },
+  });
+  if (moved.count !== 1) {
+    return { ok: false as const, reason: "wrong-status" as const };
+  }
+
+  await recordAudit({
+    actorId,
+    action: "listing.reopen",
+    entity: "listing",
+    entityId: id,
+    // The takedown's own reason goes in `before`, because the column it lived
+    // in is cleared here and the trail is now the only place it survives.
+    before: { status: "REMOVED", reason: existing.rejectionReason },
+    after: { status: "ADMIN_REVIEW", reason: trimmed },
+  });
+
+  // The bell, not an email: nothing here waits on the seller, and the
+  // approval or rejection that follows sends its own.
+  await notify({
+    userId: existing.sellerId,
+    kind: "LISTING",
+    title: "Your listing is being reviewed again",
+    body: trimmed,
+    href: `/dashboard/listings/${id}`,
+  });
+
+  return {
+    ok: true as const,
+    before: "REMOVED" as const,
+    after: "ADMIN_REVIEW" as const,
+  };
+}
+
+/**
+ * The homepage showcase.
+ *
+ * Live listings only, in both directions. Featuring anything else would
+ * promote what no buyer can open; and the showcase only ever reads live
+ * listings, so a flag left on a listing that has since sold or come down
+ * changes nothing anybody sees.
+ */
+export async function setListingFeatured(
+  id: string,
+  actorId: string,
+  featured: boolean,
+) {
+  const moved = await db.listing.updateMany({
+    where: { id, status: "LIVE", featured: !featured },
+    data: { featured },
+  });
+
+  if (moved.count !== 1) {
+    const existing = await db.listing.findUnique({
+      where: { id },
+      select: { status: true, featured: true },
+    });
+    if (!existing) return { ok: false as const, reason: "not-found" as const };
+    if (existing.status !== "LIVE") {
+      return { ok: false as const, reason: "wrong-status" as const };
+    }
+    // Already as asked — a double click, or a colleague got there first.
+    // Nothing changed, so nothing is written to the trail either.
+    return { ok: true as const, changed: false as const, featured };
+  }
+
+  await recordAudit({
+    actorId,
+    action: featured ? "listing.feature" : "listing.unfeature",
+    entity: "listing",
+    entityId: id,
+    before: { featured: !featured },
+    after: { featured },
+  });
+
+  return { ok: true as const, changed: true as const, featured };
 }

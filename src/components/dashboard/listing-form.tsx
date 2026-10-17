@@ -98,6 +98,9 @@ function money(value: number) {
   });
 }
 
+/** The schema's own `.max(8)` on proofs, which is the limit that counts. */
+const MAX_PROOFS = 8;
+
 /** Anchor ids for the sections. Static: there is one of this form per page. */
 const STEP = {
   basics: "step-basics",
@@ -1057,12 +1060,16 @@ export function ListingForm({
                   "Needed to publish"
                 )}
               </Badge>
+              {/* The error renders inside the uploader, beside the control it
+                  is about and wired to it with aria-describedby — the same
+                  home it had a few lines below, moved, not dropped. */}
               <ImageUpload
                 kind="cover"
                 label="Cover image"
                 hint="Wide. A channel banner or a screenshot of the feed works well."
                 value={draft.coverUrl}
                 onChange={(url) => set("coverUrl", url)}
+                error={errors.coverUrl}
               />
             </div>
             <div className="relative">
@@ -1086,19 +1093,10 @@ export function ListingForm({
                 hint="Square. The account's own avatar."
                 value={draft.avatarUrl}
                 onChange={(url) => set("avatarUrl", url)}
+                error={errors.avatarUrl}
               />
             </div>
           </div>
-          {errors.coverUrl ? (
-            <p role="alert" className="text-sm text-danger">
-              {errors.coverUrl}
-            </p>
-          ) : null}
-          {errors.avatarUrl ? (
-            <p role="alert" className="text-sm text-danger">
-              {errors.avatarUrl}
-            </p>
-          ) : null}
         </FormSection>
 
         <FormSection
@@ -1114,7 +1112,8 @@ export function ListingForm({
           <div className="flex items-center justify-between gap-3">
             <p className="text-sm font-medium text-fg">
               Screenshots added:{" "}
-              <span className="tnum">{draft.proofs.length}</span> of 8
+              <span className="tnum">{draft.proofs.length}</span> of{" "}
+              {MAX_PROOFS}
             </p>
             {draft.proofs.length > 0 && !captionsDone ? (
               <Badge variant="primary" size="md">
@@ -1232,28 +1231,41 @@ export function ListingForm({
             </p>
           )}
 
-          {draft.proofs.length < 8 ? (
+          {draft.proofs.length < MAX_PROOFS ? (
             <ImageUpload
               kind="proof"
+              multiple
+              maxFiles={MAX_PROOFS - draft.proofs.length}
               label={
                 draft.proofs.length === 0
-                  ? "Add a screenshot"
-                  : "Add another screenshot"
+                  ? "Add screenshots"
+                  : "Add more screenshots"
               }
-              hint={`Up to eight. ${8 - draft.proofs.length} slot${
-                8 - draft.proofs.length === 1 ? "" : "s"
-              } left.`}
+              hint={`Pick several at once. Up to eight in all — room for ${
+                MAX_PROOFS - draft.proofs.length
+              } more. Each one needs a caption once it is in.`}
               value={null}
+              // Called once per file, several times from one pick, so it
+              // updates from the current list rather than this render's.
               onChange={(_url, file) => {
                 if (!file) return;
-                edit((d) => ({
-                  ...d,
-                  proofs: [
-                    ...d.proofs,
-                    { url: file.url, label: "", sha256: file.sha256 },
-                  ],
-                }));
+                edit((d) =>
+                  // The cap holds here too, whatever the uploader was told;
+                  // and the same image twice is one screenshot, which also
+                  // keeps the url keys on the list below unique.
+                  d.proofs.length >= MAX_PROOFS ||
+                  d.proofs.some((p) => p.sha256 === file.sha256)
+                    ? d
+                    : {
+                        ...d,
+                        proofs: [
+                          ...d.proofs,
+                          { url: file.url, label: "", sha256: file.sha256 },
+                        ],
+                      },
+                );
               }}
+              error={errors.proofs}
             />
           ) : (
             <p className="flex items-center gap-2 text-sm text-subtle">
@@ -1262,7 +1274,9 @@ export function ListingForm({
             </p>
           )}
 
-          {errors.proofs ? (
+          {/* The uploader renders `errors.proofs` while it is on screen. At
+              the cap it is not, and the message still needs somewhere to go. */}
+          {errors.proofs && draft.proofs.length >= MAX_PROOFS ? (
             <p role="alert" className="text-sm text-danger">
               {errors.proofs}
             </p>

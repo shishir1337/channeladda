@@ -19,6 +19,12 @@ import {
  * The code being on the profile is what ties a real account to a Channel Adda
  * seller. Nobody but the account owner can put it there, which is the whole
  * point — the seller's word is not evidence, but their bio is.
+ *
+ * @deprecated Folded into `OwnershipPanel` in `ownership-check.tsx`, which
+ * shows the code once, says where it goes on the listing's own platform, and
+ * carries this panel's "send for review" and "back to draft" buttons. Still
+ * exported only because the seller listing page renders it until it switches
+ * over; delete it, and `OwnershipCheck`, in that same change.
  */
 export function OwnershipStep({
   listingId,

@@ -16,6 +16,28 @@ import { db } from "@/lib/db";
  * order has since gone is left out rather than crashing the page.
  */
 
+/**
+ * The words somebody typed, if this audit row carries any.
+ *
+ * `resolveDeal` writes the note a person gave for pausing or ending a deal into
+ * `after.note`, and listing decisions write theirs into `after.reason`. Nothing
+ * read either back, so a dispute reached the staff desk as "raised a dispute"
+ * and nobody could see why. `after` is JSON written by many callers over the
+ * years, so this reads it defensively: a row without a note is "no note", never
+ * a crash on the page that is trying to decide the dispute.
+ */
+export function noteFrom(after: unknown): string | null {
+  if (typeof after !== "object" || after === null || Array.isArray(after)) {
+    return null;
+  }
+  const fields = after as Record<string, unknown>;
+  for (const key of ["note", "reason"]) {
+    const value = fields[key];
+    if (typeof value === "string" && value.trim() !== "") return value.trim();
+  }
+  return null;
+}
+
 export type DealActivityRow = {
   id: string;
   action: string;
@@ -27,6 +49,8 @@ export type DealActivityRow = {
   listingTitle: string;
   /** What the buyer owes the platform on this deal, in cents. */
   amountUsd: number;
+  /** What the actor wrote when they did this, if they wrote anything. */
+  note: string | null;
 };
 
 export async function listDealActivity(
@@ -41,6 +65,7 @@ export async function listDealActivity(
       action: true,
       createdAt: true,
       entityId: true,
+      after: true,
       actor: { select: { name: true } },
     },
   });
@@ -73,6 +98,7 @@ export async function listDealActivity(
         orderStatus: order.status,
         listingTitle: order.listing.title,
         amountUsd: order.totalUsd,
+        note: noteFrom(entry.after),
       },
     ];
   });

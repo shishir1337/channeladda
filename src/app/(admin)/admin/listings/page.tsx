@@ -1,4 +1,4 @@
-import { ImageIcon, TriangleAlertIcon } from "lucide-react";
+import { ImageIcon, StarIcon, TriangleAlertIcon } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import {
@@ -18,7 +18,12 @@ import {
 } from "@/components/admin/vocab";
 import { Price } from "@/components/ui/price";
 import type { ListingStatus } from "@/generated/prisma/enums";
-import { getQueueCounts, getReviewQueue } from "@/server/admin-listings";
+import {
+  getQueueCounts,
+  getReviewQueue,
+  NEWEST_FIRST,
+  type QueueCounts,
+} from "@/server/admin-listings";
 import { requireStaff } from "@/server/session";
 
 export const metadata: Metadata = {
@@ -26,12 +31,24 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-const TABS: { label: string; status: ListingStatus; key: string }[] = [
-  { label: "For review", status: "ADMIN_REVIEW", key: "awaitingReview" },
-  { label: "Placing code", status: "CODE_CHECK", key: "awaitingCode" },
-  { label: "Live", status: "LIVE", key: "live" },
-  { label: "Sent back", status: "REJECTED", key: "rejected" },
-];
+/**
+ * Every status a listing can sit in once its seller has let go of it.
+ *
+ * There used to be four. A listing taken down, paused, sold or in a deal was
+ * on none of them, so the only way to find one was to already know its id —
+ * which is how a takedown made in error became permanent.
+ */
+const TABS: { label: string; status: ListingStatus; key: keyof QueueCounts }[] =
+  [
+    { label: "For review", status: "ADMIN_REVIEW", key: "awaitingReview" },
+    { label: "Placing code", status: "CODE_CHECK", key: "awaitingCode" },
+    { label: "Live", status: "LIVE", key: "live" },
+    { label: "In a deal", status: "RESERVED", key: "reserved" },
+    { label: "Paused", status: "PAUSED", key: "paused" },
+    { label: "Sent back", status: "REJECTED", key: "rejected" },
+    { label: "Taken down", status: "REMOVED", key: "removed" },
+    { label: "Sold", status: "SOLD", key: "sold" },
+  ];
 
 /** Hours a listing may sit in review before the row is marked. */
 const WARN_AFTER = 12;
@@ -101,7 +118,7 @@ export default async function AdminListingsPage({
                   : `/admin/listings?status=${tab.status}`
               }
               active={tab.status === active}
-              count={counts[tab.key as keyof typeof counts]}
+              count={counts[tab.key]}
             >
               {tab.label}
             </FilterLink>
@@ -116,7 +133,9 @@ export default async function AdminListingsPage({
         tone={reviewing && queue.length > 0 ? "primary" : "neutral"}
         description={
           queue.length === 100
-            ? "Showing the 100 oldest. Clear some and the rest will appear."
+            ? NEWEST_FIRST.includes(active)
+              ? "Showing the 100 most recently changed."
+              : "Showing the 100 oldest. Clear some and the rest will appear."
             : LISTING_STATUS[active].note
         }
       >
@@ -161,6 +180,15 @@ export default async function AdminListingsPage({
                         <span className="text-[0.6875rem] text-subtle capitalize">
                           {item.platform}
                         </span>
+                        {item.featured && item.status === "LIVE" ? (
+                          <span className="inline-flex items-center gap-1 text-[0.6875rem] font-semibold text-primary-text">
+                            <StarIcon
+                              aria-hidden="true"
+                              className="size-3 fill-current"
+                            />
+                            featured
+                          </span>
+                        ) : null}
                         {item.proofCount === 0 ? (
                           <span className="inline-flex items-center gap-1 rounded-full border border-danger/30 bg-danger-soft px-1.5 py-0.5 text-[0.625rem] font-semibold text-danger">
                             <TriangleAlertIcon

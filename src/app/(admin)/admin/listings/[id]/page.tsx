@@ -3,6 +3,7 @@ import {
   ExternalLinkIcon,
   FingerprintIcon,
   ImageIcon,
+  StarIcon,
   TriangleAlertIcon,
 } from "lucide-react";
 import type { Metadata } from "next";
@@ -10,8 +11,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 import { Fact, Facts, Panel } from "@/components/admin/console";
+import { WhatsAppContact } from "@/components/admin/dispute-contact";
 import {
+  FeatureListing,
   RemoveListing,
+  ReopenListing,
   ReviewDecision,
 } from "@/components/admin/review-decision";
 import { auditLabel, ListingStatusTag, Waited } from "@/components/admin/vocab";
@@ -36,7 +40,7 @@ function SubHeading({ children }: { children: ReactNode }) {
 export default async function ReviewListingPage({
   params,
 }: PageProps<"/admin/listings/[id]">) {
-  await requireStaff();
+  const staff = await requireStaff();
   const { id } = await params;
 
   const listing = await getListingForReview(id);
@@ -46,6 +50,11 @@ export default async function ReviewListingPage({
   const platform = platforms.find((p) => p.id === listing.platform);
   const duplicates = listing.proofs.filter((p) => p.alsoUsedOn.length > 0);
   const inReview = listing.status === "ADMIN_REVIEW";
+  // Every decision on this page is `requireRole("MODERATOR")` on the server,
+  // which SUPERADMIN also passes. Finance can read the page — the guard above
+  // is `requireStaff` — but a button that can only ever be refused is not a
+  // control, so the decisions are drawn for the people who can make them.
+  const canModerate = staff.role === "MODERATOR" || staff.role === "SUPERADMIN";
 
   const facts: [string, ReactNode][] = [
     [
@@ -79,6 +88,12 @@ export default async function ReviewListingPage({
               <Badge className="capitalize">
                 {platform?.name ?? listing.platform}
               </Badge>
+              {listing.featured ? (
+                <Badge variant="primary">
+                  <StarIcon aria-hidden="true" />
+                  Featured
+                </Badge>
+              ) : null}
               {inReview ? (
                 <Waited
                   since={listing.updatedAt}
@@ -257,7 +272,9 @@ export default async function ReviewListingPage({
             )}
           </Panel>
 
-          {inReview ? <ReviewDecision listingId={listing.id} /> : null}
+          {inReview && canModerate ? (
+            <ReviewDecision listingId={listing.id} />
+          ) : null}
 
           {listing.status === "REJECTED" && listing.rejectionReason ? (
             <Panel>
@@ -268,8 +285,49 @@ export default async function ReviewListingPage({
             </Panel>
           ) : null}
 
-          {listing.status === "LIVE" || listing.status === "PAUSED" ? (
+          {listing.status === "REMOVED" ? (
+            <Panel tone="danger">
+              <SubHeading>Taken down</SubHeading>
+              <p className="mt-2 text-sm leading-relaxed text-fg">
+                {listing.rejectionReason ?? (
+                  <span className="text-muted">
+                    No reason is on the listing. The history panel has who took
+                    it down and when.
+                  </span>
+                )}
+              </p>
+              <p className="mt-2 text-xs leading-relaxed text-muted">
+                Hidden from buyers and locked for the seller, who cannot edit or
+                resubmit it. Only staff can bring it back.
+              </p>
+            </Panel>
+          ) : null}
+
+          {listing.status === "LIVE" && canModerate ? (
+            <FeatureListing
+              listingId={listing.id}
+              featured={listing.featured}
+            />
+          ) : null}
+
+          {(listing.status === "LIVE" || listing.status === "PAUSED") &&
+          canModerate ? (
             <RemoveListing listingId={listing.id} />
+          ) : null}
+
+          {listing.status === "REMOVED" && canModerate ? (
+            <ReopenListing listingId={listing.id} />
+          ) : null}
+
+          {!canModerate &&
+          (inReview ||
+            listing.status === "LIVE" ||
+            listing.status === "PAUSED" ||
+            listing.status === "REMOVED") ? (
+            <p className="text-sm text-subtle">
+              Listing decisions are made by moderators. Everything they see is
+              on this page.
+            </p>
           ) : null}
         </div>
 
@@ -292,6 +350,17 @@ export default async function ReviewListingPage({
               <div>
                 <dt className="text-xs text-subtle">Email</dt>
                 <dd className="truncate text-fg">{listing.seller.email}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-subtle">
+                  WhatsApp <span className="text-subtle/80">· staff only</span>
+                </dt>
+                <dd>
+                  <WhatsAppContact
+                    number={listing.whatsapp}
+                    name={listing.seller.name}
+                  />
+                </dd>
               </div>
               <div>
                 <dt className="text-xs text-subtle">Identity check</dt>

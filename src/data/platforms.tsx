@@ -36,6 +36,26 @@ export type Platform = {
   holdDays: number;
   /** Buyer-facing handover checklist shown on every listing for this platform. */
   transferSteps: string[];
+  /**
+   * Where a seller puts the ownership code on this platform, in their words.
+   *
+   * The code proves control because only the owner can edit the place it
+   * goes, and that place is different everywhere: a YouTube description, an
+   * Instagram bio, a Telegram channel's info. One set of YouTube Studio
+   * instructions shown to every seller sent the other four looking for a
+   * Customisation tab that does not exist.
+   */
+  ownershipCheck: {
+    /** The spot itself, read after "put it in": "your channel description". */
+    place: string;
+    /** Seller-facing, in order, from opening the app to saving. */
+    steps: string[];
+    /**
+     * We can read the code back ourselves. Only YouTube has a public API for
+     * it; everywhere else a moderator opens the account and looks.
+     */
+    automatic: boolean;
+  };
 };
 
 export const platforms: Platform[] = [
@@ -61,6 +81,14 @@ export const platforms: Platform[] = [
       "You change the recovery email and phone, then enable 2FA",
       "Seller is removed from the channel permissions entirely",
     ],
+    ownershipCheck: {
+      place: "your channel description",
+      steps: [
+        "Open YouTube Studio, then Customisation and Basic info.",
+        "Paste the code anywhere in the description and press Publish.",
+      ],
+      automatic: true,
+    },
   },
   {
     id: "instagram",
@@ -84,6 +112,14 @@ export const platforms: Platform[] = [
       "You enable two-factor authentication",
       "Seller confirms the page is detached from their Meta account",
     ],
+    ownershipCheck: {
+      place: "the page’s bio",
+      steps: [
+        "Open Instagram on the page you are selling and tap Edit profile.",
+        "Paste the code anywhere in the bio and save.",
+      ],
+      automatic: false,
+    },
   },
   {
     id: "facebook",
@@ -107,6 +143,14 @@ export const platforms: Platform[] = [
       "Seller removes themselves from the Page",
       "Page is detached from the seller’s Business Manager",
     ],
+    ownershipCheck: {
+      place: "the Page’s bio",
+      steps: [
+        "Switch into the Page you are selling and open Edit details, or the bio in its Intro.",
+        "Paste the code anywhere in the bio and save.",
+      ],
+      automatic: false,
+    },
   },
   {
     id: "telegram",
@@ -130,6 +174,14 @@ export const platforms: Platform[] = [
       "You verify you are the sole remaining owner",
       "Seller leaves the channel",
     ],
+    ownershipCheck: {
+      place: "the channel description",
+      steps: [
+        "Open the channel, tap its name at the top, then Edit.",
+        "Paste the code anywhere in the description and save.",
+      ],
+      automatic: false,
+    },
   },
   {
     id: "website",
@@ -153,6 +205,14 @@ export const platforms: Platform[] = [
       "Analytics and Search Console properties are handed over",
       "You connect your own AdSense or ad network",
     ],
+    ownershipCheck: {
+      place: "the site’s home page",
+      steps: [
+        "Add the code to the home page where anyone can see it without signing in — the footer is fine.",
+        "Publish the change and check it shows on the live site, not only in your editor.",
+      ],
+      automatic: false,
+    },
   },
 ];
 
