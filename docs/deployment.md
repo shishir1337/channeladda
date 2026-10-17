@@ -250,10 +250,10 @@ hand is the last resort, for money that arrived some other way.
 The sweep re-asks Cryptomus about every unapplied invoice in rotation. It
 gives up on one only when Cryptomus answers **HTTP 404** for it, nothing
 ever called back about it, and it is more than two days old. A timeout,
-an outage or a missing key is never taken as that answer. **Check with
-live credentials** that an unknown invoice really comes back as a 404: if
-Cryptomus answers some other way, such invoices are simply retried for ever
-(harmless, one lookup each per run) rather than given up.
+an outage or a missing key is never taken as that answer. Checked against
+the live API: an unknown invoice comes back as HTTP 404 `Not found`. If
+that ever changes, such invoices are simply retried for ever (harmless,
+one lookup each per run) rather than given up.
 
 ---
 

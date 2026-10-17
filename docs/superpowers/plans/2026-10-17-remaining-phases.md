@@ -101,10 +101,10 @@ deal. Three protections the help centre promised did not exist in code.
   behind the same gate. On Safest it returns the admin fee at most, and
   stays with moderators like every other fee-sized move. Cost if wrong: a
   moderator can return a buyer's fee without finance.
-- **An invoice is given up only on an HTTP 404 from Cryptomus.** Not tested
-  against the live API. If Cryptomus answers an unknown invoice some other
-  way, those invoices are retried for ever — one lookup each per sweep —
-  rather than written off. The safe way to be wrong.
+- **An invoice is given up only on an HTTP 404 from Cryptomus.** Confirmed
+  against the live API on 2026-10-17: an unknown invoice is a 404 `Not
+  found`. Anything else is retried, one lookup each per sweep, rather than
+  written off.
 - **Suspending a seller pauses their reserved listings too**, and their
   deals carry on for staff to finish. Resume is refused while a deal on the
   listing is still running, so lifting a suspension mid-deal cannot put
@@ -165,7 +165,8 @@ deal. Three protections the help centre promised did not exist in code.
 | `pnpm lint` | clean |
 | `pnpm build` | clean |
 | `scripts/e2e-routes.sh` | 131/131 against the production build: every page, every role, including the team, money and dispute desks and both CSV exports |
-| `pnpm verify:integrations` | database ok; Cryptomus, YouTube, Google and email correctly reported unconfigured; the sweep reported broken only because `CRON_SECRET` is unset on this machine |
+| `pnpm verify:integrations` | database ok; YouTube, Google and email correctly reported unconfigured; the sweep reported broken only because `CRON_SECRET` is unset on this machine |
+| Cryptomus, live keys (2026-10-17) | signed requests accepted; a $1.00 invoice raised and read back by `order_id` (status `check`); an unknown invoice is HTTP 404; every field the code reads exists under the name it reads. Webhook registration fails only because this machine is not a public https origin |
 | Browser | checkout, listing wizard and `/fees` driven by hand in an earlier round; the new desks not yet |
 | Final review | a fresh reviewer read this round's commits; two Important findings fixed with tests (a second payment the sweep confirmed was booked nowhere; a demoted agent kept their deals), two Minor deferred below |
 
@@ -176,10 +177,20 @@ deal. Three protections the help centre promised did not exist in code.
   hardcoded it and was committed; it is out of HEAD but present in the trees
   of ~19 commits from `58a63cf` on. Rewriting history needs a force push and
   is the owner's call before merging.
-- **Nothing has met a live third party.** Cryptomus, Google sign-in, the
-  YouTube API and SMTP are written to their published contracts and tested
-  against fakes. Each needs one real run with the owner's credentials —
-  `pnpm verify:integrations` first, then a £1 invoice end to end.
+- **Cryptomus: the inbound half.** Outbound calls work with the live keys.
+  What has not met the real service is a callback: `verifyWebhookSign` has
+  never checked a signature Cryptomus produced, and no real payment has
+  gone end to end. Both need a public https origin (staging or production)
+  with `NEXT_PUBLIC_SITE_URL` set to it, then Cryptomus's test-webhook call
+  and one small real payment.
+- **The live keys live in `.env.cryptomus`, on purpose not in `.env`.**
+  `next dev` and Vitest both read `.env`; live keys there would make local
+  checkouts and any unmocked test raise real invoices. Load them only for a
+  deliberate check: `set -a; . ./.env.cryptomus; set +a; pnpm
+  verify:integrations`. Production sets them in the host's environment.
+- **Google sign-in, the YouTube API and SMTP have not met a live service.**
+  Written to their published contracts and tested against fakes; each needs
+  one `pnpm verify:integrations` run with the owner's credentials.
 - **A browser pass over the new desks.** They are covered by tests and the
   route sweep (every page, every role), not yet clicked through by hand.
 - **Deferred from the final review (Minor).** The last-superadmin guard is
@@ -193,20 +204,22 @@ deal. Three protections the help centre promised did not exist in code.
 
 | Needs | For | Without it |
 |---|---|---|
-| `CRYPTOMUS_MERCHANT_ID` + `CRYPTOMUS_PAYMENT_KEY` | charging buyers, deposits | finance desk records payments by hand |
+| `CRYPTOMUS_MERCHANT_ID` + `CRYPTOMUS_PAYMENT_KEY` | charging buyers, deposits | received 2026-10-17 and working; still to be set on the production host |
 | `CRON_SECRET` | the sweep | abandoned deals hold listings; offers never expire; media is never purged; orphaned uploads are never collected |
 | Google OAuth client id + secret | "Continue with Google" | password sign-in only |
 | YouTube Data API key | channel autofetch and code verification | the seller types the figures, a moderator checks the channel |
 | An email provider | password reset, verification, 2FA by email | `src/server/mailer.ts` throws; TOTP 2FA still works |
 | Domain-ownership documents | Cryptomus merchant review | the account stays unverified |
 
-Integrations are written against the published contracts and unit-tested, but
-none has been exercised against a live third party, because no credentials
-exist in this environment. In particular the Cryptomus signature is tested
-against vectors derived from the documented algorithm, not against a signature
-Cryptomus produced, and `verifyWebhookSign` round-trips the body through
+Integrations are written against the published contracts and unit-tested.
+Cryptomus's outbound half is now proven with live keys: the request
+signature, slash escaping included, is accepted, and invoice lookups return
+the fields the code reads. `verifyWebhookSign` round-trips the body through
 `JSON.parse`/`JSON.stringify` — correct for the documented format, but it has
-never met a real callback. Both are stated rather than hidden.
+never met a real callback. One live observation: an unpaid invoice reports
+`payment_amount_usd: "0"`, which is harmless because the underpayment check
+only runs once the status is settled. The other integrations have no
+credentials here yet. All of this is stated rather than hidden.
 
 ## Standing rules for this run
 

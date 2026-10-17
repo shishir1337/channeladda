@@ -201,10 +201,10 @@ export type InvoiceState = {
  * invoice paid during an outage must not be written off because the
  * outage lasted longer than the give-up window.
  *
- * Only an HTTP 404 counts as `missing`. Whether Cryptomus also answers a
- * 200 with an error state for an unknown invoice has not been checked
- * against the live API; if it does, that case reads as `unknown`, and the
- * invoice is retried rather than given up — the safe way to be wrong.
+ * Only an HTTP 404 counts as `missing`. Checked against the live API on
+ * 2026-10-17: an unknown `order_id` comes back as HTTP 404 with
+ * `{"message":"Not found","state":1}`. Anything else reads as `unknown`, and
+ * the invoice is retried rather than given up — the safe way to be wrong.
  */
 export type InvoiceLookup =
   | { kind: "found"; invoice: InvoiceState }
