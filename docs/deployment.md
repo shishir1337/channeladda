@@ -22,6 +22,8 @@ Project at `/var/www/channeladda`, running as root (the owner's choice).
 | `CRON_SECRET` | `openssl rand -base64 32` | **abandoned deals hold listings off the market for ever** |
 | `GOOGLE_CLIENT_ID` / `_SECRET` | Google Cloud → Credentials → OAuth client | no "Continue with Google" button |
 | `YOUTUBE_API_KEY` | Google Cloud → YouTube Data API v3 | sellers type their own figures; staff verify codes by eye |
+| `SMTP_HOST` / `_PORT` / `_USER` / `_PASS` | any provider: Resend, Postmark, SES, Mailgun | **password reset silently does nothing** |
+| `MAIL_FROM` | an address the provider has verified | mail is accepted and then dropped |
 
 `BETTER_AUTH_URL` **must be https in production.** `src/lib/auth.ts` sets
 `useSecureCookies` when `NODE_ENV` is production, so a browser drops the
@@ -30,6 +32,22 @@ session cookie on a plain-http origin and sign-in fails with no error anywhere.
 Never put `NODE_ENV=production` in `.env` or the shell. `pnpm install` would
 skip devDependencies and the build would fail on a missing `typescript`.
 `next start` sets it for itself.
+
+### Check them before you trust them
+
+```bash
+pnpm verify:integrations
+```
+
+Every third party is written against its published contract and unit-tested
+against vectors derived from it; none of that proves the credentials in front
+of you work. This raises a $1 Cryptomus invoice and reads it back — the call
+every settlement is confirmed against, so a deal cannot be funded until it
+works — resolves a YouTube channel, opens and authenticates an SMTP
+connection, and checks the OAuth redirect URI and the cron secret.
+
+It writes nothing to the database, and the invoice expires itself unpaid, so
+it is safe to run against production. Run it after any credential change.
 
 ### Generating a database password
 
@@ -249,18 +267,28 @@ rather than shipping.
 
 ---
 
-## 10. Known gap
+## 10. Email
 
-`src/server/mailer.ts` throws in production — no email provider is wired.
-Better Auth catches it, so sign-up and sign-in work and nothing returns a 500,
-but **password reset silently does nothing** and logs "Failed to run
-background task".
+`src/server/mailer.ts` speaks SMTP, which every provider accepts — Resend,
+Postmark, SES, Mailgun, Fastmail, your own Postfix. Set `SMTP_HOST`,
+`SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` and `MAIL_FROM`, then run
+`pnpm verify:integrations`, which opens a connection and authenticates
+without sending anything.
 
-Two-step verification works regardless, because it uses an authenticator app
-rather than email. But until a provider is connected, somebody who loses both
-their password and their backup codes cannot be recovered without a manual
-database change. That is why two-step is pressed on staff rather than forced
-on every buyer.
+Port 465 is TLS from the first byte and 587 starts plain and upgrades; the
+code derives the mode from the port, so it cannot be set backwards. Getting
+that wrong by hand produces a hang rather than an error.
+
+`MAIL_FROM` has to be an address the provider has verified. An unverified
+one is usually accepted at send time and dropped afterwards, which looks
+exactly like working.
+
+**With `SMTP_HOST` unset, `sendMail` throws in production.** Better Auth
+catches it, so sign-up and sign-in still work and nothing returns a 500 — but
+password reset silently does nothing and logs "Failed to run background
+task". Two-step verification is unaffected either way, because it uses an
+authenticator app; but without email, somebody who loses both their password
+and their backup codes needs a manual database change to get back in.
 
 ---
 
