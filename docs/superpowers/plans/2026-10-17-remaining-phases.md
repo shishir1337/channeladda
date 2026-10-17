@@ -97,17 +97,53 @@ deal. Three protections the help centre promised did not exist in code.
   genuine second payment with no invoice is audited and otherwise ignored, for
   finance to handle. Cost if wrong: a rare real duplicate needs a human.
 
+- [x] **A fourth review, of the fix pass itself.** Three Criticals, two of
+      them regressions the fix pass introduced: a `handoverAt` guard that made
+      refunding a Fastest deal impossible in the only state it is reachable
+      from, a `buyerPaidAt` guard that stranded a seller's channel on an
+      unverified buyer claim, and a compare-and-set miss that dropped a cleared
+      payment with no ledger row. Both guards are now routed through a dispute
+      rather than refused outright; the third re-reads and decides.
+- [x] **The dashboards, rebuilt.** Four parallel passes: the deal page, deals
+      and offers lists and messages; the overview, wallet, security and the
+      shell; the selling flow and the listing wizard; and the staff area as an
+      operations console. The activity-feed leak — hidden from agents with
+      CSS, so the whole marketplace's deal history sat in their HTML — is now
+      neither fetched nor rendered for a non-staff viewer.
+- [x] **Email.** `sendMail` speaks SMTP, so password reset, verification and
+      the turn-taking notification can actually leave the building. With no
+      `SMTP_HOST` the behaviour is exactly what it was.
+- [x] **`pnpm verify:integrations`.** One command that proves the credentials
+      in front of you work, rather than that the code matches the contract.
+
 ## Verification, as of the last commit
 
 | Check | Result |
 |---|---|
-| `pnpm test` | 257 passing, 22 files |
+| `pnpm test` | 274 passing, 23 files |
 | `pnpm typecheck` | clean |
 | `pnpm build` | clean |
 | `scripts/e2e-routes.sh` | 89/89, every route as every role |
+| `pnpm verify:integrations` | database ok; four integrations correctly reported unconfigured |
 | Browser | checkout, listing wizard and `/fees` driven by hand |
 
 `pnpm lint` fails repo-wide on CRLF vs Biome's LF and is **not** a gate.
+
+## Still to do
+
+- **Notification rows are rendered nowhere.** They are written on every turn
+  and every ending, and the only thing that reaches a person today is the
+  email. A bell with a list is the other half.
+- **The dev password is in this branch's history.** `scripts/e2e-routes.sh`
+  hardcoded it and was committed; it is out of HEAD but present in the trees
+  of ~19 commits from `58a63cf` on. Rewriting history needs a force push and
+  is the owner's call before merging.
+- **`AGENT` cannot be granted from any screen.** The role picker omits it
+  while the labels define it, so agents can only be minted by
+  `scripts/create-admin.ts`. Left alone deliberately: changing who can be
+  granted what is a decision, not a fix.
+- Eight proof screenshots is eight trips through the file picker;
+  `image-upload.tsx` has no error prop and no multi-select.
 
 ## What needs the owner, and cannot be faked
 
