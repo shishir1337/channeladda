@@ -94,6 +94,7 @@ function Attachment({ message }: { message: ThreadMessageView }) {
           target="_blank"
           rel="noopener noreferrer"
         >
+          {/* biome-ignore lint/performance/noImgElement: private attachment served per viewer; the image optimiser would cache it outside that check */}
           <img
             src={message.attachmentUrl}
             alt="Attachment"
@@ -372,6 +373,7 @@ export function ThreadView({
           {attachment ? (
             <div className="mt-2.5 flex items-center gap-3 rounded-card border border-line bg-surface-2 p-2.5">
               {attachment.kind === "IMAGE" ? (
+                // biome-ignore lint/performance/noImgElement: a local preview of the file being sent, not a served image
                 <img
                   src={attachment.url}
                   alt=""

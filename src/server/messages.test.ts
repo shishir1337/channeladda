@@ -107,7 +107,10 @@ test(
       conversationId: opened.id,
       sender: asUser(buyer.id),
       body: "",
-      attachmentKey: await uploadedBy(buyer.id, `message/${"a".repeat(32)}.png`),
+      attachmentKey: await uploadedBy(
+        buyer.id,
+        `message/${"a".repeat(32)}.png`,
+      ),
     });
     expect(result.ok).toBe(true);
 
@@ -122,7 +125,7 @@ test(
     // delete what people already sent.
     expect(latest.attachmentExpiresAt).not.toBeNull();
     const hours =
-      (latest.attachmentExpiresAt!.getTime() - Date.now()) / 3_600_000;
+      ((latest.attachmentExpiresAt?.getTime() ?? 0) - Date.now()) / 3_600_000;
     expect(hours).toBeGreaterThan(47);
     expect(hours).toBeLessThan(49);
   }),
@@ -164,7 +167,10 @@ test(
       conversationId: opened.id,
       sender: asUser(buyer.id),
       body: "here it is, whatsapp me on +1 555 0100",
-      attachmentKey: await uploadedBy(buyer.id, `message/${"b".repeat(32)}.png`),
+      attachmentKey: await uploadedBy(
+        buyer.id,
+        `message/${"b".repeat(32)}.png`,
+      ),
     });
 
     const latest = await db.message.findFirstOrThrow({

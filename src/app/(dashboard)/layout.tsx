@@ -4,10 +4,7 @@ import { NotificationBell } from "@/components/dashboard/notification-bell";
 import { getWaitingOnYou } from "@/server/dashboard";
 import { countDealsAwaiting } from "@/server/deals";
 import { countUnreadThreads } from "@/server/messages";
-import {
-  listNotifications,
-  unreadCount,
-} from "@/server/notifications";
+import { listNotifications, unreadCount } from "@/server/notifications";
 import { getCurrentUser } from "@/server/session";
 
 /**

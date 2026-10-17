@@ -131,10 +131,7 @@ export default async function WalletPage({
       />
 
       {justPaid ? (
-        <div
-          role="status"
-          className="mb-5 flex items-start gap-3 rounded-card border border-verified/40 bg-verified/5 p-4 text-sm leading-relaxed"
-        >
+        <output className="mb-5 flex items-start gap-3 rounded-card border border-verified/40 bg-verified/5 p-4 text-sm leading-relaxed">
           <CheckCircle2Icon
             aria-hidden="true"
             className="mt-0.5 size-5 shrink-0 text-verified"
@@ -143,10 +140,10 @@ export default async function WalletPage({
             <strong className="font-semibold text-fg">
               Payment received by the processor.
             </strong>{" "}
-            It reaches your balance as soon as the network confirms it —
-            usually a minute or two. Refresh this page if it is not here yet.
+            It reaches your balance as soon as the network confirms it — usually
+            a minute or two. Refresh this page if it is not here yet.
           </span>
-        </div>
+        </output>
       ) : null}
 
       {/* ---- the figures ------------------------------------------------- */}

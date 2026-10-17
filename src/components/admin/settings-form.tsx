@@ -137,7 +137,7 @@ export function SettingsForm({
       to: usd(Number(minWithdrawal) || 0),
       changed:
         Math.round(Number(minWithdrawal) * 100) !== current.minWithdrawalUsd ||
-    Number(paymentWindow) !== current.paymentWindowHours,
+        Number(paymentWindow) !== current.paymentWindowHours,
     },
   ]
     .filter((row) => row.changed)

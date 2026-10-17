@@ -237,7 +237,9 @@ test(
     const step = await db.transferStep.findFirstOrThrow({
       where: { orderId, position: 3 },
     });
-    expect(step.proofUrl).toBe("/uploads/proof/cccccccccccccccccccccccccccccccc.png");
+    expect(step.proofUrl).toBe(
+      "/uploads/proof/cccccccccccccccccccccccccccccccc.png",
+    );
   }),
 );
 

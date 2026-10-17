@@ -38,7 +38,12 @@ export async function saveSettings(
   });
 
   // Every page that quotes a price is now out of date.
-  for (const path of ["/fees", "/sell", "/admin/settings", "/dashboard/wallet"]) {
+  for (const path of [
+    "/fees",
+    "/sell",
+    "/admin/settings",
+    "/dashboard/wallet",
+  ]) {
     revalidatePath(path);
   }
   revalidatePath("/listing/[slug]", "page");

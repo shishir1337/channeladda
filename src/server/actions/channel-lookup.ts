@@ -4,8 +4,8 @@ import { revalidatePath } from "next/cache";
 import {
   containsOwnershipCode,
   handleFromUrl,
-  normaliseChannelUrl,
   newOwnershipCode,
+  normaliseChannelUrl,
   parseChannelUrl,
 } from "@/lib/channel-url";
 import { db } from "@/lib/db";

@@ -71,9 +71,10 @@ test(
     // seller's balance was credited and withdrawable the same minute.
     const o = await runTo("FASTEST", 6);
 
-    const order = await db.order.findUniqueOrThrow({ where: { id: o.orderId } });
-    expect(order.holdUntil).not.toBeNull();
-    expect(order.holdUntil!.getTime()).toBeGreaterThan(Date.now());
+    const order = await db.order.findUniqueOrThrow({
+      where: { id: o.orderId },
+    });
+    expect(order.holdUntil?.getTime()).toBeGreaterThan(Date.now());
 
     expect(
       await advanceStep({
@@ -213,7 +214,9 @@ test(
     const result = await payFromWallet(o.buyer.id, o.orderId);
     expect(result).toMatchObject({ ok: false });
 
-    const order = await db.order.findUniqueOrThrow({ where: { id: o.orderId } });
+    const order = await db.order.findUniqueOrThrow({
+      where: { id: o.orderId },
+    });
     expect(order.status).toBe("PAYMENT_EXPIRED");
     expect(await balanceOf(o.buyer.id)).toBe(20_000);
   }),
@@ -238,7 +241,9 @@ test(
       }),
     ).toMatchObject({ ok: false, reason: "needs-reference" });
 
-    const order = await db.order.findUniqueOrThrow({ where: { id: o.orderId } });
+    const order = await db.order.findUniqueOrThrow({
+      where: { id: o.orderId },
+    });
     expect(order.buyerPaidAt).toBeNull();
   }),
 );
@@ -271,9 +276,11 @@ test(
     });
     if (!countered.ok) throw new Error(countered.reason);
 
-    expect(await withdrawOffer(countered.value, seeded.buyer.id)).toMatchObject({
-      ok: false,
-    });
+    expect(await withdrawOffer(countered.value, seeded.buyer.id)).toMatchObject(
+      {
+        ok: false,
+      },
+    );
     const counter = await db.offer.findUniqueOrThrow({
       where: { id: countered.value },
     });

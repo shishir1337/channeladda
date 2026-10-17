@@ -8,11 +8,11 @@ import {
   redactContactDetails,
 } from "@/lib/redact";
 import { isChatAttachmentKey, keyIsVideo, urlForKey } from "@/lib/upload-keys";
-import { notify } from "@/server/notifications";
-import { markUploadsAttached } from "@/server/upload-access";
 import { mediaExpiryFrom } from "@/server/chat-retention";
+import { notify } from "@/server/notifications";
 import type { CurrentUser } from "@/server/session";
 import { sizeOfUpload } from "@/server/storage";
+import { markUploadsAttached } from "@/server/upload-access";
 
 /**
  * Every conversation on Channel Adda.
@@ -528,8 +528,7 @@ export async function sendMessage(input: {
   // burst of ten lines should say “there is something to read in here” and
   // it stops saying that the moment the bell shows ten. No email: chat
   // arrives in bursts and an inbox is the wrong place for it.
-  const otherId =
-    input.sender.id === row.buyerId ? row.sellerId : row.buyerId;
+  const otherId = input.sender.id === row.buyerId ? row.sellerId : row.buyerId;
   if (otherId !== input.sender.id) {
     await notify({
       userId: otherId,

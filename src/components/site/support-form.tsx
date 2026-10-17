@@ -117,7 +117,8 @@ export function SupportForm({ topic }: { topic?: string }) {
             id={topicId}
             name="topic"
             defaultValue={
-              topic && SUPPORT_TOPICS.includes(topic as (typeof SUPPORT_TOPICS)[number])
+              topic &&
+              SUPPORT_TOPICS.includes(topic as (typeof SUPPORT_TOPICS)[number])
                 ? topic
                 : SUPPORT_TOPICS[0]
             }

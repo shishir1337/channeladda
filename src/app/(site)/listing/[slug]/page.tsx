@@ -24,8 +24,8 @@ import { platformMap } from "@/data/platforms";
 import { databaseGate } from "@/lib/db-gate";
 import { formatCompact } from "@/lib/utils";
 import { getListing, getSimilarListings } from "@/server/listings";
-import { getSeller } from "@/server/sellers";
 import { heldByAcceptedOffer } from "@/server/offers";
+import { getSeller } from "@/server/sellers";
 import { getCurrentUser } from "@/server/session";
 import { getSettings } from "@/server/settings";
 
@@ -231,25 +231,25 @@ export default async function ListingPage({
               <SellerPanel seller={seller} />
 
               {listing.reserved ? null : (
-              <Panel title="Make an offer" id="offer">
-                <p className="text-sm leading-relaxed text-muted">
-                  Offer below the asking price and the seller can accept,
-                  counter, or decline. Nothing is charged when an offer is
-                  accepted — the listing is held for you while you pay.
-                </p>
-                <div className="mt-5">
-                  <OfferForm
-                    listingId={listing.id}
-                    listingSlug={listing.slug}
-                    askingPrice={listing.price}
-                    expiryHours={settings.offerExpiryHours}
-                    isOwnListing={
-                      Boolean(viewer?.slug) &&
-                      viewer?.slug === listing.sellerSlug
-                    }
-                  />
-                </div>
-              </Panel>
+                <Panel title="Make an offer" id="offer">
+                  <p className="text-sm leading-relaxed text-muted">
+                    Offer below the asking price and the seller can accept,
+                    counter, or decline. Nothing is charged when an offer is
+                    accepted — the listing is held for you while you pay.
+                  </p>
+                  <div className="mt-5">
+                    <OfferForm
+                      listingId={listing.id}
+                      listingSlug={listing.slug}
+                      askingPrice={listing.price}
+                      expiryHours={settings.offerExpiryHours}
+                      isOwnListing={
+                        Boolean(viewer?.slug) &&
+                        viewer?.slug === listing.sellerSlug
+                      }
+                    />
+                  </div>
+                </Panel>
               )}
             </div>
           </div>

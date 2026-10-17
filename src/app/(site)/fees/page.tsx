@@ -249,7 +249,10 @@ function ModeTable({
               const b = buyerTotal(price, fees, mode);
               const s = sellerPayout(price, fees, mode);
               return (
-                <tr key={price} className="border-b border-line last:border-b-0">
+                <tr
+                  key={price}
+                  className="border-b border-line last:border-b-0"
+                >
                   <th scope="row" className="px-4 py-4 text-left font-semibold">
                     <Price usd={price} />
                   </th>

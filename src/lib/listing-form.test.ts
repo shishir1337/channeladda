@@ -27,8 +27,13 @@ const TYPED: ListingDraftInput = {
   proofs: [],
 };
 
-const fields = (result: { success: boolean; error?: { issues: { path: PropertyKey[] }[] } }) =>
-  result.success ? [] : (result.error?.issues ?? []).map((i) => String(i.path[0]));
+const fields = (result: {
+  success: boolean;
+  error?: { issues: { path: PropertyKey[] }[] };
+}) =>
+  result.success
+    ? []
+    : (result.error?.issues ?? []).map((i) => String(i.path[0]));
 
 test("a draft saves without the pictures", () => {
   // The page promises "Save a draft at any point" and the submit schema's own
@@ -54,9 +59,9 @@ test("a draft still checks what the seller did type", () => {
   expect(
     fields(listingDraftSchema.safeParse({ ...TYPED, title: "hi" })),
   ).toEqual(["title"]);
-  expect(
-    fields(listingDraftSchema.safeParse({ ...TYPED, price: 0 })),
-  ).toEqual(["price"]);
+  expect(fields(listingDraftSchema.safeParse({ ...TYPED, price: 0 }))).toEqual([
+    "price",
+  ]);
 });
 
 test("a draft needs only the thing that identifies the account", () => {
@@ -128,6 +133,9 @@ test("submitting one for review still asks for all of it", () => {
 
 test("a draft still refuses a handle that is not one", () => {
   // Half-finished is not unchecked. The handle goes into a public URL.
-  const bad = { platform: "youtube", handle: "not a handle!" } as ListingDraftInput;
+  const bad = {
+    platform: "youtube",
+    handle: "not a handle!",
+  } as ListingDraftInput;
   expect(fields(listingDraftSchema.safeParse(bad))).toContain("handle");
 });

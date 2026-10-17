@@ -8,9 +8,9 @@ import { Container, Section } from "@/components/ui/section";
 import { platformMap } from "@/data/platforms";
 import { sellerAvatarSrc } from "@/data/sellers";
 import { databaseGate } from "@/lib/db-gate";
+import { ratingLabel } from "@/lib/utils";
 import { getSellerListings } from "@/server/listings";
 import { getSellers } from "@/server/sellers";
-import { ratingLabel } from "@/lib/utils";
 
 /** Marketplace data changes constantly; Prisma queries are invisible to Next's
  *  cache detection, so revalidation is declared explicitly. */

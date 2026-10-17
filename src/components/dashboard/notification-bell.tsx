@@ -170,9 +170,7 @@ export function NotificationBell({
                 aria-hidden="true"
                 className="mx-auto size-8 text-subtle"
               />
-              <p className="mt-3 text-sm font-medium text-fg">
-                Nothing yet
-              </p>
+              <p className="mt-3 text-sm font-medium text-fg">Nothing yet</p>
               <p className="mt-1 text-xs leading-relaxed text-muted">
                 Offers, messages and anything a deal needs from you land here.
               </p>

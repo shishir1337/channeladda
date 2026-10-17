@@ -87,7 +87,11 @@ export function PayoutDecision({
             <span>
               Marking{" "}
               {typeof amountCents === "number" ? (
-                <Price usd={amountCents / 100} exact className="font-semibold" />
+                <Price
+                  usd={amountCents / 100}
+                  exact
+                  className="font-semibold"
+                />
               ) : (
                 "this payout"
               )}{" "}

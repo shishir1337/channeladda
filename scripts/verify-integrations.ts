@@ -35,7 +35,11 @@ const results: Result[] = [];
 function record(result: Result) {
   results.push(result);
   const mark =
-    result.state === "ok" ? "  ok  " : result.state === "skipped" ? " skip " : " FAIL ";
+    result.state === "ok"
+      ? "  ok  "
+      : result.state === "skipped"
+        ? " skip "
+        : " FAIL ";
   console.log(`[${mark}] ${result.name}`);
   console.log(`         ${result.detail}`);
   if (result.fix && result.state === "failed") {
@@ -65,7 +69,9 @@ async function checkDatabase() {
   try {
     const { PrismaClient } = await import("@/generated/prisma/client");
     const { PrismaPg } = await import("@prisma/adapter-pg");
-    const db = new PrismaClient({ adapter: new PrismaPg({ connectionString: url }) });
+    const db = new PrismaClient({
+      adapter: new PrismaPg({ connectionString: url }),
+    });
 
     const [{ count: users }] = await db.$queryRawUnsafe<{ count: bigint }[]>(
       'SELECT COUNT(*)::bigint AS count FROM "User"',
@@ -158,7 +164,8 @@ async function checkCryptomus() {
       return record({
         name: "Cryptomus — reading an invoice back",
         state: "failed",
-        detail: "The invoice was created but /payment/info returned nothing for it.",
+        detail:
+          "The invoice was created but /payment/info returned nothing for it.",
         fix:
           "Every settlement is confirmed against this call before money moves, " +
           "so deals cannot be funded until it works. Check the key has read " +
@@ -342,7 +349,9 @@ function checkCron() {
 async function main() {
   console.log("");
   console.log("Checking every third party this product depends on.");
-  console.log("Nothing is written to the database. One $1 test invoice is raised.");
+  console.log(
+    "Nothing is written to the database. One $1 test invoice is raised.",
+  );
   console.log("");
 
   await checkDatabase();
@@ -363,7 +372,9 @@ async function main() {
 
   if (skipped.length > 0) {
     console.log("");
-    console.log("Not configured — the product works without these, differently:");
+    console.log(
+      "Not configured — the product works without these, differently:",
+    );
     for (const r of skipped) console.log(`  · ${r.name}`);
   }
 

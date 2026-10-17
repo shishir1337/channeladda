@@ -1,5 +1,6 @@
 import "server-only";
 
+import { platformMap } from "@/data/platforms";
 import type { DealMode, OrderStatus, UserRole } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
 import {
@@ -10,18 +11,17 @@ import {
   TERMINAL_STATUSES,
 } from "@/lib/deal-machine";
 import { OPENING_STATUS, templateFor } from "@/lib/deal-templates";
-import { platformMap } from "@/data/platforms";
 import { orderAmounts } from "@/lib/fees";
 import { isSerializationFailure } from "@/lib/serialization-failure";
 import { keyFromUrl } from "@/lib/upload-keys";
 import { recordAudit } from "@/server/audit";
 import { notifyDealEnded, notifyNextActor } from "@/server/deal-notify";
+import { notifyStaff } from "@/server/notifications";
 import {
   heldByAcceptedOffer,
   releaseLapsedOfferReservations,
 } from "@/server/offers";
 import { getSettings } from "@/server/settings";
-import { notifyStaff } from "@/server/notifications";
 import { markUploadsAttached } from "@/server/upload-access";
 
 /**
@@ -952,13 +952,19 @@ export async function advanceStep(input: {
   // has passed. Nothing implemented it — Order.holdUntil was written by
   // nothing — so a Fastest seller was credited the minute the buyer
   // confirmed, and a recovery on day six left the buyer with neither.
-  if (completing && order.mode === "FASTEST" && order.holdUntil && order.holdUntil > now) {
+  if (
+    completing &&
+    order.mode === "FASTEST" &&
+    order.holdUntil &&
+    order.holdUntil > now
+  ) {
     return { ok: false, reason: "on-hold" };
   }
   const startsHold = order.mode === "FASTEST" && stamp === "handoverAt";
   const holdDays =
-    platformMap[order.listing.platform.toLowerCase() as keyof typeof platformMap]
-      ?.holdDays ?? 14;
+    platformMap[
+      order.listing.platform.toLowerCase() as keyof typeof platformMap
+    ]?.holdDays ?? 14;
 
   try {
     await db.$transaction(async (tx) => {
@@ -1279,7 +1285,6 @@ export async function resolveDeal(input: {
     return { ok: false, reason: "not-paid" };
   }
 
-
   // Finishing a deal is the final step's job. That step checks the template,
   // the actor, and — above the threshold — a second staff member; none of
   // which happens here. The same transitions are legal for an agent, so
@@ -1343,7 +1348,8 @@ export async function resolveDeal(input: {
 
   const reversingSomethingClaimed =
     (input.to === "RETURNED_TO_SELLER" && order.buyerPaidAt !== null) ||
-    (input.to === "REFUNDED" && (order.handoverAt !== null || sellerHandedOver));
+    (input.to === "REFUNDED" &&
+      (order.handoverAt !== null || sellerHandedOver));
   if (reversingSomethingClaimed && order.status !== "DISPUTED") {
     return { ok: false, reason: "needs-dispute" };
   }

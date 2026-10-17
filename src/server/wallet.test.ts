@@ -318,7 +318,6 @@ test(
   }),
 );
 
-
 test(
   "a withdrawal below the platform minimum is refused",
   withCleanDb(async () => {

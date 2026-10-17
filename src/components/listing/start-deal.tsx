@@ -162,7 +162,10 @@ export function StartDeal({
         ) : null}
       </dl>
 
-      <label htmlFor={riskId} className="mt-4 flex gap-2.5 text-xs leading-relaxed text-muted">
+      <label
+        htmlFor={riskId}
+        className="mt-4 flex gap-2.5 text-xs leading-relaxed text-muted"
+      >
         <input
           id={riskId}
           type="checkbox"
@@ -172,9 +175,8 @@ export function StartDeal({
         />
         <span>
           I understand that revenue, subscriber counts and monetization can
-          change after a handover, that no part of that is guaranteed by
-          Channel Adda, and that a drop afterwards is not grounds for a
-          refund.
+          change after a handover, that no part of that is guaranteed by Channel
+          Adda, and that a drop afterwards is not grounds for a refund.
         </span>
       </label>
 

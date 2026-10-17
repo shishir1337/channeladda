@@ -53,9 +53,9 @@ test("anything that is not a generated key is refused", () => {
     "../../etc/passwd",
     "message/../proof/aaaa.png",
     "message/short.png",
-    "message/" + "a".repeat(32) + ".svg",
-    "message/" + "a".repeat(32) + ".exe",
-    "secrets/" + "a".repeat(32) + ".png",
+    `message/${"a".repeat(32)}.svg`,
+    `message/${"a".repeat(32)}.exe`,
+    `secrets/${"a".repeat(32)}.png`,
     "",
   ]) {
     expect(isServableKey(key)).toBe(false);
@@ -327,7 +327,6 @@ test(
     // The seller was debited with no offsetting platform credit, so the fee
     // vanished from the books the moment the rate stopped being zero.
     const seeded = await seedListing({ settings: { sellerFeeBp: 500 } });
-    const staff = await seedUser("MODERATOR");
     const created = await createDeal({
       listingId: seeded.listing.id,
       buyerId: seeded.buyer.id,
@@ -410,10 +409,14 @@ test(
     const { clearVerificationIfIdentityChanged } = await import(
       "@/server/seller-listings"
     );
-    const cleared = await clearVerificationIfIdentityChanged(seller.id, listing.id, {
-      sourceUrl: "https://youtube.com/@somebody-else",
-      handle: "@somebody-else",
-    });
+    const cleared = await clearVerificationIfIdentityChanged(
+      seller.id,
+      listing.id,
+      {
+        sourceUrl: "https://youtube.com/@somebody-else",
+        handle: "@somebody-else",
+      },
+    );
     expect(cleared).toBe(true);
 
     const after = await db.listing.findUniqueOrThrow({
@@ -588,7 +591,6 @@ test(
   }),
 );
 
-
 // ------------------------------------------- I5: uploads belong to somebody
 
 test(
@@ -645,7 +647,9 @@ test(
 
     expect(await collectOrphanUploads()).toBe(1);
     expect(await db.upload.findUnique({ where: { key: stale } })).toBeNull();
-    expect(await db.upload.findUnique({ where: { key: fresh } })).not.toBeNull();
+    expect(
+      await db.upload.findUnique({ where: { key: fresh } }),
+    ).not.toBeNull();
   }),
 );
 
@@ -692,7 +696,7 @@ test(
 test(
   "sending an attachment stamps its upload as attached",
   withCleanDb(async () => {
-    const { listing, seller, buyer } = await seedListing();
+    const { seller, buyer } = await seedListing();
     const { markUploadsAttached } = await import("@/server/upload-access");
     const key = `message/${"f".repeat(32)}.png`;
 
@@ -862,9 +866,7 @@ test(
     // key that leaked from another thread could be re-attached in your own —
     // and canReadUpload then answers from whichever message it finds first.
     const { listing, seller, buyer } = await seedListing();
-    const { openConversation, sendMessage } = await import(
-      "@/server/messages"
-    );
+    const { openConversation, sendMessage } = await import("@/server/messages");
     const key = `message/${"d".repeat(32)}.png`;
     await db.upload.create({
       data: {

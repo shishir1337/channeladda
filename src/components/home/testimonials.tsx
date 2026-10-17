@@ -102,8 +102,7 @@ export async function Testimonials() {
                   </span>
                   <span className="mt-0.5 block text-xs text-subtle">
                     Bought a{" "}
-                    {PLATFORM_NAMES[review.order.listing.platform] ??
-                      "channel"}{" "}
+                    {PLATFORM_NAMES[review.order.listing.platform] ?? "channel"}{" "}
                     account ·{" "}
                     {review.order.mode === "SAFEST" ? "Safest" : "Fastest"} deal
                   </span>

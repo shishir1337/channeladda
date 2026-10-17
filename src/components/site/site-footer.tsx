@@ -52,7 +52,10 @@ export function SiteFooter() {
                 marketplace. Until there are real accounts to point at, they
                 say which platforms we trade rather than pretending to be
                 somewhere we are not. */}
-            <ul aria-label="Platforms we trade" className="mt-6 flex items-center gap-2">
+            <ul
+              aria-label="Platforms we trade"
+              className="mt-6 flex items-center gap-2"
+            >
               {socials.map((social) => (
                 <li
                   key={social.label}

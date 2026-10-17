@@ -253,7 +253,9 @@ export function SellerPanel({ seller }: { seller: Seller }) {
               aria-hidden="true"
               className="size-3.5 fill-primary text-primary"
             />
-            <span className="tnum text-muted">{ratingLabel(seller.rating)}</span>
+            <span className="tnum text-muted">
+              {ratingLabel(seller.rating)}
+            </span>
             <span>
               ({seller.reviews} reviews) · {seller.country}
             </span>

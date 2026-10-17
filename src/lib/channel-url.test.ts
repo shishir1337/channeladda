@@ -144,7 +144,6 @@ test("codes do not repeat in any practical sense", () => {
   expect(codes.size).toBe(500);
 });
 
-
 // --------------------------------------------------- the handle for the form
 
 test("a link that carries a handle gives one back", () => {

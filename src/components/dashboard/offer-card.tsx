@@ -271,8 +271,8 @@ export function OfferCard({
         <p className="mt-4 rounded-xl border border-verified/30 bg-verified-soft p-3 text-sm text-fg">
           {viewingAs === "buyer" ? (
             <>
-              Accepted. The listing is held for you at {usd(offer.amount)}{" "}
-              while you open the deal — it lapses if you do not.{" "}
+              Accepted. The listing is held for you at {usd(offer.amount)} while
+              you open the deal — it lapses if you do not.{" "}
               <Link
                 href={`/listing/${offer.listingSlug}`}
                 className="font-semibold text-primary-text underline underline-offset-2"

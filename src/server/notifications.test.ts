@@ -167,12 +167,18 @@ test(
     // The bell reached buyers and sellers, and nothing told the people who
     // have to act. A seller's money sat held against their balance until
     // somebody happened to open the payouts queue.
-    const { requestWithdrawal, creditDeposit } = await import("@/server/wallet");
+    const { requestWithdrawal, creditDeposit } = await import(
+      "@/server/wallet"
+    );
     const seller = await seedUser();
     const finance = await seedUser("FINANCE");
     const moderator = await seedUser("MODERATOR");
     await db.payoutAddress.create({
-      data: { userId: seller.id, address: "TXyz1234567890abcdef", network: "TRON" },
+      data: {
+        userId: seller.id,
+        address: "TXyz1234567890abcdef",
+        network: "TRON",
+      },
     });
     await creditDeposit(seller.id, 50_000, "dep-notify", "USDT");
 

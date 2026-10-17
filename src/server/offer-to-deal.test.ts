@@ -94,7 +94,9 @@ test(
         mode: "SAFEST",
       }),
     ).toMatchObject({ ok: false });
-    expect(await db.order.count({ where: { listingId: o.listing.id } })).toBe(1);
+    expect(await db.order.count({ where: { listingId: o.listing.id } })).toBe(
+      1,
+    );
   }),
 );
 
@@ -114,7 +116,9 @@ test(
       where: { id: o.listing.id },
     });
     expect(listing.status).toBe("LIVE");
-    const offer = await db.offer.findUniqueOrThrow({ where: { id: o.offerId } });
+    const offer = await db.offer.findUniqueOrThrow({
+      where: { id: o.offerId },
+    });
     expect(offer.status).toBe("EXPIRED");
   }),
 );
@@ -192,7 +196,9 @@ test(
       mode: "FASTEST",
     });
 
-    const offer = await db.offer.findUniqueOrThrow({ where: { id: made.value } });
+    const offer = await db.offer.findUniqueOrThrow({
+      where: { id: made.value },
+    });
     expect(offer.status).toBe("REJECTED");
   }),
 );

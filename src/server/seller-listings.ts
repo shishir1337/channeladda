@@ -3,7 +3,6 @@ import "server-only";
 import { randomBytes } from "node:crypto";
 import type { ListingStatus, Platform } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
-import { markUploadsAttached } from "@/server/upload-access";
 import {
   fromCents,
   fromEngagementBp,
@@ -11,6 +10,7 @@ import {
   toCents,
   toEngagementBp,
 } from "@/lib/listing-form";
+import { markUploadsAttached } from "@/server/upload-access";
 
 /**
  * The seller's own listings.

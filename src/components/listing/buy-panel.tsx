@@ -65,17 +65,17 @@ export function BuyPanel({
       {heldOfferUsd ? (
         <p className="mt-4 rounded-card border border-verified/30 bg-verified-soft p-3.5 text-sm leading-relaxed text-fg">
           The seller accepted your offer of{" "}
-          <Price usd={heldOfferUsd} className="font-semibold" />. The deal
-          below opens at that price, and the listing is held for you while
-          you start it — not for ever.
+          <Price usd={heldOfferUsd} className="font-semibold" />. The deal below
+          opens at that price, and the listing is held for you while you start
+          it — not for ever.
         </p>
       ) : null}
 
       {heldForSomeoneElse ? (
         <p className="mt-4 rounded-card border border-line bg-surface-2 p-3.5 text-sm leading-relaxed text-muted">
-          <span className="font-semibold text-fg">Reserved.</span> Somebody
-          is completing a purchase of this account. If it falls through it
-          comes back on sale — save it to hear when.
+          <span className="font-semibold text-fg">Reserved.</span> Somebody is
+          completing a purchase of this account. If it falls through it comes
+          back on sale — save it to hear when.
         </p>
       ) : (
         <StartDeal
@@ -108,11 +108,11 @@ export function BuyPanel({
         </p>
         <p className="mt-2 text-xs leading-relaxed text-muted">
           Whichever way you buy, one side of the deal is always held by Channel
-          Adda — the channel on a Safest deal, the money on a Fastest one. On
-          a Fastest deal the seller is paid{" "}
-          <span className="font-medium text-fg">{holdDays} days</span> after
-          you confirm, which covers the window in which an old owner could try
-          to recover the account. On a Safest deal our agent holds the channel
+          Adda — the channel on a Safest deal, the money on a Fastest one. On a
+          Fastest deal the seller is paid{" "}
+          <span className="font-medium text-fg">{holdDays} days</span> after you
+          confirm, which covers the window in which an old owner could try to
+          recover the account. On a Safest deal our agent holds the channel
           itself until you have paid the seller.
         </p>
       </div>

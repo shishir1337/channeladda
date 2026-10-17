@@ -2,8 +2,8 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { keyFromUrl, urlForKey } from "@/lib/upload-keys";
-import { deleteUpload } from "@/server/storage";
 import type { CurrentUser } from "@/server/session";
+import { deleteUpload } from "@/server/storage";
 
 /**
  * Who may read an uploaded file.

@@ -88,7 +88,7 @@ function textBody(mail: Mail): string {
  * that the link is clickable.
  */
 function htmlBody(mail: Mail): string {
-  const escape = (value: string) =>
+  const escapeHtml = (value: string) =>
     value
       .replace(/&/g, "&amp;")
       .replace(/</g, "&lt;")
@@ -97,12 +97,15 @@ function htmlBody(mail: Mail): string {
 
   const paragraphs = mail.body
     .split(/\n{2,}/)
-    .map((p) => `<p style="margin:0 0 16px">${escape(p).replace(/\n/g, "<br>")}</p>`)
+    .map(
+      (p) =>
+        `<p style="margin:0 0 16px">${escapeHtml(p).replace(/\n/g, "<br>")}</p>`,
+    )
     .join("");
 
   const link = mail.link
-    ? `<p style="margin:24px 0"><a href="${escape(mail.link)}" style="display:inline-block;padding:12px 20px;background:#111;color:#fff;border-radius:10px;text-decoration:none;font-weight:600">Open Channel Adda</a></p>` +
-      `<p style="margin:0;color:#666;font-size:13px">Or paste this into your browser:<br>${escape(mail.link)}</p>`
+    ? `<p style="margin:24px 0"><a href="${escapeHtml(mail.link)}" style="display:inline-block;padding:12px 20px;background:#111;color:#fff;border-radius:10px;text-decoration:none;font-weight:600">Open Channel Adda</a></p>` +
+      `<p style="margin:0;color:#666;font-size:13px">Or paste this into your browser:<br>${escapeHtml(mail.link)}</p>`
     : "";
 
   return (

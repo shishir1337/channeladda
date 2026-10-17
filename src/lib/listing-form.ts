@@ -193,7 +193,9 @@ export const listingSubmitSchema = listingFields.extend({
  * for an empty text one. Both mean “not filled in yet” here.
  */
 const blankText = z.literal("");
-const blankNumber = z.custom<number>((v) => typeof v === "number" && Number.isNaN(v));
+const blankNumber = z.custom<number>(
+  (v) => typeof v === "number" && Number.isNaN(v),
+);
 
 export const listingDraftSchema = listingFields.extend({
   title: z.union([blankText, listingFields.shape.title]),

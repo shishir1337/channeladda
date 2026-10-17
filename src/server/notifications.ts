@@ -99,7 +99,9 @@ export async function notifyAll(
   userIds: readonly (string | null | undefined)[],
   build: (userId: string) => NotifyInput,
 ): Promise<void> {
-  const unique = [...new Set(userIds.filter((id): id is string => Boolean(id)))];
+  const unique = [
+    ...new Set(userIds.filter((id): id is string => Boolean(id))),
+  ];
   await Promise.all(unique.map((id) => notify(build(id))));
 }
 

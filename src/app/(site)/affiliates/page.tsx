@@ -139,7 +139,8 @@ export default async function AffiliatesPage() {
               </dl>
               <p className="mt-4 border-t border-line pt-4 text-xs leading-relaxed text-subtle">
                 Refer ten people who each complete one deal that size and that
-                is <Price usd={exampleFee * SHARE * 10} className="text-muted" />{" "}
+                is{" "}
+                <Price usd={exampleFee * SHARE * 10} className="text-muted" />{" "}
                 in a year.
               </p>
             </div>

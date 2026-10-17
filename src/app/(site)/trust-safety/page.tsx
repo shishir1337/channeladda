@@ -129,9 +129,9 @@ export default function TrustSafetyPage() {
                 Transferring an account is against the written terms of most
                 platforms. We are open about that rather than pretending
                 otherwise: it is why we verify ownership live, why the hold
-                matches each platform&apos;s recovery window, and why a
-                platform ban after completion is covered in our refund policy
-                instead of being left to argue about.
+                matches each platform&apos;s recovery window, and why a platform
+                ban after completion is covered in our refund policy instead of
+                being left to argue about.
               </p>
               <Button asChild variant="secondary" size="md" className="mt-6">
                 <Link href="/listing-rules">Read the listing rules</Link>

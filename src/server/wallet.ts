@@ -231,14 +231,14 @@ export async function payFromWallet(
 
         const took = await tx.order.updateMany({
           where: {
-          id: order.id,
-          paymentRef: null,
-          // As recordOpeningPayment does. Without the status, an order the
-          // sweep expired mid-payment was written back to life with its
-          // listing already reserved for somebody else: two live deals, one
-          // channel, and a second seller payout for an account already gone.
-          status: order.status,
-        },
+            id: order.id,
+            paymentRef: null,
+            // As recordOpeningPayment does. Without the status, an order the
+            // sweep expired mid-payment was written back to life with its
+            // listing already reserved for somebody else: two live deals, one
+            // channel, and a second seller payout for an account already gone.
+            status: order.status,
+          },
           data: {
             status: target,
             paymentRef: `wallet:${order.reference}`,
@@ -539,11 +539,12 @@ export async function settleWithdrawal(
   await notify({
     userId: withdrawal.userId,
     kind: "PAYOUT",
-    title: sent ? `${amount} is on its way` : `Your ${amount} payout was not sent`,
+    title: sent
+      ? `${amount} is on its way`
+      : `Your ${amount} payout was not sent`,
     body: sent
       ? `Sent to your payout address.${txHash ? ` Transaction ${txHash}.` : ""} Blockchain confirmation times vary.`
-      : `${note?.trim() || "Finance could not send this one."} The amount is back in your available balance.`
-,
+      : `${note?.trim() || "Finance could not send this one."} The amount is back in your available balance.`,
     href: "/dashboard/wallet",
     email: {
       subject: sent ? `${amount} sent` : `${amount} payout not sent`,
