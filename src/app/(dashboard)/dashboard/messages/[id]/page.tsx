@@ -2,9 +2,11 @@ import { ArrowLeftIcon } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { LiveRefresh } from "@/components/messages/live-refresh";
 import { ThreadView } from "@/components/messages/thread-view";
 import { getThread, markThreadRead } from "@/server/messages";
 import { requireUser } from "@/server/session";
+import { threadFingerprint } from "@/server/thread-fingerprint";
 
 export const metadata: Metadata = {
   title: "Conversation",
@@ -16,11 +18,15 @@ export default async function ThreadPage({
 }: PageProps<"/dashboard/messages/[id]">) {
   const { id } = await params;
   const user = await requireUser(`/dashboard/messages/${id}`);
+  // Taken before the thread is read, never after: a change landing between
+  // the two would otherwise be in the fingerprint but not on the page, and
+  // the poll would never see a reason to redraw it.
+  const fingerprint = await threadFingerprint(id, user);
   const thread = await getThread(id, user);
 
   // `getThread` returns null both for a thread that does not exist and for one
   // this person is not in, so guessing ids tells you nothing either way.
-  if (!thread) notFound();
+  if (!thread || !fingerprint) notFound();
 
   await markThreadRead(id, user);
 
@@ -29,6 +35,7 @@ export default async function ThreadPage({
 
   return (
     <>
+      <LiveRefresh conversationId={thread.id} fingerprint={fingerprint} />
       <Link
         href="/dashboard/messages"
         className="inline-flex items-center gap-1.5 text-sm text-subtle transition-colors hover:text-fg"

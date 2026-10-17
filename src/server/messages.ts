@@ -231,7 +231,7 @@ export async function getThread(
   });
   if (!row) return null;
 
-  const viewerRole = roleOf(viewer, row);
+  const viewerRole = roleInThread(viewer, row);
   if (!viewerRole) return null;
 
   return {
@@ -295,7 +295,13 @@ function senderOf(
   return { senderName: message.sender.name, senderRole };
 }
 
-function roleOf(
+/**
+ * How this person is involved in a thread, or null when they are not.
+ *
+ * Exported so everything that shows a thread — the page, the poll that keeps
+ * it current — answers "may they see it?" with the same rule.
+ */
+export function roleInThread(
   viewer: CurrentUser,
   row: { buyerId: string; sellerId: string },
 ): ThreadRole | null {
@@ -496,7 +502,7 @@ export async function sendMessage(input: {
   });
   if (!row) return { ok: false, reason: "not-allowed" };
 
-  const role = roleOf(input.sender, row);
+  const role = roleInThread(input.sender, row);
   if (!role) return { ok: false, reason: "not-allowed" };
   // Staff can still write on a closed thread — closing it is often the moment
   // they need to explain why.
@@ -587,7 +593,7 @@ export async function markThreadRead(
     where: { id: conversationId },
     select: { buyerId: true, sellerId: true },
   });
-  if (!row || !roleOf(viewer, row)) return;
+  if (!row || !roleInThread(viewer, row)) return;
 
   await db.message.updateMany({
     where: {

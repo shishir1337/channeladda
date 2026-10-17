@@ -3,11 +3,13 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Panel } from "@/components/admin/console";
+import { LiveRefresh } from "@/components/messages/live-refresh";
 import { StaffControls } from "@/components/messages/staff-controls";
 import { ThreadView } from "@/components/messages/thread-view";
 import { Badge } from "@/components/ui/badge";
 import { getThread } from "@/server/messages";
 import { requireStaff } from "@/server/session";
+import { threadFingerprint } from "@/server/thread-fingerprint";
 
 export const metadata: Metadata = {
   title: "Conversation",
@@ -19,11 +21,14 @@ export default async function AdminThreadPage({
 }: PageProps<"/admin/messages/[id]">) {
   const { id } = await params;
   const staff = await requireStaff();
+  // Before the thread is read, for the reason the dashboard page gives.
+  const fingerprint = await threadFingerprint(id, staff);
   const thread = await getThread(id, staff);
-  if (!thread) notFound();
+  if (!thread || !fingerprint) notFound();
 
   return (
     <>
+      <LiveRefresh conversationId={thread.id} fingerprint={fingerprint} />
       <Link
         href="/admin/messages"
         className="inline-flex min-h-11 items-center gap-1.5 text-sm text-muted transition-colors hover:text-fg"
