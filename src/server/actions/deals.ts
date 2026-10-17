@@ -31,8 +31,8 @@ const MESSAGES: Record<repo.DealFailure, string> = {
   "needs-approval": "A second staff member has to approve this handover.",
   "not-paid": "The opening payment has not cleared yet.",
   disputed: "This deal is with Channel Adda while the dispute is open.",
-  "already-handed-over":
-    "The buyer already has the account. A refund is not the way out of this one.",
+  "needs-dispute":
+    "One side says this already happened, so reversing it is a decision, not a correction. Pause it for review first — then it can be decided with both accounts of it on the record.",
   "not-disputed":
     "A deal is finished by its last step, not from here. Dispute it first if it is stuck.",
   "already-paid":

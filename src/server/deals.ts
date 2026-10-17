@@ -48,8 +48,8 @@ export type DealFailure =
   | "disputed"
   /** Too late to undo: the buyer has already paid the seller. */
   | "already-paid"
-  /** Too late to refund: the buyer already holds the account. */
-  | "already-handed-over"
+  /** Reversing a handover is an adjudication, so it needs a dispute. */
+  | "needs-dispute"
   /** Finishing a deal is the last step’s job, not a shortcut past it. */
   | "not-disputed"
   | "bad-proof";
@@ -1143,25 +1143,36 @@ export async function resolveDeal(input: {
     return { ok: false, reason: "not-disputed" };
   }
 
-  // Once the buyer has paid the seller, handing the channel back would leave
-  // the seller holding both the money and the asset.
-  //
-  // This used to read sellerConfirmedAt — the seller's own say-so — so the
-  // way to keep both was simply never to press “I received it”. buyerPaidAt
-  // is stamped by the buyer with their transaction reference, which is the
-  // fact the guard is about.
-  if (
-    input.to === "RETURNED_TO_SELLER" &&
-    (order.buyerPaidAt || order.sellerConfirmedAt)
-  ) {
+  // Handing the channel back once the **seller** has confirmed the buyer's
+  // payment arrived would leave the seller holding the money and the asset
+  // both. That one is an outright refusal, because it is the one signal
+  // here that cannot be gamed by the party it would favour: a seller does
+  // not falsely admit to having been paid.
+  if (input.to === "RETURNED_TO_SELLER" && order.sellerConfirmedAt) {
     return { ok: false, reason: "already-paid" };
   }
 
-  // The mirror image, which had no guard at all: once the buyer has
-  // confirmed they hold the account, a full refund leaves them with the
-  // account and the money both, and the seller with neither.
-  if (input.to === "REFUNDED" && order.handoverAt) {
-    return { ok: false, reason: "already-handed-over" };
+  // Everything below is a decision rather than a rule.
+  //
+  // Both of these reverse something that has already happened, and in both
+  // the evidence is one party's unverified word: `buyerPaidAt` is stamped
+  // by the buyer completing a step whose payment reference is free text,
+  // and `handoverAt` by the buyer saying they received access. Treating
+  // either as proof made the guard a dead end — a buyer could type a
+  // reference, pay nothing, and strand the seller's channel with the agent
+  // for ever; and a refund became unreachable in the only state a Fastest
+  // refund exists for, leaving the money in the platform's position with
+  // no route out at all.
+  //
+  // So they are not refused, they are routed: through a dispute, where a
+  // moderator sees what each side claims and the decision is on the record.
+  // What a single staff member must not be able to do is reverse either one
+  // with one click from a running deal.
+  const reversingSomethingClaimed =
+    (input.to === "RETURNED_TO_SELLER" && order.buyerPaidAt !== null) ||
+    (input.to === "REFUNDED" && order.handoverAt !== null);
+  if (reversingSomethingClaimed && order.status !== "DISPUTED") {
+    return { ok: false, reason: "needs-dispute" };
   }
 
   const now = new Date();
@@ -1196,12 +1207,19 @@ export async function resolveDeal(input: {
         data: { status: "LIVE" },
       });
 
-      // A deal paid out of a balance is refunded back into it. Writing only
-      // the platform side left the buyer's ledger carrying the debit with the
-      // money existing nowhere — and made the refund policy's "credited to
-      // your Channel Adda balance" untrue for the one case where the platform
-      // could actually perform it.
-      const fromWallet = order.paymentRef?.startsWith("wallet:") === true;
+      // A refund is credited to the buyer's Channel Adda balance, whatever
+      // they paid with.
+      //
+      // It used to do this only for a deal paid out of a balance, on the
+      // reasoning that a crypto payment goes back the way it came. Nothing
+      // sends it back: there is no outbound refund anywhere in this
+      // codebase, and the processor's own refund statuses are inbound
+      // notifications about something a human did elsewhere. So the
+      // platform wrote itself a debit, its position netted to zero, and the
+      // buyer got a deal marked REFUNDED and no money at all.
+      //
+      // The balance is the mechanism that exists, and it is withdrawable to
+      // the buyer's own wallet through the payout queue.
 
       const refund = async (amountUsd: number, note: string) => {
         await tx.ledgerEntry.create({
@@ -1213,17 +1231,15 @@ export async function resolveDeal(input: {
             note,
           },
         });
-        if (fromWallet) {
-          await tx.ledgerEntry.create({
-            data: {
-              orderId: order.id,
-              userId: order.buyerId,
-              kind: "REFUND",
-              amountUsd,
-              note,
-            },
-          });
-        }
+        await tx.ledgerEntry.create({
+          data: {
+            orderId: order.id,
+            userId: order.buyerId,
+            kind: "REFUND",
+            amountUsd,
+            note,
+          },
+        });
       };
 
       if (input.to === "REFUNDED") {

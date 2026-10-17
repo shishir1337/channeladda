@@ -107,7 +107,7 @@ test(
 // ------------------------------- the seller cannot take back a channel paid for
 
 test(
-  "a channel is not handed back once the buyer has paid for it",
+  "handing a channel back is not a one-click action once a payment is claimed",
   withCleanDb(async () => {
     // The guard read sellerConfirmedAt — the seller's own say-so. So a seller
     // who had been paid simply never pressed "I received it", raised a
@@ -128,12 +128,12 @@ test(
       note: "seller says no payment",
     });
 
-    expect(result).toMatchObject({ ok: false, reason: "already-paid" });
+    expect(result).toMatchObject({ ok: false, reason: "needs-dispute" });
   }),
 );
 
 test(
-  "a fastest deal is not refunded once the buyer holds the channel",
+  "refunding after a handover is not a one-click action",
   withCleanDb(async () => {
     // The mirror image, and it had no guard at all. The buyer confirms they
     // own the channel, then disputes: a full refund left them with the
@@ -151,7 +151,7 @@ test(
       note: "buyer asked",
     });
 
-    expect(result).toMatchObject({ ok: false, reason: "already-handed-over" });
+    expect(result).toMatchObject({ ok: false, reason: "needs-dispute" });
     expect(await balanceOf(o.buyer.id)).toBe(0);
   }),
 );
@@ -209,5 +209,119 @@ test(
       where: { id: o.listing.id },
     });
     expect(listing.status).toBe("LIVE");
+  }),
+);
+
+// ------------------------------------- a guard must not become a dead end
+
+test(
+  "a disputed fastest deal can still be refunded after handover",
+  withCleanDb(async () => {
+    // The guard against refunding a buyer who already holds the channel fired
+    // on AWAITING_RELEASE — which is the only state a Fastest refund is
+    // reachable from, and it always carries handoverAt, because the same
+    // write sets both. So "refund the buyer" was dead code: a buyer whose
+    // seller recovered the channel after handover had no route to their
+    // money, and the remaining outcomes either paid the seller in full or
+    // refunded the fee alone.
+    const o = await runTo("FASTEST", 6);
+    const mid = await db.order.findUniqueOrThrow({ where: { id: o.orderId } });
+    expect(mid.handoverAt).not.toBeNull();
+
+    await resolveDeal({
+      orderId: o.orderId,
+      to: "DISPUTED",
+      byUserId: o.buyer.id,
+      note: "seller took it back",
+    });
+
+    const result = await resolveDeal({
+      orderId: o.orderId,
+      to: "REFUNDED",
+      byUserId: o.staff.id,
+      note: "seller recovered the channel through Google",
+    });
+
+    expect(result).toMatchObject({ ok: true });
+    expect(await balanceOf(o.buyer.id)).toBe(10_300);
+  }),
+);
+
+test(
+  "refunding a handed-over deal still needs a dispute, not one click",
+  withCleanDb(async () => {
+    // The protection that guard was reaching for: a single staff member must
+    // not be able to reverse a completed handover straight from the live
+    // state. It is an adjudication, so it goes through a dispute and leaves
+    // a record.
+    const o = await runTo("FASTEST", 6);
+
+    const result = await resolveDeal({
+      orderId: o.orderId,
+      to: "REFUNDED",
+      byUserId: o.staff.id,
+      note: "buyer asked",
+    });
+
+    expect(result).toMatchObject({ ok: false, reason: "needs-dispute" });
+    expect(await balanceOf(o.buyer.id)).toBe(0);
+  }),
+);
+
+test(
+  "a seller's channel can be returned when the buyer only claims to have paid",
+  withCleanDb(async () => {
+    // buyerPaidAt is stamped by the buyer completing a step whose payment
+    // reference is free text nobody validates. Treating it as proof let a
+    // buyer type "0x0", pay nothing, and strand the seller's channel with the
+    // agent for ever: returning it was refused, and the only other ending
+    // refunded nothing and meant something else.
+    const o = await runTo("SAFEST", 7);
+    const mid = await db.order.findUniqueOrThrow({ where: { id: o.orderId } });
+    expect(mid.buyerPaidAt).not.toBeNull();
+    expect(mid.sellerConfirmedAt).toBeNull();
+
+    await resolveDeal({
+      orderId: o.orderId,
+      to: "DISPUTED",
+      byUserId: o.seller.id,
+      note: "no payment arrived",
+    });
+
+    const result = await resolveDeal({
+      orderId: o.orderId,
+      to: "RETURNED_TO_SELLER",
+      byUserId: o.staff.id,
+      note: "checked the chain, nothing was sent",
+    });
+
+    expect(result).toMatchObject({ ok: true });
+  }),
+);
+
+test(
+  "a channel is never handed back once the seller says they were paid",
+  withCleanDb(async () => {
+    // The seller's own admission is the one signal that cannot be gamed by
+    // the party it would favour, so it stays an outright refusal.
+    const o = await runTo("SAFEST", 8);
+    const mid = await db.order.findUniqueOrThrow({ where: { id: o.orderId } });
+    expect(mid.sellerConfirmedAt).not.toBeNull();
+
+    await resolveDeal({
+      orderId: o.orderId,
+      to: "DISPUTED",
+      byUserId: o.seller.id,
+      note: "changed my mind",
+    });
+
+    expect(
+      await resolveDeal({
+        orderId: o.orderId,
+        to: "RETURNED_TO_SELLER",
+        byUserId: o.staff.id,
+        note: "seller asked",
+      }),
+    ).toMatchObject({ ok: false, reason: "already-paid" });
   }),
 );
