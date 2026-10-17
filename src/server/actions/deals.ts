@@ -174,12 +174,36 @@ export async function markOpeningPaymentReceived(
     return { ok: false, error: "Enter the payment reference." };
   }
 
+  const outcomes: Record<repo.PaymentOutcome, string> = {
+    applied: "Payment recorded. The deal is under way.",
+    "already-applied":
+      "That payment was already recorded. Nothing has changed.",
+    "second-payment-credited":
+      "This deal was already paid, so that payment went to the buyer's balance.",
+    "reference-mismatch":
+      "This deal is already paid under another reference, and there is no settled invoice matching this one. Nothing was credited — the mismatch is in the audit trail for you to reconcile.",
+    "credited-to-balance":
+      "This deal had already stopped, so that payment went to the buyer's balance rather than opening it.",
+  };
+
   try {
-    await repo.recordManualPayment(orderId, reference, asset.trim() || "USDT");
+    const outcome = await repo.recordManualPayment(
+      orderId,
+      reference,
+      asset.trim() || "USDT",
+    );
+    refresh(orderId);
+
+    // A mismatch is not a failure of the request — the money may well be
+    // real — but it is not what the clerk thinks they just did, so it comes
+    // back as an error rather than a tick.
+    if (outcome === "reference-mismatch") {
+      return { ok: false, error: outcomes[outcome] };
+    }
+    return { ok: true, message: outcomes[outcome] };
   } catch (error) {
-    // recordOpeningPayment throws rather than returning a reason when the
-    // order is already paid under a different reference — that means two
-    // payments for one deal, which is not a user-correctable mistake.
+    // Only an order that does not exist, or a row that kept moving under
+    // the write, reaches here now. Everything else has an outcome.
     return {
       ok: false,
       error:
@@ -188,9 +212,6 @@ export async function markOpeningPaymentReceived(
           : "Could not record that payment.",
     };
   }
-
-  refresh(orderId);
-  return { ok: true, message: "Payment recorded. The deal is under way." };
 }
 
 /**

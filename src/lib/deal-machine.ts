@@ -138,6 +138,15 @@ const TRANSITIONS: readonly Transition[] = Object.freeze([
     to: "PAYMENT_EXPIRED",
     actors: ["system"],
   },
+  // A dispute raised before anyone paid lapses on the same clock. The sweep
+  // writes this, so the table has to know about it — a sweep that
+  // contradicts the table is a rule nobody can find.
+  {
+    mode: null,
+    from: "DISPUTED",
+    to: "PAYMENT_EXPIRED",
+    actors: ["system"],
+  },
   {
     mode: null,
     from: "AWAITING_PAYMENT",
@@ -220,6 +229,11 @@ export function canTransition(
     );
   }
   if (from === "DISPUTED") {
+    // The clock still runs on a dispute nobody paid for: the sweep lapses
+    // it like any other unpaid deal, which is what stops a free dispute
+    // holding a listing off the market for ever. Everything else out of a
+    // dispute is a staff decision.
+    if (actor === "system" && to === "PAYMENT_EXPIRED") return true;
     return actor === "staff" && DISPUTE_OUTCOMES[mode].includes(to);
   }
 

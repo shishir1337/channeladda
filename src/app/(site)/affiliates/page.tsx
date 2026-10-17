@@ -90,7 +90,7 @@ export default async function AffiliatesPage() {
               <SectionHeading
                 eyebrow="What it pays"
                 title="One referred sale, one real number"
-                description={`A ${EXAMPLE_PRICE.toLocaleString("en-US")} channel sale on a Fastest deal earns Channel Adda its buyer and seller fees combined. Your share of that is ${SHARE * 100}%.`}
+                description={`A ${EXAMPLE_PRICE.toLocaleString("en-US")} channel sale on a Fastest deal earns Channel Adda ${exampleFee.toLocaleString("en-US")} in buyer and seller fees combined. Your share of that is ${SHARE * 100}%.`}
               />
               <ul className="mt-7 flex flex-col gap-2.5">
                 {[

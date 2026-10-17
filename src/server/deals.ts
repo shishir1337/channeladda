@@ -276,6 +276,25 @@ export async function createDeal(input: {
  * that fires twice must not charge two fees or write two ledger rows.
  */
 /**
+ * What recording a payment actually did.
+ *
+ * It used to return void, so every caller said the same cheerful thing
+ * whatever happened underneath — including a finance clerk being told “the
+ * deal is under way” for a payment that had just been audited as a reference
+ * mismatch and credited to nobody.
+ */
+export type PaymentOutcome =
+  /** The deal was waiting for this, and it is now under way. */
+  | "applied"
+  /** The same payment, delivered again. The first one did the work. */
+  | "already-applied"
+  /** A second, separate payment with its own settled invoice. Credited. */
+  | "second-payment-credited"
+  /** A reference we do not recognise on a deal already paid. Nothing done. */
+  | "reference-mismatch"
+  /** The deal could not accept it, so it became the buyer's balance. */
+  | "credited-to-balance";
+/**
  * Finance recording a payment that reached us outside Cryptomus.
  *
  * The clerk types a transaction id, and that used to become the order's
@@ -293,7 +312,7 @@ export async function recordManualPayment(
   orderId: string,
   txid: string,
   asset: string,
-): Promise<void> {
+): Promise<PaymentOutcome> {
   const order = await db.order.findUnique({
     where: { id: orderId },
     select: { reference: true },
@@ -308,7 +327,7 @@ export async function recordManualPayment(
     after: { txid, asset, reference: order.reference },
   });
 
-  await recordOpeningPayment(orderId, order.reference, asset);
+  return recordOpeningPayment(orderId, order.reference, asset);
 }
 /**
  * A second payment that arrived for a deal somebody had already paid.
@@ -335,7 +354,7 @@ async function creditSecondPayment(
   },
   ref: string,
   asset: string,
-): Promise<void> {
+): Promise<PaymentOutcome> {
   const invoice = await db.invoice.findUnique({
     where: { reference: ref },
     select: { orderId: true, amountUsd: true, settledAt: true },
@@ -350,7 +369,7 @@ async function creditSecondPayment(
       entityId: order.id,
       after: { offered: ref, alreadyPaidUnder: order.paymentRef },
     });
-    return;
+    return "reference-mismatch";
   }
 
   const externalRef = `overpay:${ref}`;
@@ -366,7 +385,7 @@ async function creditSecondPayment(
       },
     });
   } catch (error) {
-    if (isUniqueViolation(error)) return;
+    if (isUniqueViolation(error)) return "already-applied";
     throw error;
   }
 
@@ -381,6 +400,8 @@ async function creditSecondPayment(
       amountUsd: invoice.amountUsd,
     },
   });
+
+  return "second-payment-credited";
 }
 
 /**
@@ -431,7 +452,7 @@ export async function recordOpeningPayment(
   asset: string,
   /** Guards the one re-entry after a lost compare-and-set. */
   attempt = 0,
-): Promise<void> {
+): Promise<PaymentOutcome> {
   const order = await db.order.findUnique({
     where: { id: orderId },
     select: {
@@ -448,7 +469,7 @@ export async function recordOpeningPayment(
   if (!order) throw new Error(`No such order: ${orderId}`);
 
   // Same reference twice: the first one already did the work.
-  if (order.paymentRef === ref) return;
+  if (order.paymentRef === ref) return "already-applied";
 
   // A different reference on an order that is already paid is a second
   // payment, not a retry — a buyer can open an invoice and then pay the same
@@ -457,8 +478,7 @@ export async function recordOpeningPayment(
   // refund row and no audit trail. It becomes a wallet credit instead, which
   // is both recoverable and visible.
   if (order.paymentRef) {
-    await creditSecondPayment(order, ref, asset);
-    return;
+    return creditSecondPayment(order, ref, asset);
   }
 
   const target = OPENING_STATUS[order.mode];
@@ -466,7 +486,7 @@ export async function recordOpeningPayment(
     // Real money that the deal can no longer accept. It becomes balance
     // rather than an exception nobody can clear.
     await creditUnusablePayment(order, ref, asset);
-    return;
+    return "credited-to-balance";
   }
 
   // Safest records only the platform's fee. The channel price goes straight
@@ -546,8 +566,7 @@ export async function recordOpeningPayment(
         `Could not settle payment ${ref} on ${order.id}: the order kept moving.`,
       );
     }
-    await recordOpeningPayment(orderId, ref, asset, attempt + 1);
-    return;
+    return recordOpeningPayment(orderId, ref, asset, attempt + 1);
   }
 
   await notifyNextActor(order.id);
@@ -566,6 +585,8 @@ export async function recordOpeningPayment(
       amountUsd: ledger.amountUsd,
     },
   });
+
+  return "applied";
 }
 
 /** The staff desks. `AGENT` is deliberately absent — see `roleOnDeal`. */

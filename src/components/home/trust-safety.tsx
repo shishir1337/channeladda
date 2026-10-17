@@ -79,9 +79,12 @@ export function TrustSafety() {
 
         <div className="mt-8 rounded-panel border border-line bg-surface p-6 sm:mt-10 sm:p-8">
           <dl className="grid gap-6 text-center sm:grid-cols-3 sm:text-left">
+            {/* Facts about how the product is built, which are checkable
+                from the product itself. The figures that used to sit here
+                were measurements nobody had taken. */}
             {[
-              { v: "< 24h", l: "A moderator reads every dispute within" },
-              { v: "2", l: "Staff approvals on a high-value handover" },
+              { v: "2", l: "Deal types — we hold the money, or the account" },
+              { v: "1", l: "Agent on every deal, named before it starts" },
               { v: "0", l: "Deals where both sides are exposed at once" },
             ].map((stat) => (
               <div key={stat.l}>

@@ -637,7 +637,7 @@ test(
       data: {
         ...base,
         key: stale,
-        createdAt: new Date(Date.now() - 3 * 60 * 60 * 1000),
+        createdAt: new Date(Date.now() - 30 * 60 * 60 * 1000),
       },
     });
     await db.upload.create({ data: { ...base, key: fresh } });
@@ -678,7 +678,7 @@ test(
         kind: "message",
         bytes: 10,
         contentType: "image/png",
-        createdAt: new Date(Date.now() - 3 * 60 * 60 * 1000),
+        createdAt: new Date(Date.now() - 30 * 60 * 60 * 1000),
       },
     });
 

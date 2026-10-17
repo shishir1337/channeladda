@@ -114,3 +114,21 @@ test("a fastest deal is refundable wherever the platform still holds the money",
     false,
   );
 });
+
+test("the sweep's own write is a transition the table knows about", () => {
+  // The sweep lapses an unpaid dispute, and for a while the table said that
+  // was illegal — a rule enforced in one place and contradicted in another is
+  // a rule nobody can find. Both modes, because the sweep does not check.
+  for (const mode of ["SAFEST", "FASTEST"] as const) {
+    expect(canTransition(mode, "DISPUTED", "PAYMENT_EXPIRED", "system")).toBe(
+      true,
+    );
+    // Still nobody else's to make.
+    expect(canTransition(mode, "DISPUTED", "PAYMENT_EXPIRED", "buyer")).toBe(
+      false,
+    );
+    expect(canTransition(mode, "DISPUTED", "PAYMENT_EXPIRED", "staff")).toBe(
+      false,
+    );
+  }
+});

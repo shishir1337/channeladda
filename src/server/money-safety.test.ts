@@ -93,7 +93,7 @@ test(
 
     await expect(
       recordOpeningPayment(result.orderId, result.reference, "USDT"),
-    ).resolves.toBeUndefined();
+    ).resolves.toBe("credited-to-balance");
 
     expect(await balanceOf(seeded.buyer.id)).toBe(10_300);
     const order = await db.order.findUniqueOrThrow({
@@ -244,6 +244,64 @@ test(
       where: { orderId: created.orderId },
     });
     expect(rows).toHaveLength(1);
+    expect(await balanceOf(seeded.buyer.id)).toBe(0);
+  }),
+);
+
+test(
+  "recording a payment by hand says what actually happened",
+  withCleanDb(async () => {
+    // The clerk was told "Payment recorded. The deal is under way." whatever
+    // happened underneath — including when nothing happened at all. A buyer
+    // pays the deal from their balance, then wires the fee again by mistake;
+    // finance records it; there is no invoice under the order's reference, so
+    // it is audited as a mismatch and nothing is credited. Finance is told
+    // the deal is under way and the buyer is out of pocket.
+    const { recordManualPayment } = await import("@/server/deals");
+    const seeded = await seedListing();
+    const created = await createDeal({
+      listingId: seeded.listing.id,
+      buyerId: seeded.buyer.id,
+      mode: "FASTEST",
+    });
+    if (!created.ok) throw new Error(created.reason);
+
+    // The honest happy path.
+    expect(
+      await recordManualPayment(created.orderId, "0xdeadbeef", "USDT"),
+    ).toBe("applied");
+
+    // And the same call again, on a deal that is already under way.
+    expect(
+      await recordManualPayment(created.orderId, "0xdeadbeef", "USDT"),
+    ).toBe("already-applied");
+  }),
+);
+
+test(
+  "a payment recorded against a deal paid another way is not silently dropped",
+  withCleanDb(async () => {
+    const { recordManualPayment } = await import("@/server/deals");
+    const seeded = await seedListing();
+    const created = await createDeal({
+      listingId: seeded.listing.id,
+      buyerId: seeded.buyer.id,
+      mode: "FASTEST",
+    });
+    if (!created.ok) throw new Error(created.reason);
+
+    // Paid under some other name, as a wallet payment is.
+    await db.order.update({
+      where: { id: created.orderId },
+      data: {
+        paymentRef: `wallet:${created.reference}`,
+        status: "AGENT_VERIFYING",
+      },
+    });
+
+    expect(
+      await recordManualPayment(created.orderId, "0xabc", "USDT"),
+    ).toBe("reference-mismatch");
     expect(await balanceOf(seeded.buyer.id)).toBe(0);
   }),
 );

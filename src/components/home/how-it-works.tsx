@@ -63,7 +63,7 @@ const modes = [
       "We hold the account, not your money — you pay the seller once it is ours",
       "Two waiting periods: seller to us, then us to you",
       "Recovery email and 2FA reset supervised by an agent",
-      "If it breaks before you pay, you have paid only our fee — and we refund it",
+      "If it breaks before our agent takes the channel, we refund our fee",
     ],
   },
 ];

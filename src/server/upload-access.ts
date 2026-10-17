@@ -118,12 +118,17 @@ export async function markUploadsAttached(urls: (string | null | undefined)[]) {
  *
  * `purgeExpiredMedia` only removes files a message still points at, so an
  * upload abandoned halfway through a form — or produced by hitting the upload
- * endpoint in a loop — stayed on disk for ever. An hour is long enough for the
- * slowest form to be submitted and short enough that the endpoint is not
- * storage.
+ * endpoint in a loop — stayed on disk for ever.
+ *
+ * A day, not an hour. The listing form asks for a cover, an avatar and up to
+ * eight proof screenshots, and the honest way to produce those is to go and
+ * take them — which is longer than an hour and is exactly the behaviour the
+ * form is asking for. An hour deleted the cover out from under a seller who
+ * did as they were told, leaving a listing pointing at nothing with no error
+ * anywhere. A day still means the upload endpoint is not storage.
  */
 export async function collectOrphanUploads(): Promise<number> {
-  const cutoff = new Date(Date.now() - 60 * 60 * 1000);
+  const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
   const orphans = await db.upload.findMany({
     where: { attachedAt: null, createdAt: { lt: cutoff } },
