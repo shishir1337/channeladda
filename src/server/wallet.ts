@@ -6,6 +6,7 @@ import { canTransition } from "@/lib/deal-machine";
 import { OPENING_STATUS } from "@/lib/deal-templates";
 import { isSerializationFailure } from "@/lib/serialization-failure";
 import { recordAudit } from "@/server/audit";
+import { postEvent } from "@/server/chat-events";
 import { notify, notifyStaff } from "@/server/notifications";
 import { getSettings } from "@/server/settings";
 
@@ -195,6 +196,7 @@ export async function payFromWallet(
       buyerFeeUsd: true,
       reference: true,
       paymentRef: true,
+      conversationId: true,
     },
   });
 
@@ -292,6 +294,22 @@ export async function payFromWallet(
       return { ok: false, reason: "insufficient" };
     }
     throw error;
+  }
+
+  // After the commit, not inside it: the transaction above is Serializable
+  // and reports a lost race as "not enough balance", and a chat line written
+  // in it touches the conversation every message touches. A message landing
+  // at the same moment would have told the buyer they could not afford the
+  // deal. A crash between the two loses this line, never the payment.
+  if (order.conversationId) {
+    await postEvent(db, {
+      conversationId: order.conversationId,
+      kind: "EVENT",
+      event: { type: "payment-received", reference: order.reference },
+      senderId: null,
+      orderId: order.id,
+      at: now,
+    });
   }
 
   await recordAudit({

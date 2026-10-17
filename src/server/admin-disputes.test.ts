@@ -246,7 +246,10 @@ test(
       actorName: null,
       note: null,
     });
-    expect(dispute.conversation).toBeNull();
+    // Nobody wrote to anybody, but every deal has a conversation now — the
+    // one opening the deal made — so the desk always has somewhere to read
+    // what happened, if only the deal's own lines.
+    expect(dispute.conversation?.messages).toBeGreaterThan(0);
   }),
 );
 

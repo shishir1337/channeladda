@@ -164,8 +164,12 @@ test(
     await message(t.conversationId, t.buyer.id, daysAgo(400));
 
     expect(await purgeOldMessages()).toBe(0);
+    // What the people said. The deal writes its own lines into the thread
+    // too, which are not what this is about.
     expect(
-      await db.message.count({ where: { conversationId: t.conversationId } }),
+      await db.message.count({
+        where: { conversationId: t.conversationId, kind: "TEXT" },
+      }),
     ).toBe(1);
   }),
 );

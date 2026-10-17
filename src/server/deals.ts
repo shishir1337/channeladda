@@ -15,10 +15,12 @@ import { orderAmounts } from "@/lib/fees";
 import { isSerializationFailure } from "@/lib/serialization-failure";
 import { keyFromUrl } from "@/lib/upload-keys";
 import { recordAudit } from "@/server/audit";
+import { ensureConversation, postEvent } from "@/server/chat-events";
 import { notifyDealEnded, notifyNextActor } from "@/server/deal-notify";
 import { notifyStaff } from "@/server/notifications";
 import {
   heldByAcceptedOffer,
+  notifyClosedOffers,
   releaseLapsedOfferReservations,
 } from "@/server/offers";
 import { getSettings } from "@/server/settings";
@@ -212,13 +214,17 @@ export async function createDeal(input: {
     input.mode,
   );
   const steps = templateFor(input.mode);
+  const buyer = await db.user.findUnique({
+    where: { id: input.buyerId },
+    select: { name: true },
+  });
 
   // Retried only for a reference collision. Everything else either succeeds or
   // is a decision, and re-running it would not change the answer.
   for (let attempt = 0; attempt < 5; attempt++) {
     const reference = newReference();
     try {
-      const orderId = await db.$transaction(async (tx) => {
+      const { orderId, closed } = await db.$transaction(async (tx) => {
         // Compare-and-set, not read-then-write: two buyers pressing buy at the
         // same moment must not both end up with an order. A zero row count
         // means somebody else got there between the read above and here.
@@ -247,32 +253,71 @@ export async function createDeal(input: {
           if (reserved.count !== 1) throw new DealAbort("taken");
         }
 
-        // Anybody still waiting on an offer hears a decision rather than
-        // nothing. Without this a buyer could watch “waiting on seller” for
-        // up to thirty days on a channel somebody else had already bought.
-        await tx.offer.updateMany({
-          where: { listingId: listing.id, status: "OPEN" },
-          data: { status: "REJECTED", respondedAt: new Date() },
-        });
-
         // The 10-day chat purge carves out threads with an order on them, and
         // nothing ever wrote that link — so the carve-out could never fire,
         // and every deal's conversation was deleted after ten days. That
         // conversation is what the dispute process and the refund policy both
         // call the only account of what was agreed.
         //
-        // The link lives on the deal, not the thread, so a second deal opened
-        // in the same conversation after the first lapsed is linked too.
-        // Inside the transaction: if the order rolls back, the link does too.
-        const thread = await tx.conversation.findUnique({
-          where: {
-            listingId_buyerId: {
-              listingId: listing.id,
-              buyerId: input.buyerId,
-            },
-          },
-          select: { id: true },
+        // Every deal has one now: a buyer who never wrote to the seller gets
+        // the thread here, so the agent has somewhere to talk to both. The
+        // link lives on the deal, not the thread, so a second deal opened in
+        // the same conversation after the first lapsed is linked too. Inside
+        // the transaction: if the order rolls back, the link does too.
+        const conversationId = await ensureConversation(tx, {
+          listingId: listing.id,
+          buyerId: input.buyerId,
+          sellerId: listing.sellerId,
         });
+        const now = new Date();
+
+        // Anybody still waiting on an offer hears a decision rather than
+        // nothing. Without this a buyer could watch “waiting on seller” for
+        // up to thirty days on a channel somebody else had already bought.
+        //
+        // One at a time, so each closes with a line in its own conversation.
+        // The buyer opening this deal is not "declined": their own open offer
+        // is one they have just superseded, so it reads as withdrawn.
+        const open = await tx.offer.findMany({
+          where: { listingId: listing.id, status: "OPEN" },
+          select: { id: true, buyerId: true, amountUsd: true },
+        });
+        const closed: {
+          buyerId: string;
+          amountUsd: number;
+          thread: string | null;
+        }[] = [];
+        for (const other of open) {
+          const own = other.buyerId === input.buyerId;
+          const moved = await tx.offer.updateMany({
+            where: { id: other.id, status: "OPEN" },
+            data: { status: own ? "WITHDRAWN" : "REJECTED", respondedAt: now },
+          });
+          if (moved.count !== 1 || own) continue;
+          const thread = await tx.conversation.findUnique({
+            where: {
+              listingId_buyerId: {
+                listingId: listing.id,
+                buyerId: other.buyerId,
+              },
+            },
+            select: { id: true },
+          });
+          if (thread) {
+            await postEvent(tx, {
+              conversationId: thread.id,
+              kind: "EVENT",
+              event: {
+                type: "offer-auto-declined",
+                amountCents: other.amountUsd,
+              },
+              senderId: null,
+              offerId: other.id,
+              at: now,
+            });
+          }
+          closed.push({ ...other, thread: thread?.id ?? null });
+        }
 
         const order = await tx.order.create({
           data: {
@@ -280,7 +325,7 @@ export async function createDeal(input: {
             listingId: listing.id,
             buyerId: input.buyerId,
             sellerId: listing.sellerId,
-            conversationId: thread?.id ?? null,
+            conversationId,
             mode: input.mode,
             status: "AWAITING_PAYMENT",
             offerId: offer?.id ?? null,
@@ -307,8 +352,25 @@ export async function createDeal(input: {
           select: { id: true },
         });
 
-        return order.id;
+        await postEvent(tx, {
+          conversationId,
+          kind: "EVENT",
+          event: {
+            type: "deal-opened",
+            name: buyer?.name ?? "",
+            mode: input.mode,
+            reference,
+            priceCents: amounts.priceUsd,
+          },
+          senderId: input.buyerId,
+          orderId: order.id,
+          at: now,
+        });
+
+        return { orderId: order.id, closed };
       });
+
+      await notifyClosedOffers(closed);
 
       await recordAudit({
         actorId: input.buyerId,
@@ -532,6 +594,8 @@ export async function recordOpeningPayment(
       totalUsd: true,
       buyerFeeUsd: true,
       buyerId: true,
+      reference: true,
+      conversationId: true,
     },
   });
 
@@ -611,6 +675,18 @@ export async function recordOpeningPayment(
         note: `${order.mode} opening payment`,
       },
     });
+
+    // Nobody pressed a button for this: the processor said so. No sender.
+    if (order.conversationId) {
+      await postEvent(tx, {
+        conversationId: order.conversationId,
+        kind: "EVENT",
+        event: { type: "payment-received", reference: order.reference },
+        senderId: null,
+        orderId: order.id,
+        at: now,
+      });
+    }
   });
 
   // Lost the compare-and-set. Before `status` joined the predicate the only
@@ -772,6 +848,7 @@ export async function assignAgent(input: {
       buyerId: true,
       sellerId: true,
       agentId: true,
+      conversationId: true,
     },
   });
 
@@ -780,7 +857,7 @@ export async function assignAgent(input: {
 
   const assignee = await db.user.findUnique({
     where: { id: input.agentId },
-    select: { role: true, bannedAt: true },
+    select: { role: true, bannedAt: true, name: true },
   });
   if (assignee?.role !== "AGENT" || assignee.bannedAt) {
     return { ok: false, reason: "wrong-actor" };
@@ -850,6 +927,26 @@ export async function assignAgent(input: {
     throw error;
   }
 
+  // After the commit, not inside it. The transaction above is Serializable
+  // and reports any serialisation failure as "over the cap", so a chat line
+  // written in it — which touches the conversation every message touches —
+  // would make a message landing at the same moment read as the agent being
+  // full. A crash between the two loses this line, not the assignment.
+  if (order.conversationId && order.agentId !== input.agentId) {
+    await postEvent(db, {
+      conversationId: order.conversationId,
+      kind: "EVENT",
+      event: {
+        // A seller who already invited the previous agent's address has to
+        // be told plainly that it changed.
+        type: order.agentId ? "agent-changed" : "agent-joined",
+        agentName: assignee.name,
+      },
+      senderId: null,
+      orderId: order.id,
+    });
+  }
+
   await notifyNextActor(order.id);
 
   await recordAudit({
@@ -887,6 +984,7 @@ export async function advanceStep(input: {
       buyerFeeUsd: true,
       totalUsd: true,
       holdUntil: true,
+      conversationId: true,
       listing: { select: { platform: true } },
       steps: {
         where: { completedAt: null },
@@ -983,6 +1081,11 @@ export async function advanceStep(input: {
     platformMap[
       order.listing.platform.toLowerCase() as keyof typeof platformMap
     ]?.holdDays ?? 14;
+  const holdUntil = new Date(now.getTime() + holdDays * 86_400_000);
+  const doer = await db.user.findUnique({
+    where: { id: input.userId },
+    select: { name: true },
+  });
 
   try {
     await db.$transaction(async (tx) => {
@@ -1014,9 +1117,7 @@ export async function advanceStep(input: {
         data: {
           ...(template.entersStatus ? { status: template.entersStatus } : {}),
           ...(stamp ? { [stamp]: now } : {}),
-          ...(startsHold
-            ? { holdUntil: new Date(now.getTime() + holdDays * 86_400_000) }
-            : {}),
+          ...(startsHold ? { holdUntil } : {}),
           ...(input.paymentRef ? { buyerPaymentRef: input.paymentRef } : {}),
           ...(completing ? { completedAt: now } : {}),
         },
@@ -1024,6 +1125,44 @@ export async function advanceStep(input: {
       if (moved.count !== 1) throw new DealAbort("wrong-step");
 
       if (completing) await completeOrder(tx, order);
+
+      // The record, in the conversation: the step, by whoever did it, and
+      // what it set going. The transaction reference a Safest buyer typed is
+      // not repeated here — it is on the deal, and this line is a preview.
+      //
+      // A millisecond apart, so the lines keep the order they happened in:
+      // the thread is sorted by time, and equal times have no order.
+      if (order.conversationId) {
+        const line = (offset: number) => ({
+          conversationId: order.conversationId as string,
+          kind: "EVENT" as const,
+          orderId: order.id,
+          at: new Date(now.getTime() + offset),
+        });
+        await postEvent(tx, {
+          ...line(0),
+          event: {
+            type: "step-done",
+            name: doer?.name ?? "",
+            label: template.label,
+          },
+          senderId: input.userId,
+        });
+        if (startsHold) {
+          await postEvent(tx, {
+            ...line(1),
+            event: { type: "hold-started", until: holdUntil },
+            senderId: null,
+          });
+        }
+        if (completing) {
+          await postEvent(tx, {
+            ...line(2),
+            event: { type: "deal-ended", outcome: RESOLUTION_LABELS.COMPLETED },
+            senderId: null,
+          });
+        }
+      }
     });
   } catch (error) {
     if (error instanceof DealAbort) return { ok: false, reason: error.reason };
@@ -1197,16 +1336,37 @@ async function expireStale(scope: { listingId?: string }): Promise<number> {
       createdAt: { lt: cutoff },
       ...(scope.listingId ? { listingId: scope.listingId } : {}),
     },
-    select: { id: true, listingId: true, status: true },
+    select: {
+      id: true,
+      listingId: true,
+      status: true,
+      reference: true,
+      conversationId: true,
+    },
   });
 
   let expired = 0;
   for (const order of stale) {
-    const moved = await db.order.updateMany({
-      where: { id: order.id, status: order.status, paymentRef: null },
-      data: { status: "PAYMENT_EXPIRED", cancelledAt: new Date() },
+    const now = new Date();
+    const moved = await db.$transaction(async (tx) => {
+      const took = await tx.order.updateMany({
+        where: { id: order.id, status: order.status, paymentRef: null },
+        data: { status: "PAYMENT_EXPIRED", cancelledAt: now },
+      });
+      if (took.count !== 1) return false;
+      if (order.conversationId) {
+        await postEvent(tx, {
+          conversationId: order.conversationId,
+          kind: "EVENT",
+          event: { type: "payment-lapsed", reference: order.reference },
+          senderId: null,
+          orderId: order.id,
+          at: now,
+        });
+      }
+      return true;
     });
-    if (moved.count !== 1) continue;
+    if (!moved) continue;
 
     await db.listing.updateMany({
       where: { id: order.listingId, status: "RESERVED" },
@@ -1279,6 +1439,7 @@ export async function resolveDeal(input: {
       buyerPaidAt: true,
       handoverAt: true,
       reference: true,
+      conversationId: true,
     },
   });
 
@@ -1397,6 +1558,10 @@ export async function resolveDeal(input: {
   }
 
   const now = new Date();
+  const by = await db.user.findUnique({
+    where: { id: input.byUserId },
+    select: { name: true },
+  });
   try {
     await db.$transaction(async (tx) => {
       const moved = await tx.order.updateMany({
@@ -1411,6 +1576,26 @@ export async function resolveDeal(input: {
         },
       });
       if (moved.count !== 1) throw new DealAbort("terminal");
+
+      // The record, in the conversation. A dispute names who raised it, as
+      // the deal page does; an ending says what it was. The note behind it
+      // stays on the dispute, where staff read it — it is free text, and this
+      // line is shown in previews.
+      if (order.conversationId) {
+        await postEvent(tx, {
+          conversationId: order.conversationId,
+          kind: "EVENT",
+          event:
+            input.to === "DISPUTED"
+              ? { type: "dispute-raised", name: by?.name ?? "" }
+              : { type: "deal-ended", outcome: RESOLUTION_LABELS[input.to] },
+          // Staff act as Channel Adda, never as a named person — the same rule
+          // as their messages — so a staff decision carries no sender.
+          senderId: actor === "staff" ? null : input.byUserId,
+          orderId: order.id,
+          at: now,
+        });
+      }
 
       // A dispute is a pause: the listing stays reserved because the deal may
       // still complete.
