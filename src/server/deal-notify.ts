@@ -3,6 +3,55 @@ import "server-only";
 import { db } from "@/lib/db";
 import type { DealActor } from "@/lib/deal-machine";
 import { templateFor } from "@/lib/deal-templates";
+import { sendMail } from "@/server/mailer";
+
+/** Where a link in an email has to point. */
+function siteUrl(): string {
+  return (
+    process.env.NEXT_PUBLIC_SITE_URL ??
+    process.env.BETTER_AUTH_URL ??
+    "http://localhost:3000"
+  );
+}
+
+/**
+ * The email that reaches somebody who is not looking at the dashboard.
+ *
+ * Separate and pure so the words can be tested without a mail server. The
+ * subject names the thing being asked for, because “Update on your deal” is
+ * what everybody's filters learn to ignore — and the one thing this email
+ * exists to survive is a week of not logging in.
+ */
+export function turnEmail(input: {
+  name: string | null;
+  reference: string;
+  listingTitle: string;
+  stepLabel: string;
+  mode: "SAFEST" | "FASTEST";
+  href: string;
+}) {
+  const greeting = input.name ? `Hi ${input.name},` : "Hi there,";
+  const mode =
+    input.mode === "SAFEST"
+      ? "This is a Safest deal: we are holding the channel, and the buyer pays the seller directly."
+      : "This is a Fastest deal: we are holding the money until the buyer confirms they have the account.";
+
+  return {
+    subject: `Your move: ${input.stepLabel} (${input.reference})`,
+    body: [
+      greeting,
+      "",
+      `It is your turn on ${input.listingTitle} (${input.reference}).`,
+      "",
+      `What is needed: ${input.stepLabel}`,
+      "",
+      mode,
+      "",
+      "Nothing moves until you do this, so the other side is waiting.",
+    ].join("\n"),
+    link: input.href,
+  };
+}
 
 /**
  * Telling the next person it is their turn.
@@ -50,15 +99,37 @@ export async function notifyNextActor(orderId: string): Promise<void> {
     const userId = recipients[next.actor as DealActor];
     if (!userId) return;
 
+    const href = `/dashboard/deals/${order.id}`;
     await db.notification.create({
       data: {
         userId,
         kind: "ORDER",
         title: `${next.label} — ${order.reference}`,
         body: `Your move on ${order.listing.title}.`,
-        href: `/dashboard/deals/${order.id}`,
+        href,
       },
     });
+
+    // And by email, because the notification row is the part that only
+    // reaches somebody already looking. A deal has two multi-day Google
+    // waits in it; a week of silence is the normal case this has to survive.
+    const person = await db.user.findUnique({
+      where: { id: userId },
+      select: { email: true, name: true },
+    });
+    if (person?.email) {
+      await sendMail({
+        to: person.email,
+        ...turnEmail({
+          name: person.name,
+          reference: order.reference,
+          listingTitle: order.listing.title,
+          stepLabel: next.label,
+          mode: order.mode as "SAFEST" | "FASTEST",
+          href: `${siteUrl()}${href}`,
+        }),
+      });
+    }
   } catch (error) {
     console.error(`[deal-notify] ${orderId}`, error);
   }
