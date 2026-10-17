@@ -3,7 +3,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import type { DealActor } from "@/lib/deal-machine";
 import { templateFor } from "@/lib/deal-templates";
-import { sendMail } from "@/server/mailer";
+import { canSendMail, sendMail } from "@/server/mailer";
 
 /** Where a link in an email has to point. */
 function siteUrl(): string {
@@ -113,6 +113,12 @@ export async function notifyNextActor(orderId: string): Promise<void> {
     // And by email, because the notification row is the part that only
     // reaches somebody already looking. A deal has two multi-day Google
     // waits in it; a week of silence is the normal case this has to survive.
+    //
+    // Skipped entirely with no mail path configured: there is nothing to
+    // send, and looking up an address to log a message nobody will read is
+    // a round trip on every step of every deal.
+    if (!canSendMail()) return;
+
     const person = await db.user.findUnique({
       where: { id: userId },
       select: { email: true, name: true },

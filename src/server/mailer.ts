@@ -113,6 +113,19 @@ function htmlBody(mail: Mail): string {
   );
 }
 
+/**
+ * Is there anywhere for mail to go?
+ *
+ * For the difference between mail somebody asked for and mail the system
+ * decided to send. A password reset has to be logged in development so it
+ * can be followed; a turn-taking notification on every step of every deal
+ * does not, and logging one is noise that also costs a database round trip
+ * to find an address nobody will read.
+ */
+export function canSendMail(): boolean {
+  return smtpConfig() !== null;
+}
+
 export async function sendMail(mail: Mail): Promise<void> {
   const config = smtpConfig();
 
