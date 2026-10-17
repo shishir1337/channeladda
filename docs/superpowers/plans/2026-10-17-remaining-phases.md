@@ -203,7 +203,7 @@ deal. Three protections the help centre promised did not exist in code.
 
 | Check | Result |
 |---|---|
-| `pnpm test` | 539 passing, 57 files |
+| `pnpm test` | 547 passing, 58 files |
 | `pnpm typecheck` | clean, TypeScript 7.0.2 |
 | `pnpm lint` | clean, Biome 2.5.15, on a fresh checkout too |
 | `pnpm build` | clean, Next.js 16.4.2 |
@@ -211,7 +211,7 @@ deal. Three protections the help centre promised did not exist in code.
 | `pnpm verify:integrations` | database ok; YouTube, Google and email correctly reported unconfigured; the sweep reported broken only because `CRON_SECRET` is unset on this machine |
 | Cryptomus, live keys (2026-10-17) | signed requests accepted; a $1.00 invoice raised and read back by `order_id` (status `check`); an unknown invoice is HTTP 404; every field the code reads exists under the name it reads; a reused order_id returns the same invoice, `cancel` and final once expired, which is the bug fixed above. Webhook registration fails only because this machine is not a public https origin |
 | Browser | deal chat driven by hand on the e2e copy as buyer, seller and agent: ask, offer, counter, accept, start Safest at the agreed price, pay from balance, agent takes the deal and writes in the thread, seller saves payment details and completes step 2 — all from the conversation, at desktop width and below the 1024px breakpoint (the window could not be narrowed to 390px). Found and fixed: the seller's panel did not show the address to invite |
-| Final review | a fresh reviewer read this round's commits; two Important findings fixed with tests (a second payment the sweep confirmed was booked nowhere; a demoted agent kept their deals), two Minor deferred below |
+| Final review | deal chat (31efcd2..1baddf4): a fresh reviewer found no Critical and three Important issues; with four Minor re-graded Important, all seven were fixed with tests that failed first (a staff-raised dispute named the moderator; the agent's deal-ended link was a 404; the agent could not write in a closed thread from the page; a winning buyer could be told they lost; the panel kept a lapsed hold; a buyer waiting for payment details was not told when they arrived; the agent's email reached the buyer's page data). The deferred minors are in the deal-chat ledger. The previous round's review fixed a second payment the sweep confirmed but booked nowhere, and a demoted agent keeping their deals |
 
 
 ## Still to do
