@@ -137,6 +137,8 @@ export async function createDeal(input: {
   listingId: string;
   buyerId: string;
   mode: DealMode;
+  /** The buyer ticked the revenue-risk box at checkout. */
+  acceptedRevenueRisk?: boolean;
 }): Promise<DealOutcome<{ orderId: string; reference: string }>> {
   const listing = await db.listing.findUnique({
     where: { id: input.listingId },
@@ -197,6 +199,14 @@ export async function createDeal(input: {
             buyerFeeUsd: amounts.buyerFeeUsd,
             sellerFeeUsd: amounts.sellerFeeUsd,
             totalUsd: amounts.totalUsd,
+            // The consent three published policies say we collect. The
+            // column has existed since the schema was written and nothing
+            // ever wrote it, so a dispute about lost monetization was
+            // refused on the strength of an acknowledgement we could not
+            // produce.
+            revenueRiskAcceptedAt: input.acceptedRevenueRisk
+              ? new Date()
+              : null,
             steps: {
               create: steps.map((step) => ({
                 position: step.position,
@@ -641,8 +651,14 @@ export async function assignAgent(input: {
   // off a colleague or nominate who holds one. Being the buyer or the seller
   // is never enough: a seller could otherwise pick their own custodian.
   const actor = await roleOnDeal(order, input.byUserId);
+  // `actor` is null for someone with no part in this deal, which is exactly
+  // who an unassigned agent is. A buyer or seller who also holds the AGENT
+  // role resolves to “buyer” or “seller” here, and the check used not to
+  // look — so a seller with the role became the custodian of their own sale.
   const claimingUnheld =
-    order.agentId === null && input.byUserId === input.agentId;
+    actor === null &&
+    order.agentId === null &&
+    input.byUserId === input.agentId;
   if (actor !== "staff" && !claimingUnheld) {
     return { ok: false, reason: "wrong-actor" };
   }

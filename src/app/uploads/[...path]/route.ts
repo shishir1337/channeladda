@@ -57,8 +57,13 @@ export async function GET(
       "X-Content-Type-Options": "nosniff",
       // Never let one of these render as a page on our own origin.
       "Content-Security-Policy": "default-src 'none'; sandbox",
-      // Keys are random and a file never changes under one, so this is safe.
-      "Cache-Control": "public, max-age=31536000, immutable",
+      // Private, not public: these bytes are permission-gated, and the day
+      // a CDN or a caching proxy is put in front of this route a shared
+      // cache entry would serve one person's screenshot to the next
+      // requester. A file never changes under a key, so the browser's own
+      // cache can still hold it for a year.
+      "Cache-Control": "private, max-age=31536000, immutable",
+      Vary: "Cookie",
     },
   });
 }

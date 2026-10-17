@@ -794,3 +794,99 @@ test(
     expect(await canReadUpload(key, asUser(seller.id))).toBe(true);
   }),
 );
+
+// ---------------------------------- an agent may not hold their own sale
+
+test(
+  "a party to the deal cannot appoint themselves its agent",
+  withCleanDb(async () => {
+    // The comment says being the buyer or the seller is never enough, because
+    // a seller could otherwise pick their own custodian. The check did not
+    // say it: claiming an unheld deal asked only that the deal had no agent
+    // and that you were appointing yourself — so a seller who also holds the
+    // AGENT role became the custodian of their own channel.
+    const { listing, seller, buyer } = await seedListing();
+    const { assignAgent } = await import("@/server/deals");
+    await db.user.update({
+      where: { id: seller.id },
+      data: { role: "AGENT" },
+    });
+    const created = await createDeal({
+      listingId: listing.id,
+      buyerId: buyer.id,
+      mode: "SAFEST",
+    });
+    if (!created.ok) throw new Error(created.reason);
+
+    expect(
+      await assignAgent({
+        orderId: created.orderId,
+        agentId: seller.id,
+        byUserId: seller.id,
+        agentEmail: "agent@channeladda.test",
+        agentBrand: "Channel Adda",
+      }),
+    ).toMatchObject({ ok: false, reason: "wrong-actor" });
+  }),
+);
+
+test(
+  "an uninvolved agent can still claim an unheld deal",
+  withCleanDb(async () => {
+    const { listing, buyer, agent } = await seedListing();
+    const { assignAgent } = await import("@/server/deals");
+    const created = await createDeal({
+      listingId: listing.id,
+      buyerId: buyer.id,
+      mode: "SAFEST",
+    });
+    if (!created.ok) throw new Error(created.reason);
+
+    expect(
+      await assignAgent({
+        orderId: created.orderId,
+        agentId: agent.id,
+        byUserId: agent.id,
+        agentEmail: "agent@channeladda.test",
+        agentBrand: "Channel Adda",
+      }),
+    ).toMatchObject({ ok: true });
+  }),
+);
+
+test(
+  "an attachment can only be sent by whoever uploaded it",
+  withCleanDb(async () => {
+    // sendMessage checked the key's shape but not who owned the file, so a
+    // key that leaked from another thread could be re-attached in your own —
+    // and canReadUpload then answers from whichever message it finds first.
+    const { listing, seller, buyer } = await seedListing();
+    const { openConversation, sendMessage } = await import(
+      "@/server/messages"
+    );
+    const key = `message/${"d".repeat(32)}.png`;
+    await db.upload.create({
+      data: {
+        key,
+        uploaderId: seller.id,
+        kind: "message",
+        bytes: 10,
+        contentType: "image/png",
+      },
+    });
+    const opened = await openConversation({
+      listingId: listing.id,
+      buyerId: buyer.id,
+    });
+    if (!opened.ok) throw new Error("openConversation failed");
+
+    const sent = await sendMessage({
+      conversationId: opened.id,
+      sender: asUser(buyer.id),
+      body: "look",
+      attachmentKey: key,
+    });
+
+    expect(sent).toMatchObject({ ok: false });
+  }),
+);

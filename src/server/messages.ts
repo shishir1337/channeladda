@@ -431,6 +431,21 @@ export async function sendMessage(input: {
   if (input.attachmentKey && !isChatAttachmentKey(input.attachmentKey)) {
     return { ok: false, reason: "bad-attachment" };
   }
+
+  // And it has to be theirs. The shape check says the key could name a
+  // chat attachment; this says the sender is the one who uploaded it. A key
+  // that leaked from another thread could otherwise be re-attached in your
+  // own, after which canReadUpload answers from whichever of the two
+  // messages it happens to find first.
+  if (input.attachmentKey) {
+    const upload = await db.upload.findUnique({
+      where: { key: input.attachmentKey },
+      select: { uploaderId: true },
+    });
+    if (upload?.uploaderId !== input.sender.id) {
+      return { ok: false, reason: "bad-attachment" };
+    }
+  }
   if (text.length > MAX_MESSAGE) return { ok: false, reason: "too-long" };
 
   const row = await db.conversation.findUnique({

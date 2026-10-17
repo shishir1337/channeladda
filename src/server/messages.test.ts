@@ -74,6 +74,25 @@ test(
   }),
 );
 
+/**
+ * An upload row for a chat attachment.
+ *
+ * sendMessage checks that the sender is the one who uploaded the file, so a
+ * test that attaches a key out of thin air is testing a case the product
+ * refuses — and used to pass because nothing checked.
+ */
+async function uploadedBy(userId: string, key: string) {
+  await db.upload.create({
+    data: {
+      key,
+      uploaderId: userId,
+      kind: "message",
+      bytes: 10,
+      contentType: key.endsWith(".png") ? "image/png" : "video/mp4",
+    },
+  });
+  return key;
+}
 test(
   "an attachment can be sent with no words",
   withCleanDb(async () => {
@@ -88,7 +107,7 @@ test(
       conversationId: opened.id,
       sender: asUser(buyer.id),
       body: "",
-      attachmentKey: `message/${"a".repeat(32)}.png`,
+      attachmentKey: await uploadedBy(buyer.id, `message/${"a".repeat(32)}.png`),
     });
     expect(result.ok).toBe(true);
 
@@ -145,7 +164,7 @@ test(
       conversationId: opened.id,
       sender: asUser(buyer.id),
       body: "here it is, whatsapp me on +1 555 0100",
-      attachmentKey: `message/${"b".repeat(32)}.png`,
+      attachmentKey: await uploadedBy(buyer.id, `message/${"b".repeat(32)}.png`),
     });
 
     const latest = await db.message.findFirstOrThrow({

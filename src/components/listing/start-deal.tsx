@@ -58,6 +58,12 @@ export function StartDeal({
   const router = useRouter();
   const groupId = useId();
   const [mode, setMode] = useState<DealMode>("SAFEST");
+  // The refund policy, the Terms and the help centre all say a buyer
+  // acknowledges this at checkout, and nothing ever asked. A platform that
+  // refuses a dispute on the basis of a consent it cannot produce is in a
+  // worse position than one that never claimed it.
+  const [acceptedRisk, setAcceptedRisk] = useState(false);
+  const riskId = useId();
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -156,11 +162,27 @@ export function StartDeal({
         ) : null}
       </dl>
 
+      <label htmlFor={riskId} className="mt-4 flex gap-2.5 text-xs leading-relaxed text-muted">
+        <input
+          id={riskId}
+          type="checkbox"
+          checked={acceptedRisk}
+          onChange={(e) => setAcceptedRisk(e.target.checked)}
+          className="mt-0.5 size-4 shrink-0 cursor-pointer accent-primary"
+        />
+        <span>
+          I understand that revenue, subscriber counts and monetization can
+          change after a handover, that no part of that is guaranteed by
+          Channel Adda, and that a drop afterwards is not grounds for a
+          refund.
+        </span>
+      </label>
+
       <Button
         type="button"
         size="lg"
-        className="mt-4 w-full"
-        disabled={pending}
+        className="mt-3 w-full"
+        disabled={pending || !acceptedRisk}
         onClick={() => {
           if (!session?.user) {
             router.push(`/signin?next=/listing/${listingSlug}`);
@@ -168,7 +190,7 @@ export function StartDeal({
           }
           setError(null);
           startTransition(async () => {
-            const result = await startDeal(listingId, mode);
+            const result = await startDeal(listingId, mode, acceptedRisk);
             if (!result.ok) {
               setError(result.error);
               return;

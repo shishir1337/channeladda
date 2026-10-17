@@ -340,5 +340,10 @@ export async function describesOwnership(
   description: string,
   code: string,
 ): Promise<boolean> {
+  // A pure predicate over two strings the caller already has, so it leaks
+  // nothing today — but it is the one action in the codebase with no
+  // caller check, and the next edit that gives it a database read would
+  // inherit that.
+  await requireUser();
   return containsOwnershipCode(description, code);
 }

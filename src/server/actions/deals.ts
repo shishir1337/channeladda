@@ -53,12 +53,26 @@ function refresh(orderId?: string) {
 export async function startDeal(
   listingId: string,
   mode: DealMode,
+  acceptedRevenueRisk = false,
 ): Promise<DealResult & { orderId?: string }> {
   const user = await requireUser();
+
+  // Three published policies say the buyer acknowledges this at checkout.
+  // Checked here as well as in the browser, because a policy is only worth
+  // the record behind it.
+  if (!acceptedRevenueRisk) {
+    return {
+      ok: false,
+      error:
+        "Tick the box to confirm you understand revenue and monetization are not guaranteed.",
+    };
+  }
+
   const result = await repo.createDeal({
     listingId,
     buyerId: user.id,
     mode,
+    acceptedRevenueRisk: true,
   });
 
   if (!result.ok) return fail(result.reason);

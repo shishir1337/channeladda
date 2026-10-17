@@ -202,3 +202,27 @@ test(
     expect(await balanceOf(seller.id)).toBe(9_500);
   }),
 );
+
+test(
+  "the revenue-risk acknowledgement is recorded on the order",
+  withCleanDb(async () => {
+    // The refund policy, the Terms and the help centre all say the buyer
+    // acknowledges this at checkout. The column existed from the first
+    // migration and nothing ever wrote it — so a dispute about lost
+    // monetization was refused on the strength of a consent that did not
+    // exist anywhere.
+    const seeded = await seedListing();
+    const created = await createDeal({
+      listingId: seeded.listing.id,
+      buyerId: seeded.buyer.id,
+      mode: "FASTEST",
+      acceptedRevenueRisk: true,
+    });
+    if (!created.ok) throw new Error(created.reason);
+
+    const order = await db.order.findUniqueOrThrow({
+      where: { id: created.orderId },
+    });
+    expect(order.revenueRiskAcceptedAt).not.toBeNull();
+  }),
+);
