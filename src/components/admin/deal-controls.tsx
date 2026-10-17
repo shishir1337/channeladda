@@ -101,9 +101,9 @@ export function ClaimDeal({
   defaultEmail: string;
   defaultBrand: string;
   /**
-   * The agent has a stored identity, set on the Team page. The server uses
-   * it whatever is typed, so the fields are shown read-only rather than
-   * offering an edit that would be silently ignored.
+   * The agent has a stored identity, set by a superadmin on their member
+   * page. The server uses it whatever is typed, so the fields are shown
+   * read-only rather than offering an edit that would be silently ignored.
    */
   locked?: boolean;
 }) {
@@ -127,7 +127,7 @@ export function ClaimDeal({
           label="Google account to invite"
           hint={
             locked
-              ? "Your transfer identity, set on the Team page."
+              ? "Your transfer identity, set by a superadmin."
               : "The seller invites this as channel owner."
           }
           value={email}

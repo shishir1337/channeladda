@@ -93,17 +93,40 @@ ADMIN_PASSWORD='...' pnpm exec tsx --conditions=react-server scripts/create-admi
 ```
 
 Then sign in, open `/dashboard/security`, and turn on two-step. That account
-can change fees and appoint staff.
+can change fees and appoint staff. Nobody else needs a script.
 
-### Roles to create
+### Building the team
 
-Through `/admin/users`. Each is a different desk and the boundaries are
-enforced per page, not just in the navigation:
+From `/admin/team` (superadmin only). **Invite** someone by email and role:
+the page gives you a link to send them yourself — it works once, for 72
+hours, and only the hash of it is stored, so a lost link is revoked and
+reissued rather than recovered. An existing member is promoted from their
+own page, `/admin/users/<id>`. Each role is a different desk, and the
+boundaries are enforced on the server for every page, action and download,
+not just in the navigation:
 
-- `AGENT` — takes custody of channels. Sees `/admin/deals` and nothing else.
-- `MODERATOR` — listings, reports, conversations. No money.
-- `FINANCE` — payouts and recording payments. No fees.
-- `SUPERADMIN` — fees, roles, bans.
+- `AGENT` — takes custody of Safest channels. Sees `/admin/deals` and
+  nothing else. Give each agent a **transfer identity** on their member page —
+  the Google account sellers invite as owner and the name they see. Once
+  set, it is used on every deal they take, whatever is typed, so one agent
+  never reaches sellers under two names.
+- `MODERATOR` — the listing queue (approve, send back, take down, reopen,
+  feature), reports, conversations, support, and the **dispute desk**
+  (`/admin/disputes`) for every outcome that moves no money.
+- `FINANCE` — the **money desk** (`/admin/money`: the platform's
+  position, every balance, ledger and payout CSVs, balance corrections),
+  payouts, recording a payment by hand, and the dispute outcomes that move
+  money: completing a Fastest deal, refunding, and cancelling a paid
+  Fastest deal. A balance correction is capped at $500 credited per member
+  per 24 hours for finance; above that it needs a superadmin.
+- `SUPERADMIN` — everything above, plus fees, the payment window, roles,
+  invitations, suspensions and staff accounts.
+
+Member support that used to need a developer is on each member's page
+(`/admin/users/<id>`): record an identity check, reset two-step
+verification, mark an email verified, sign them out everywhere, suspend.
+Every one of these goes on the audit trail under the name of whoever
+did it.
 
 Give every one of them two-step. Between them they can move other people's
 money and take ownership of other people's channels.
@@ -194,10 +217,15 @@ Check it works:
 ```bash
 curl -fsS -X POST https://channeladda.com/api/cron \
   -H "authorization: Bearer $CRON_SECRET"
-# {"ok":true,"deals":0,"offers":0,"media":0,"messages":0}
+# {"ok":true,"reconciled":0,"deals":0,"offers":0,"acceptances":0,"media":0,"messages":0,"orphans":0}
 ```
 
 With no `CRON_SECRET` set the endpoint is **closed**, not open. It answers 401.
+
+Each run is recorded, and the staff overview (`/admin`) says when the
+sweep last ran. If that time is more than half an hour old, the cron job
+has stopped — check it before anything else, because abandoned deals,
+lapsed offers and unreconciled payments all wait on it.
 
 ---
 
@@ -214,7 +242,18 @@ With no `CRON_SECRET` set the endpoint is **closed**, not open. It answers 401.
 
 Verify end to end on a real £1 invoice before opening the doors. A payment
 that never reaches `recordOpeningPayment` leaves a deal stuck at
-`AWAITING_PAYMENT`, which finance can clear by hand from `/admin/deals`.
+`AWAITING_PAYMENT`. On `/admin/deals`, finance sees what Cryptomus last said
+about each unpaid deal and can press **Check with Cryptomus now**, which
+applies the payment only if Cryptomus confirms it. Recording a payment by
+hand is the last resort, for money that arrived some other way.
+
+The sweep re-asks Cryptomus about every unapplied invoice in rotation. It
+gives up on one only when Cryptomus answers **HTTP 404** for it, nothing
+ever called back about it, and it is more than two days old. A timeout,
+an outage or a missing key is never taken as that answer. **Check with
+live credentials** that an unknown invoice really comes back as a 404: if
+Cryptomus answers some other way, such invoices are simply retried for ever
+(harmless, one lookup each per run) rather than given up.
 
 ---
 
