@@ -332,7 +332,10 @@ numbers (they look like phone numbers) and links.
   gives any)*.
 - **Not run through the contact filter** — that is the point of the field —
   **but links are refused** *(call: a "payment link" is the classic way to send
-  a buyer to a fake page)*.
+  a buyer to a fake page)*. A link here means a web address — anything starting
+  `http://`, `https://` or `www.` — or a messaging invite such as `t.me/…`. A
+  bare email address is allowed, because some payment services (PayPal) are
+  addressed by one.
 - **Who sees it:** the seller, the agent and staff always; **the buyer only
   once it is their turn to pay the seller** (status AWAITING_BUYER_PAYMENT) and
   after. Before that the channel is not yet in custody, and the details would be
@@ -409,7 +412,9 @@ again, refuses with its usual plain message, and the page refreshes.
   *(call)*: closing a chat is moderation of what people say, and must not
   freeze a negotiation or a deal that has money or a channel in the air. The
   note check lives in `offers.ts`, so it holds on the listing and Offers pages
-  too; it is a rule about text, not about who may do what.
+  too; it is a rule about text, not about who may do what. Staff can still
+  write in a closed conversation, as they can today, and so can the deal's
+  agent, who is staff for that deal.
 - **Own listing, banned users, unverified email, listing status, payment
   window, offer expiry, reservations, the agent's channel cap, second
   approvals, recovery holds, disputes** — all enforced by the existing server
