@@ -97,24 +97,12 @@ export const auth = betterAuth({
       link.searchParams.set("token", token);
       link.searchParams.set("callbackURL", "/verify-email?verified=1");
 
-      // Best effort, unlike the reset above. By now the account exists, and
-      // Better Auth awaits this inside the sign-up request: a throw showed
-      // the visitor an error for an account that had been created, and the
-      // retry was refused as a duplicate. Verification is not required to
-      // sign in, and /verify-email can send another.
-      try {
-        await sendMail({
-          to: user.email,
-          subject: "Confirm your email address",
-          body: "Confirm this address to finish setting up your Channel Adda account.",
-          link: link.toString(),
-        });
-      } catch (error) {
-        console.error(
-          `[auth] verification email to ${user.id} was not sent`,
-          error,
-        );
-      }
+      await sendMail({
+        to: user.email,
+        subject: "Confirm your email address",
+        body: "Confirm this address to finish setting up your Channel Adda account.",
+        link: link.toString(),
+      });
     },
   },
 
