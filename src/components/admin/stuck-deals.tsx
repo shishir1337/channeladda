@@ -44,7 +44,11 @@ const LIVE_STATUSES = [
 const STALE_DAYS = 7;
 const AGEING_DAYS = 3;
 
-export async function StuckDeals() {
+export async function StuckDeals({
+  canMoveMoney = false,
+}: {
+  canMoveMoney?: boolean;
+}) {
   const deals = await db.order.findMany({
     where: { status: { in: [...LIVE_STATUSES] } },
     orderBy: { createdAt: "asc" },
@@ -179,6 +183,7 @@ export async function StuckDeals() {
                     orderId={order.id}
                     mode={order.mode}
                     status={order.status}
+                    canMoveMoney={canMoveMoney}
                   />
                 </div>
               </RowItem>

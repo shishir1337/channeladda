@@ -362,8 +362,12 @@ const ENDINGS: readonly Ending[] = [
     to: "CANCELLED",
     label: "Cancel the deal",
     weight: "final",
-    consequence: () =>
-      "Ends it with nothing moved and frees the listing. Only reachable while no channel and no payment are in play.",
+    consequence: (mode) =>
+      mode === "FASTEST"
+        ? "Ends it and frees the listing. If the buyer has paid, everything we are holding — price and fee — goes back to their balance."
+        : mode === "SAFEST"
+          ? "Ends it and frees the listing. Before our agent holds the channel, the admin fee goes back to the buyer. Once the agent holds it, this is refused — return the channel instead."
+          : "Ends it and frees the listing, returning whatever we are holding for the buyer.",
   },
   {
     to: "COMPLETED",
@@ -411,11 +415,18 @@ export function EndDeal({
   orderId,
   mode,
   status,
+  canMoveMoney = false,
 }: {
   orderId: string;
   /** Known for every row except reassignment, where the query is SAFEST-only. */
   mode?: DealMode;
   status?: OrderStatus;
+  /**
+   * FINANCE or SUPERADMIN. The two outcomes that pay somebody out of money
+   * the platform holds are theirs; the server refuses anyone else, and this
+   * says so before the click rather than after it.
+   */
+  canMoveMoney?: boolean;
 }) {
   const router = useRouter();
   const ids = { note: useId(), panel: useId(), group: useId() };
@@ -561,6 +572,11 @@ export function EndDeal({
                     {!reachable ? (
                       <span className="rounded-full border border-line bg-surface-2 px-1.5 py-0.5 text-[0.625rem] font-semibold whitespace-nowrap text-subtle">
                         Not this mode
+                      </span>
+                    ) : null}
+                    {ending.weight === "money" && !canMoveMoney ? (
+                      <span className="rounded-full border border-line bg-surface-2 px-1.5 py-0.5 text-[0.625rem] font-semibold whitespace-nowrap text-subtle">
+                        Finance only
                       </span>
                     ) : null}
                   </span>

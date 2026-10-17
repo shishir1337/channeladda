@@ -33,6 +33,10 @@ const MESSAGES: Record<repo.DealFailure, string> = {
   disputed: "This deal is with Channel Adda while the dispute is open.",
   "needs-dispute":
     "One side says this already happened, so reversing it is a decision, not a correction. Pause it for review first — then it can be decided with both accounts of it on the record.",
+  "in-custody":
+    "One of our agents is holding this channel. Give it back to the seller rather than cancelling — cancelling would close the deal and leave the channel in a staff account.",
+  "needs-finance":
+    "Paying somebody out of money Channel Adda is holding is the finance desk’s call, not a moderator’s. Everything else about this deal is yours.",
   "not-disputed":
     "A deal is finished by its last step, not from here. Dispute it first if it is stuck.",
   "already-paid":

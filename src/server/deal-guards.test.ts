@@ -21,7 +21,7 @@ async function open(mode: Mode, priceUsd?: number) {
     mode,
   });
   if (!created.ok) throw new Error(created.reason);
-  const staff = await seedUser("MODERATOR");
+  const staff = await seedUser("FINANCE") /* money outcomes are finance-only */;
   await db.order.update({
     where: { id: created.orderId },
     data: { agentId: seeded.agent.id },

@@ -28,7 +28,7 @@ async function runTo(
       ? {}
       : { settings: { sellerFeeBp: opts.sellerFeeBp } },
   );
-  const staff = await seedUser("MODERATOR");
+  const staff = await seedUser("FINANCE") /* money outcomes are finance-only */;
 
   const created = await createDeal({
     listingId: seeded.listing.id,

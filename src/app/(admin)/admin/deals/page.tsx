@@ -240,6 +240,7 @@ export default async function AdminDealsPage({
                     orderId={order.id}
                     mode="SAFEST"
                     status={order.status}
+                    canMoveMoney={isFinance}
                   />
                 </div>
               </RowItem>
@@ -410,6 +411,7 @@ export default async function AdminDealsPage({
                       orderId={order.id}
                       mode={order.mode}
                       status={order.status}
+                      canMoveMoney={isFinance}
                     />
                   </div>
                 </RowItem>
@@ -419,7 +421,7 @@ export default async function AdminDealsPage({
         )}
       </ConsoleSection>
 
-      {isStaff ? <StuckDeals /> : null}
+      {isStaff ? <StuckDeals canMoveMoney={isFinance} /> : null}
 
       {/* Staff only — and genuinely not rendered, rather than rendered and
           hidden. Every reference in here links somewhere an agent gets a 404

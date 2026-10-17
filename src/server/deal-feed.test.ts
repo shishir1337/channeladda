@@ -13,7 +13,7 @@ import { seedListing, seedUser, withCleanDb } from "@/test/db";
 
 async function completeSafestDeal() {
   const seeded = await seedListing();
-  const staff = await seedUser("MODERATOR");
+  const staff = await seedUser("FINANCE") /* money outcomes are finance-only */;
 
   const created = await createDeal({
     listingId: seeded.listing.id,
@@ -155,7 +155,7 @@ test(
   "resolution reaches the feed under its own name",
   withCleanDb(async () => {
     const seeded = await seedListing();
-    const staff = await seedUser("MODERATOR");
+    const staff = await seedUser("FINANCE");
     const created = await createDeal({
       listingId: seeded.listing.id,
       buyerId: seeded.buyer.id,

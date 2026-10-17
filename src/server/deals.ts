@@ -52,6 +52,10 @@ export type DealFailure =
   | "needs-dispute"
   /** Finishing a deal is the last step’s job, not a shortcut past it. */
   | "not-disputed"
+  /** Moving money out of the platform's hands is the finance desk's. */
+  | "needs-finance"
+  /** The channel is ours to give back, so it cannot just be abandoned. */
+  | "in-custody"
   | "bad-proof";
 
 export type DealOutcome<T = Record<never, never>> =
@@ -1099,6 +1103,19 @@ async function expireStale(scope: { listingId?: string }): Promise<number> {
   return expired;
 }
 
+/**
+ * The two outcomes that pay somebody out of the platform's position.
+ *
+ * `COMPLETED` credits the seller the whole price on a Fastest deal;
+ * `REFUNDED` returns the whole hold to the buyer. `CANCELLED` and
+ * `RETURNED_TO_SELLER` move the admin fee at most, and `DISPUTED` moves
+ * nothing — those stay with any staff member.
+ */
+const MOVES_PLATFORM_MONEY: readonly string[] = Object.freeze([
+  "COMPLETED",
+  "REFUNDED",
+]);
+
 export async function resolveDeal(input: {
   orderId: string;
   to:
@@ -1153,6 +1170,7 @@ export async function resolveDeal(input: {
     return { ok: false, reason: "not-paid" };
   }
 
+
   // Finishing a deal is the final step's job. That step checks the template,
   // the actor, and — above the threshold — a second staff member; none of
   // which happens here. The same transitions are legal for an agent, so
@@ -1171,6 +1189,17 @@ export async function resolveDeal(input: {
   // not falsely admit to having been paid.
   if (input.to === "RETURNED_TO_SELLER" && order.sellerConfirmedAt) {
     return { ok: false, reason: "already-paid" };
+  }
+
+  // Cancelling a Safest deal whose channel we are holding closed the order,
+  // put the listing back on sale, and left a staff agent personally owning
+  // the seller's Google channel with RETURNED_TO_SELLER no longer
+  // reachable. The seller's asset sat in a staff account while the same
+  // channel was advertised again.
+  //
+  // There is a correct ending for this and it is the one next to it.
+  if (input.to === "CANCELLED" && order.custodyAt) {
+    return { ok: false, reason: "in-custody" };
   }
 
   // Everything below is a decision rather than a rule.
@@ -1194,6 +1223,30 @@ export async function resolveDeal(input: {
     (input.to === "REFUNDED" && order.handoverAt !== null);
   if (reversingSomethingClaimed && order.status !== "DISPUTED") {
     return { ok: false, reason: "needs-dispute" };
+  }
+  // Paying somebody out of the platform's own position is the finance
+  // desk's, not every moderator's.
+  //
+  // The product draws this line everywhere else: /admin/payouts is
+  // FINANCE-only, the staff nav hides the whole Money group from
+  // moderators, and the overview will not show them a payout figure. The
+  // deal desk walked around all of it, because roleOnDeal collapses every
+  // staff role into one “staff” actor — so a moderator could raise a
+  // dispute on a $50,000 deal and decide it in the seller's favour, and the
+  // whole escrow landed in a wallet with no finance involvement at all.
+  //
+  // Everything that moves no platform money is still theirs to decide.
+  if (MOVES_PLATFORM_MONEY.includes(input.to)) {
+    const decider = await db.user.findUnique({
+      where: { id: input.byUserId },
+      select: { role: true },
+    });
+    if (
+      !decider ||
+      (decider.role !== "FINANCE" && decider.role !== "SUPERADMIN")
+    ) {
+      return { ok: false, reason: "needs-finance" };
+    }
   }
 
   const now = new Date();
@@ -1269,14 +1322,31 @@ export async function resolveDeal(input: {
         return;
       }
 
-      // The admin fee buys the agent's work. Where the agent never got as far
-      // as holding the channel it was not earned — the spec says staff may
-      // cancel and refund it, and /fees tells buyers so. Once custody has
-      // happened the fee stands. And a fee that was never collected is not
-      // refunded at all: doing that pushed the platform's position negative,
-      // repeatably, from a buyer cancelling their own unpaid deal.
-      if (order.paymentRef && !order.custodyAt) {
-        await refund(order.buyerFeeUsd, `Fee refunded: ${input.note}`);
+      // A cancellation returns whatever the platform is still holding, and
+      // what that is depends on the mode.
+      //
+      // This used to be `buyerFeeUsd` whenever `!order.custodyAt` — and
+      // custodyAt is stamped on Safest step 4 and nowhere else, so on every
+      // paid *Fastest* deal the condition held and the refund was the admin
+      // fee. The platform kept the channel price, the order went terminal,
+      // and since the only REFUND writes in this codebase are the two above,
+      // no path remained that could ever return it. A $100 deal cancelled
+      // after payment left $100 of the buyer's money on our books for good.
+      //
+      // On Fastest we hold price and fee, so all of it goes back: a deal
+      // that did not happen does not earn a fee. On Safest we only ever
+      // held the fee, and once an agent has taken custody that fee is the
+      // work they did — which /fees states. A fee never collected is not
+      // refunded at all, or the platform's position goes negative from a
+      // buyer cancelling their own unpaid deal.
+      if (order.paymentRef) {
+        const held =
+          order.mode === "FASTEST"
+            ? order.totalUsd
+            : order.custodyAt
+              ? 0
+              : order.buyerFeeUsd;
+        if (held > 0) await refund(held, `Refunded: ${input.note}`);
       }
     });
   } catch (error) {
