@@ -112,6 +112,23 @@ export async function reconcileInvoices(limit = 25): Promise<number> {
       if (outcome !== "settled") {
         // Dead invoices stop being chased; a pending one is looked at again.
         if (outcome === "dead") await markApplied(invoice.reference);
+
+        // A refund is neither. The money reached us and went back, so if we
+        // applied it there is a hold on the books that is no longer real.
+        if (outcome === "refunded") {
+          await recordAudit({
+            actorId: null,
+            action: "payment.refunded_by_processor",
+            entity: invoice.orderId ? "order" : "user",
+            entityId: invoice.orderId ?? invoice.userId,
+            after: {
+              reference: invoice.reference,
+              status: confirmed.status,
+              via: "reconcile",
+            },
+          });
+          await markApplied(invoice.reference);
+        }
         continue;
       }
 

@@ -218,16 +218,24 @@ export async function getInvoice(orderId: string): Promise<{
 const SETTLED = new Set(["paid", "paid_over"]);
 
 /** Statuses after which an invoice will never be paid. */
-const DEAD = new Set([
-  "fail",
-  "cancel",
-  "system_fail",
-  "refund_process",
-  "refund_fail",
-  "refund_paid",
-]);
+const DEAD = new Set(["fail", "cancel", "system_fail", "refund_fail"]);
 
-export type InvoiceOutcome = "settled" | "pending" | "dead" | "held";
+/**
+ * The processor sending the payer's money back.
+ *
+ * Not the same thing as an invoice that was never paid, and it used to be
+ * filed with them: a refund on a deal we had already applied left the hold
+ * on our books, so the deal completed normally and credited the seller out
+ * of money that had gone back to the buyer. Separated so a human is told.
+ */
+const REFUNDED = new Set(["refund_process", "refund_paid"]);
+
+export type InvoiceOutcome =
+  | "settled"
+  | "pending"
+  | "dead"
+  | "held"
+  | "refunded";
 
 export function classifyStatus(
   status: string,
@@ -235,6 +243,7 @@ export function classifyStatus(
 ): InvoiceOutcome {
   if (SETTLED.has(status)) return "settled";
   if (status === "locked") return "held"; // AML review; neither paid nor dead
+  if (REFUNDED.has(status)) return "refunded";
   if (DEAD.has(status)) return "dead";
   // `is_final` on anything else means an expired invoice.
   return isFinal ? "dead" : "pending";

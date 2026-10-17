@@ -7,6 +7,7 @@ import {
   cryptomusConfig,
   getInvoice,
 } from "@/server/cryptomus";
+import { TERMINAL_STATUSES } from "@/lib/deal-machine";
 import { recordOpeningPayment } from "@/server/deals";
 import { markApplied, noteCallback } from "@/server/invoices";
 import { creditDeposit } from "@/server/wallet";
@@ -173,6 +174,36 @@ async function handleTopUp(
   return "applied";
 }
 
+/**
+ * A deal whose payment the processor has sent back.
+ *
+ * Moved to DISPUTED, which is the one status that stops a deal without
+ * deciding it: every later step refuses while a deal is disputed, so the
+ * seller cannot be credited out of a hold whose money has gone. Staff then
+ * decide it like any other dispute, with the audit row in front of them.
+ */
+async function freezeRefundedDeal(
+  orderId: string,
+  reference: string,
+  status: string,
+) {
+  const frozen = await db.order.updateMany({
+    where: { id: orderId, status: { notIn: [...TERMINAL_STATUSES] } },
+    data: { status: "DISPUTED" },
+  });
+
+  await recordAudit({
+    actorId: null,
+    action: "payment.refunded_by_processor",
+    entity: "order",
+    entityId: orderId,
+    after: { reference, status, frozen: frozen.count === 1 },
+  });
+
+  console.warn(
+    `[cryptomus] ${reference} was refunded by the processor; deal frozen`,
+  );
+}
 async function handle(
   orderId: string,
   status: string,
@@ -206,6 +237,16 @@ async function handle(
       txid: payload.txid,
     },
   });
+
+  // The processor sent the payer's money back. If we had already applied
+  // this payment, the hold on our books is now a claim about money that
+  // has gone: left alone, the deal completes normally and credits the
+  // seller out of it. Freeze it and put it in front of a human, because
+  // reversing a hold is a decision rather than a sweep.
+  if (outcome === "refunded" && order.paymentRef) {
+    await freezeRefundedDeal(order.id, orderId, status);
+    return "ignored";
+  }
 
   if (outcome !== "settled") return "ignored";
 

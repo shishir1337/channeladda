@@ -44,8 +44,15 @@ test("failures and cancellations are dead", () => {
 });
 
 test("a refund in any stage is not a payment", () => {
-  for (const status of ["refund_process", "refund_fail", "refund_paid"]) {
-    expect(classifyStatus(status, true)).toBe("dead");
+  // A refund that failed is an invoice that will never be paid.
+  expect(classifyStatus("refund_fail", true)).toBe("dead");
+
+  // A refund that is happening is not the same thing, and filing it with
+  // the dead ones hid it: if we had already applied that payment, the hold
+  // on our books was a claim about money that had gone back to the payer,
+  // and the deal completed normally and credited the seller out of it.
+  for (const status of ["refund_process", "refund_paid"]) {
+    expect(classifyStatus(status, true)).toBe("refunded");
   }
 });
 

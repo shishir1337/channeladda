@@ -17,7 +17,7 @@ const safeguards = [
   {
     icon: FileCheck2Icon,
     title: "Ownership code check",
-    body: "Sellers drop a one-time Channel Adda code into the account bio or description. Our system reads it live — no screenshot can fake it.",
+    body: "Sellers drop a one-time Channel Adda code into the account bio or description. On YouTube we read the live channel and check it ourselves; everywhere else a moderator opens the account and looks. Either way it is the live account, not a screenshot.",
   },
   {
     icon: ScanEyeIcon,
