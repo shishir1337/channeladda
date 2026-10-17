@@ -14,6 +14,18 @@ JARS="${2:?}"
 # redirecting to /signin. Run the server with BETTER_AUTH_URL set to the
 # URL you sweep, or pass that URL here as the third argument.
 ORIGIN="${3:-$BASE}"
+
+# The seeded accounts' shared password. Not written down here: the file that
+# creates those accounts is git-ignored for exactly this reason, and a
+# password in a committed script is a password in the repository whatever it
+# happens to unlock today.
+PASSWORD="${E2E_PASSWORD:-}"
+if [ -z "$PASSWORD" ]; then
+  echo "Set E2E_PASSWORD to the seeded accounts’ password. It is the one"
+  echo "scripts/dev-credentials.ts sets:"
+  echo "  E2E_PASSWORD=... bash scripts/e2e-routes.sh BASE_URL JAR_DIR"
+  exit 2
+fi
 PASS=0
 FAIL=0
 
@@ -21,7 +33,7 @@ login() {
   local email="$1" jar="$2"
   curl -s -c "$JARS/$jar.jar" -X POST "$BASE/api/auth/sign-in/email" \
     -H 'Content-Type: application/json' -H "Origin: $ORIGIN" \
-    -d "{\"email\":\"$email\",\"password\":\"channeladda-dev-2026\"}" \
+    -d "{\"email\":\"$email\",\"password\":\"$PASSWORD\"}" \
     -o /dev/null -w '%{http_code}'
 }
 

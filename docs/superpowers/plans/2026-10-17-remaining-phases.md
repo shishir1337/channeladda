@@ -139,3 +139,5 @@ never met a real callback. Both are stated rather than hidden.
   `DATABASE_URL_TEST`, and the table adding to `TABLES` in `src/test/db.ts`.
 - `scripts/e2e-routes.sh BASE JARS` needs the server's `BETTER_AUTH_URL` to
   match the URL swept, or every sign-in is a 403 and every check a redirect.
+  It also needs `E2E_PASSWORD` in the environment — the seeded accounts'
+  password is not written down in a committed file.
