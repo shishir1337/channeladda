@@ -35,9 +35,20 @@ export default async function SoldPage() {
 
   const sorted = await getRecentlySold();
   const totalValue = sorted.reduce((n, s) => n + s.price, 0);
-  const avgDays = Math.round(
-    sorted.reduce((n, s) => n + s.daysToClose, 0) / sorted.length,
-  );
+  // Dividing by nothing rendered “Median close NaN days” on the public page
+  // of a deployment that had not sold anything yet. And it was a mean, not
+  // a median, which on a handful of deals is the more misleading of the two.
+  const closeDays = sorted.map((s) => s.daysToClose).sort((a, b) => a - b);
+  const medianDays =
+    closeDays.length === 0
+      ? null
+      : closeDays.length % 2 === 1
+        ? closeDays[(closeDays.length - 1) / 2]
+        : Math.round(
+            (closeDays[closeDays.length / 2 - 1] +
+              closeDays[closeDays.length / 2]) /
+              2,
+          );
 
   return (
     <>
@@ -45,16 +56,18 @@ export default async function SoldPage() {
         crumbs={[{ label: "Home", href: "/" }, { label: "Recently sold" }]}
         eyebrow="Completed deals"
         title="What accounts actually sell for"
-        description="Asking prices are easy to find. These are settled prices — what a buyer really paid after negotiation, with escrow released and the seller paid out."
+        description="Asking prices are easy to find. These are settled prices — what a buyer really paid after negotiation, on a deal that completed and a seller who was paid."
       >
-        <dl className="mt-7 grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <dl className="mt-7 grid grid-cols-2 gap-4 sm:grid-cols-3">
           <Stat label="Deals shown" value={String(sorted.length)} />
           <Stat
             label="Settled value"
             value={<Price usd={totalValue} compact />}
           />
-          <Stat label="Median close" value={`${avgDays} days`} />
-          <Stat label="Disputed" value="0" tone="verified" />
+          <Stat
+            label="Median close"
+            value={medianDays === null ? "—" : `${medianDays} days`}
+          />
         </dl>
       </PageHeader>
 

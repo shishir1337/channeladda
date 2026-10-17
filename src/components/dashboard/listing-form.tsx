@@ -235,6 +235,12 @@ export function ListingForm({
         }}
       >
         {errors.form ? <FormNotice>{errors.form}</FormNotice> : null}
+      {!errors.form && Object.keys(errors).length > 0 ? (
+        <FormNotice>
+          There is something to fix below — the fields with a message on
+          them are the ones holding this up.
+        </FormNotice>
+      ) : null}
 
         <Section
           title="What are you selling?"
@@ -489,8 +495,15 @@ export function ListingForm({
                 className="size-16 shrink-0 rounded-lg border border-line object-cover"
               />
               <label className="min-w-[12rem] flex-1 text-sm">
-                <span className="sr-only">What this screenshot shows</span>
+                <span className="block text-sm font-medium text-fg">
+                  What this shows
+                  <span aria-hidden="true" className="ml-0.5 text-danger">
+                    *
+                  </span>
+                </span>
                 <input
+                  required
+                  aria-invalid={errors[`proofs.${i}.label`] ? true : undefined}
                   value={proof.label}
                   onChange={(e) =>
                     setDraft((d) => ({
@@ -501,8 +514,23 @@ export function ListingForm({
                     }))
                   }
                   placeholder="e.g. Last 28 days of revenue"
-                  className="h-11 w-full rounded-xl border border-line bg-surface px-3.5 text-base text-fg placeholder:text-subtle focus:border-primary/60 focus:outline-none sm:text-[0.9375rem]"
+                  className={cn(
+                    "mt-1.5 h-11 w-full rounded-xl border bg-surface px-3.5 text-base text-fg placeholder:text-subtle focus:outline-none sm:text-[0.9375rem]",
+                    errors[`proofs.${i}.label`]
+                      ? "border-danger focus:border-danger"
+                      : "border-line focus:border-primary/60",
+                  )}
                 />
+                {/* Without this the whole form died silently: the schema
+                    requires a caption, a screenshot arrives with an empty
+                    one, and the failure is keyed `proofs.0.label` — which
+                    nothing rendered and the scroll-to-first-error could not
+                    find either. Both buttons flickered and did nothing. */}
+                {errors[`proofs.${i}.label`] ? (
+                  <span role="alert" className="mt-1.5 block text-sm text-danger">
+                    {errors[`proofs.${i}.label`]}
+                  </span>
+                ) : null}
               </label>
               <button
                 type="button"

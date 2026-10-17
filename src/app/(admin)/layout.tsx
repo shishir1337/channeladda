@@ -70,17 +70,25 @@ export default async function AdminLayout({ children }: LayoutProps<"/">) {
         },
       ],
     },
-    {
-      label: "Money",
-      items: [
-        {
-          label: "Payouts",
-          href: "/admin/payouts",
-          icon: "money",
-          section: true,
-        },
-      ],
-    },
+    // Payouts is FINANCE and SUPERADMIN only, which is what the page's own
+    // guard enforces. The nav showed it to moderators too, and the 404 it
+    // leads to throws them out of the staff shell onto the public
+    // marketing page — “This page has been sold, moved or never existed”.
+    ...(staff.role === "FINANCE" || staff.role === "SUPERADMIN"
+      ? [
+          {
+            label: "Money",
+            items: [
+              {
+                label: "Payouts",
+                href: "/admin/payouts",
+                icon: "money" as const,
+                section: true,
+              },
+            ],
+          },
+        ]
+      : []),
     {
       label: "Moderation",
       items: [

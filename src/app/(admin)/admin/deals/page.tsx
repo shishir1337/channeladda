@@ -238,7 +238,10 @@ export default async function AdminDealsPage({
 
       {isStaff ? <StuckDeals /> : null}
 
-      <section className="mt-10">
+      {/* Staff only. An agent can open the deals they hold and nothing
+          else, so every reference here was a 404 that threw them out of
+          the staff area onto the public marketing page. */}
+      <section className={isStaff ? "mt-10" : "hidden"} aria-hidden={!isStaff}>
         <h2 className="font-display text-lg font-bold text-fg">
           Everything that has happened
         </h2>

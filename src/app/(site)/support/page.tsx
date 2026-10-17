@@ -40,16 +40,27 @@ const channels = [
   },
 ];
 
-export default function SupportPage() {
+export default async function SupportPage({
+  searchParams,
+}: PageProps<"/support">) {
   const quickHelp = helpArticles.slice(0, 4);
+
+  // requireUser sends a suspended account here with this reason, and the
+  // page used to ignore it entirely — so someone ejected from their own
+  // dashboard landed on a generic contact page with no idea why.
+  const suspended = (await searchParams).reason === "account-suspended";
 
   return (
     <>
       <PageHeader
         crumbs={[{ label: "Home", href: "/" }, { label: "Support" }]}
         eyebrow="Support"
-        title="Talk to a human"
-        description="Most questions are about an order in progress, and those are the ones we answer fastest. Nothing here is a bot."
+        title={suspended ? "Your account is suspended" : "Talk to a human"}
+        description={
+          suspended
+            ? "You cannot sign in to your dashboard while a suspension is in place. Tell us below what you were doing and we will look at it — a moderator reads every one of these, and a suspension that was a mistake is lifted the same day."
+            : "Most questions are about an order in progress, and those are the ones we answer fastest. Nothing here is a bot."
+        }
       />
 
       <Section>
