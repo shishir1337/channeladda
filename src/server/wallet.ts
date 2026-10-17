@@ -7,6 +7,7 @@ import { OPENING_STATUS } from "@/lib/deal-templates";
 import { isSerializationFailure } from "@/lib/serialization-failure";
 import { recordAudit } from "@/server/audit";
 import { postEvent } from "@/server/chat-events";
+import { notifyNextActor } from "@/server/deal-notify";
 import { notify, notifyStaff } from "@/server/notifications";
 import { getSettings } from "@/server/settings";
 
@@ -311,6 +312,10 @@ export async function payFromWallet(
       at: now,
     });
   }
+
+  // The Cryptomus path has always told the next person; this one never did,
+  // so a seller waited on a deal that was already paid.
+  await notifyNextActor(order.id);
 
   await recordAudit({
     actorId: userId,

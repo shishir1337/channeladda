@@ -1172,6 +1172,11 @@ export async function advanceStep(input: {
   }
 
   await notifyNextActor(order.id);
+  // The last step leaves no next actor, so nobody heard that the deal they
+  // were in had finished. Everyone on it does now.
+  if (completing) {
+    await notifyDealEnded(order.id, RESOLUTION_LABELS.COMPLETED);
+  }
 
   // The buyer has checked the channel and pays the seller next. A seller
   // who never said where is reminded — once, because this step completes
@@ -1397,6 +1402,9 @@ async function expireStale(scope: { listingId?: string }): Promise<number> {
       where: { id: order.listingId, status: "RESERVED" },
       data: { status: "LIVE" },
     });
+    // Both sides were left to find out by looking; the listing is back on
+    // sale and the buyer can start again.
+    await notifyDealEnded(order.id, "Payment window closed");
     await recordAudit({
       actorId: null,
       action: "deal.expired",

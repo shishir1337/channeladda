@@ -5,6 +5,18 @@ import type { DealActor } from "@/lib/deal-machine";
 import { templateFor } from "@/lib/deal-templates";
 import { canSendMail, sendMail } from "@/server/mailer";
 
+/**
+ * Where a notification about a deal takes somebody: its conversation, where
+ * the next step can be taken and the other side asked about it. The deal
+ * page is one click from there. A deal from before conversations were
+ * guaranteed falls back to its page.
+ */
+function dealHref(order: { id: string; conversationId: string | null }) {
+  return order.conversationId
+    ? `/dashboard/messages/${order.conversationId}`
+    : `/dashboard/deals/${order.id}`;
+}
+
 /** Where a link in an email has to point. */
 function siteUrl(): string {
   return (
@@ -76,6 +88,7 @@ export async function notifyNextActor(orderId: string): Promise<void> {
         buyerId: true,
         sellerId: true,
         agentId: true,
+        conversationId: true,
         listing: { select: { title: true } },
         steps: {
           where: { completedAt: null },
@@ -99,7 +112,7 @@ export async function notifyNextActor(orderId: string): Promise<void> {
     const userId = recipients[next.actor as DealActor];
     if (!userId) return;
 
-    const href = `/dashboard/deals/${order.id}`;
+    const href = dealHref(order);
     await db.notification.create({
       data: {
         userId,
@@ -155,6 +168,7 @@ export async function notifyDealEnded(
         buyerId: true,
         sellerId: true,
         agentId: true,
+        conversationId: true,
         listing: { select: { title: true } },
       },
     });
@@ -170,7 +184,7 @@ export async function notifyDealEnded(
         kind: "ORDER" as const,
         title: `${outcome} — ${order.reference}`,
         body: `The deal for ${order.listing.title} has closed.`,
-        href: `/dashboard/deals/${order.id}`,
+        href: dealHref(order),
       })),
     });
   } catch (error) {

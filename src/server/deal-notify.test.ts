@@ -60,3 +60,122 @@ test("a missing name does not produce 'Hi ,'", () => {
   expect(mail.body).not.toContain("Hi ,");
   expect(mail.body.startsWith("Hi there")).toBe(true);
 });
+
+// ------------------------------------------------- who hears, and where to
+
+import { db } from "@/lib/db";
+import { templateFor } from "@/lib/deal-templates";
+import {
+  advanceStep,
+  createDeal,
+  expireStaleDeals,
+  recordOpeningPayment,
+} from "@/server/deals";
+import { creditDeposit, payFromWallet } from "@/server/wallet";
+import { passHold, seedListing, withCleanDb } from "@/test/db";
+
+async function openDeal(mode: "SAFEST" | "FASTEST") {
+  const seeded = await seedListing();
+  const created = await createDeal({
+    listingId: seeded.listing.id,
+    buyerId: seeded.buyer.id,
+    mode,
+    acceptedRevenueRisk: true,
+  });
+  if (!created.ok) throw new Error(created.reason);
+  const order = await db.order.findUniqueOrThrow({
+    where: { id: created.orderId },
+  });
+  return { ...seeded, order };
+}
+
+test(
+  "your-move notifications open the conversation",
+  withCleanDb(async () => {
+    const { order, seller } = await openDeal("SAFEST");
+    await recordOpeningPayment(order.id, `pay-${order.id}`, "USDT");
+
+    const turn = await db.notification.findFirstOrThrow({
+      where: { userId: seller.id, kind: "ORDER" },
+    });
+    expect(turn.href).toBe(`/dashboard/messages/${order.conversationId}`);
+  }),
+);
+
+test(
+  "finishing a deal through its last step tells all three",
+  withCleanDb(async () => {
+    const { order, buyer, seller, agent } = await openDeal("FASTEST");
+    await db.order.update({
+      where: { id: order.id },
+      data: {
+        agentId: agent.id,
+        agentEmail: "transfers@channeladda.test",
+        agentBrand: "Channel Adda Transfers",
+      },
+    });
+    await recordOpeningPayment(order.id, `pay-${order.id}`, "USDT");
+    const actors: Record<string, string> = {
+      buyer: buyer.id,
+      seller: seller.id,
+      agent: agent.id,
+    };
+    for (const step of templateFor("FASTEST")) {
+      if (step.position < 2) continue;
+      await passHold(order.id);
+      const done = await advanceStep({
+        orderId: order.id,
+        position: step.position,
+        userId: actors[step.actor],
+      });
+      if (!done.ok) throw new Error(`${step.position}: ${done.reason}`);
+    }
+
+    const told = await db.notification.findMany({
+      where: { title: { startsWith: "Deal completed" } },
+      select: { userId: true, href: true },
+    });
+    expect(told.map((n) => n.userId).sort()).toEqual(
+      [buyer.id, seller.id, agent.id].sort(),
+    );
+    expect(
+      told.every(
+        (n) => n.href === `/dashboard/messages/${order.conversationId}`,
+      ),
+    ).toBe(true);
+  }),
+);
+
+test(
+  "a lapsed payment window tells both sides",
+  withCleanDb(async () => {
+    const { order, buyer, seller } = await openDeal("SAFEST");
+    await db.order.update({
+      where: { id: order.id },
+      data: { createdAt: new Date(Date.now() - 49 * 3_600_000) },
+    });
+    expect(await expireStaleDeals()).toBe(1);
+
+    const told = await db.notification.findMany({
+      where: { title: { startsWith: "Payment window closed" } },
+      select: { userId: true },
+    });
+    expect(told.map((n) => n.userId).sort()).toEqual(
+      [buyer.id, seller.id].sort(),
+    );
+  }),
+);
+
+test(
+  "paying from the balance tells the seller it is their move",
+  withCleanDb(async () => {
+    const { order, buyer, seller } = await openDeal("SAFEST");
+    await creditDeposit(buyer.id, order.totalUsd, `dep-${order.id}`, "USDT");
+    expect(await payFromWallet(order.id, buyer.id)).toEqual({ ok: true });
+
+    const turn = await db.notification.findFirst({
+      where: { userId: seller.id, kind: "ORDER" },
+    });
+    expect(turn?.title).toContain("Invite the agent as channel owner");
+  }),
+);
