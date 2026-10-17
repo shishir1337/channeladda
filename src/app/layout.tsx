@@ -40,7 +40,7 @@ export const metadata: Metadata = {
     "social media marketplace",
     "monetized channel for sale",
     "telegram channel marketplace",
-    "escrow account transfer",
+    "supervised account transfer",
   ],
   openGraph: {
     title: "Channel Adda — Buy & sell social media accounts, safely",

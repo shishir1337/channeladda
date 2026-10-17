@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Price } from "@/components/ui/price";
 import type { Listing } from "@/data/listings";
 import { platformMap } from "@/data/platforms";
-import { cn, formatCompact } from "@/lib/utils";
+import { cn, formatCompact, ratingLabel } from "@/lib/utils";
 
 const tagStyles = {
   featured: { label: "Featured", variant: "primary" as const },
@@ -172,7 +172,7 @@ export function ListingCard({
               className="size-3.5 shrink-0 fill-primary text-primary"
             />
             <span className="tnum text-muted">
-              {listing.sellerRating.toFixed(1)}
+              {ratingLabel(listing.sellerRating)}
             </span>
             <span className="truncate">
               · {listing.sellerName} · {listing.sellerSales} sales

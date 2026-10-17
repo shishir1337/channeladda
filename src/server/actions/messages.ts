@@ -81,7 +81,7 @@ export async function postMessage(
   return {
     ok: true,
     note: result.redactedKinds.length
-      ? `Sent, with ${result.redactedKinds.join(" and ")} removed. Deals stay on Channel Adda so escrow can protect them.`
+      ? `Sent, with ${result.redactedKinds.join(" and ")} removed. Deals stay on Channel Adda so we can protect them.`
       : null,
   };
 }

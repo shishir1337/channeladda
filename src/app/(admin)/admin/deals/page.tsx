@@ -126,8 +126,10 @@ export default async function AdminDealsPage({
             Waiting on payment
           </h2>
           <p className="mt-1.5 text-sm leading-relaxed text-muted">
-            Until the Cryptomus webhook exists, a payment is recorded here by
-            hand. Every later step of a deal unlocks behind it.
+            Cryptomus tells us when one of these clears, and the sweep picks
+            up anything that callback misses. Record one by hand only when
+            the money reached us some other way — every later step of the
+            deal unlocks behind it.
           </p>
           <ul className="mt-4 flex flex-col gap-3">
             {awaitingPayment.map((order) => (

@@ -18,7 +18,7 @@ import { Price } from "@/components/ui/price";
 import type { Listing } from "@/data/listings";
 import type { Platform } from "@/data/platforms";
 import { type Seller, sellerAvatarSrc } from "@/data/sellers";
-import { formatCompact } from "@/lib/utils";
+import { formatCompact, ratingLabel } from "@/lib/utils";
 
 export function Panel({
   title,
@@ -252,7 +252,7 @@ export function SellerPanel({ seller }: { seller: Seller }) {
               aria-hidden="true"
               className="size-3.5 fill-primary text-primary"
             />
-            <span className="tnum text-muted">{seller.rating.toFixed(1)}</span>
+            <span className="tnum text-muted">{ratingLabel(seller.rating)}</span>
             <span>
               ({seller.reviews} reviews) · {seller.country}
             </span>

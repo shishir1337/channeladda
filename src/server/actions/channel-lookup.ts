@@ -268,6 +268,11 @@ export async function checkOwnershipCode(
       facts.channelId,
       listing.ownershipCode,
     );
+
+    // What the verified channel is actually called. Taken from the
+    // canonical URL Google returns rather than from anything the seller
+    // typed.
+    const verifiedHandle = handleFromUrl(facts.canonicalUrl);
     if (!result.ok) {
       return {
         ok: false,
@@ -284,6 +289,12 @@ export async function checkOwnershipCode(
         // Recorded now that it is proven, and overwritten from the verified
         // channel so the listing cannot advertise figures from another one.
         externalId: facts.channelId,
+        // The handle above all. It is the <h1> on the listing page with the
+        // verified tick beside it, and it was the one field verification
+        // never touched — so a seller could type @MrBeast, point sourceUrl
+        // at a throwaway channel they really do control, put the code in
+        // that one, and publish “@MrBeast ✓ Ownership verified”.
+        handle: verifiedHandle ?? undefined,
         title: facts.title || undefined,
         audience: facts.subscribersHidden ? undefined : facts.subscribers,
         avatarUrl: facts.avatarUrl ?? undefined,

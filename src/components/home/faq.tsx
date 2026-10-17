@@ -39,7 +39,7 @@ export function Faq() {
                 Talk to a human first
               </h3>
               <p className="mt-2 text-sm text-muted">
-                We will walk you through a listing, the escrow flow and the fees
+                We will walk you through a listing, the deal types and the fees
                 before you commit anything.
               </p>
               <Button

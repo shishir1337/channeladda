@@ -19,6 +19,7 @@ import { sellerAvatarSrc } from "@/data/sellers";
 import { databaseGate } from "@/lib/db-gate";
 import { getSellerListings } from "@/server/listings";
 import { getSeller, getSellerSlugs } from "@/server/sellers";
+import { ratingLabel } from "@/lib/utils";
 
 /** Marketplace data changes constantly; Prisma queries are invisible to Next's
  *  cache detection, so revalidation is declared explicitly. */
@@ -35,7 +36,7 @@ export async function generateMetadata({
   const seller = await getSeller(slug);
   if (!seller) return { title: "Seller not found" };
 
-  const description = `${seller.name} has completed ${seller.sales} escrow-settled sales on Channel Adda with a ${seller.rating.toFixed(1)} rating. Verified since ${seller.memberSince}.`;
+  const description = `${seller.name} has completed ${seller.sales} supervised sales on Channel Adda${seller.rating === null ? "" : ` with a ${seller.rating.toFixed(1)} rating`}. Verified since ${seller.memberSince}.`;
   return {
     title: `${seller.name} — verified seller`,
     description,
@@ -108,7 +109,7 @@ export default async function SellerPage({
                       className="size-4 fill-primary text-primary"
                     />
                     <span className="tnum font-semibold text-fg">
-                      {seller.rating.toFixed(1)}
+                      {ratingLabel(seller.rating)}
                     </span>
                   </span>
                   <span className="tnum">({seller.reviews} reviews)</span>
@@ -161,7 +162,7 @@ export default async function SellerPage({
               className="mt-0.5 size-4 shrink-0 text-verified"
             />
             <span>
-              Every rating here comes from an escrow-settled order. A review can
+              Every rating here comes from an completed order. A review can
               only be written by a buyer whose deal completed, so there is no
               way to buy reputation on Channel Adda.
             </span>

@@ -68,7 +68,7 @@ function deriveTag(
 }
 
 /** Maps a DB row onto the shape the components already consume. */
-type SellerStat = { name: string; rating: number; sales: number };
+type SellerStat = { name: string; rating: number | null; sales: number };
 
 /**
  * Rating and completed sales for a page of listings, in two queries rather
@@ -105,9 +105,10 @@ async function sellerStatsFor(
       person.id,
       {
         name: person.name,
-        // A seller with no reviews yet reads as 5.0 rather than 0.0, which
-        // would look like a bad seller instead of a new one.
-        rating: ratingBy.get(person.id) ?? 5,
+        // Null rather than a number: a seller with no reviews has not
+        // earned 5.0, and 0.0 would read as a bad seller rather than a new
+        // one. The surfaces show “New”.
+        rating: ratingBy.get(person.id) ?? null,
         sales: salesBy.get(person.id) ?? 0,
       },
     ]),
@@ -146,7 +147,7 @@ function toListing(row: Row, seller?: SellerStat): Listing {
     avatarUrl: row.avatarUrl,
     sellerSlug: row.seller.slug ?? "",
     sellerName: seller?.name ?? row.seller.name,
-    sellerRating: seller?.rating ?? 5,
+    sellerRating: seller?.rating ?? null,
     sellerSales: seller?.sales ?? 0,
     watching: row.watching,
     listedDaysAgo,

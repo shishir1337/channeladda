@@ -30,7 +30,7 @@ export function Services() {
         <SectionHeading
           eyebrow="Channel Adda services"
           title="Growth and recovery work, handled in-house"
-          description="Buying the account is step one. These are the add-ons buyers and sellers ask for most, run by vetted specialists under the same escrow protection."
+          description="Buying the account is step one. These are the add-ons buyers and sellers ask for most, run by vetted specialists under the same the same protection as any other deal."
         />
 
         <ul className="mt-9 grid gap-3 sm:mt-12 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">

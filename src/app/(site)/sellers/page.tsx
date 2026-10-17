@@ -10,6 +10,7 @@ import { sellerAvatarSrc } from "@/data/sellers";
 import { databaseGate } from "@/lib/db-gate";
 import { getSellerListings } from "@/server/listings";
 import { getSellers } from "@/server/sellers";
+import { ratingLabel } from "@/lib/utils";
 
 /** Marketplace data changes constantly; Prisma queries are invisible to Next's
  *  cache detection, so revalidation is declared explicitly. */
@@ -18,7 +19,7 @@ export const revalidate = 60;
 export const metadata: Metadata = {
   title: "Verified sellers",
   description:
-    "Every Channel Adda seller is KYC-verified and rated only by buyers whose escrow-settled deals completed. Browse sellers by rating, volume and platform.",
+    "Every Channel Adda seller is KYC-verified and rated only by buyers whose completed deals completed. Browse sellers by rating, volume and platform.",
   alternates: { canonical: "/sellers" },
 };
 
@@ -45,7 +46,7 @@ export default async function SellersPage() {
         crumbs={[{ label: "Home", href: "/" }, { label: "Sellers" }]}
         eyebrow="Verified sellers"
         title="The people behind the listings"
-        description="Ratings come only from completed, escrow-settled orders. There is no way to buy a review here, which is what makes these numbers worth reading."
+        description="Ratings come only from completed, completed orders. There is no way to buy a review here, which is what makes these numbers worth reading."
       >
         <dl className="mt-7 grid grid-cols-2 gap-4 sm:grid-cols-3">
           <Stat label="Verified sellers" value={String(topSellers.length)} />
@@ -100,7 +101,7 @@ export default async function SellersPage() {
                           className="size-3.5 fill-primary text-primary"
                         />
                         <span className="tnum text-muted">
-                          {seller.rating.toFixed(1)}
+                          {ratingLabel(seller.rating)}
                         </span>
                         <span className="truncate">
                           ({seller.reviews}) · {seller.country}

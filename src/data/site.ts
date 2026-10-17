@@ -104,7 +104,7 @@ export const services: Service[] = [
     icon: "arrow-left-right",
     fromPrice: 0,
     turnaround: "Same day",
-    body: "For high-value or complicated deals, an agent joins a call with both sides and walks the transfer checklist live — recovery email, two-factor, ownership promotion, the lot. Free on any escrow order above $10,000.",
+    body: "For high-value or complicated deals, an agent joins a call with both sides and walks the transfer checklist live — recovery email, two-factor, ownership promotion, the lot. Free on any deal above $10,000.",
     includes: [
       "Scheduled call with buyer and seller",
       "Live walkthrough of the platform checklist",
@@ -121,7 +121,7 @@ export const serviceMap = Object.fromEntries(
 export const testimonials = [
   {
     quote:
-      "I had two failed deals on Telegram before this. Here the money sat in escrow until the channel was actually in my Google account. Released it the same evening.",
+      "I had two failed deals on Telegram before this. Here the money sat in held until the channel was actually in my Google account. Released it the same evening.",
     name: "Daniel Osei",
     role: "Bought a 428K YouTube channel",
     initials: "DO",
@@ -209,7 +209,7 @@ export const footerNav: {
   {
     title: "Trust & safety",
     links: [
-      { label: "How escrow works", href: "/how-it-works" },
+      { label: "How a deal works", href: "/how-it-works" },
       { label: "Trust & safety", href: "/trust-safety" },
       { label: "KYC verification", href: "/aml-kyc" },
       { label: "Dispute resolution", href: "/help/opening-a-dispute" },

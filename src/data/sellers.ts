@@ -6,7 +6,8 @@ export type Seller = {
   initials: string;
   country: string;
   /** Out of 5, one decimal. */
-  rating: number;
+  /** Null until somebody has actually reviewed them. */
+  rating: number | null;
   reviews: number;
   sales: number;
   /** Median first-reply time in minutes. */

@@ -147,7 +147,7 @@ export default async function SoldPage() {
                   aria-hidden="true"
                   className="size-5 text-verified"
                 />
-                Every one of these settled through escrow
+                Every one of these was supervised by an agent
               </h2>
               <p className="mt-2.5 text-sm leading-relaxed text-muted">
                 The buyer confirmed the handover, the cooling-off period passed,

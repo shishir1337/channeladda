@@ -47,19 +47,19 @@ export function SiteFooter() {
               </span>
             </div>
 
-            <ul className="mt-6 flex items-center gap-2">
+            {/* The icons used to be links to /browse, labelled “Channel Adda
+                on Telegram” and so on, so clicking one reloaded the
+                marketplace. Until there are real accounts to point at, they
+                say which platforms we trade rather than pretending to be
+                somewhere we are not. */}
+            <ul aria-label="Platforms we trade" className="mt-6 flex items-center gap-2">
               {socials.map((social) => (
-                <li key={social.label}>
-                  <Link
-                    href="/browse"
-                    aria-label={social.label}
-                    className="inline-flex size-11 items-center justify-center rounded-xl border border-line text-muted transition-colors duration-200 hover:border-line-strong hover:bg-surface hover:text-fg"
-                  >
-                    <social.icon
-                      aria-hidden="true"
-                      className="size-[1.05rem]"
-                    />
-                  </Link>
+                <li
+                  key={social.label}
+                  className="inline-flex size-11 items-center justify-center rounded-xl border border-line text-muted"
+                >
+                  <social.icon aria-hidden="true" className="size-[1.05rem]" />
+                  <span className="sr-only">{social.label}</span>
                 </li>
               ))}
             </ul>

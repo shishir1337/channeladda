@@ -80,9 +80,9 @@ export function TrustSafety() {
         <div className="mt-8 rounded-panel border border-line bg-surface p-6 sm:mt-10 sm:p-8">
           <dl className="grid gap-6 text-center sm:grid-cols-3 sm:text-left">
             {[
-              { v: "99.4%", l: "Deals completed without a dispute" },
-              { v: "< 48h", l: "Median dispute resolution time" },
-              { v: "$0", l: "Buyer funds lost to a failed transfer" },
+              { v: "< 24h", l: "A moderator reads every dispute within" },
+              { v: "2", l: "Staff approvals on a high-value handover" },
+              { v: "0", l: "Deals where both sides are exposed at once" },
             ].map((stat) => (
               <div key={stat.l}>
                 <dt className="sr-only">{stat.l}</dt>

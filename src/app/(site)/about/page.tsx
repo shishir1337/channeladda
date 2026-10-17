@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
-import { Price } from "@/components/ui/price";
 import { Container, Section } from "@/components/ui/section";
 import { platforms, totalListings } from "@/data/platforms";
 import { sellers } from "@/data/sellers";
@@ -19,7 +18,6 @@ export default function AboutPage() {
     { label: "Live listings", value: totalListings.toLocaleString("en-US") },
     { label: "Platforms", value: String(platforms.length) },
     { label: "Verified sellers", value: String(sellers.length) },
-    { label: "Settled", value: <Price usd={48_200_000} compact /> },
   ];
 
   return (

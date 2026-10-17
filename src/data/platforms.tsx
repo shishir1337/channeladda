@@ -31,7 +31,7 @@ export type Platform = {
   blurb: string;
   /** How ownership actually moves on this platform, in plain language. */
   transferNote: string;
-  /** Days funds stay in escrow after handover, set by the platform's own
+  /** Days the handover is held open afterwards, set by the platform's own
    *  account-recovery window rather than by preference. */
   holdDays: number;
   /** Buyer-facing handover checklist shown on every listing for this platform. */
@@ -75,7 +75,7 @@ export const platforms: Platform[] = [
     blurb:
       "Instagram pages across fashion, fitness, food and travel, with real engagement figures and audience-country breakdowns. Follower counts are checked against engagement so inflated accounts do not reach this page.",
     transferNote:
-      "Instagram has no official ownership transfer, so a handover means credentials plus the recovery email and phone. That is why Instagram deals carry our longest escrow hold — a previous owner can attempt recovery for weeks.",
+      "Instagram has no official ownership transfer, so a handover means credentials plus the recovery email and phone. That is why Instagram deals carry our longest hold — a previous owner can attempt recovery for weeks.",
     holdDays: 21,
     transferSteps: [
       "Seller hands over the login and the current recovery email",

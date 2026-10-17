@@ -82,7 +82,7 @@ export default async function PlatformBrowsePage({
           />
           <Stat label="Starting from" value={<Price usd={p.startingPrice} />} />
           <Stat
-            label="Escrow hold"
+            label="Hold period"
             value={`${p.holdDays} days`}
             icon={<TimerIcon aria-hidden="true" className="size-4" />}
           />
@@ -104,7 +104,7 @@ export default async function PlatformBrowsePage({
             <div className="max-w-2xl">
               <Badge variant="verified" size="md">
                 <ShieldCheckIcon aria-hidden="true" />
-                Transfer &amp; escrow
+                Transfer &amp; hold
               </Badge>
               <h2 className="mt-4 text-[1.5rem] leading-[1.2] font-bold sm:text-3xl">
                 How a {p.name} handover actually works
@@ -124,7 +124,7 @@ export default async function PlatformBrowsePage({
                 href="/how-it-works"
                 className="mt-6 inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-primary-text transition-colors hover:text-fg"
               >
-                See the full escrow process
+                See how a deal works
                 <ArrowRightIcon aria-hidden="true" className="size-4" />
               </Link>
             </div>

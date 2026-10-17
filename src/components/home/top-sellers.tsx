@@ -10,6 +10,7 @@ import { Price } from "@/components/ui/price";
 import { Container, Section, SectionHeading } from "@/components/ui/section";
 import { platformMap } from "@/data/platforms";
 import { type Seller, sellerAvatarSrc } from "@/data/sellers";
+import { ratingLabel } from "@/lib/utils";
 
 export function TopSellers({ sellers }: { sellers: Seller[] }) {
   return (
@@ -18,7 +19,7 @@ export function TopSellers({ sellers }: { sellers: Seller[] }) {
         <SectionHeading
           eyebrow="Verified sellers"
           title="The people behind the listings"
-          description="Ratings come only from completed, escrow-settled orders — there is no way to buy a review here."
+          description="Ratings come only from completed, completed orders — there is no way to buy a review here."
           action={
             <Link
               href="/sellers"
@@ -83,7 +84,7 @@ export function TopSellers({ sellers }: { sellers: Seller[] }) {
                     ))}
                   </span>
                   <span className="tnum text-sm font-semibold">
-                    {seller.rating.toFixed(1)}
+                    {ratingLabel(seller.rating)}
                   </span>
                   <span className="tnum text-xs text-subtle">
                     ({seller.reviews} reviews)

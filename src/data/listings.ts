@@ -37,7 +37,8 @@ export type Listing = {
    * the card throw and took the whole page down with it.
    */
   sellerName: string;
-  sellerRating: number;
+  /** Null until somebody has actually reviewed them. */
+  sellerRating: number | null;
   sellerSales: number;
   watching: number;
   /** Days since the listing went live — drives "just listed" sorting. */

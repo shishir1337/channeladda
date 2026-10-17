@@ -44,18 +44,22 @@ async function buildSeller(userId: string): Promise<Seller | null> {
 
   const sales = user.ordersSold.length;
   const volume = user.ordersSold.reduce((n, o) => n + o.priceUsd, 0) / 100;
+  // Null, not five. /sellers says these ratings come only from completed
+  // orders and that there is no way to buy a review here — and then every
+  // brand-new seller rendered five filled stars and “5.0”, disclosed only
+  // by a “(0 reviews)” suffix beside it.
   const rating =
     user.reviewsGot.length > 0
       ? user.reviewsGot.reduce((n, r) => n + r.rating, 0) /
         user.reviewsGot.length
-      : 5;
+      : null;
 
   return {
     slug: user.slug,
     name: user.name,
     initials: initialsOf(user.name),
     country: user.country ?? "Global",
-    rating: Math.round(rating * 10) / 10,
+    rating: rating === null ? null : Math.round(rating * 10) / 10,
     reviews: user.reviewsGot.length,
     sales,
     responseMins: user.responseMins ?? 15,

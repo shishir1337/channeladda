@@ -1,6 +1,17 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 
+/**
+ * A rating, or the honest absence of one.
+ *
+ * A seller with no reviews used to render “5.0” and five filled stars on a
+ * page promising that ratings come only from completed orders and cannot be
+ * bought. Nobody earned that number.
+ */
+export function ratingLabel(rating: number | null): string {
+  return rating === null ? "New" : rating.toFixed(1);
+}
+
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }

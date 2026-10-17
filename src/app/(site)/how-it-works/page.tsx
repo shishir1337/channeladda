@@ -11,7 +11,7 @@ import { platforms } from "@/data/platforms";
 export const metadata: Metadata = {
   title: "How it works",
   description:
-    "Escrow, the handover checklist and the cooling-off period explained. How Channel Adda moves money and account ownership without either side taking a leap of faith.",
+    "Both deal types, the handover checklist and the cooling-off period explained. How Channel Adda moves money and account ownership without either side taking a leap of faith.",
   alternates: { canonical: "/how-it-works" },
 };
 
@@ -22,7 +22,7 @@ export default function HowItWorksPage() {
         crumbs={[{ label: "Home", href: "/" }, { label: "How it works" }]}
         eyebrow="The process"
         title="Nobody goes first on trust"
-        description="The oldest problem in account trading is that someone has to move first — hand over the login, or hand over the money. Escrow removes the question entirely."
+        description="The oldest problem in account trading is that someone has to move first — hand over the login, or hand over the money. We take one side of the exchange and hold it, so neither of you has to."
       />
 
       <HowItWorks />
@@ -38,7 +38,7 @@ export default function HowItWorksPage() {
           <div className="mt-9 overflow-x-auto rounded-card border border-line bg-surface sm:mt-12">
             <table className="w-full min-w-[44rem] text-sm">
               <caption className="sr-only">
-                Escrow hold period and transfer mechanism by platform
+                Hold period and transfer mechanism by platform
               </caption>
               <thead>
                 <tr className="border-b border-line bg-surface-2">

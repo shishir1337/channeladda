@@ -9,7 +9,7 @@ import { helpArticles, helpCategories } from "@/data/help";
 export const metadata: Metadata = {
   title: "Help centre",
   description:
-    "Guides on escrow, listing an account, verifying ownership, getting paid and opening a dispute.",
+    "Guides on how a deal is protected, listing an account, verifying ownership, getting paid and opening a dispute.",
   alternates: { canonical: "/help" },
 };
 
@@ -20,7 +20,7 @@ export default function HelpPage() {
         crumbs={[{ label: "Home", href: "/" }, { label: "Help" }]}
         eyebrow="Help centre"
         title="Guides, not FAQ filler"
-        description="Written for the questions people actually ask before their first deal — what escrow does with your money, what a handover involves, and what happens when it goes wrong."
+        description="Written for the questions people actually ask before their first deal — what each deal type holds, what a handover involves, and what happens when it goes wrong."
       />
 
       <Section>
