@@ -4,7 +4,10 @@ import { purgeExpiredMedia, purgeOldMessages } from "@/server/chat-retention";
 import { expireStaleDeals } from "@/server/deals";
 import { reconcileInvoices } from "@/server/invoices";
 import { recordSweep } from "@/server/settings";
-import { expireOffers } from "@/server/offers";
+import {
+  expireOffers,
+  releaseLapsedOfferReservations,
+} from "@/server/offers";
 import { collectOrphanUploads } from "@/server/upload-access";
 
 /**
@@ -60,6 +63,9 @@ export async function POST(request: Request) {
     ["reconciled", reconcileInvoices],
     ["deals", expireStaleDeals],
     ["offers", expireOffers],
+    // An accepted offer nobody turned into a deal. Before this, accepting
+    // one took the listing off the market for good.
+    ["acceptances", () => releaseLapsedOfferReservations()],
     // Media before messages: deleting a message first would take its
     // attachment row with it and orphan the file on disk for ever.
     ["media", purgeExpiredMedia],

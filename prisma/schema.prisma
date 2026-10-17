@@ -474,6 +474,8 @@ model Offer {
   counterOf   String?
   createdAt   DateTime    @default(now())
   respondedAt DateTime?
+  /// The deal an accepted offer became, if it became one.
+  order       Order?
 
   @@index([listingId, status])
   @@index([buyerId])
@@ -491,6 +493,11 @@ model Order {
 
   mode   DealMode    @default(SAFEST)
   status OrderStatus @default(AWAITING_PAYMENT)
+
+  /// The accepted offer this deal was opened from, when it was. Its amount
+  /// is the deal's price. Unique, so one accepted offer opens one deal.
+  offerId String? @unique
+  offer   Offer?  @relation(fields: [offerId], references: [id])
 
   /// The staff member who takes custody (Safest) or supervises (Fastest).
   agentId    String?

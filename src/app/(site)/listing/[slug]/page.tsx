@@ -25,6 +25,7 @@ import { databaseGate } from "@/lib/db-gate";
 import { formatCompact } from "@/lib/utils";
 import { getListing, getSimilarListings } from "@/server/listings";
 import { getSeller } from "@/server/sellers";
+import { heldByAcceptedOffer } from "@/server/offers";
 import { getCurrentUser } from "@/server/session";
 import { getSettings } from "@/server/settings";
 
@@ -78,6 +79,14 @@ export default async function ListingPage({
   // A seller browsing their own listing gets neither buy action.
   const isOwnListing =
     Boolean(viewer?.slug) && viewer?.slug === listing.sellerSlug;
+
+  // A reserved listing is held for one person. If it is this viewer, by an
+  // offer the seller accepted, the deal opens here at the agreed price.
+  const heldOffer =
+    listing.reserved && viewer
+      ? await heldByAcceptedOffer(listing.id, viewer.id)
+      : null;
+  const heldOfferUsd = heldOffer ? heldOffer.amountUsd / 100 : null;
   const PlatformIcon = platform.icon;
 
   return (
@@ -210,6 +219,7 @@ export default async function ListingPage({
                 holdDays={platform.holdDays}
                 fees={settings}
                 isOwnListing={isOwnListing}
+                heldOfferUsd={heldOfferUsd}
               />
             </div>
 
@@ -220,6 +230,7 @@ export default async function ListingPage({
               <ProofPanel platform={platform} />
               <SellerPanel seller={seller} />
 
+              {listing.reserved ? null : (
               <Panel title="Make an offer" id="offer">
                 <p className="text-sm leading-relaxed text-muted">
                   Offer below the asking price and the seller can accept,
@@ -239,6 +250,7 @@ export default async function ListingPage({
                   />
                 </div>
               </Panel>
+              )}
             </div>
           </div>
 
@@ -249,6 +261,7 @@ export default async function ListingPage({
                 holdDays={platform.holdDays}
                 fees={settings}
                 isOwnListing={isOwnListing}
+                heldOfferUsd={heldOfferUsd}
               />
             </div>
           </aside>

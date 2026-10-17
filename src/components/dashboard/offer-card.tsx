@@ -269,9 +269,20 @@ export function OfferCard({
 
       {offer.effectiveStatus === "ACCEPTED" ? (
         <p className="mt-4 rounded-xl border border-verified/30 bg-verified-soft p-3 text-sm text-fg">
-          {viewingAs === "buyer"
-            ? "Accepted. The listing is held for you — checkout is the next thing being built."
-            : "Accepted. The listing is reserved for this buyer and hidden from everyone else."}
+          {viewingAs === "buyer" ? (
+            <>
+              Accepted. The listing is held for you at {usd(offer.amount)}{" "}
+              while you open the deal — it lapses if you do not.{" "}
+              <Link
+                href={`/listing/${offer.listingSlug}`}
+                className="font-semibold text-primary-text underline underline-offset-2"
+              >
+                Open the deal
+              </Link>
+            </>
+          ) : (
+            "Accepted. The listing is reserved for this buyer while they open the deal. If they do not, it comes back on sale on its own."
+          )}
         </p>
       ) : null}
     </li>

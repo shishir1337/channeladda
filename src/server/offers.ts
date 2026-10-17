@@ -2,7 +2,10 @@ import "server-only";
 
 import type { OfferStatus } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
+import { TERMINAL_STATUSES } from "@/lib/deal-machine";
+import { recordAudit } from "@/server/audit";
 import { notify } from "@/server/notifications";
+import { getSettings } from "@/server/settings";
 import { fromCents } from "@/lib/listing-form";
 
 /**
@@ -493,6 +496,119 @@ export async function withdrawOffer(
  * timeout. It lives here because the reservation is created here and the two
  * belong together.
  */
+/**
+ * The accepted offer a buyer holds on a listing, if it is still holding it.
+ *
+ * “Holding” means accepted within the payment window and not yet turned into
+ * a deal. createDeal uses it to open the deal at the agreed price — which
+ * it could not do before: it refused the RESERVED listing outright, so the
+ * buyer who won the offer was told the listing was not accepting deals.
+ */
+export async function heldByAcceptedOffer(
+  listingId: string,
+  buyerId: string,
+): Promise<{ id: string; amountUsd: number } | null> {
+  const { paymentWindowHours } = await getSettings();
+  const since = new Date(Date.now() - paymentWindowHours * 3_600_000);
+  return db.offer.findFirst({
+    where: {
+      listingId,
+      buyerId,
+      status: "ACCEPTED",
+      respondedAt: { gte: since },
+      order: null,
+    },
+    orderBy: { respondedAt: "desc" },
+    select: { id: true, amountUsd: true },
+  });
+}
+
+/**
+ * Accepted offers that were never turned into a deal, released.
+ *
+ * Accepting reserves the listing. Before this, nothing could undo that: the
+ * winning buyer could not open the deal, nobody else could, the seller could
+ * not pause it, and a moderator could not remove it. One click on Accept took
+ * a listing off the marketplace for good.
+ *
+ * An acceptance now holds the listing for the payment window — the same time
+ * an unpaid deal gets — and then lapses. The listing goes back on sale only if
+ * no live deal is holding it; the reservation that became a deal belongs to
+ * the deal now, not to the offer.
+ *
+ * Run by the scheduled sweep, and by createDeal for the one listing a buyer
+ * is trying to open, so the next buyer is never refused by a stale hold.
+ */
+export async function releaseLapsedOfferReservations(
+  listingId?: string,
+): Promise<number> {
+  const { paymentWindowHours } = await getSettings();
+  const cutoff = new Date(Date.now() - paymentWindowHours * 3_600_000);
+
+  const lapsed = await db.offer.findMany({
+    where: {
+      status: "ACCEPTED",
+      respondedAt: { lt: cutoff },
+      order: null,
+      ...(listingId ? { listingId } : {}),
+    },
+    select: {
+      id: true,
+      listingId: true,
+      buyerId: true,
+      amountUsd: true,
+      listing: { select: { sellerId: true, title: true } },
+    },
+  });
+
+  let released = 0;
+  for (const offer of lapsed) {
+    const moved = await db.offer.updateMany({
+      where: { id: offer.id, status: "ACCEPTED" },
+      data: { status: "EXPIRED" },
+    });
+    if (moved.count !== 1) continue;
+
+    const live = await db.order.count({
+      where: {
+        listingId: offer.listingId,
+        status: { notIn: [...TERMINAL_STATUSES] },
+      },
+    });
+    if (live === 0) {
+      await db.listing.updateMany({
+        where: { id: offer.listingId, status: "RESERVED" },
+        data: { status: "LIVE" },
+      });
+    }
+
+    const amount = asMoney(offer.amountUsd);
+    await notify({
+      userId: offer.buyerId,
+      kind: "OFFER",
+      title: `Your accepted offer of ${amount} lapsed`,
+      body: `The deal was never opened, so ${offer.listing.title} is back on sale. You can make another offer.`,
+      href: "/dashboard/offers",
+    });
+    await notify({
+      userId: offer.listing.sellerId,
+      kind: "LISTING",
+      title: `${offer.listing.title} is back on sale`,
+      body: `The buyer whose offer of ${amount} you accepted never opened the deal.`,
+      href: "/dashboard/listings",
+    });
+    await recordAudit({
+      actorId: null,
+      action: "offer.reservation_lapsed",
+      entity: "listing",
+      entityId: offer.listingId,
+      after: { offerId: offer.id, amountUsd: offer.amountUsd },
+    });
+    released += 1;
+  }
+
+  return released;
+}
 export async function releaseReservation(listingId: string) {
   const released = await db.listing.updateMany({
     where: { id: listingId, status: "RESERVED" },

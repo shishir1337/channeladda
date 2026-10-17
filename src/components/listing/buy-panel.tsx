@@ -21,6 +21,7 @@ export function BuyPanel({
   holdDays,
   fees,
   isOwnListing,
+  heldOfferUsd = null,
 }: {
   listing: Listing;
   /** Only the primitive is passed — a Platform carries its icon component,
@@ -30,7 +31,16 @@ export function BuyPanel({
   fees: FeeSettings;
   /** A seller cannot buy their own listing, so they get neither action. */
   isOwnListing: boolean;
+  /**
+   * Dollars. Set when this viewer holds an accepted offer on a reserved
+   * listing: the deal opens at this price, not the asking price.
+   */
+  heldOfferUsd?: number | null;
 }) {
+  // Reserved for somebody else: the buy and offer controls used to render
+  // here anyway, and both were refused server-side with nothing on the
+  // page saying the listing was held.
+  const heldForSomeoneElse = listing.reserved === true && !heldOfferUsd;
   return (
     <div className="rounded-panel border border-line bg-surface p-5 shadow-soft sm:p-6">
       <div className="flex items-start justify-between gap-3">
@@ -52,16 +62,33 @@ export function BuyPanel({
         <FavoriteButton listingId={listing.id} handle={listing.handle} />
       </div>
 
-      <StartDeal
-        listingId={listing.id}
-        listingSlug={listing.slug}
-        price={listing.price}
-        fees={fees}
-        isOwnListing={isOwnListing}
-      />
+      {heldOfferUsd ? (
+        <p className="mt-4 rounded-card border border-verified/30 bg-verified-soft p-3.5 text-sm leading-relaxed text-fg">
+          The seller accepted your offer of{" "}
+          <Price usd={heldOfferUsd} className="font-semibold" />. The deal
+          below opens at that price, and the listing is held for you while
+          you start it — not for ever.
+        </p>
+      ) : null}
+
+      {heldForSomeoneElse ? (
+        <p className="mt-4 rounded-card border border-line bg-surface-2 p-3.5 text-sm leading-relaxed text-muted">
+          <span className="font-semibold text-fg">Reserved.</span> Somebody
+          is completing a purchase of this account. If it falls through it
+          comes back on sale — save it to hear when.
+        </p>
+      ) : (
+        <StartDeal
+          listingId={listing.id}
+          listingSlug={listing.slug}
+          price={heldOfferUsd ?? listing.price}
+          fees={fees}
+          isOwnListing={isOwnListing}
+        />
+      )}
 
       <div className="mt-5 grid gap-2.5">
-        {!isOwnListing ? (
+        {!isOwnListing && !listing.reserved ? (
           <Button asChild variant="secondary" size="md">
             <Link href={`/listing/${listing.slug}#offer`}>
               <MessageSquareIcon aria-hidden="true" className="size-4" />

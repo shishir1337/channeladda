@@ -7,6 +7,7 @@ import {
   canTransition,
   type DealActor,
   isTerminal,
+  TERMINAL_STATUSES,
 } from "@/lib/deal-machine";
 import { OPENING_STATUS, templateFor } from "@/lib/deal-templates";
 import { orderAmounts } from "@/lib/fees";
@@ -14,6 +15,10 @@ import { isSerializationFailure } from "@/lib/serialization-failure";
 import { keyFromUrl } from "@/lib/upload-keys";
 import { recordAudit } from "@/server/audit";
 import { notifyDealEnded, notifyNextActor } from "@/server/deal-notify";
+import {
+  heldByAcceptedOffer,
+  releaseLapsedOfferReservations,
+} from "@/server/offers";
 import { getSettings } from "@/server/settings";
 import { markUploadsAttached } from "@/server/upload-access";
 
@@ -168,21 +173,38 @@ export async function createDeal(input: {
   // takes a listing off the market for good, and anybody could do that to
   // every listing on the site for the price of nothing. Checked here, where
   // the next buyer actually hits it, rather than waiting for a scheduler.
+  //
+  // An accepted offer is the other thing that reserves a listing, and the
+  // buyer who holds one is exactly who should be let through: the deal opens
+  // at the agreed price. Refusing them — which this used to do — left the
+  // listing reserved for a deal that could never be opened.
+  let offer: { id: string; amountUsd: number } | null = null;
   if (listing.status === "RESERVED") {
-    const freed = await expireStaleDealsForListing(listing.id);
-    if (freed > 0) {
-      const again = await db.listing.findUnique({
-        where: { id: listing.id },
-        select: { status: true },
-      });
-      if (again?.status === "LIVE") listing.status = "LIVE";
+    offer = await heldByAcceptedOffer(listing.id, input.buyerId);
+    if (!offer) {
+      const freed =
+        (await expireStaleDealsForListing(listing.id)) +
+        (await releaseLapsedOfferReservations(listing.id));
+      if (freed > 0) {
+        const again = await db.listing.findUnique({
+          where: { id: listing.id },
+          select: { status: true },
+        });
+        if (again?.status === "LIVE") listing.status = "LIVE";
+      }
     }
   }
 
-  if (listing.status !== "LIVE") return { ok: false, reason: "not-live" };
+  if (!offer && listing.status !== "LIVE") {
+    return { ok: false, reason: "not-live" };
+  }
 
   const settings = await getSettings();
-  const amounts = orderAmounts(listing.priceUsd, settings, input.mode);
+  const amounts = orderAmounts(
+    offer ? offer.amountUsd : listing.priceUsd,
+    settings,
+    input.mode,
+  );
   const steps = templateFor(input.mode);
 
   // Retried only for a reference collision. Everything else either succeeds or
@@ -194,11 +216,38 @@ export async function createDeal(input: {
         // Compare-and-set, not read-then-write: two buyers pressing buy at the
         // same moment must not both end up with an order. A zero row count
         // means somebody else got there between the read above and here.
-        const reserved = await tx.listing.updateMany({
-          where: { id: listing.id, status: "LIVE" },
-          data: { status: "RESERVED" },
+        //
+        // From an accepted offer the listing is already reserved — by the
+        // offer — so the check is that it still is, and that no live deal
+        // has been opened against it in the meantime. The unique offerId on
+        // the order then makes a second deal off the same acceptance
+        // impossible rather than merely unlikely.
+        if (offer) {
+          const stillHeld = await tx.listing.count({
+            where: { id: listing.id, status: "RESERVED" },
+          });
+          const live = await tx.order.count({
+            where: {
+              listingId: listing.id,
+              status: { notIn: [...TERMINAL_STATUSES] },
+            },
+          });
+          if (stillHeld !== 1 || live > 0) throw new DealAbort("taken");
+        } else {
+          const reserved = await tx.listing.updateMany({
+            where: { id: listing.id, status: "LIVE" },
+            data: { status: "RESERVED" },
+          });
+          if (reserved.count !== 1) throw new DealAbort("taken");
+        }
+
+        // Anybody still waiting on an offer hears a decision rather than
+        // nothing. Without this a buyer could watch “waiting on seller” for
+        // up to thirty days on a channel somebody else had already bought.
+        await tx.offer.updateMany({
+          where: { listingId: listing.id, status: "OPEN" },
+          data: { status: "REJECTED", respondedAt: new Date() },
         });
-        if (reserved.count !== 1) throw new DealAbort("taken");
 
         const order = await tx.order.create({
           data: {
@@ -208,6 +257,7 @@ export async function createDeal(input: {
             sellerId: listing.sellerId,
             mode: input.mode,
             status: "AWAITING_PAYMENT",
+            offerId: offer?.id ?? null,
             priceUsd: amounts.priceUsd,
             buyerFeeUsd: amounts.buyerFeeUsd,
             sellerFeeUsd: amounts.sellerFeeUsd,
@@ -255,7 +305,12 @@ export async function createDeal(input: {
         action: "deal.created",
         entity: "order",
         entityId: orderId,
-        after: { mode: input.mode, reference, totalUsd: amounts.totalUsd },
+        after: {
+          mode: input.mode,
+          reference,
+          totalUsd: amounts.totalUsd,
+          ...(offer ? { fromOffer: offer.id } : {}),
+        },
       });
 
       return { ok: true, orderId, reference };

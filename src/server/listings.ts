@@ -143,6 +143,7 @@ function toListing(row: Row, seller?: SellerStat): Listing {
     price: toUsd(row.priceUsd),
     wasPrice: row.wasPriceUsd ? toUsd(row.wasPriceUsd) : undefined,
     ownershipVerified: row.ownershipVerifiedAt !== null,
+    reserved: row.status === "RESERVED",
     coverUrl: row.coverUrl,
     avatarUrl: row.avatarUrl,
     sellerSlug: row.seller.slug ?? "",
