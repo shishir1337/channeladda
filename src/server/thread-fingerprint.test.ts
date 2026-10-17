@@ -166,3 +166,34 @@ test(
     expect(await threadFingerprint("no-such-thread", t.viewer)).toBeNull();
   }),
 );
+
+test(
+  "a held acceptance lapsing changes it",
+  withCleanDb(async () => {
+    // The panel says "$80 is held for you" until the payment window passes;
+    // after that the buyer would start the deal at the asking price, so the
+    // page has to redraw the moment the hold lapses.
+    const t = await thread();
+    const made = await createOffer({
+      buyerId: t.buyer.id,
+      listingId: t.listing.id,
+      amountCents: 8_000,
+      message: null,
+      expiryHours: 48,
+    });
+    if (!made.ok) throw new Error(made.reason);
+    const { acceptOffer } = await import("@/server/offers");
+    expect(
+      (await acceptOffer(made.value.offerId, t.seller.id, "seller")).ok,
+    ).toBe(true);
+
+    const now = new Date();
+    const before = await threadFingerprint(t.id, t.viewer, now);
+    const after = await threadFingerprint(
+      t.id,
+      t.viewer,
+      new Date(now.getTime() + 49 * HOUR),
+    );
+    expect(after).not.toBe(before);
+  }),
+);

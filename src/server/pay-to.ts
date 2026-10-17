@@ -115,9 +115,17 @@ export async function saveSellerPayTo(input: {
     after: { sellerPayTo: text },
   });
 
-  if (replacing && visibleToBuyer) {
-    const title = `${order.seller.name || "The seller"} changed where to pay them`;
-    const body = `On ${order.reference}. Check the new details with them in the conversation before you send anything.`;
+  // Once it is the buyer's turn, any save is news to them: details that
+  // changed are a warning, details that arrive are what they were waiting
+  // for — they were told the seller had not said yet.
+  if (visibleToBuyer) {
+    const name = order.seller.name || "The seller";
+    const title = replacing
+      ? `${name} changed where to pay them`
+      : `${name} added where to pay them`;
+    const body = replacing
+      ? `On ${order.reference}. Check the new details with them in the conversation before you send anything.`
+      : `On ${order.reference}. The details are on the deal, ready for your payment.`;
     await notify({
       userId: order.buyerId,
       kind: "ORDER",
@@ -126,7 +134,8 @@ export async function saveSellerPayTo(input: {
       href: order.conversationId
         ? `/dashboard/messages/${order.conversationId}`
         : `/dashboard/deals/${order.id}`,
-      // By email too: this is the one change that can cost a buyer money.
+      // By email too: the buyer is waiting on this, and a change is the one
+      // thing here that can cost them money.
       email: { subject: title, body },
     });
   }

@@ -394,3 +394,38 @@ test(
     expect(mail.sent.map((m) => m.to)).toContain(seller.email);
   }),
 );
+
+test(
+  "accepting never tells the winning buyer they lost",
+  withCleanDb(async () => {
+    // An offer past its expiry stays OPEN until the sweep runs, and a buyer
+    // can make a fresh one beside it. Accepting the fresh one used to close
+    // the stale one as "the listing went to another buyer" — to the buyer
+    // who had just won it.
+    const { listing, buyer, seller } = await seedListing();
+    const stale = await offer(listing.id, buyer.id, 7_000);
+    await db.offer.update({
+      where: { id: stale.offerId },
+      data: { expiresAt: new Date(Date.now() - HOUR) },
+    });
+    const fresh = await offer(listing.id, buyer.id, 8_000);
+    await db.notification.deleteMany();
+
+    expect((await acceptOffer(fresh.offerId, seller.id, "seller")).ok).toBe(
+      true,
+    );
+
+    const lines = await entries(fresh.conversationId);
+    expect(lines.some((m) => /another buyer/.test(m.body))).toBe(false);
+    const told = await db.notification.findMany({
+      where: { userId: buyer.id },
+    });
+    expect(told.map((n) => n.title)).toEqual([
+      `Your offer of $80 was accepted`,
+    ]);
+    const old = await db.offer.findUniqueOrThrow({
+      where: { id: stale.offerId },
+    });
+    expect(old.status).toBe("EXPIRED");
+  }),
+);

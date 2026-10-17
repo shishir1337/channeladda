@@ -377,8 +377,13 @@ test(
     expect(asBuyer?.viewerRole).toBe("buyer");
     expect(asBuyer?.nextStep?.position).toBe(3);
     expect(asBuyer?.nextStep?.actor).toBe("agent");
-    expect(asBuyer?.agentEmail).toBe("transfers@channeladda.test");
+    // The buyer is told who the agent is, not the account that takes
+    // custody of channels: the whole view reaches their browser.
+    expect(asBuyer?.agentEmail).toBeNull();
     expect(asBuyer?.agentBrand).toBe("Channel Adda Transfers");
+    expect((await getDealFor(seller.id, orderId))?.agentEmail).toBe(
+      "transfers@channeladda.test",
+    );
     expect(asBuyer?.steps).toHaveLength(9);
     expect(asBuyer?.totalUsd).toBe(300);
 

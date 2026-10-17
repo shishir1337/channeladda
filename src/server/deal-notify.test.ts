@@ -138,11 +138,14 @@ test(
     expect(told.map((n) => n.userId).sort()).toEqual(
       [buyer.id, seller.id, agent.id].sort(),
     );
-    expect(
-      told.every(
-        (n) => n.href === `/dashboard/messages/${order.conversationId}`,
-      ),
-    ).toBe(true);
+    const href = (userId: string) =>
+      told.find((n) => n.userId === userId)?.href;
+    // Both sides to the conversation, where the record is.
+    expect(href(buyer.id)).toBe(`/dashboard/messages/${order.conversationId}`);
+    expect(href(seller.id)).toBe(`/dashboard/messages/${order.conversationId}`);
+    // The agent's access to the conversation ends with the deal, so a link
+    // there would be a 404. The deal page is theirs to open.
+    expect(href(agent.id)).toBe(`/dashboard/deals/${order.id}`);
   }),
 );
 

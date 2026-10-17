@@ -271,3 +271,22 @@ test(
     ).toBe(0);
   }),
 );
+
+test(
+  "details added once the buyer is waiting for them tell the buyer",
+  withCleanDb(async () => {
+    // The buyer reached their turn and was told the seller had not said
+    // where to pay. When the seller does, the buyer hears about it.
+    const t = await safestTo(6);
+    const saved = await saveSellerPayTo({
+      orderId: t.orderId,
+      userId: t.seller.id,
+      text: DETAILS,
+    });
+    expect(saved).toEqual({ ok: true });
+    const told = await db.notification.findMany({
+      where: { userId: t.buyer.id, title: { contains: "added where" } },
+    });
+    expect(told).toHaveLength(1);
+  }),
+);

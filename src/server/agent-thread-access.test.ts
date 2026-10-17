@@ -4,6 +4,7 @@ import {
   assignAgent,
   createDeal,
   expireStaleDeals,
+  getDealFor,
   resolveDeal,
 } from "@/server/deals";
 import {
@@ -265,5 +266,46 @@ test(
       where: { id: t.conversationId },
     });
     expect(thread.flaggedAt).toBeNull();
+  }),
+);
+
+test(
+  "an agent whose deal ended is not pointed at its conversation",
+  withCleanDb(async () => {
+    // The deal page links to the chat; once the agent's access has ended the
+    // link would be a 404, so it is not offered to them.
+    const t = await dealThread();
+    expect((await getDealFor(t.agent.id, t.orderId))?.conversationId).toBe(
+      t.conversationId,
+    );
+    await resolveDeal({
+      orderId: t.orderId,
+      to: "CANCELLED",
+      byUserId: t.staff.id,
+      note: "Never paid.",
+    });
+    expect(
+      (await getDealFor(t.agent.id, t.orderId))?.conversationId,
+    ).toBeNull();
+    // Both sides keep theirs.
+    expect((await getDealFor(t.buyer.id, t.orderId))?.conversationId).toBe(
+      t.conversationId,
+    );
+  }),
+);
+
+test(
+  "the buyer's deal view never carries the agent's email",
+  withCleanDb(async () => {
+    // Hidden on screen was not enough: the whole view reaches the browser,
+    // and the address is the account that takes custody of channels.
+    const t = await dealThread();
+    expect((await getDealFor(t.buyer.id, t.orderId))?.agentEmail).toBeNull();
+    expect((await getDealFor(t.seller.id, t.orderId))?.agentEmail).toBe(
+      "transfers@channeladda.test",
+    );
+    expect((await getDealFor(t.agent.id, t.orderId))?.agentEmail).toBe(
+      "transfers@channeladda.test",
+    );
   }),
 );

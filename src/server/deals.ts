@@ -1620,7 +1620,11 @@ export async function resolveDeal(input: {
           kind: "EVENT",
           event:
             input.to === "DISPUTED"
-              ? { type: "dispute-raised", name: by?.name ?? "" }
+              ? {
+                  type: "dispute-raised",
+                  // Staff raise a dispute as Channel Adda, never by name.
+                  name: actor === "staff" ? "Channel Adda" : (by?.name ?? ""),
+                }
               : { type: "deal-ended", outcome: RESOLUTION_LABELS[input.to] },
           // Staff act as Channel Adda, never as a named person — the same rule
           // as their messages — so a staff decision carries no sender.
@@ -1969,10 +1973,18 @@ export async function getDealFor(
     buyerName: order.buyer.name,
     sellerName: order.seller.name,
     agentName: order.agent?.name ?? null,
-    agentEmail: order.agentEmail,
+    // The account that takes custody of channels: the seller needs it to
+    // invite, the agent and staff to check it. The buyer has no use for it,
+    // and this whole view reaches their browser, hidden on screen or not.
+    agentEmail: viewerRole === "buyer" ? null : order.agentEmail,
     agentBrand: order.agentBrand,
     viewerRole,
-    conversationId: order.conversationId,
+    // Not for an agent whose deal is over: their access to the conversation
+    // ends with it, and a link there would be a 404.
+    conversationId:
+      viewerRole === "agent" && isTerminal(order.status)
+        ? null
+        : order.conversationId,
     steps,
     nextStep: isTerminal(order.status)
       ? null

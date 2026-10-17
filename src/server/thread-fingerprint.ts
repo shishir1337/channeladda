@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { roleInThread } from "@/server/messages";
 import { offerTurn } from "@/server/offers";
 import type { CurrentUser } from "@/server/session";
+import { getSettings } from "@/server/settings";
 
 /**
  * A short string that changes whenever an open conversation should redraw.
@@ -36,18 +37,34 @@ export async function threadFingerprint(
   });
   if (!thread || !(await roleInThread(viewer, thread))) return null;
 
-  const [offer, order] = await Promise.all([
+  const [offer, order, settings] = await Promise.all([
     db.offer.findFirst({
       where: { listingId: thread.listingId, buyerId: thread.buyerId },
       orderBy: { createdAt: "desc" },
-      select: { id: true, status: true, expiresAt: true, bySeller: true },
+      select: {
+        id: true,
+        status: true,
+        expiresAt: true,
+        bySeller: true,
+        respondedAt: true,
+      },
     }),
     db.order.findFirst({
       where: { conversationId },
       orderBy: { createdAt: "desc" },
       select: { id: true, status: true, updatedAt: true, holdUntil: true },
     }),
+    getSettings(),
   ]);
+
+  // An accepted offer holds the listing for the payment window, and the
+  // panel says so until it lapses — which, like an offer running out of
+  // time, writes nothing anywhere.
+  const heldOver =
+    offer?.status === "ACCEPTED" &&
+    offer.respondedAt !== null &&
+    offer.respondedAt.getTime() + settings.paymentWindowHours * 3_600_000 <=
+      now.getTime();
 
   return [
     thread.lastMessageAt.toISOString(),
@@ -55,7 +72,9 @@ export async function threadFingerprint(
     thread.listing.updatedAt.toISOString(),
     // As it reads now: an open offer past its expiry has lapsed, whether or
     // not the sweep has written that down.
-    offer ? `${offer.id}:${offerTurn(offer, now).effectiveStatus}` : "-",
+    offer
+      ? `${offer.id}:${offerTurn(offer, now).effectiveStatus}:${heldOver ? "lapsed" : ""}`
+      : "-",
     order
       ? [
           order.id,

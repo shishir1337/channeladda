@@ -17,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { db } from "@/lib/db";
 import { dealPanelState } from "@/lib/deal-panel";
 import { fromCents } from "@/lib/listing-form";
+import { writesInClosedThread } from "@/lib/thread-rules";
 import { loadPanelInput } from "@/server/deal-panel";
 import { getDealFor } from "@/server/deals";
 import { getThread, markThreadRead } from "@/server/messages";
@@ -88,6 +89,9 @@ export default async function ThreadPage({
         ? thread.buyerName
         : `${thread.buyerName} and ${thread.sellerName}`;
   const closed = thread.closedAt !== null;
+  // The message box is closed only to those the server would refuse: the
+  // deal's agent and staff can still write in a closed conversation.
+  const composerClosed = closed && !writesInClosedThread(thread.viewerRole);
 
   // The message box offers a number only when the panel says one can be put
   // on the table now, and never in a conversation staff closed — an offer
@@ -209,7 +213,7 @@ export default async function ThreadPage({
         <ThreadView
           conversationId={thread.id}
           otherSide={otherSide}
-          closed={closed}
+          closed={composerClosed}
           viewerRole={thread.viewerRole}
           offerComposer={offerComposer}
           messages={toMessageViews(thread.messages)}

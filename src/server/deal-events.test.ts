@@ -412,3 +412,35 @@ test(
     expect((await events(orderId)).length).toBe(4);
   }),
 );
+
+test(
+  "a dispute staff raise is Channel Adda's, not the moderator's",
+  withCleanDb(async () => {
+    // Staff speak as Channel Adda: a buyer should not learn which moderator
+    // is reading their deal, from a message or from a line about a dispute.
+    const { orderId } = await open("FASTEST");
+    await recordOpeningPayment(orderId, `pay-${orderId}`, "USDT");
+    const moderator = await db.user.create({
+      data: {
+        email: "jane.moderator@example.test",
+        name: "Jane Moderator",
+        role: "MODERATOR",
+      },
+    });
+
+    const raised = await resolveDeal({
+      orderId,
+      to: "DISPUTED",
+      byUserId: moderator.id,
+      note: "Checking the transfer.",
+    });
+    if (!raised.ok) throw new Error(raised.reason);
+
+    const last = (await events(orderId)).at(-1);
+    expect(last?.body).toBe(
+      eventText({ type: "dispute-raised", name: "Channel Adda" }),
+    );
+    expect(last?.body).not.toContain("Jane");
+    expect(last?.senderId).toBeNull();
+  }),
+);

@@ -184,7 +184,12 @@ export async function notifyDealEnded(
         kind: "ORDER" as const,
         title: `${outcome} — ${order.reference}`,
         body: `The deal for ${order.listing.title} has closed.`,
-        href: dealHref(order),
+        // The agent's access to the conversation ends with the deal, so a
+        // link there would be a 404 for them; the deal page is theirs.
+        href:
+          userId === order.agentId
+            ? `/dashboard/deals/${order.id}`
+            : dealHref(order),
       })),
     });
   } catch (error) {

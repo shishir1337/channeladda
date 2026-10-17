@@ -607,7 +607,7 @@ export async function acceptOffer(
           status: "OPEN",
           id: { not: offerId },
         },
-        select: { id: true, buyerId: true, amountUsd: true },
+        select: { id: true, buyerId: true, amountUsd: true, expiresAt: true },
       });
       const closed: {
         buyerId: string;
@@ -615,6 +615,20 @@ export async function acceptOffer(
         thread: string | null;
       }[] = [];
       for (const other of others) {
+        // The winning buyer's own other offers — one past its expiry that no
+        // sweep has marked yet, or one raced in beside this — are not "lost
+        // to another buyer". They close quietly: lapsed if the clock ran
+        // out, withdrawn otherwise, because this acceptance supersedes them.
+        if (other.buyerId === row.buyerId) {
+          const lapsed = other.expiresAt <= now;
+          await tx.offer.updateMany({
+            where: { id: other.id, status: "OPEN" },
+            data: lapsed
+              ? { status: "EXPIRED" }
+              : { status: "WITHDRAWN", respondedAt: now },
+          });
+          continue;
+        }
         const moved = await tx.offer.updateMany({
           where: { id: other.id, status: "OPEN" },
           data: { status: "REJECTED", respondedAt: now },

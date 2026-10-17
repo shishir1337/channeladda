@@ -8,6 +8,7 @@ import {
   type RedactionKind,
   redactContactDetails,
 } from "@/lib/redact";
+import { writesInClosedThread } from "@/lib/thread-rules";
 import { isChatAttachmentKey, keyIsVideo, urlForKey } from "@/lib/upload-keys";
 import { mediaExpiryFrom } from "@/server/chat-retention";
 import { notify } from "@/server/notifications";
@@ -618,7 +619,7 @@ export async function sendMessage(input: {
   if (!role) return { ok: false, reason: "not-allowed" };
   // Channel Adda's own people. The deal's agent is staff for this deal, so
   // the same exemptions hold for them.
-  const ours = role === "staff" || role === "agent";
+  const ours = writesInClosedThread(role);
   // Staff can still write on a closed thread — closing it is often the moment
   // they need to explain why — and so can the agent running a deal in it.
   if (row.closedAt && !ours) return { ok: false, reason: "closed" };
