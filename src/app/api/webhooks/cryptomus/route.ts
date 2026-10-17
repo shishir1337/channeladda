@@ -214,8 +214,15 @@ async function handle(
     return handleTopUp(orderId, outcome);
   }
 
-  const order = await db.order.findUnique({
+  // The invoice row says whose deal a reference belongs to. Each payment
+  // attempt has its own reference, so the deal's own reference matches only
+  // invoices raised before that was so.
+  const invoice = await db.invoice.findUnique({
     where: { reference: orderId },
+    select: { orderId: true },
+  });
+  const order = await db.order.findUnique({
+    where: invoice?.orderId ? { id: invoice.orderId } : { reference: orderId },
     select: { id: true, totalUsd: true, paymentRef: true },
   });
 

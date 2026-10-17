@@ -1,8 +1,18 @@
 "use server";
 
-import { createInvoice, isConfigured } from "@/server/cryptomus";
+import { revalidatePath } from "next/cache";
+import { db } from "@/lib/db";
+import {
+  classifyStatus,
+  createInvoice,
+  isConfigured,
+} from "@/server/cryptomus";
 import { getDealFor } from "@/server/deals";
-import { recordInvoice } from "@/server/invoices";
+import {
+  newReference,
+  reconcileInvoice,
+  recordInvoice,
+} from "@/server/invoices";
 import { requireUser } from "@/server/session";
 
 /**
@@ -16,7 +26,13 @@ import { requireUser } from "@/server/session";
  */
 export type PayResult =
   | { ok: true; url: string }
-  | { ok: false; error: string; manual?: boolean };
+  | {
+      ok: false;
+      error: string;
+      manual?: boolean;
+      /** Not a failure: a message about a payment already made. */
+      notice?: boolean;
+    };
 
 function siteUrl(): string {
   const base =
@@ -52,26 +68,66 @@ export async function startPayment(orderId: string): Promise<PayResult> {
   }
 
   const base = siteUrl();
+  const raise = (reference: string) =>
+    createInvoice({
+      amountUsd: deal.totalUsd,
+      orderId: reference,
+      callbackUrl: `${base}/api/webhooks/cryptomus`,
+      successUrl: `${base}/dashboard/deals/${deal.id}?paid=1`,
+      returnUrl: `${base}/dashboard/deals/${deal.id}`,
+    });
+
   try {
+    // A reference is good for one invoice's life, not the deal's. Cryptomus
+    // answers an order_id it has seen with that same invoice — open within
+    // its hour, and the same cancelled one after it — and a deal waits 48
+    // hours for payment. Keyed on the deal's reference, every press after
+    // the first hour sent the buyer to a dead page.
+    const latest = await db.invoice.findFirst({
+      where: { orderId: deal.id, purpose: "DEAL", appliedAt: null },
+      orderBy: { createdAt: "desc" },
+      select: { reference: true },
+    });
+
+    if (latest) {
+      const invoice = await raise(latest.reference);
+      switch (classifyStatus(invoice.status, invoice.isFinal)) {
+        case "pending":
+          return { ok: true, url: invoice.url };
+        case "settled":
+          // Paid, and the callback has not landed yet. A second invoice
+          // would ask the buyer to pay twice.
+          return bookArrivedPayment(latest.reference, deal.id);
+        case "held":
+          return {
+            ok: false,
+            notice: true,
+            error:
+              "Cryptomus is holding your payment for a compliance check. " +
+              "Do not pay again — Channel Adda will be in touch about it.",
+          };
+        case "dead":
+        case "refunded":
+          break; // Nothing was kept from that invoice: raise a fresh one.
+      }
+    }
+
+    // Random rather than the deal's five-digit reference. Cryptomus keeps
+    // order_ids for ever per merchant, and staging shares the merchant, so a
+    // reused CA-12345 would hand a production buyer a staging invoice.
+    const reference = newReference("DEAL");
+
     // Written before the invoice is raised, so a callback always has
     // something to resolve against even if this request then fails.
     await recordInvoice({
-      reference: deal.reference,
+      reference,
       purpose: "DEAL",
       amountUsd: deal.totalUsd,
       userId: user.id,
       orderId: deal.id,
     });
 
-    const invoice = await createInvoice({
-      amountUsd: deal.totalUsd,
-      // The deal reference is what the webhook looks the order up by, and
-      // Cryptomus requires it to be unique per invoice.
-      orderId: deal.reference,
-      callbackUrl: `${base}/api/webhooks/cryptomus`,
-      successUrl: `${base}/dashboard/deals/${deal.id}?paid=1`,
-      returnUrl: `${base}/dashboard/deals/${deal.id}`,
-    });
+    const invoice = await raise(reference);
     return { ok: true, url: invoice.url };
   } catch (error) {
     console.error(`[payments] invoice for ${orderId}`, error);
@@ -82,4 +138,22 @@ export async function startPayment(orderId: string): Promise<PayResult> {
         "try again in a moment.",
     };
   }
+}
+
+async function bookArrivedPayment(
+  reference: string,
+  dealId: string,
+): Promise<PayResult> {
+  const outcome = await reconcileInvoice(reference);
+  revalidatePath(`/dashboard/deals/${dealId}`);
+  return {
+    ok: false,
+    notice: true,
+    error:
+      outcome === "applied" || outcome === "already-applied"
+        ? "Cryptomus already has your payment for this deal, and it is now " +
+          "booked. Refresh to see the next step."
+        : "Cryptomus already has your payment for this deal. It is being " +
+          "confirmed — do not pay again. This page moves on once it is booked.",
+  };
 }

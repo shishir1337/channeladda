@@ -50,6 +50,11 @@ export type Invoice = {
   url: string;
   orderId: string;
   status: string;
+  /**
+   * An order_id Cryptomus has seen returns the same invoice, so a "new"
+   * invoice can come back already cancelled or paid.
+   */
+  isFinal: boolean;
   expiresAt: Date | null;
 };
 
@@ -144,6 +149,7 @@ export async function createInvoice(request: InvoiceRequest): Promise<Invoice> {
     order_id: string;
     status?: string;
     payment_status?: string;
+    is_final?: boolean;
     expired_at?: number;
   }>(
     "/payment",
@@ -167,6 +173,7 @@ export async function createInvoice(request: InvoiceRequest): Promise<Invoice> {
     url: result.url,
     orderId: result.order_id,
     status: result.payment_status ?? result.status ?? "check",
+    isFinal: Boolean(result.is_final),
     expiresAt: result.expired_at ? new Date(result.expired_at * 1000) : null,
   };
 }

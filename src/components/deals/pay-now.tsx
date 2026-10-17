@@ -133,7 +133,9 @@ export function PayNow({
               const result = await startPayment(orderId);
               if (!result.ok) {
                 setError(result.error);
-                setManual(Boolean(result.manual));
+                // Both read as information, not an error: "pay by hand",
+                // and "Cryptomus already has your payment".
+                setManual(Boolean(result.manual || result.notice));
                 return;
               }
               // Cryptomus hosts the payment page; a full navigation rather
