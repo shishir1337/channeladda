@@ -134,6 +134,8 @@ export async function listDealsForAgent(agentId: string, limit = 50) {
       status: true,
       priceUsd: true,
       createdAt: true,
+      // Where the agent talks to both sides and can work the steps.
+      conversationId: true,
       listing: { select: { title: true, slug: true } },
     },
   });

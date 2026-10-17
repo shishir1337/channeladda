@@ -186,19 +186,31 @@ deal. Three protections the help centre promised did not exist in code.
       built from the old schema after `prisma generate` ("Unknown field
       `paymentWindowHours`"); it now rebuilds itself. next-themes' script
       no longer trips React 19's "Encountered a script tag" warning.
+- [x] **Deal chat** (design `specs/2026-10-18-deal-chat-design.md`, plan
+      `plans/2026-10-19-deal-chat.md`). The conversation is where a deal
+      is negotiated and run: offer cards and a line for every offer and deal
+      change; one "what can I do now" panel per reader (buy or offer, answer
+      an offer, start the deal, pay, the next step); a seller can put a price
+      to a buyer; the assigned agent reads and writes in their running
+      deal's thread; a Safest seller says where to be paid, and changes are
+      loud; an open thread refreshes itself. Seven bugs fixed on the way:
+      counters notified nobody, offer notes skipped the contact filter, a
+      second deal in a thread had no conversation, auto-declined buyers were
+      never told, and finishing, lapsing and balance-paying a deal notified
+      nobody.
 
 ## Verification, as of the last commit
 
 | Check | Result |
 |---|---|
-| `pnpm test` | 392 passing, 40 files |
+| `pnpm test` | 539 passing, 57 files |
 | `pnpm typecheck` | clean, TypeScript 7.0.2 |
 | `pnpm lint` | clean, Biome 2.5.15, on a fresh checkout too |
 | `pnpm build` | clean, Next.js 16.4.2 |
-| `scripts/e2e-routes.sh` | 131/131 against the production build of the upgraded packages: every page, every role, including the team, money and dispute desks and both CSV exports |
+| `scripts/e2e-routes.sh` | 131/131 against the production build of the deal-chat branch, on `channeladda_e2e` (a copy of the dev database, migrated; the dev database itself is not): every page, every role |
 | `pnpm verify:integrations` | database ok; YouTube, Google and email correctly reported unconfigured; the sweep reported broken only because `CRON_SECRET` is unset on this machine |
 | Cryptomus, live keys (2026-10-17) | signed requests accepted; a $1.00 invoice raised and read back by `order_id` (status `check`); an unknown invoice is HTTP 404; every field the code reads exists under the name it reads; a reused order_id returns the same invoice, `cancel` and final once expired, which is the bug fixed above. Webhook registration fails only because this machine is not a public https origin |
-| Browser | checkout, listing wizard and `/fees` driven by hand in an earlier round; the new desks not yet |
+| Browser | deal chat driven by hand on the e2e copy as buyer, seller and agent: ask, offer, counter, accept, start Safest at the agreed price, pay from balance, agent takes the deal and writes in the thread, seller saves payment details and completes step 2 — all from the conversation, at desktop width and below the 1024px breakpoint (the window could not be narrowed to 390px). Found and fixed: the seller's panel did not show the address to invite |
 | Final review | a fresh reviewer read this round's commits; two Important findings fixed with tests (a second payment the sweep confirmed was booked nowhere; a demoted agent kept their deals), two Minor deferred below |
 
 

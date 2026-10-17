@@ -2,6 +2,7 @@ import { ArrowLeftIcon } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { AgentInvite } from "@/components/deals/agent-invite";
 import { STATUS_LABELS, STATUS_TONE } from "@/components/deals/deal-status";
 import { DealNextStep, RaiseDispute } from "@/components/deals/deal-timeline";
 import { PayNow } from "@/components/deals/pay-now";
@@ -13,6 +14,7 @@ import type { OfferComposerConfig } from "@/components/messages/offer-composer";
 import { toMessageViews, toPanelView } from "@/components/messages/serialize";
 import { ThreadView } from "@/components/messages/thread-view";
 import { Badge } from "@/components/ui/badge";
+import { db } from "@/lib/db";
 import { dealPanelState } from "@/lib/deal-panel";
 import { fromCents } from "@/lib/listing-form";
 import { loadPanelInput } from "@/server/deal-panel";
@@ -64,6 +66,19 @@ export default async function ThreadPage({
   const deal = dealId ? await getDealFor(user.id, dealId) : null;
   const wallet =
     panel?.kind === "pay" && deal ? await getWallet(user.id) : null;
+  // As the deal page does it: only the agent is ever asked to name a second
+  // approver, only on their own step, and nobody else is shown the list.
+  const staffIds =
+    deal?.viewerRole === "agent" && deal.nextStep?.actor === "agent"
+      ? await db.user.findMany({
+          where: {
+            role: { in: ["MODERATOR", "FINANCE", "SUPERADMIN"] },
+            bannedAt: null,
+          },
+          orderBy: { name: "asc" },
+          select: { id: true, name: true },
+        })
+      : undefined;
 
   // The agent of the deal and staff are talking to both of them.
   const otherSide =
@@ -175,7 +190,9 @@ export default async function ThreadPage({
               />
             ) : panel.kind === "step" && deal ? (
               <div className="flex flex-col gap-4">
-                <DealNextStep deal={deal} />
+                <DealNextStep deal={deal} staffIds={staffIds} />
+                {/* "The address to invite is on this page": it is, here too. */}
+                <AgentInvite deal={deal} />
                 <PayToCard deal={deal} />
                 {deal.nextStep ? <RaiseDispute deal={deal} /> : null}
               </div>

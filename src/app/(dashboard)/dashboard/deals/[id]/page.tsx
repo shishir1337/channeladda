@@ -1,7 +1,6 @@
 import {
   ArrowLeftIcon,
   ExternalLinkIcon,
-  MailIcon,
   MessagesSquareIcon,
   ShieldCheckIcon,
   UsersIcon,
@@ -10,6 +9,7 @@ import {
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { AgentInvite } from "@/components/deals/agent-invite";
 import {
   moneyNote,
   STATUS_LABELS,
@@ -205,37 +205,8 @@ export default async function DealPage({
           {/* Safest only: where the buyer pays the seller directly. */}
           <PayToCard deal={deal} />
 
-          {/*
-            The seller has to invite a specific Google account as channel owner,
-            so that address is the one piece of contact detail this product
-            shows on purpose — it is Channel Adda's, not the other party's, and
-            the transfer cannot happen without it.
-          */}
-          {deal.agentEmail && viewer !== "buyer" ? (
-            <section
-              aria-labelledby="invite-heading"
-              className="rounded-panel border border-line bg-surface p-5 sm:p-6"
-            >
-              <h2
-                id="invite-heading"
-                className="flex items-center gap-2 font-display text-base font-bold text-fg"
-              >
-                <MailIcon aria-hidden="true" className="size-4 shrink-0" />
-                Invite this account as {safest ? "owner" : "manager"}
-              </h2>
-              <p className="mt-3 rounded-card border border-line bg-surface-2 px-3.5 py-3 font-mono text-sm break-all text-fg select-all">
-                {deal.agentEmail}
-              </p>
-              {deal.agentBrand ? (
-                <p className="mt-2.5 max-w-[62ch] text-sm leading-relaxed text-muted">
-                  It will show up as{" "}
-                  <strong className="text-fg">{deal.agentBrand}</strong>. If the
-                  name does not match, stop and contact support — nobody else
-                  should be asking for owner access to your channel.
-                </p>
-              ) : null}
-            </section>
-          ) : null}
+          {/* The account the seller invites. Never shown to the buyer. */}
+          <AgentInvite deal={deal} />
 
           {/* ---- the money ----------------------------------------------- */}
           <section

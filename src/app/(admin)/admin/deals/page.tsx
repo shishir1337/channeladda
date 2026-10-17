@@ -551,6 +551,18 @@ export default async function AdminDealsPage({
                       Open the deal and work the steps →
                     </p>
                   </Link>
+                  {/* Beside the row, not in it: a link inside a link is
+                      not one either browser or screen reader can follow. */}
+                  {order.conversationId ? (
+                    <div className="px-4 pb-3.5">
+                      <Link
+                        href={`/dashboard/messages/${order.conversationId}`}
+                        className="inline-flex min-h-9 items-center text-xs font-medium text-primary-text underline-offset-4 hover:underline"
+                      >
+                        Open the deal chat
+                      </Link>
+                    </div>
+                  ) : null}
                 </RowItem>
               ))}
             </Rows>
