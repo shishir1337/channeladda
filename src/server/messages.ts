@@ -14,6 +14,11 @@ import { notify } from "@/server/notifications";
 import { offerTurn } from "@/server/offers";
 import type { CurrentUser } from "@/server/session";
 import { sizeOfUpload } from "@/server/storage";
+import {
+  agentOnThread,
+  runningDealsOf,
+  stillAnAgent,
+} from "@/server/thread-access";
 import { markUploadsAttached } from "@/server/upload-access";
 
 /**
@@ -30,7 +35,8 @@ import { markUploadsAttached } from "@/server/upload-access";
 
 export { MAX_MESSAGE };
 
-export type ThreadRole = "buyer" | "seller" | "staff";
+/** How the reader is involved. `agent`: the agent of a deal running here. */
+export type ThreadRole = "buyer" | "seller" | "agent" | "staff";
 
 /**
  * Who wrote an entry. Wider than the reader's role: the deal's agent writes
@@ -265,7 +271,7 @@ export async function getThread(
   });
   if (!row) return null;
 
-  const viewerRole = roleInThread(viewer, row);
+  const viewerRole = await roleInThread(viewer, row);
   if (!viewerRole) return null;
 
   const now = new Date();
@@ -349,13 +355,16 @@ function senderOf(
  * Exported so everything that shows a thread — the page, the poll that keeps
  * it current — answers "may they see it?" with the same rule.
  */
-export function roleInThread(
+export async function roleInThread(
   viewer: CurrentUser,
-  row: { buyerId: string; sellerId: string },
-): ThreadRole | null {
+  row: { id: string; buyerId: string; sellerId: string },
+): Promise<ThreadRole | null> {
   if (row.buyerId === viewer.id) return "buyer";
   if (row.sellerId === viewer.id) return "seller";
   if (isStaff(viewer)) return "staff";
+  if (viewer.role === "AGENT" && (await agentOnThread(viewer.id, row.id))) {
+    return "agent";
+  }
   return null;
 }
 
@@ -364,13 +373,25 @@ export async function listThreads(
   viewer: CurrentUser,
   take = 50,
 ): Promise<ThreadSummary[]> {
+  // An agent's inbox is the conversations of the deals they are running, by
+  // the same rule as reading one — re-read from the database for the same
+  // reason.
+  const asAgent = viewer.role === "AGENT" && (await stillAnAgent(viewer.id));
+
   const rows = await db.conversation.findMany({
-    where: { OR: [{ buyerId: viewer.id }, { sellerId: viewer.id }] },
+    where: {
+      OR: [
+        { buyerId: viewer.id },
+        { sellerId: viewer.id },
+        ...(asAgent ? [{ orders: runningDealsOf(viewer.id) }] : []),
+      ],
+    },
     orderBy: { lastMessageAt: "desc" },
     take,
     select: {
       id: true,
       buyerId: true,
+      sellerId: true,
       lastMessageAt: true,
       flaggedAt: true,
       closedAt: true,
@@ -392,12 +413,18 @@ export async function listThreads(
 
   return rows.map((row) => {
     const iAmBuyer = row.buyerId === viewer.id;
+    const iAmSeller = row.sellerId === viewer.id;
     return {
       id: row.id,
       listingSlug: row.listing.slug,
       listingTitle: row.listing.title,
       listingHandle: row.listing.handle,
-      withName: iAmBuyer ? row.seller.name : row.buyer.name,
+      // An agent is talking to both of them.
+      withName: iAmBuyer
+        ? row.seller.name
+        : iAmSeller
+          ? row.buyer.name
+          : `${row.buyer.name} and ${row.seller.name}`,
       lastMessageAt: row.lastMessageAt,
       preview: row.messages[0]
         ? `${row.messages[0].fromStaff ? "Channel Adda: " : ""}${row.messages[0].body}`
@@ -550,11 +577,14 @@ export async function sendMessage(input: {
   });
   if (!row) return { ok: false, reason: "not-allowed" };
 
-  const role = roleInThread(input.sender, row);
+  const role = await roleInThread(input.sender, row);
   if (!role) return { ok: false, reason: "not-allowed" };
+  // Channel Adda's own people. The deal's agent is staff for this deal, so
+  // the same exemptions hold for them.
+  const ours = role === "staff" || role === "agent";
   // Staff can still write on a closed thread — closing it is often the moment
-  // they need to explain why.
-  if (row.closedAt && role !== "staff") return { ok: false, reason: "closed" };
+  // they need to explain why — and so can the agent running a deal in it.
+  if (row.closedAt && !ours) return { ok: false, reason: "closed" };
 
   // The listing's own handle is the subject of the conversation, not a way out
   // of it, so it is never mistaken for a contact detail.
@@ -597,7 +627,7 @@ export async function sendMessage(input: {
         // A thread stays flagged once flagged. Staff clear it, not the next
         // clean message — otherwise the way to hide an attempt is to send
         // something innocent straight after it.
-        ...(flagged && role !== "staff"
+        ...(flagged && !ours
           ? {
               flaggedAt: now,
               flagReason: kinds.length
@@ -639,9 +669,9 @@ export async function markThreadRead(
 ) {
   const row = await db.conversation.findUnique({
     where: { id: conversationId },
-    select: { buyerId: true, sellerId: true },
+    select: { id: true, buyerId: true, sellerId: true },
   });
-  if (!row || !roleInThread(viewer, row)) return;
+  if (!row || !(await roleInThread(viewer, row))) return;
 
   await db.message.updateMany({
     where: {

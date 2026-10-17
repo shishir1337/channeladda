@@ -65,8 +65,13 @@ export default async function ThreadPage({
   const wallet =
     panel?.kind === "pay" && deal ? await getWallet(user.id) : null;
 
+  // The agent of the deal and staff are talking to both of them.
   const otherSide =
-    thread.viewerRole === "buyer" ? thread.sellerName : thread.buyerName;
+    thread.viewerRole === "buyer"
+      ? thread.sellerName
+      : thread.viewerRole === "seller"
+        ? thread.buyerName
+        : `${thread.buyerName} and ${thread.sellerName}`;
   const closed = thread.closedAt !== null;
 
   // The message box offers a number only when the panel says one can be put

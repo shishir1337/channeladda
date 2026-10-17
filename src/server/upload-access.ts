@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { keyFromUrl, urlForKey } from "@/lib/upload-keys";
 import type { CurrentUser } from "@/server/session";
 import { deleteUpload } from "@/server/storage";
+import { agentOnThread } from "@/server/thread-access";
 
 /**
  * Who may read an uploaded file.
@@ -20,10 +21,12 @@ import { deleteUpload } from "@/server/storage";
  * permission check on it would be theatre.
  */
 // AGENT is deliberately not here. An agent is staff for the deals they are
-// assigned to, not for the platform: session.ts and messages.ts both keep
-// them out, and an agent is 404'd from /admin/messages. Reading every
+// assigned to, not for the platform: session.ts keeps them out of the staff
+// desks, and an agent is 404'd from /admin/messages. Reading every
 // seller's analytics screenshots and every private thread's attachments
-// from a URL is a wider grant than the page that would show them.
+// from a URL is a wider grant than the page that would show them. The one
+// thing an agent reaches is the conversation of a deal they are running —
+// see the message branch below.
 const STAFF_ROLES = ["MODERATOR", "FINANCE", "SUPERADMIN"] as const;
 
 function isStaff(user: CurrentUser | null): boolean {
@@ -76,17 +79,26 @@ export async function canReadUpload(
   }
 
   if (kind === "message") {
-    // Only the two people in the conversation it was sent in.
+    // The two people in the conversation it was sent in, and the agent of a
+    // deal running there — by the same rule as reading the thread, so a file
+    // never reaches someone who could not see the message it came with.
     const message = await db.message.findFirst({
       where: { attachmentUrl: urlForKey(key) },
       select: {
+        conversationId: true,
         conversation: { select: { buyerId: true, sellerId: true } },
       },
     });
     if (!message) return false;
-    return (
+    if (
       message.conversation.buyerId === user.id ||
       message.conversation.sellerId === user.id
+    ) {
+      return true;
+    }
+    return (
+      user.role === "AGENT" &&
+      (await agentOnThread(user.id, message.conversationId))
     );
   }
 

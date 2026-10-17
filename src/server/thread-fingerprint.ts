@@ -26,6 +26,7 @@ export async function threadFingerprint(
   const thread = await db.conversation.findUnique({
     where: { id: conversationId },
     select: {
+      id: true,
       buyerId: true,
       sellerId: true,
       listingId: true,
@@ -33,7 +34,7 @@ export async function threadFingerprint(
       listing: { select: { status: true, updatedAt: true } },
     },
   });
-  if (!thread || !roleInThread(viewer, thread)) return null;
+  if (!thread || !(await roleInThread(viewer, thread))) return null;
 
   const [offer, order] = await Promise.all([
     db.offer.findFirst({
