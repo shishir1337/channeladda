@@ -24,7 +24,7 @@ const trustPoints = [
   {
     icon: UsersIcon,
     title: "Ratings that cannot be bought",
-    body: "A review can only be written by a buyer whose completed deal completed.",
+    body: "A review can only be written by a buyer whose deal actually completed.",
   },
 ];
 

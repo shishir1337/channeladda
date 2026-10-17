@@ -19,7 +19,7 @@ export function TopSellers({ sellers }: { sellers: Seller[] }) {
         <SectionHeading
           eyebrow="Verified sellers"
           title="The people behind the listings"
-          description="Ratings come only from completed, completed orders — there is no way to buy a review here."
+          description="Ratings come only from deals that completed — there is no way to buy a review here."
           action={
             <Link
               href="/sellers"

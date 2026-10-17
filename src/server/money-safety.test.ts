@@ -163,3 +163,87 @@ test(
     expect(order.paymentRef).toBeNull();
   }),
 );
+
+test(
+  "a payment that loses the compare-and-set is still written down",
+  withCleanDb(async () => {
+    // Two fixes that did not know about each other. Adding `status` to the
+    // compare-and-set made it possible to miss for a reason other than “an
+    // identical delivery got there first” — and the loser returned having
+    // written nothing at all, while the caller still reported the payment as
+    // applied. That marked the invoice applied, discarded Cryptomus's retry,
+    // and hid it from the sweep that exists to catch exactly that.
+    //
+    // Two real payments racing is the deterministic version of the same
+    // miss: a buyer pays the invoice while finance records a bank transfer.
+    const seeded = await seedListing();
+    const created = await createDeal({
+      listingId: seeded.listing.id,
+      buyerId: seeded.buyer.id,
+      mode: "FASTEST",
+    });
+    if (!created.ok) throw new Error(created.reason);
+
+    // Both references have a settled invoice, which is what two real
+    // payments look like: startPayment writes one per invoice it raises.
+    // Whichever wins the compare-and-set, the other is a second payment
+    // with evidence behind it, so the assertion does not depend on who won.
+    for (const reference of [created.reference, "CA-88888"]) {
+      await db.invoice.create({
+        data: {
+          reference,
+          orderId: created.orderId,
+          userId: seeded.buyer.id,
+          purpose: "DEAL",
+          amountUsd: 10_300,
+          settledAt: new Date(),
+          lastStatus: "paid",
+        },
+      });
+    }
+
+    await Promise.all([
+      recordOpeningPayment(created.orderId, created.reference, "USDT"),
+      recordOpeningPayment(created.orderId, "CA-88888", "USDT"),
+    ]);
+
+    // One of them opened the deal; the other was a second payment and is the
+    // buyer's money either way. Neither may simply vanish.
+    const order = await db.order.findUniqueOrThrow({
+      where: { id: created.orderId },
+    });
+    expect(order.status).toBe("AGENT_VERIFYING");
+
+    const holds = await db.ledgerEntry.findMany({
+      where: { orderId: created.orderId, kind: "ESCROW_HOLD" },
+    });
+    expect(holds).toHaveLength(1);
+    expect(await balanceOf(seeded.buyer.id)).toBe(10_300);
+  }),
+);
+
+test(
+  "a payment is never applied twice when two deliveries race",
+  withCleanDb(async () => {
+    // The guard the compare-and-set exists for, still intact: two callbacks
+    // in flight at once must produce one ledger row, not two.
+    const seeded = await seedListing();
+    const created = await createDeal({
+      listingId: seeded.listing.id,
+      buyerId: seeded.buyer.id,
+      mode: "FASTEST",
+    });
+    if (!created.ok) throw new Error(created.reason);
+
+    await Promise.all([
+      recordOpeningPayment(created.orderId, created.reference, "USDT"),
+      recordOpeningPayment(created.orderId, created.reference, "USDT"),
+    ]);
+
+    const rows = await db.ledgerEntry.findMany({
+      where: { orderId: created.orderId },
+    });
+    expect(rows).toHaveLength(1);
+    expect(await balanceOf(seeded.buyer.id)).toBe(0);
+  }),
+);

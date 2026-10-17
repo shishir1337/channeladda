@@ -162,7 +162,7 @@ export default async function SellerPage({
               className="mt-0.5 size-4 shrink-0 text-verified"
             />
             <span>
-              Every rating here comes from an completed order. A review can
+              Every rating here comes from a deal that completed. A review can
               only be written by a buyer whose deal completed, so there is no
               way to buy reputation on Channel Adda.
             </span>

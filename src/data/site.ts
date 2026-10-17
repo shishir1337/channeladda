@@ -121,7 +121,7 @@ export const serviceMap = Object.fromEntries(
 export const testimonials = [
   {
     quote:
-      "I had two failed deals on Telegram before this. Here the money sat in held until the channel was actually in my Google account. Released it the same evening.",
+      "I had two failed deals on Telegram before this. Here the money stayed put until the channel was actually in my Google account. Released it the same evening.",
     name: "Daniel Osei",
     role: "Bought a 428K YouTube channel",
     initials: "DO",

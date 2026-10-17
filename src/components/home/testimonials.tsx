@@ -10,7 +10,7 @@ export function Testimonials() {
         <SectionHeading
           eyebrow="Reviews"
           title="What closing a deal here actually feels like"
-          description="Pulled from verified orders. Every reviewer completed an completed transaction."
+          description="Pulled from verified orders. Every reviewer completed a real deal here."
           align="center"
         />
 

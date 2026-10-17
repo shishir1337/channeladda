@@ -114,7 +114,7 @@ export default async function ServicePage({
                   {[
                     "Send a brief with the account and what you want to achieve.",
                     "We confirm scope, price and a delivery date in writing.",
-                    "You pay into held by us — the specialist is not paid yet.",
+                    "Your payment is held by us — the specialist is not paid yet.",
                     "Work is delivered and you confirm before the money is released.",
                   ].map((step, i) => (
                     <li key={step} className="flex gap-3.5">

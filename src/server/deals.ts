@@ -429,6 +429,8 @@ export async function recordOpeningPayment(
   orderId: string,
   ref: string,
   asset: string,
+  /** Guards the one re-entry after a lost compare-and-set. */
+  attempt = 0,
 ): Promise<void> {
   const order = await db.order.findUnique({
     where: { id: orderId },
@@ -522,8 +524,31 @@ export async function recordOpeningPayment(
     });
   });
 
-  // Lost the race to an identical delivery. The other one did the work.
-  if (!claimed) return;
+  // Lost the compare-and-set. Before `status` joined the predicate the only
+  // way to miss was an identical delivery that had already done the work,
+  // and returning here was right. Now the order may also have moved under
+  // us — expired by the sweep, or claimed by a payment from the buyer's
+  // balance — and returning would drop a payment that really arrived.
+  //
+  // So read it again and decide from what is actually there. One re-entry:
+  // whatever the order is now, the branches above either finish or credit,
+  // and a second miss means something is changing the row in a loop.
+  if (!claimed) {
+    if (attempt > 0) {
+      await recordAudit({
+        actorId: null,
+        action: "payment.unsettled",
+        entity: "order",
+        entityId: order.id,
+        after: { reference: ref, status: order.status },
+      });
+      throw new Error(
+        `Could not settle payment ${ref} on ${order.id}: the order kept moving.`,
+      );
+    }
+    await recordOpeningPayment(orderId, ref, asset, attempt + 1);
+    return;
+  }
 
   await notifyNextActor(order.id);
 
