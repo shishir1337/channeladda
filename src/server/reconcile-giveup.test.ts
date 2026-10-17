@@ -1,6 +1,6 @@
 import { beforeEach, expect, test, vi } from "vitest";
 import { db } from "@/lib/db";
-import { seedUser, withCleanDb } from "@/test/db";
+import { seedListing, seedUser, withCleanDb } from "@/test/db";
 
 // What the processor answers is the whole question here, so it is the one
 // thing replaced. Everything else — the queue, the give-up, the audit row —
@@ -96,5 +96,74 @@ test(
       where: { reference: "TOPUP-SEEN" },
     });
     expect(row.appliedAt).toBeNull();
+  }),
+);
+
+test(
+  "a second payment the sweep confirms is credited to the buyer, not just closed",
+  withCleanDb(async () => {
+    // The buyer paid the deal one way, then a crypto invoice for the same
+    // deal was paid too and its callback was lost. Only the sweep sees it.
+    // It used to call recordOpeningPayment, ignore the answer, and mark the
+    // invoice applied: the second-payment credit needs a settled invoice,
+    // the sweep never stamped one, so nothing was booked — and the invoice
+    // left the "paid, not applied" list for good.
+    const { createDeal, recordOpeningPayment } = await import("@/server/deals");
+    const seeded = await seedListing();
+    const deal = await createDeal({
+      listingId: seeded.listing.id,
+      buyerId: seeded.buyer.id,
+      mode: "FASTEST",
+    });
+    if (!deal.ok) throw new Error(deal.reason);
+
+    await db.invoice.create({
+      data: {
+        reference: deal.reference,
+        orderId: deal.orderId,
+        userId: seeded.buyer.id,
+        purpose: "DEAL",
+        amountUsd: 10_300,
+        settledAt: new Date(),
+        lastStatus: "paid",
+        appliedAt: new Date(),
+      },
+    });
+    await recordOpeningPayment(deal.orderId, deal.reference, "USDT");
+
+    const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
+    await db.invoice.create({
+      data: {
+        reference: "CA-77777",
+        orderId: deal.orderId,
+        userId: seeded.buyer.id,
+        purpose: "DEAL",
+        amountUsd: 10_300,
+        createdAt: tenMinutesAgo,
+        updatedAt: tenMinutesAgo,
+      },
+    });
+    lookup.mockResolvedValue({
+      kind: "found",
+      invoice: {
+        status: "paid",
+        isFinal: true,
+        paidAmountUsd: 10_300,
+        payerCurrency: "USDT",
+      },
+    });
+
+    expect(await reconcileInvoices()).toBe(1);
+
+    const credited = await db.ledgerEntry.aggregate({
+      where: { userId: seeded.buyer.id, externalRef: "overpay:CA-77777" },
+      _sum: { amountUsd: true },
+    });
+    expect(credited._sum.amountUsd).toBe(10_300);
+    const row = await db.invoice.findUniqueOrThrow({
+      where: { reference: "CA-77777" },
+    });
+    expect(row.appliedAt).not.toBeNull();
+    expect(row.settledAt).not.toBeNull();
   }),
 );

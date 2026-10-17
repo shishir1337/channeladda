@@ -172,8 +172,9 @@ export async function listDealsNeedingAgent(limit = 50) {
 /**
  * Deals held by an agent who can no longer act on them.
  *
- * A suspended agent still owns the channels they were holding, so these need a
- * human to move them on rather than waiting to be noticed.
+ * A suspended agent still owns the channels they were holding, and so does one
+ * moved to another role — neither can act on the deal any more (roleOnDeal) —
+ * so these need a human to move them on rather than waiting to be noticed.
  */
 export async function listDealsNeedingReassignment(limit = 50) {
   return db.order.findMany({
@@ -187,7 +188,9 @@ export async function listDealsNeedingReassignment(limit = 50) {
           "AWAITING_HANDOVER",
         ],
       },
-      agent: { bannedAt: { not: null } },
+      agent: {
+        OR: [{ bannedAt: { not: null } }, { role: { not: "AGENT" } }],
+      },
     },
     orderBy: { createdAt: "asc" },
     take: limit,

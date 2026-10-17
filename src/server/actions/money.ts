@@ -140,7 +140,7 @@ export async function checkInvoiceNow(reference: string): Promise<MoneyResult> {
       return {
         ok: true,
         message:
-          "Cryptomus confirmed it as paid. The payment is applied and the deal has moved on.",
+          "Cryptomus confirmed it as paid, and it is booked: to the deal if the deal was waiting for it, or to the buyer's balance if the deal had already been paid another way.",
       };
     case "already-applied":
       return {

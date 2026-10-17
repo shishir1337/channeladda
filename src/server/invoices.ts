@@ -259,11 +259,23 @@ async function reconcileOne(invoice: {
       return false;
     }
 
-    await recordOpeningPayment(
+    // The processor's own lookup is the settlement evidence here, as the
+    // callback is on the webhook path. A second payment is credited only
+    // against a settled invoice, and this path never stamped one — so a
+    // second payment only the sweep saw was booked nowhere.
+    await db.invoice.updateMany({
+      where: { id: invoice.id, settledAt: null },
+      data: { settledAt: new Date(), lastStatus: confirmed.status },
+    });
+
+    const outcome = await recordOpeningPayment(
       invoice.orderId,
       invoice.reference,
       confirmed.payerCurrency ?? "USDT",
     );
+    // Booked nowhere: leave the invoice open, on the "paid, not applied"
+    // list, for a person. Marking it applied hid real money for good.
+    if (outcome === "reference-mismatch") return false;
   } else {
     return false;
   }

@@ -677,13 +677,27 @@ async function roleOnDeal(
 ): Promise<DealActor | null> {
   if (userId === parties.buyerId) return "buyer";
   if (userId === parties.sellerId) return "seller";
-  if (parties.agentId && userId === parties.agentId) return "agent";
 
   const user = await db.user.findUnique({
     where: { id: userId },
-    select: { role: true },
+    select: { role: true, bannedAt: true },
   });
-  return user && STAFF_ROLES.includes(user.role) ? "staff" : null;
+  if (!user) return null;
+
+  // The order records who was given the channel; it counts only while they
+  // still hold the role. Moving an agent to another role was meant to take
+  // their desk away, and the deal kept answering "agent" for them, so they
+  // could sign back in and hand the channel over anyway. Their deals wait
+  // for reassignment instead (listDealsNeedingReassignment).
+  if (
+    parties.agentId &&
+    userId === parties.agentId &&
+    user.role === "AGENT" &&
+    !user.bannedAt
+  ) {
+    return "agent";
+  }
+  return STAFF_ROLES.includes(user.role) ? "staff" : null;
 }
 
 /** Which `Order` timestamp a completed step stamps, if any. */

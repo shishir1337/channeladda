@@ -156,7 +156,7 @@ const INVOICE_VARIANT = {
 /**
  * The deal desk.
  *
- * Ordered by what blocks: a channel stranded with a suspended agent, then a
+ * Ordered by what blocks: a channel stranded with an agent who cannot act, then a
  * payment that has landed and is holding up every later step, then the deals
  * nobody is holding, then everything in flight, then the trail of what has
  * happened. Each queue says how many are in it and how long the oldest has
@@ -312,7 +312,7 @@ export default async function AdminDealsPage({
           note="Live deals with nobody holding them."
         />
         <Metric
-          label="Suspended agent"
+          label="Agent can no longer act"
           value={needingReassignment.length}
           icon={ShieldAlertIcon}
           tone={needingReassignment.length > 0 ? "danger" : "neutral"}
@@ -373,10 +373,10 @@ export default async function AdminDealsPage({
       {needingReassignment.length > 0 ? (
         <ConsoleSection
           id="reassign"
-          title="Held by a suspended agent"
+          title="Held by an agent who can no longer act"
           count={needingReassignment.length}
           tone="danger"
-          description="These channels are still owned by an account that can no longer act on them. Nothing moves until somebody else takes them on, or they go back to the seller."
+          description="These channels are still owned by an agent who was suspended or moved to another role, and who can no longer act on them. Nothing moves until somebody else takes them on, or they go back to the seller."
         >
           <Rows>
             {needingReassignment.map((order) => (
