@@ -544,7 +544,11 @@ export function EndDeal({
           What should happen
         </legend>
         <div className="mt-2 grid gap-2">
-          {ENDINGS.map((ending) => {
+          {ENDINGS.filter(
+            // A disputed deal is already paused; offering it again only
+            // produced a refusal.
+            (ending) => !(ending.to === "DISPUTED" && status === "DISPUTED"),
+          ).map((ending) => {
             const active = choice === ending.to;
             const reachable = ending.applies?.(mode) ?? true;
             const tag = WEIGHT_TAG[ending.weight];
@@ -589,7 +593,11 @@ export function EndDeal({
                         Not this mode
                       </span>
                     ) : null}
-                    {ending.weight === "money" && !canMoveMoney ? (
+                    {!canMoveMoney &&
+                    (ending.weight === "money" ||
+                      (ending.to === "CANCELLED" &&
+                        mode === "FASTEST" &&
+                        paid === true)) ? (
                       <span className="rounded-full border border-line bg-surface-2 px-1.5 py-0.5 text-[0.625rem] font-semibold whitespace-nowrap text-subtle">
                         Finance only
                       </span>

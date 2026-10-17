@@ -543,3 +543,31 @@ test(
     ).toMatchObject({ ok: true });
   }),
 );
+
+test(
+  "a moderator cannot refund a paid fastest buyer by cancelling instead",
+  withCleanDb(async () => {
+    // Cancelling a paid Fastest deal returns everything we hold, which makes
+    // it a refund under another name — and CANCELLED was not on the
+    // finance-only list. So the finance gate was one radio button wide: a
+    // moderator who could not choose "Refund the buyer" could choose "Cancel".
+    const o = await runTo("FASTEST", 3);
+    const moderator = await seedUser("MODERATOR");
+    await resolveDeal({
+      orderId: o.orderId,
+      to: "DISPUTED",
+      byUserId: o.buyer.id,
+      note: "stuck",
+    });
+
+    expect(
+      await resolveDeal({
+        orderId: o.orderId,
+        to: "CANCELLED",
+        byUserId: moderator.id,
+        note: "calling it off",
+      }),
+    ).toMatchObject({ ok: false, reason: "needs-finance" });
+    expect(await balanceOf(o.buyer.id)).toBe(0);
+  }),
+);

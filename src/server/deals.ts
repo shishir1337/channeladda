@@ -1203,17 +1203,26 @@ async function expireStale(scope: { listingId?: string }): Promise<number> {
 }
 
 /**
- * The two outcomes that pay somebody out of the platform's position.
+ * Whether an outcome pays somebody out of the platform's position.
  *
- * `COMPLETED` credits the seller the whole price on a Fastest deal;
- * `REFUNDED` returns the whole hold to the buyer. `CANCELLED` and
- * `RETURNED_TO_SELLER` move the admin fee at most, and `DISPUTED` moves
- * nothing — those stay with any staff member.
+ * `COMPLETED` credits the seller the whole price on a Fastest deal and
+ * `REFUNDED` returns the whole hold to the buyer. So does `CANCELLED` on a
+ * paid Fastest deal — we hold the whole price there, and cancelling hands
+ * it back: a refund under another name, which made the finance gate one
+ * radio button wide. Cancelling a paid Safest deal returns the buyer's
+ * admin fee at most, the same fee-sized move any staff member could always
+ * make. `RETURNED_TO_SELLER` and `DISPUTED` move nothing.
  */
-const MOVES_PLATFORM_MONEY: readonly string[] = Object.freeze([
-  "COMPLETED",
-  "REFUNDED",
-]);
+function movesPlatformMoney(
+  to: string,
+  order: { mode: string; paymentRef: string | null },
+): boolean {
+  if (to === "COMPLETED" || to === "REFUNDED") return true;
+  if (to === "CANCELLED") {
+    return order.mode === "FASTEST" && order.paymentRef !== null;
+  }
+  return false;
+}
 
 export async function resolveDeal(input: {
   orderId: string;
@@ -1350,7 +1359,7 @@ export async function resolveDeal(input: {
   // whole escrow landed in a wallet with no finance involvement at all.
   //
   // Everything that moves no platform money is still theirs to decide.
-  if (MOVES_PLATFORM_MONEY.includes(input.to)) {
+  if (movesPlatformMoney(input.to, order)) {
     const decider = await db.user.findUnique({
       where: { id: input.byUserId },
       select: { role: true },

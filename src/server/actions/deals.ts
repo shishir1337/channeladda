@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import type { DealMode } from "@/generated/prisma/enums";
 import * as repo from "@/server/deals";
+import { agentIdentity } from "@/server/admin-users";
 import { requireRole, requireUser } from "@/server/session";
 
 /**
@@ -128,11 +129,16 @@ export async function claimDeal(
   agentBrand: string,
 ): Promise<DealResult> {
   const user = await requireRole("AGENT");
+  // The agent's stored identity wins over whatever was typed. It used to be
+  // typed per deal, so one agent reached different sellers under different
+  // names — and a seller told to invite the wrong address as owner hands
+  // their channel to nobody.
+  const stored = await agentIdentity(user.id);
   const result = await repo.assignAgent({
     orderId,
     agentId: user.id,
-    agentEmail,
-    agentBrand,
+    agentEmail: stored?.email ?? agentEmail,
+    agentBrand: stored?.brand ?? agentBrand,
     byUserId: user.id,
   });
 
@@ -150,11 +156,12 @@ export async function assignDealAgent(
   agentBrand: string,
 ): Promise<DealResult> {
   const user = await requireRole("MODERATOR", "FINANCE");
+  const stored = await agentIdentity(agentId);
   const result = await repo.assignAgent({
     orderId,
     agentId,
-    agentEmail,
-    agentBrand,
+    agentEmail: stored?.email ?? agentEmail,
+    agentBrand: stored?.brand ?? agentBrand,
     byUserId: user.id,
   });
 
