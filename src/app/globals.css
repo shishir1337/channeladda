@@ -3,6 +3,11 @@
 /* Class-based dark mode so the theme toggle can override the OS preference. */
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* Inside the signed-in app (anything rendered while an AppShell is mounted,
+   portals included). Shared controls use it to be dense in the tool and keep
+   their marketing proportions everywhere else. */
+@custom-variant app (&:where(:root:has([data-app]) *));
+
 /* ------------------------------------------------------------------ *
  * Channel Adda design tokens
  * Dark-first "trading floor" palette: ink surfaces, signal gold as the
@@ -48,6 +53,10 @@
   --brand-facebook: #1877f2;
   --brand-telegram: #1b8fc4;
   --brand-website: #0f9d63;
+
+  --db-font-display: var(--font-space-grotesk), var(--font-inter), sans-serif;
+  --db-radius-card: 1rem;
+  --db-radius-panel: 1.5rem;
 }
 
 .dark {
@@ -87,6 +96,77 @@
   --brand-website: #23c98a;
 }
 
+/* ------------------------------------------------------------------ *
+ * The app: dashboards for members, agents and staff.
+ * A tool is scanned, not read, so it gets its own quieter palette: true
+ * neutrals, colour only where it means something, one type family, tighter
+ * radii. Keyed off the shell being in the document rather than a class on
+ * <html>, so menus and sheets portalled to <body> pick it up too and the
+ * public site never does.
+ * ------------------------------------------------------------------ */
+:root:has([data-app]) {
+  --db-bg: #fafafa;
+  --db-bg-subtle: #f4f4f5;
+  --db-surface: #ffffff;
+  --db-surface-2: #f4f4f5;
+  --db-surface-3: #ebebed;
+  --db-border: #e8e8eb;
+  --db-border-strong: #d6d6db;
+
+  --db-fg: #18181b;
+  --db-fg-muted: #52525b;
+  --db-fg-subtle: #71717a;
+
+  --db-primary-soft: #fff6e3;
+  --db-verified: #0c8a57;
+  --db-verified-soft: #e9f6ef;
+  --db-info: #2457d6;
+  --db-info-soft: #ebf0fc;
+  --db-danger: #cf2a1e;
+  --db-danger-soft: #fdefee;
+
+  --db-shadow-color: 240 6% 10%;
+
+  --db-font-display: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --db-radius-card: 0.75rem;
+  --db-radius-panel: 0.75rem;
+
+  /* Tailwind's own steps, pulled in so a stray rounded-2xl on a page cannot
+     reintroduce the marketing curves. */
+  --radius-xl: 0.5rem;
+  --radius-2xl: 0.75rem;
+  --radius-3xl: 0.75rem;
+
+  color-scheme: light;
+}
+
+:root.dark:has([data-app]) {
+  --db-bg: #09090b;
+  --db-bg-subtle: #0e0e10;
+  --db-surface: #111113;
+  --db-surface-2: #18181b;
+  --db-surface-3: #212124;
+  --db-border: #232326;
+  --db-border-strong: #323238;
+
+  --db-fg: #ededef;
+  --db-fg-muted: #a1a1aa;
+  --db-fg-subtle: #80808a;
+
+  --db-primary-soft: #2a1f0a;
+  --db-verified: #2fc48a;
+  --db-verified-soft: #0f2219;
+  --db-info: #6b97ff;
+  --db-info-soft: #121a2c;
+  --db-danger: #ff6b60;
+  --db-danger-soft: #2a1513;
+
+  --db-shadow-color: 240 10% 2%;
+  --db-glow: 0 0 0 0 transparent;
+
+  color-scheme: dark;
+}
+
 @theme inline {
   --color-bg: var(--db-bg);
   --color-bg-subtle: var(--db-bg-subtle);
@@ -116,11 +196,11 @@
   --color-ring: var(--db-ring);
 
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
-  --font-display: var(--font-space-grotesk), var(--font-inter), sans-serif;
+  --font-display: var(--db-font-display);
   --font-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
 
-  --radius-card: 1rem;
-  --radius-panel: 1.5rem;
+  --radius-card: var(--db-radius-card);
+  --radius-panel: var(--db-radius-panel);
 
   --shadow-soft:
     0 1px 2px hsl(var(--db-shadow-color) / 0.06),
@@ -134,6 +214,56 @@
   --animate-marquee: marquee 44s linear infinite;
   --animate-rise: rise 0.5s var(--ease-out-soft) both;
   --animate-pulse-dot: pulse-dot 2.4s ease-in-out infinite;
+  --animate-app-in: app-in 240ms var(--ease-out-soft) both;
+  --animate-pop-in: pop-in 160ms var(--ease-out-soft) both;
+  --animate-pop-out: pop-out 120ms ease-in both;
+
+  @keyframes app-in {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes pop-in {
+    from {
+      opacity: 0;
+      transform: translateY(-4px) scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes pop-out {
+    from {
+      opacity: 1;
+      transform: none;
+    }
+    to {
+      opacity: 0;
+      transform: translateY(-2px) scale(0.98);
+    }
+  }
+  @keyframes slide-in-left {
+    from {
+      transform: translateX(-100%);
+    }
+    to {
+      transform: translateX(0);
+    }
+  }
+  @keyframes slide-out-left {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(-100%);
+    }
+  }
 
   @keyframes marquee {
     from {
@@ -246,9 +376,15 @@
   h2,
   h3,
   h4 {
-    font-family: var(--font-display);
+    font-family: var(--db-font-display);
     letter-spacing: -0.02em;
     text-wrap: balance;
+  }
+
+  /* In the app headings are Inter, and Inter at heading sizes wants less
+     negative tracking than Space Grotesk did. */
+  :root:has([data-app]) :is(h1, h2, h3, h4) {
+    letter-spacing: -0.011em;
   }
 
   p {
@@ -260,6 +396,12 @@
     font-family: var(--font-mono);
     font-variant-numeric: tabular-nums;
     font-feature-settings: "tnum";
+  }
+
+  /* The app keeps the aligned figures and drops the typewriter: money in a
+     table reads as data, not as code. References opt back in with font-mono. */
+  :root:has([data-app]) .tnum {
+    font-family: inherit;
   }
 
   :focus-visible {
@@ -290,6 +432,13 @@
     background: var(--color-line-strong);
     border-radius: 999px;
     border: 2px solid var(--color-bg-subtle);
+  }
+
+  :root:has([data-app]) ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  :root:has([data-app]) ::-webkit-scrollbar-thumb {
+    border-color: var(--color-bg);
   }
 }
 

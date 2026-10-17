@@ -120,15 +120,15 @@ export function NotificationBell({
         aria-haspopup="dialog"
         onClick={() => setOpen((was) => !was)}
         className={cn(
-          "relative inline-flex size-11 cursor-pointer items-center justify-center rounded-xl text-muted transition-colors hover:bg-surface-2 hover:text-fg",
-          open && "bg-surface-2 text-fg",
+          "relative inline-flex size-11 cursor-pointer items-center justify-center rounded-md text-muted transition-colors duration-150 hover:bg-black/[0.05] hover:text-fg pointer-fine:size-8 dark:hover:bg-white/[0.06]",
+          open && "bg-black/[0.05] text-fg dark:bg-white/[0.06]",
         )}
       >
-        <BellIcon aria-hidden="true" className="size-[1.15rem]" />
+        <BellIcon aria-hidden="true" className="size-4" />
         {unread > 0 ? (
           <span
             aria-hidden="true"
-            className="tnum absolute top-1.5 right-1.5 inline-flex min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[0.5625rem] font-bold text-primary-on ring-2 ring-bg"
+            className="absolute top-2 right-2 inline-flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-primary px-[0.1875rem] text-[0.5625rem] leading-none font-semibold text-primary-fg tabular-nums ring-2 ring-bg pointer-fine:top-0.5 pointer-fine:right-0.5"
           >
             {unread > 9 ? "9+" : unread}
           </span>
@@ -140,12 +140,10 @@ export function NotificationBell({
           ref={panel}
           role="dialog"
           aria-label="Notifications"
-          className="absolute right-0 z-50 mt-2 flex max-h-[min(32rem,70vh)] w-[min(22rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-card border border-line bg-surface shadow-lift"
+          className="absolute right-0 z-50 mt-2 flex max-h-[min(32rem,70vh)] w-[min(23rem,calc(100vw-1.5rem))] origin-top-right animate-pop-in flex-col overflow-hidden rounded-lg border border-line bg-surface shadow-lift max-sm:fixed max-sm:inset-x-3 max-sm:top-14 max-sm:w-auto"
         >
-          <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-3">
-            <p className="font-display text-sm font-bold text-fg">
-              Notifications
-            </p>
+          <div className="flex h-11 items-center justify-between gap-3 border-b border-line px-4">
+            <p className="text-sm font-semibold text-fg">Notifications</p>
             {unread > 0 ? (
               <button
                 type="button"
@@ -156,7 +154,7 @@ export function NotificationBell({
                     router.refresh();
                   })
                 }
-                className="inline-flex cursor-pointer items-center gap-1.5 text-xs font-medium text-muted transition-colors hover:text-fg disabled:opacity-60"
+                className="-mr-1.5 inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-md px-1.5 text-xs font-medium text-muted transition-colors hover:bg-surface-2 hover:text-fg disabled:opacity-60"
               >
                 <CheckCheckIcon aria-hidden="true" className="size-3.5" />
                 Mark all read
@@ -165,13 +163,15 @@ export function NotificationBell({
           </div>
 
           {items.length === 0 ? (
-            <div className="px-4 py-10 text-center">
-              <BellIcon
+            <div className="px-6 py-10 text-center">
+              <span
                 aria-hidden="true"
-                className="mx-auto size-8 text-subtle"
-              />
+                className="mx-auto inline-flex size-9 items-center justify-center rounded-lg border border-line bg-surface text-muted shadow-xs"
+              >
+                <BellIcon className="size-4" />
+              </span>
               <p className="mt-3 text-sm font-medium text-fg">Nothing yet</p>
-              <p className="mt-1 text-xs leading-relaxed text-muted">
+              <p className="mx-auto mt-1 max-w-[30ch] text-[0.8125rem] leading-relaxed text-muted">
                 Offers, messages and anything a deal needs from you land here.
               </p>
             </div>
@@ -185,29 +185,27 @@ export function NotificationBell({
                   <>
                     <span
                       className={cn(
-                        "mt-0.5 inline-flex size-8 shrink-0 items-center justify-center rounded-lg",
+                        "mt-0.5 inline-flex size-7 shrink-0 items-center justify-center rounded-md border",
                         unreadRow
-                          ? "bg-primary-soft text-primary-text"
-                          : "bg-surface-2 text-subtle",
+                          ? "border-primary/25 bg-primary-soft text-primary-text"
+                          : "border-line bg-surface text-subtle",
                       )}
                     >
-                      <Icon aria-hidden="true" className="size-4" />
+                      <Icon aria-hidden="true" className="size-3.5" />
                     </span>
                     <span className="min-w-0 flex-1">
                       <span
                         className={cn(
-                          "block text-sm leading-snug",
-                          unreadRow
-                            ? "font-semibold text-fg"
-                            : "font-medium text-muted",
+                          "block text-[0.8125rem] leading-snug",
+                          unreadRow ? "font-medium text-fg" : "text-muted",
                         )}
                       >
                         {item.title}
                       </span>
-                      <span className="mt-0.5 block line-clamp-2 text-xs leading-relaxed text-muted">
+                      <span className="mt-0.5 block line-clamp-2 text-xs leading-relaxed text-subtle">
                         {item.body}
                       </span>
-                      <span className="mt-1 block text-[0.6875rem] text-subtle">
+                      <span className="mt-1 block text-[0.6875rem] text-subtle tabular-nums">
                         {ago(item.createdAt)}
                         {unreadRow ? (
                           <span className="sr-only"> · unread</span>
@@ -218,9 +216,11 @@ export function NotificationBell({
                 );
 
                 const className = cn(
-                  "flex w-full gap-3 px-4 py-3 text-left transition-colors",
-                  unreadRow ? "bg-primary/[0.03]" : null,
-                  item.href ? "hover:bg-surface-2" : null,
+                  "relative flex w-full gap-3 px-4 py-3 text-left transition-colors duration-150",
+                  unreadRow
+                    ? "pr-8 before:absolute before:top-[1.0625rem] before:right-4 before:size-1.5 before:rounded-full before:bg-primary"
+                    : null,
+                  item.href ? "hover:bg-surface-2/70" : null,
                 );
 
                 return (
@@ -245,11 +245,11 @@ export function NotificationBell({
             </ul>
           )}
 
-          <div className="border-t border-line px-4 py-2.5">
+          <div className="border-t border-line p-1">
             <Link
               href="/dashboard/notifications"
               onClick={() => setOpen(false)}
-              className="block text-center text-xs font-semibold text-primary-text transition-colors hover:text-fg"
+              className="flex h-8 items-center justify-center rounded-md text-xs font-medium text-muted transition-colors hover:bg-surface-2 hover:text-fg"
             >
               See everything
             </Link>

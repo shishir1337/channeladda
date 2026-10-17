@@ -5,7 +5,7 @@ import { getWaitingOnYou } from "@/server/dashboard";
 import { countDealsAwaiting } from "@/server/deals";
 import { countUnreadThreads } from "@/server/messages";
 import { listNotifications, unreadCount } from "@/server/notifications";
-import { getCurrentUser } from "@/server/session";
+import { type CurrentUser, getCurrentUser } from "@/server/session";
 
 /**
  * The signed-in area.
@@ -45,6 +45,16 @@ async function bellFor(userId: string) {
     />
   );
 }
+/** Only what the account menu shows, so nothing else crosses to the client. */
+function shellUser(user: CurrentUser) {
+  return {
+    name: user.name,
+    email: user.email,
+    emailVerified: user.emailVerified,
+    role: user.role,
+  };
+}
+
 export default async function DashboardLayout({ children }: LayoutProps<"/">) {
   // Deliberately not `requireUser()`.
   //
@@ -65,14 +75,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/">) {
   const groups: NavGroup[] = [
     {
       label: null,
-      items: [
-        { label: "Overview", href: "/dashboard", icon: "overview" },
-        {
-          label: "Notifications",
-          href: "/dashboard/notifications",
-          icon: "bell",
-        },
-      ],
+      items: [{ label: "Overview", href: "/dashboard", icon: "overview" }],
     },
     {
       label: "Trading",
@@ -100,28 +103,6 @@ export default async function DashboardLayout({ children }: LayoutProps<"/">) {
       ],
     },
     {
-      label: "Account",
-      items: [
-        {
-          label: "Security",
-          href: "/dashboard/security",
-          icon: "settings",
-          section: true,
-        },
-      ],
-    },
-    {
-      label: "Money",
-      items: [
-        {
-          label: "Wallet",
-          href: "/dashboard/wallet",
-          icon: "money",
-          section: true,
-        },
-      ],
-    },
-    {
       label: "Selling",
       items: [
         {
@@ -138,10 +119,37 @@ export default async function DashboardLayout({ children }: LayoutProps<"/">) {
         },
       ],
     },
+    {
+      label: "Money",
+      items: [
+        {
+          label: "Wallet",
+          href: "/dashboard/wallet",
+          icon: "money",
+          section: true,
+        },
+      ],
+    },
+    {
+      label: "Account",
+      items: [
+        {
+          label: "Notifications",
+          href: "/dashboard/notifications",
+          icon: "bell",
+        },
+        {
+          label: "Security",
+          href: "/dashboard/security",
+          icon: "settings",
+          section: true,
+        },
+      ],
+    },
   ];
 
   return (
-    <AppShell groups={groups} bell={bell}>
+    <AppShell groups={groups} bell={bell} user={shellUser(user)}>
       {children}
     </AppShell>
   );

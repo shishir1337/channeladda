@@ -3,6 +3,7 @@
 import { MoonIcon, SunIcon } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
+import { cn } from "@/lib/utils";
 
 export function ThemeToggle({ className }: { className?: string }) {
   const { resolvedTheme, setTheme } = useTheme();
@@ -23,7 +24,10 @@ export function ThemeToggle({ className }: { className?: string }) {
           ? `Switch to ${isDark ? "light" : "dark"} theme`
           : "Switch colour theme"
       }
-      className={`inline-flex size-11 cursor-pointer items-center justify-center rounded-xl border border-line text-muted transition-colors duration-200 hover:border-line-strong hover:bg-surface-2 hover:text-fg ${className ?? ""}`}
+      className={cn(
+        "inline-flex size-11 cursor-pointer items-center justify-center rounded-xl border border-line text-muted transition-colors duration-200 hover:border-line-strong hover:bg-surface-2 hover:text-fg",
+        className,
+      )}
     >
       {mounted && !isDark ? (
         <MoonIcon aria-hidden="true" className="size-[1.15rem]" />

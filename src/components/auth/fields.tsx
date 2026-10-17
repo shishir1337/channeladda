@@ -23,7 +23,10 @@ export function TextField({
 } & InputHTMLAttributes<HTMLInputElement>) {
   return (
     <div className={className}>
-      <label htmlFor={id} className="block text-sm font-medium text-fg">
+      <label
+        htmlFor={id}
+        className="block text-sm font-medium text-fg app:text-[0.8125rem]"
+      >
         {label}
         {props.required ? <span className="ml-0.5 text-danger">*</span> : null}
       </label>
@@ -45,10 +48,10 @@ export function TextField({
         }
         className={cn(
           // 16px base avoids iOS zooming the field on focus.
-          "mt-2 h-12 w-full rounded-xl border bg-surface-2 px-3.5 text-base text-fg placeholder:text-subtle focus:outline-none sm:text-[0.9375rem]",
+          "mt-2 h-12 w-full rounded-xl border bg-surface-2 px-3.5 text-base text-fg placeholder:text-subtle focus:outline-none sm:text-[0.9375rem] app:mt-1.5 app:h-11 app:px-3 app:pointer-fine:h-9 app:rounded-lg app:bg-surface app:shadow-xs app:transition-[border-color,box-shadow] app:duration-150 app:hover:border-line-strong app:focus:ring-[3px] app:sm:text-sm app:dark:bg-surface-2",
           error
-            ? "border-danger focus:border-danger"
-            : "border-line focus:border-primary/60",
+            ? "border-danger focus:border-danger app:focus:ring-danger/15"
+            : "border-line focus:border-primary/60 app:focus:border-primary app:focus:ring-primary/20",
         )}
         {...props}
       />
@@ -77,7 +80,10 @@ export function PasswordField({
 
   return (
     <div>
-      <label htmlFor={id} className="block text-sm font-medium text-fg">
+      <label
+        htmlFor={id}
+        className="block text-sm font-medium text-fg app:text-[0.8125rem]"
+      >
         {label}
         {props.required ? <span className="ml-0.5 text-danger">*</span> : null}
       </label>
@@ -86,7 +92,7 @@ export function PasswordField({
           {hint}
         </p>
       ) : null}
-      <div className="relative mt-2">
+      <div className="relative mt-2 app:mt-1.5">
         <input
           id={id}
           type={shown ? "text" : "password"}
@@ -100,10 +106,10 @@ export function PasswordField({
               .join(" ") || undefined
           }
           className={cn(
-            "h-12 w-full rounded-xl border bg-surface-2 pr-12 pl-3.5 text-base text-fg placeholder:text-subtle focus:outline-none sm:text-[0.9375rem]",
+            "h-12 w-full rounded-xl border bg-surface-2 pr-12 pl-3.5 text-base text-fg placeholder:text-subtle focus:outline-none sm:text-[0.9375rem] app:h-11 app:pl-3 app:pointer-fine:h-9 app:rounded-lg app:bg-surface app:shadow-xs app:transition-[border-color,box-shadow] app:duration-150 app:hover:border-line-strong app:focus:ring-[3px] app:sm:text-sm app:dark:bg-surface-2",
             error
-              ? "border-danger focus:border-danger"
-              : "border-line focus:border-primary/60",
+              ? "border-danger focus:border-danger app:focus:ring-danger/15"
+              : "border-line focus:border-primary/60 app:focus:border-primary app:focus:ring-primary/20",
           )}
           {...props}
         />
@@ -111,7 +117,7 @@ export function PasswordField({
           type="button"
           onClick={() => setShown((v) => !v)}
           aria-label={shown ? "Hide password" : "Show password"}
-          className="absolute top-1/2 right-1 inline-flex size-10 -translate-y-1/2 cursor-pointer items-center justify-center rounded-lg text-subtle transition-colors hover:text-fg"
+          className="absolute top-1/2 right-1 inline-flex size-10 -translate-y-1/2 app:pointer-fine:size-7 app:rounded-md cursor-pointer items-center justify-center rounded-lg text-subtle transition-colors hover:text-fg"
         >
           {shown ? (
             <EyeOffIcon aria-hidden="true" className="size-[1.15rem]" />
@@ -152,7 +158,10 @@ export function TextArea({
 } & TextareaHTMLAttributes<HTMLTextAreaElement>) {
   return (
     <div className={className}>
-      <label htmlFor={id} className="block text-sm font-medium text-fg">
+      <label
+        htmlFor={id}
+        className="block text-sm font-medium text-fg app:text-[0.8125rem]"
+      >
         {label}
         {props.required ? <span className="ml-0.5 text-danger">*</span> : null}
       </label>
@@ -173,10 +182,10 @@ export function TextArea({
             .join(" ") || undefined
         }
         className={cn(
-          "mt-2 w-full resize-y rounded-xl border bg-surface-2 p-3.5 text-base leading-relaxed text-fg placeholder:text-subtle focus:outline-none sm:text-[0.9375rem]",
+          "mt-2 w-full resize-y rounded-xl border bg-surface-2 p-3.5 text-base leading-relaxed text-fg placeholder:text-subtle focus:outline-none sm:text-[0.9375rem] app:mt-1.5 app:px-3 app:py-2 app:rounded-lg app:bg-surface app:shadow-xs app:transition-[border-color,box-shadow] app:duration-150 app:hover:border-line-strong app:focus:ring-[3px] app:sm:text-sm app:dark:bg-surface-2",
           error
-            ? "border-danger focus:border-danger"
-            : "border-line focus:border-primary/60",
+            ? "border-danger focus:border-danger app:focus:ring-danger/15"
+            : "border-line focus:border-primary/60 app:focus:border-primary app:focus:ring-primary/20",
         )}
         {...props}
       />
@@ -193,7 +202,7 @@ export function FormNotice({ children }: { children: React.ReactNode }) {
   return (
     <p
       role="alert"
-      className="mb-5 rounded-xl border border-danger/30 bg-danger-soft px-4 py-3 text-sm text-fg"
+      className="mb-5 rounded-xl border border-danger/30 bg-danger-soft px-4 py-3 text-sm text-fg app:mb-4 app:rounded-lg app:py-2.5 app:text-[0.8125rem]"
     >
       {children}
     </p>

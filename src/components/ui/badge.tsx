@@ -15,8 +15,8 @@ const badgeVariants = cva(
         solid: "bg-primary text-primary-fg",
       },
       size: {
-        sm: "px-2 py-0.5 text-[0.6875rem] [&_svg]:size-3",
-        md: "px-2.5 py-1 text-xs [&_svg]:size-3.5",
+        sm: "px-2 py-0.5 text-[0.6875rem] [&_svg]:size-3 app:h-5 app:py-0 app:text-xs app:leading-none",
+        md: "px-2.5 py-1 text-xs [&_svg]:size-3.5 app:h-6 app:px-2 app:py-0 app:leading-none",
       },
     },
     defaultVariants: { variant: "neutral", size: "sm" },

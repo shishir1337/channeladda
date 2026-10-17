@@ -5,7 +5,7 @@ import { countOpenDisputes } from "@/server/admin-disputes";
 import { getQueueCounts } from "@/server/admin-listings";
 import { countFlaggedThreads } from "@/server/messages";
 import { listNotifications, unreadCount } from "@/server/notifications";
-import { requireAdminArea } from "@/server/session";
+import { type CurrentUser, requireAdminArea } from "@/server/session";
 import { countOpenTickets } from "@/server/support";
 
 /**
@@ -51,6 +51,16 @@ async function bellFor(userId: string) {
     />
   );
 }
+/** Only what the account menu shows, so nothing else crosses to the client. */
+function shellUser(user: CurrentUser) {
+  return {
+    name: user.name,
+    email: user.email,
+    emailVerified: user.emailVerified,
+    role: user.role,
+  };
+}
+
 export default async function AdminLayout({ children }: LayoutProps<"/">) {
   const staff = await requireAdminArea();
 
@@ -61,6 +71,7 @@ export default async function AdminLayout({ children }: LayoutProps<"/">) {
     return (
       <AppShell
         staff
+        user={shellUser(staff)}
         groups={[
           {
             label: null,
@@ -202,7 +213,12 @@ export default async function AdminLayout({ children }: LayoutProps<"/">) {
   ];
 
   return (
-    <AppShell groups={groups} staff bell={await bellFor(staff.id)}>
+    <AppShell
+      groups={groups}
+      staff
+      user={shellUser(staff)}
+      bell={await bellFor(staff.id)}
+    >
       {children}
     </AppShell>
   );

@@ -19,22 +19,22 @@ export function EmptyState({
   return (
     <div
       className={cn(
-        "flex flex-col items-center rounded-panel border border-dashed border-line-strong bg-surface px-6 py-14 text-center sm:py-20",
+        "flex flex-col items-center rounded-panel border border-dashed border-line-strong bg-surface px-6 py-14 text-center sm:py-20 app:border-solid app:border-line app:py-12 app:shadow-xs app:sm:py-12",
         className,
       )}
     >
-      <span className="flex size-14 items-center justify-center rounded-2xl bg-surface-2 text-subtle">
-        <Icon aria-hidden="true" className="size-6" />
+      <span className="flex size-14 items-center justify-center rounded-2xl bg-surface-2 text-subtle app:size-10 app:rounded-lg app:border app:border-line app:bg-surface app:text-muted app:shadow-xs">
+        <Icon aria-hidden="true" className="size-6 app:size-[1.15rem]" />
       </span>
-      <h2 className="mt-5 font-display text-lg font-semibold sm:text-xl">
+      <h2 className="mt-5 font-display text-lg font-semibold sm:text-xl app:mt-4 app:text-sm app:sm:text-sm">
         {title}
       </h2>
       {description ? (
-        <p className="mt-2.5 max-w-md text-[0.9375rem] leading-relaxed text-muted">
+        <p className="mt-2.5 max-w-md text-[0.9375rem] leading-relaxed text-muted app:mt-1 app:max-w-[46ch] app:text-[0.8125rem]">
           {description}
         </p>
       ) : null}
-      {action ? <div className="mt-7">{action}</div> : null}
+      {action ? <div className="mt-7 app:mt-5">{action}</div> : null}
     </div>
   );
 }

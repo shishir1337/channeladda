@@ -63,10 +63,10 @@ export function Pagination({
                 aria-current={slot.page === page ? "page" : undefined}
                 aria-label={`Page ${slot.page}`}
                 className={cn(
-                  "tnum inline-flex size-11 items-center justify-center rounded-xl border text-sm font-medium transition-colors duration-200",
+                  "tnum inline-flex size-11 items-center justify-center rounded-xl border text-sm font-medium transition-colors duration-200 app:rounded-md app:text-[0.8125rem] app:duration-150 app:pointer-fine:size-8",
                   slot.page === page
-                    ? "border-primary bg-primary text-primary-fg"
-                    : "border-line text-muted hover:border-line-strong hover:bg-surface-2 hover:text-fg",
+                    ? "border-primary bg-primary text-primary-fg app:border-line app:bg-surface app:text-fg app:shadow-xs app:dark:bg-surface-2"
+                    : "border-line text-muted hover:border-line-strong hover:bg-surface-2 hover:text-fg app:border-transparent app:hover:border-transparent app:hover:bg-black/[0.04] app:dark:hover:bg-white/[0.06]",
                 )}
               >
                 {slot.page}
@@ -88,7 +88,7 @@ export function Pagination({
 }
 
 const stepClass =
-  "inline-flex size-11 items-center justify-center rounded-xl border border-line text-muted transition-colors duration-200";
+  "inline-flex size-11 items-center justify-center rounded-xl border border-line text-muted transition-colors duration-200 app:rounded-md app:pointer-fine:size-8 app:duration-150";
 
 function Step({
   href,
