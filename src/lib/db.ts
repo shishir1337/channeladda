@@ -12,6 +12,8 @@ import { PrismaClient } from "@/generated/prisma/client";
  */
 const globalForPrisma = globalThis as unknown as {
   prisma?: PrismaClient;
+  /** The generated `PrismaClient` export that built `prisma`. */
+  prismaBuild?: unknown;
   dbReachable?: { at: number; ok: boolean };
 };
 
@@ -27,12 +29,32 @@ function createClient() {
   });
 }
 
-let client: PrismaClient | undefined = globalForPrisma.prisma;
+/**
+ * The cached client, if this build of the generated client made it.
+ *
+ * `prisma generate` rewrites the client and the dev server hot-reloads it,
+ * but globalThis survives the reload. Reusing the cached instance kept the
+ * old schema, so a new column read as "Unknown field" on every page that
+ * touched it until somebody restarted the server. A regenerated client is a
+ * new `PrismaClient` export, which is what this compares — `instanceof` does
+ * not work, because the generated constructor returns a different object.
+ */
+function adopt(cached: PrismaClient | undefined): PrismaClient | undefined {
+  if (!cached || globalForPrisma.prismaBuild === PrismaClient) return cached;
+  globalForPrisma.prisma = undefined;
+  void cached.$disconnect().catch(() => {});
+  return undefined;
+}
+
+let client: PrismaClient | undefined = adopt(globalForPrisma.prisma);
 
 function currentClient(): PrismaClient {
   if (!client) {
     client = createClient();
-    if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = client;
+    if (process.env.NODE_ENV !== "production") {
+      globalForPrisma.prisma = client;
+      globalForPrisma.prismaBuild = PrismaClient;
+    }
   }
   return client;
 }
