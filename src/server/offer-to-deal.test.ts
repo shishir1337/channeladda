@@ -28,9 +28,13 @@ async function acceptedOffer(amountCents = 8_000) {
     expiryHours: 48,
   });
   if (!made.ok) throw new Error(made.reason);
-  const accepted = await acceptOffer(made.value, seeded.seller.id, "seller");
+  const accepted = await acceptOffer(
+    made.value.offerId,
+    seeded.seller.id,
+    "seller",
+  );
   if (!accepted.ok) throw new Error(accepted.reason);
-  return { ...seeded, offerId: made.value };
+  return { ...seeded, offerId: made.value.offerId };
 }
 
 test(
@@ -197,7 +201,7 @@ test(
     });
 
     const offer = await db.offer.findUniqueOrThrow({
-      where: { id: made.value },
+      where: { id: made.value.offerId },
     });
     expect(offer.status).toBe("REJECTED");
   }),

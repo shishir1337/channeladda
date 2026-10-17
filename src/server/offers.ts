@@ -4,7 +4,17 @@ import type { OfferStatus } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
 import { TERMINAL_STATUSES } from "@/lib/deal-machine";
 import { fromCents } from "@/lib/listing-form";
+import {
+  mentionsOffPlatform,
+  type RedactionKind,
+  redactContactDetails,
+} from "@/lib/redact";
 import { recordAudit } from "@/server/audit";
+import {
+  type DbWriter,
+  ensureConversation,
+  postEvent,
+} from "@/server/chat-events";
 import { notify } from "@/server/notifications";
 import { getSettings } from "@/server/settings";
 
@@ -15,6 +25,11 @@ import { getSettings } from "@/server/settings";
  * told they can buy the same listing.** Accepting an offer is therefore a
  * compare-and-set on the listing row, not a read-then-write — see
  * `acceptOffer`.
+ *
+ * Every offer, and every answer to one, also leaves its mark in the
+ * conversation between that buyer and the seller: a card for the offer, a
+ * line for each answer. Written here, in the same transaction as the change,
+ * so the thread is the record of the negotiation whichever page acted.
  */
 
 /** Below this an offer is not a negotiation, it is noise. */
@@ -94,14 +109,30 @@ type Row = {
 };
 
 /**
+ * Where an offer stands right now, and whose move it is.
+ *
  * An OPEN offer past its expiry is spent, whether or not anything has got
  * around to marking it. Deriving that on read means the rule holds without a
- * scheduled job — there is no cron in this system yet, and an offer that stays
- * acceptable because nobody swept it is a real way to lose money.
+ * scheduled job, and an offer that stays acceptable because nobody swept it
+ * is a real way to lose money. Shared by every place that shows an offer —
+ * the Offers page, the card in the conversation, the deal panel — so none of
+ * them can disagree about it.
  */
-function toView(row: Row, now = new Date()): OfferView {
+export function offerTurn(
+  row: { status: OfferStatus; expiresAt: Date; bySeller: boolean },
+  now = new Date(),
+): { effectiveStatus: OfferStatus; awaiting: "buyer" | "seller" | null } {
   const lapsed = row.status === "OPEN" && row.expiresAt <= now;
   const effectiveStatus: OfferStatus = lapsed ? "EXPIRED" : row.status;
+  return {
+    effectiveStatus,
+    awaiting:
+      effectiveStatus !== "OPEN" ? null : row.bySeller ? "buyer" : "seller",
+  };
+}
+
+function toView(row: Row, now = new Date()): OfferView {
+  const turn = offerTurn(row, now);
 
   return {
     id: row.id,
@@ -113,7 +144,7 @@ function toView(row: Row, now = new Date()): OfferView {
     listingCoverUrl: row.listing.coverUrl,
     amount: fromCents(row.amountUsd),
     status: row.status,
-    effectiveStatus,
+    effectiveStatus: turn.effectiveStatus,
     bySeller: row.bySeller,
     message: row.message,
     expiresAt: row.expiresAt,
@@ -123,8 +154,7 @@ function toView(row: Row, now = new Date()): OfferView {
     buyerName: row.buyer.name,
     sellerId: row.listing.sellerId,
     sellerName: row.listing.seller.name,
-    awaiting:
-      effectiveStatus !== "OPEN" ? null : row.bySeller ? "buyer" : "seller",
+    awaiting: turn.awaiting,
   };
 }
 
@@ -177,19 +207,21 @@ export type OfferFailure =
   | "already-open"
   | "expired"
   | "wrong-turn"
-  | "taken";
+  | "taken"
+  /** A note, into a conversation Channel Adda closed. */
+  | "closed";
 
 type Result<T = undefined> =
   | ({ ok: true } & (T extends undefined ? object : { value: T }))
   | { ok: false; reason: OfferFailure };
 
-/**
- * A buyer makes an offer.
- *
- * One live offer per buyer per listing: without that, a buyer can bury a
- * seller under a hundred offers, and it becomes unclear which one accepting
- * refers to.
- */
+/** Thrown inside a transaction to roll it back with a reason attached. */
+class OfferAbort extends Error {
+  constructor(readonly reason: OfferFailure) {
+    super(reason);
+  }
+}
+
 /** Cents as a person reads them. */
 function asMoney(cents: number): string {
   return (cents / 100).toLocaleString("en-US", {
@@ -198,16 +230,109 @@ function asMoney(cents: number): string {
     maximumFractionDigits: 0,
   });
 }
+
+/** Where a notification about an offer takes somebody: the conversation. */
+function threadHref(conversationId: string): string {
+  return `/dashboard/messages/${conversationId}`;
+}
+
+type Note = { text: string | null; kinds: RedactionKind[]; flagged: boolean };
+
+/**
+ * An offer's note, through the same filter as a chat message.
+ *
+ * It used to be stored as typed, which made it the one way round the filter:
+ * "call me on 017…" in an offer reached the seller untouched. It reaches the
+ * conversation now, so it is treated exactly like anything else said there.
+ */
+function filterNote(note: string | null, handle: string): Note {
+  if (!note) return { text: null, kinds: [], flagged: false };
+  const { body, kinds } = redactContactDetails(note, {
+    allowHandles: [handle],
+  });
+  return {
+    text: body,
+    kinds,
+    flagged: kinds.length > 0 || mentionsOffPlatform(note),
+  };
+}
+
+/** Raises the thread to staff when a note tried to leave the platform. */
+async function flagForNote(
+  w: DbWriter,
+  conversationId: string,
+  note: Note,
+  now: Date,
+) {
+  if (!note.flagged) return;
+  await w.conversation.update({
+    where: { id: conversationId },
+    data: {
+      flaggedAt: now,
+      flagReason: note.kinds.length
+        ? `Tried to share ${note.kinds.join(", ")} in an offer`
+        : "Suggested moving the conversation off Channel Adda in an offer",
+    },
+  });
+}
+
+/**
+ * Whether a note may go into this buyer's conversation.
+ *
+ * Closing a conversation stops free text reaching it, from anywhere — the
+ * listing page included, or the offer box would be the way round a closed
+ * chat. The offer itself is not text and still goes through without one.
+ */
+async function noteRefused(
+  listingId: string,
+  buyerId: string,
+  note: string | null,
+): Promise<boolean> {
+  if (!note) return false;
+  const thread = await db.conversation.findUnique({
+    where: { listingId_buyerId: { listingId, buyerId } },
+    select: { closedAt: true },
+  });
+  return thread?.closedAt != null;
+}
+
+/** The conversation this buyer has about this listing, if any. */
+async function threadOf(
+  w: DbWriter,
+  listingId: string,
+  buyerId: string,
+): Promise<string | null> {
+  const thread = await w.conversation.findUnique({
+    where: { listingId_buyerId: { listingId, buyerId } },
+    select: { id: true },
+  });
+  return thread?.id ?? null;
+}
+
+/**
+ * A buyer makes an offer.
+ *
+ * One live offer per buyer per listing: without that, a buyer can bury a
+ * seller under a hundred offers, and it becomes unclear which one accepting
+ * refers to.
+ */
 export async function createOffer(input: {
   buyerId: string;
   listingId: string;
   amountCents: number;
   message: string | null;
   expiryHours: number;
-}): Promise<Result<string>> {
+}): Promise<Result<{ offerId: string; conversationId: string }>> {
   const listing = await db.listing.findUnique({
     where: { id: input.listingId },
-    select: { id: true, status: true, sellerId: true, priceUsd: true },
+    select: {
+      id: true,
+      status: true,
+      sellerId: true,
+      priceUsd: true,
+      handle: true,
+      title: true,
+    },
   });
   if (!listing) return { ok: false, reason: "not-found" };
   if (listing.status !== "LIVE") return { ok: false, reason: "not-live" };
@@ -216,6 +341,11 @@ export async function createOffer(input: {
   }
   if (input.amountCents < listing.priceUsd * MIN_OFFER_FRACTION) {
     return { ok: false, reason: "too-low" };
+  }
+
+  const note = filterNote(input.message, listing.handle);
+  if (await noteRefused(listing.id, input.buyerId, note.text)) {
+    return { ok: false, reason: "closed" };
   }
 
   const open = await db.offer.findFirst({
@@ -229,37 +359,59 @@ export async function createOffer(input: {
   });
   if (open) return { ok: false, reason: "already-open" };
 
-  const offer = await db.offer.create({
-    data: {
-      listingId: input.listingId,
-      buyerId: input.buyerId,
-      amountUsd: input.amountCents,
-      message: input.message,
-      bySeller: false,
-      expiresAt: new Date(Date.now() + input.expiryHours * 3_600_000),
-    },
-    select: { id: true },
-  });
-
-  // The seller has to hear about it, or the offer sits until it lapses and
-  // the buyer concludes nobody is home.
   const buyer = await db.user.findUnique({
     where: { id: input.buyerId },
     select: { name: true },
   });
-  const listingTitle = await db.listing.findUnique({
-    where: { id: input.listingId },
-    select: { title: true },
+
+  const now = new Date();
+  const { offerId, conversationId } = await db.$transaction(async (tx) => {
+    // The offer is where the conversation starts when the buyer never wrote
+    // first, so the seller finds it in their inbox and not only on Offers.
+    const conversationId = await ensureConversation(tx, {
+      listingId: listing.id,
+      buyerId: input.buyerId,
+      sellerId: listing.sellerId,
+    });
+    const offer = await tx.offer.create({
+      data: {
+        listingId: input.listingId,
+        buyerId: input.buyerId,
+        amountUsd: input.amountCents,
+        message: note.text,
+        bySeller: false,
+        expiresAt: new Date(now.getTime() + input.expiryHours * 3_600_000),
+      },
+      select: { id: true },
+    });
+    await postEvent(tx, {
+      conversationId,
+      kind: "OFFER",
+      event: {
+        type: "offer-made",
+        name: buyer?.name ?? "",
+        amountCents: input.amountCents,
+        bySeller: false,
+      },
+      senderId: input.buyerId,
+      offerId: offer.id,
+      at: now,
+    });
+    await flagForNote(tx, conversationId, note, now);
+    return { offerId: offer.id, conversationId };
   });
+
+  // The seller has to hear about it, or the offer sits until it lapses and
+  // the buyer concludes nobody is home.
   const amount = asMoney(input.amountCents);
   await notify({
     userId: listing.sellerId,
     kind: "OFFER",
     title: `${buyer?.name ?? "Someone"} offered ${amount}`,
-    body: `On ${listingTitle?.title ?? "your listing"}. You can accept it, turn it down, or come back with a number of your own.`,
-    href: "/dashboard/offers",
+    body: `On ${listing.title || "your listing"}. You can accept it, turn it down, or come back with a number of your own.`,
+    href: threadHref(conversationId),
     email: {
-      subject: `${amount} offered on ${listingTitle?.title ?? "your listing"}`,
+      subject: `${amount} offered on ${listing.title || "your listing"}`,
       body: [
         `${buyer?.name ?? "Someone"} has offered ${amount}.`,
         "",
@@ -269,7 +421,7 @@ export async function createOffer(input: {
     },
   });
 
-  return { ok: true, value: offer.id };
+  return { ok: true, value: { offerId, conversationId } };
 }
 
 /** Loads an offer and checks the caller is allowed to respond to it now. */
@@ -288,7 +440,16 @@ async function loadRespondable(
       status: true,
       bySeller: true,
       expiresAt: true,
-      listing: { select: { sellerId: true, status: true, priceUsd: true } },
+      buyer: { select: { name: true } },
+      listing: {
+        select: {
+          sellerId: true,
+          status: true,
+          priceUsd: true,
+          handle: true,
+          seller: { select: { name: true } },
+        },
+      },
     },
   });
   if (!row) return { ok: false as const, reason: "not-found" as const };
@@ -314,6 +475,62 @@ async function loadRespondable(
   return { ok: true as const, row };
 }
 
+type Respondable = Extract<
+  Awaited<ReturnType<typeof loadRespondable>>,
+  { ok: true }
+>["row"];
+
+/** The name of whoever is answering, for the line in the conversation. */
+function responderName(row: Respondable, as: "buyer" | "seller"): string {
+  return as === "seller" ? row.listing.seller.name : row.buyer.name;
+}
+
+/**
+ * Claims an open offer inside a transaction.
+ *
+ * The status was read before the transaction began, so two presses of the
+ * same button — easy in a chat — both passed it, and a double-pressed
+ * counter left two live offers on one listing. The write itself checks now.
+ */
+async function claimOpen(
+  w: DbWriter,
+  offerId: string,
+  to: OfferStatus,
+  now: Date,
+) {
+  const took = await w.offer.updateMany({
+    where: { id: offerId, status: "OPEN" },
+    data: { status: to, respondedAt: now },
+  });
+  if (took.count !== 1) throw new OfferAbort("wrong-turn");
+}
+
+/**
+ * Who needs to hear about an answer to an offer.
+ *
+ * Whoever did not press the button. An offer can be made by either side,
+ * so this is worked out from the row rather than assumed.
+ */
+async function tellTheOtherSide(
+  row: { buyerId: string; listing: { sellerId: string } },
+  responderId: string,
+  conversationId: string,
+  outcome: { title: string; body: string; email: boolean },
+) {
+  const otherId =
+    responderId === row.buyerId ? row.listing.sellerId : row.buyerId;
+  await notify({
+    userId: otherId,
+    kind: "OFFER",
+    title: outcome.title,
+    body: outcome.body,
+    href: threadHref(conversationId),
+    ...(outcome.email
+      ? { email: { subject: outcome.title, body: outcome.body } }
+      : {}),
+  });
+}
+
 /**
  * Accept, and reserve the listing.
  *
@@ -323,34 +540,6 @@ async function loadRespondable(
  * sees zero rows affected and is told the listing is taken. Reading the status
  * first and writing second would let both through.
  */
-/**
- * Who needs to hear about an answer to an offer.
- *
- * Whoever did not press the button. An offer can be made by either side,
- * so this is worked out from the row rather than assumed.
- */
-async function tellTheOtherSide(
-  row: {
-    id: string;
-    buyerId: string;
-    amountUsd: number;
-    listing: { sellerId: string };
-  },
-  responderId: string,
-  outcome: { title: string; body: string },
-) {
-  const otherId =
-    responderId === row.buyerId ? row.listing.sellerId : row.buyerId;
-  await notify({
-    userId: otherId,
-    kind: "OFFER",
-    title: outcome.title,
-    body: outcome.body,
-    href: "/dashboard/offers",
-    email: { subject: outcome.title, body: outcome.body },
-  });
-}
-
 export async function acceptOffer(
   offerId: string,
   responderId: string,
@@ -363,42 +552,108 @@ export async function acceptOffer(
   if (row.listing.status !== "LIVE") return { ok: false, reason: "taken" };
 
   const now = new Date();
+  let conversationId: string;
+  let closed: { buyerId: string; amountUsd: number; thread: string | null }[];
   try {
-    await db.$transaction(async (tx) => {
+    ({ conversationId, closed } = await db.$transaction(async (tx) => {
       const reserved = await tx.listing.updateMany({
         where: { id: row.listingId, status: "LIVE" },
         data: { status: "RESERVED" },
       });
-      if (reserved.count !== 1) throw new Error("listing-taken");
+      if (reserved.count !== 1) throw new OfferAbort("taken");
 
-      await tx.offer.update({
-        where: { id: offerId },
-        data: { status: "ACCEPTED", respondedAt: now },
+      await claimOpen(tx, offerId, "ACCEPTED", now);
+
+      const conversationId = await ensureConversation(tx, {
+        listingId: row.listingId,
+        buyerId: row.buyerId,
+        sellerId: row.listing.sellerId,
+      });
+      await postEvent(tx, {
+        conversationId,
+        kind: "EVENT",
+        event: {
+          type: "offer-accepted",
+          name: responderName(row, as),
+          amountCents: row.amountUsd,
+        },
+        senderId: responderId,
+        offerId,
+        at: now,
       });
 
-      // Everyone else who was waiting hears a decision rather than nothing.
-      await tx.offer.updateMany({
+      // Everyone else who was waiting hears a decision rather than nothing:
+      // a line in their own conversation, and a notification below.
+      const others = await tx.offer.findMany({
         where: {
           listingId: row.listingId,
           status: "OPEN",
           id: { not: offerId },
         },
-        data: { status: "REJECTED", respondedAt: now },
+        select: { id: true, buyerId: true, amountUsd: true },
       });
-    });
+      const closed: {
+        buyerId: string;
+        amountUsd: number;
+        thread: string | null;
+      }[] = [];
+      for (const other of others) {
+        const moved = await tx.offer.updateMany({
+          where: { id: other.id, status: "OPEN" },
+          data: { status: "REJECTED", respondedAt: now },
+        });
+        if (moved.count !== 1) continue;
+        const thread = await threadOf(tx, row.listingId, other.buyerId);
+        if (thread) {
+          await postEvent(tx, {
+            conversationId: thread,
+            kind: "EVENT",
+            event: {
+              type: "offer-auto-declined",
+              amountCents: other.amountUsd,
+            },
+            senderId: null,
+            offerId: other.id,
+            at: now,
+          });
+        }
+        closed.push({ ...other, thread });
+      }
+      return { conversationId, closed };
+    }));
   } catch (error) {
-    if (error instanceof Error && error.message === "listing-taken") {
-      return { ok: false, reason: "taken" };
-    }
+    if (error instanceof OfferAbort) return { ok: false, reason: error.reason };
     throw error;
   }
 
-  await tellTheOtherSide(row, responderId, {
+  await tellTheOtherSide(row, responderId, conversationId, {
     title: `Your offer of ${asMoney(row.amountUsd)} was accepted`,
     body: "The listing is held for you. Open it to start the deal — it does not stay held for ever.",
+    email: true,
   });
+  await notifyClosedOffers(closed);
 
   return { ok: true };
+}
+
+/**
+ * The buyers whose offers closed because someone else got the listing.
+ *
+ * In the bell and not by email: there is nothing for them to do, and it is
+ * news rather than a request.
+ */
+export async function notifyClosedOffers(
+  closed: { buyerId: string; amountUsd: number; thread: string | null }[],
+) {
+  for (const offer of closed) {
+    await notify({
+      userId: offer.buyerId,
+      kind: "OFFER",
+      title: `Your offer of ${asMoney(offer.amountUsd)} closed`,
+      body: "The listing went to another buyer, so it is no longer available.",
+      href: offer.thread ? threadHref(offer.thread) : "/dashboard/offers",
+    });
+  }
 }
 
 export async function declineOffer(
@@ -408,15 +663,41 @@ export async function declineOffer(
 ): Promise<Result> {
   const loaded = await loadRespondable(offerId, responderId, as);
   if (!loaded.ok) return loaded;
+  const { row } = loaded;
 
-  await db.offer.update({
-    where: { id: offerId },
-    data: { status: "REJECTED", respondedAt: new Date() },
-  });
+  const now = new Date();
+  let conversationId: string;
+  try {
+    conversationId = await db.$transaction(async (tx) => {
+      await claimOpen(tx, offerId, "REJECTED", now);
+      const conversationId = await ensureConversation(tx, {
+        listingId: row.listingId,
+        buyerId: row.buyerId,
+        sellerId: row.listing.sellerId,
+      });
+      await postEvent(tx, {
+        conversationId,
+        kind: "EVENT",
+        event: {
+          type: "offer-declined",
+          name: responderName(row, as),
+          amountCents: row.amountUsd,
+        },
+        senderId: responderId,
+        offerId,
+        at: now,
+      });
+      return conversationId;
+    });
+  } catch (error) {
+    if (error instanceof OfferAbort) return { ok: false, reason: error.reason };
+    throw error;
+  }
 
-  await tellTheOtherSide(loaded.row, responderId, {
-    title: `Your offer of ${asMoney(loaded.row.amountUsd)} was turned down`,
+  await tellTheOtherSide(row, responderId, conversationId, {
+    title: `Your offer of ${asMoney(row.amountUsd)} was turned down`,
     body: "Nothing is lost. You can make another one, or look at something else.",
+    email: true,
   });
 
   return { ok: true };
@@ -433,7 +714,7 @@ export async function counterOffer(input: {
   amountCents: number;
   message: string | null;
   expiryHours: number;
-}): Promise<Result<string>> {
+}): Promise<Result<{ offerId: string; conversationId: string }>> {
   const loaded = await loadRespondable(
     input.offerId,
     input.responderId,
@@ -447,27 +728,60 @@ export async function counterOffer(input: {
     return { ok: false, reason: "too-low" };
   }
 
+  const note = filterNote(input.message, row.listing.handle);
+  if (await noteRefused(row.listingId, row.buyerId, note.text)) {
+    return { ok: false, reason: "closed" };
+  }
+
+  const name = responderName(row, input.as);
   const now = new Date();
-  const created = await db.$transaction(async (tx) => {
-    await tx.offer.update({
-      where: { id: input.offerId },
-      data: { status: "COUNTERED", respondedAt: now },
-    });
-    return tx.offer.create({
-      data: {
+  let created: { offerId: string; conversationId: string };
+  try {
+    created = await db.$transaction(async (tx) => {
+      await claimOpen(tx, input.offerId, "COUNTERED", now);
+      const offer = await tx.offer.create({
+        data: {
+          listingId: row.listingId,
+          buyerId: row.buyerId,
+          amountUsd: input.amountCents,
+          message: note.text,
+          bySeller: input.as === "seller",
+          counterOf: input.offerId,
+          expiresAt: new Date(now.getTime() + input.expiryHours * 3_600_000),
+        },
+        select: { id: true },
+      });
+      const conversationId = await ensureConversation(tx, {
         listingId: row.listingId,
         buyerId: row.buyerId,
-        amountUsd: input.amountCents,
-        message: input.message,
-        bySeller: input.as === "seller",
-        counterOf: input.offerId,
-        expiresAt: new Date(now.getTime() + input.expiryHours * 3_600_000),
-      },
-      select: { id: true },
+        sellerId: row.listing.sellerId,
+      });
+      // The counter is its own card: it is the offer that is open now.
+      await postEvent(tx, {
+        conversationId,
+        kind: "OFFER",
+        event: { type: "countered", name, amountCents: input.amountCents },
+        senderId: input.responderId,
+        offerId: offer.id,
+        at: now,
+      });
+      await flagForNote(tx, conversationId, note, now);
+      return { offerId: offer.id, conversationId };
     });
+  } catch (error) {
+    if (error instanceof OfferAbort) return { ok: false, reason: error.reason };
+    throw error;
+  }
+
+  // Nobody was told about a counter before, so a buyer whose offer had been
+  // countered waited for an answer that had already arrived.
+  await tellTheOtherSide(row, input.responderId, created.conversationId, {
+    title: `${name || "Someone"} countered with ${asMoney(input.amountCents)}`,
+    body: "Accept it, counter again, or turn it down. It lapses on its own if nobody answers.",
+    email: true,
   });
 
-  return { ok: true, value: created.id };
+  return { ok: true, value: created };
 }
 
 /** The buyer pulling their own offer back. */
@@ -481,25 +795,59 @@ export async function withdrawOffer(
   // no notification — rather than declining it, which tells the seller.
   const row = await db.offer.findFirst({
     where: { id: offerId, buyerId, bySeller: false },
-    select: { id: true, status: true },
+    select: {
+      id: true,
+      status: true,
+      listingId: true,
+      amountUsd: true,
+      buyer: { select: { name: true } },
+      listing: { select: { sellerId: true } },
+    },
   });
   if (!row) return { ok: false, reason: "not-found" };
   if (row.status !== "OPEN") return { ok: false, reason: "wrong-turn" };
 
-  await db.offer.update({
-    where: { id: offerId },
-    data: { status: "WITHDRAWN", respondedAt: new Date() },
+  const now = new Date();
+  let conversationId: string;
+  try {
+    conversationId = await db.$transaction(async (tx) => {
+      await claimOpen(tx, offerId, "WITHDRAWN", now);
+      const conversationId = await ensureConversation(tx, {
+        listingId: row.listingId,
+        buyerId,
+        sellerId: row.listing.sellerId,
+      });
+      await postEvent(tx, {
+        conversationId,
+        kind: "EVENT",
+        event: {
+          type: "offer-withdrawn",
+          name: row.buyer.name,
+          amountCents: row.amountUsd,
+        },
+        senderId: buyerId,
+        offerId,
+        at: now,
+      });
+      return conversationId;
+    });
+  } catch (error) {
+    if (error instanceof OfferAbort) return { ok: false, reason: error.reason };
+    throw error;
+  }
+
+  // The seller may have been about to answer it.
+  await notify({
+    userId: row.listing.sellerId,
+    kind: "OFFER",
+    title: `${row.buyer.name || "The buyer"} withdrew their offer of ${asMoney(row.amountUsd)}`,
+    body: "There is nothing to answer now.",
+    href: threadHref(conversationId),
   });
+
   return { ok: true };
 }
 
-/**
- * Releases a reservation when a deal does not go ahead.
- *
- * Not wired to anything yet — checkout is what will call it, on payment
- * timeout. It lives here because the reservation is created here and the two
- * belong together.
- */
 /**
  * The accepted offer a buyer holds on a listing, if it is still holding it.
  *
@@ -567,11 +915,28 @@ export async function releaseLapsedOfferReservations(
 
   let released = 0;
   for (const offer of lapsed) {
-    const moved = await db.offer.updateMany({
-      where: { id: offer.id, status: "ACCEPTED" },
-      data: { status: "EXPIRED" },
+    const now = new Date();
+    const thread = await db.$transaction(async (tx) => {
+      const moved = await tx.offer.updateMany({
+        where: { id: offer.id, status: "ACCEPTED" },
+        data: { status: "EXPIRED" },
+      });
+      if (moved.count !== 1) return undefined;
+      const thread = await threadOf(tx, offer.listingId, offer.buyerId);
+      if (thread) {
+        await postEvent(tx, {
+          conversationId: thread,
+          kind: "EVENT",
+          event: { type: "reservation-lapsed", amountCents: offer.amountUsd },
+          senderId: null,
+          offerId: offer.id,
+          at: now,
+        });
+      }
+      return thread;
     });
-    if (moved.count !== 1) continue;
+    // undefined: another sweep got there first. null: no conversation.
+    if (thread === undefined) continue;
 
     const live = await db.order.count({
       where: {
@@ -592,7 +957,7 @@ export async function releaseLapsedOfferReservations(
       kind: "OFFER",
       title: `Your accepted offer of ${amount} lapsed`,
       body: `The deal was never opened, so ${offer.listing.title} is back on sale. You can make another offer.`,
-      href: "/dashboard/offers",
+      href: thread ? threadHref(thread) : "/dashboard/offers",
     });
     await notify({
       userId: offer.listing.sellerId,
@@ -613,6 +978,7 @@ export async function releaseLapsedOfferReservations(
 
   return released;
 }
+
 export async function releaseReservation(listingId: string) {
   const released = await db.listing.updateMany({
     where: { id: listingId, status: "RESERVED" },
@@ -622,7 +988,7 @@ export async function releaseReservation(listingId: string) {
 }
 
 /**
- * Writes down what `toView` has been deriving all along.
+ * Writes down what `offerTurn` has been deriving all along.
  *
  * Reading an expired offer as EXPIRED keeps the rule correct, but it leaves
  * the database saying OPEN for ever: the seller's dashboard count is wrong,
@@ -630,15 +996,42 @@ export async function releaseReservation(listingId: string) {
  * the column is subtly broken. Now that there is a sweep to call it, the
  * derivation and the stored value agree.
  *
- * Idempotent, and safe to run twice at once: the `status: "OPEN"` predicate
- * means a second pass over the same rows changes nothing.
+ * One offer at a time, so each one that lapses leaves a line in its
+ * conversation. Safe to run twice at once: each offer is claimed with a
+ * compare-and-set on `OPEN`, so a second pass over the same rows changes
+ * nothing and writes no second line.
  */
 export async function expireOffers(now = new Date()): Promise<number> {
-  const { count } = await db.offer.updateMany({
+  const due = await db.offer.findMany({
     where: { status: "OPEN", expiresAt: { lte: now } },
-    // No respondedAt: the clock ran out, which is not a response. Writing
-    // one here made "lapsed" and "rejected" indistinguishable in the history.
-    data: { status: "EXPIRED" },
+    select: { id: true, listingId: true, buyerId: true, amountUsd: true },
   });
-  return count;
+
+  let expired = 0;
+  for (const offer of due) {
+    const moved = await db.$transaction(async (tx) => {
+      const took = await tx.offer.updateMany({
+        where: { id: offer.id, status: "OPEN", expiresAt: { lte: now } },
+        // No respondedAt: the clock ran out, which is not a response. Writing
+        // one here made "lapsed" and "rejected" indistinguishable in the
+        // history.
+        data: { status: "EXPIRED" },
+      });
+      if (took.count !== 1) return false;
+      const thread = await threadOf(tx, offer.listingId, offer.buyerId);
+      if (thread) {
+        await postEvent(tx, {
+          conversationId: thread,
+          kind: "EVENT",
+          event: { type: "offer-expired", amountCents: offer.amountUsd },
+          senderId: null,
+          offerId: offer.id,
+          at: now,
+        });
+      }
+      return true;
+    });
+    if (moved) expired += 1;
+  }
+  return expired;
 }

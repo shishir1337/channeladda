@@ -267,7 +267,7 @@ test(
     });
     if (!made.ok) throw new Error(made.reason);
     const countered = await counterOffer({
-      offerId: made.value,
+      offerId: made.value.offerId,
       responderId: seeded.seller.id,
       as: "seller",
       amountCents: 9_000,
@@ -276,13 +276,13 @@ test(
     });
     if (!countered.ok) throw new Error(countered.reason);
 
-    expect(await withdrawOffer(countered.value, seeded.buyer.id)).toMatchObject(
-      {
-        ok: false,
-      },
-    );
+    expect(
+      await withdrawOffer(countered.value.offerId, seeded.buyer.id),
+    ).toMatchObject({
+      ok: false,
+    });
     const counter = await db.offer.findUniqueOrThrow({
-      where: { id: countered.value },
+      where: { id: countered.value.offerId },
     });
     expect(counter.status).toBe("OPEN");
   }),

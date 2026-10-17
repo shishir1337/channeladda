@@ -15,7 +15,8 @@ import { getSettings } from "@/server/settings";
  */
 
 export type OfferResult =
-  | { ok: true; message: string }
+  /** `conversationId`: where the offer's card now sits, when one was made. */
+  | { ok: true; message: string; conversationId?: string }
   | { ok: false; error: string };
 
 const MESSAGES: Record<repo.OfferFailure, string> = {
@@ -28,6 +29,8 @@ const MESSAGES: Record<repo.OfferFailure, string> = {
   expired: "That offer has expired. Ask for a fresh one.",
   "wrong-turn": "That offer has already been answered.",
   taken: "Someone else got there first — this listing is no longer available.",
+  closed:
+    "Channel Adda closed this conversation, so the offer can't carry a note. Send it without one.",
 };
 
 function fail(reason: repo.OfferFailure): OfferResult {
@@ -37,6 +40,9 @@ function fail(reason: repo.OfferFailure): OfferResult {
 function refresh(slug?: string) {
   revalidatePath("/dashboard/offers");
   revalidatePath("/dashboard/listings");
+  // Every offer and every answer writes into a conversation now, and the
+  // inbox list shows it too: the layout, so every thread under it.
+  revalidatePath("/dashboard/messages", "layout");
   if (slug) revalidatePath(`/listing/${slug}`);
   revalidatePath("/browse");
 }
@@ -82,6 +88,7 @@ export async function makeOffer(
   return {
     ok: true,
     message: `Offer sent. The seller has ${settings.offerExpiryHours} hours to respond.`,
+    conversationId: result.value.conversationId,
   };
 }
 
