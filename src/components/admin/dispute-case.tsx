@@ -1,14 +1,14 @@
 import {
+  ArrowUpRightIcon,
   CheckIcon,
-  ExternalLinkIcon,
   FlagIcon,
   MessagesSquareIcon,
   PaperclipIcon,
+  StoreIcon,
   TriangleAlertIcon,
 } from "lucide-react";
 import Link from "next/link";
 import type { ComponentProps, ReactNode } from "react";
-import { Amount } from "@/components/admin/console";
 import { EndDeal } from "@/components/admin/deal-controls";
 import { WhatsAppContact } from "@/components/admin/dispute-contact";
 import { AddDisputeNote } from "@/components/admin/dispute-note";
@@ -19,7 +19,9 @@ import {
   OrderStatusBadge,
   Waited,
 } from "@/components/admin/vocab";
+import { Amount, Callout, Facts, Reference } from "@/components/app/kit";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type {
   DisputeCase as Case,
@@ -72,47 +74,78 @@ function when(date: Date) {
   });
 }
 
+/**
+ * One stop on the record's rail: a dot, and a hairline down to the next.
+ * The entry that froze the deal gets the red dot, so the start of the story
+ * is findable at a glance.
+ */
+function RecordItem({
+  tone = "neutral",
+  children,
+}: {
+  tone?: "neutral" | "danger";
+  children: ReactNode;
+}) {
+  return (
+    <li className="group/item relative pb-5 pl-6 last:pb-0">
+      <span
+        aria-hidden="true"
+        className="absolute top-3 -bottom-3 left-1 w-px bg-line group-last/item:hidden"
+      />
+      <span
+        aria-hidden="true"
+        className={cn(
+          "absolute top-1.5 left-0 size-[9px] rounded-full ring-4 ring-surface",
+          tone === "danger" ? "bg-danger" : "bg-line-strong",
+        )}
+      />
+      {children}
+    </li>
+  );
+}
+
 function Entry({ entry, raising }: { entry: RecordEntry; raising?: boolean }) {
   const side = SIDE[entry.side];
   const fallback = entry.note ? null : unwritten(entry.action);
   return (
-    <div
-      className={cn(
-        "rounded-xl border p-3",
-        raising ? "border-danger/35 bg-danger-soft" : "border-line bg-surface",
-      )}
-    >
-      <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
-        <span className="font-semibold text-fg">
+    <>
+      <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.8125rem] leading-5">
+        <span className="font-medium text-fg">
           {entry.actorName ?? "Channel Adda"}
         </span>
         <Badge variant={side.variant}>{side.label}</Badge>
         <span className="text-muted">{auditLabel(entry.action)}</span>
         <time
           dateTime={entry.at.toISOString()}
-          className="tnum text-subtle"
+          className="tnum text-xs text-subtle"
           suppressHydrationWarning
         >
           {when(entry.at)}
         </time>
       </p>
       {entry.note ? (
-        <blockquote className="mt-2 border-l-2 border-line-strong pl-3 text-sm leading-relaxed break-words whitespace-pre-line text-fg">
+        <blockquote
+          className={cn(
+            "mt-2 rounded-lg border px-3 py-2 text-sm leading-relaxed break-words whitespace-pre-line text-fg",
+            raising
+              ? "border-danger/20 bg-danger-soft/50"
+              : "border-line bg-surface-2/50",
+          )}
+        >
           {entry.note}
         </blockquote>
       ) : fallback ? (
-        <p className="mt-1.5 text-xs leading-relaxed text-muted">{fallback}</p>
+        <p className="mt-1 text-[0.8125rem] leading-relaxed text-muted">
+          {fallback}
+        </p>
       ) : null}
-    </div>
+    </>
   );
 }
 
 function Heading({ id, children }: { id: string; children: ReactNode }) {
   return (
-    <h3
-      id={id}
-      className="font-mono text-[0.625rem] font-semibold tracking-[0.12em] text-subtle uppercase"
-    >
+    <h3 id={id} className="text-[0.8125rem] leading-5 font-semibold text-fg">
       {children}
     </h3>
   );
@@ -121,10 +154,39 @@ function Heading({ id, children }: { id: string; children: ReactNode }) {
 /** A fact that wraps on a phone instead of pushing the page sideways. */
 function Line({ term, children }: { term: string; children: ReactNode }) {
   return (
-    <div className="grid gap-0.5 border-b border-line py-2 last:border-b-0 sm:grid-cols-[8.5rem_1fr] sm:gap-3">
-      <dt className="text-xs text-subtle">{term}</dt>
-      <dd className="min-w-0 text-sm break-words text-fg">{children}</dd>
+    <div className="grid gap-0.5 border-b border-line py-2.5 last:border-b-0 sm:grid-cols-[7.5rem_minmax(0,1fr)] sm:gap-3">
+      <dt className="text-[0.8125rem] leading-5 text-muted">{term}</dt>
+      <dd className="min-w-0 text-[0.8125rem] leading-5 break-words text-fg">
+        {children}
+      </dd>
     </div>
+  );
+}
+
+/** A person, by name, with the address staff will write to underneath. */
+function Person({
+  href,
+  name,
+  email,
+}: {
+  href?: string;
+  name: string;
+  email: string;
+}) {
+  return (
+    <>
+      {href ? (
+        <Link
+          href={href}
+          className="font-medium text-fg underline-offset-4 transition-colors hover:underline"
+        >
+          {name}
+        </Link>
+      ) : (
+        <span className="font-medium text-fg">{name}</span>
+      )}
+      <span className="block truncate text-xs text-subtle">{email}</span>
+    </>
   );
 }
 
@@ -154,28 +216,30 @@ export function DisputeCase({
     <article
       aria-labelledby={headingId}
       className={cn(
-        "relative overflow-hidden rounded-card border bg-surface",
-        overdue ? "border-danger/40" : "border-line",
+        "relative overflow-hidden rounded-card border bg-surface shadow-xs",
+        overdue ? "border-danger/35" : "border-line",
       )}
     >
-      <span
-        aria-hidden="true"
-        className={cn(
-          "absolute inset-y-0 left-0 w-[3px]",
-          overdue ? "bg-danger" : "bg-line-strong",
-        )}
-      />
+      {/* Only an overdue case is striped: a neutral stripe on every case
+          would be decoration, and the stripe has to mean something. */}
+      {overdue ? (
+        <span
+          aria-hidden="true"
+          className="absolute inset-y-0 left-0 z-[1] w-0.5 bg-danger"
+        />
+      ) : null}
 
       {/* ---- what it is ---- */}
-      <header className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 border-b border-line p-4 pl-5">
+      <header className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3 border-b border-line px-4 py-3.5 sm:px-5">
         <div className="min-w-0 flex-1">
           <h2
             id={headingId}
-            className="font-display text-base leading-snug font-bold break-words text-fg"
+            className="text-[0.9375rem] leading-6 font-semibold break-words text-fg"
           >
             {dispute.listing.title || dispute.listing.handle}
           </h2>
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            <Reference>{dispute.reference}</Reference>
             <DealModeBadge mode={dispute.mode} />
             <OrderStatusBadge status={dispute.status} />
             <Waited
@@ -187,39 +251,40 @@ export function DisputeCase({
           </div>
           <p
             className={cn(
-              "mt-1.5 text-xs",
-              overdue ? "font-semibold text-danger" : "text-subtle",
+              "mt-2 text-xs",
+              overdue ? "font-medium text-danger" : "text-subtle",
             )}
           >
             {overdue ? "Past the seven-day promise — was due " : "Decide by "}
-            <time dateTime={decideBy.toISOString()} suppressHydrationWarning>
+            <time
+              dateTime={decideBy.toISOString()}
+              className="tnum"
+              suppressHydrationWarning
+            >
               {when(decideBy)}
             </time>
           </p>
         </div>
-        <div className="flex shrink-0 flex-col items-end gap-1">
-          <span className="tnum text-[0.6875rem] text-subtle">
-            {dispute.reference}
-          </span>
-          <Amount
-            cents={dispute.priceUsd}
-            caption={
-              dispute.mode === "SAFEST" ? "price, paid off-platform" : "price"
-            }
-          />
-        </div>
+        <Amount
+          cents={dispute.priceUsd}
+          caption={
+            dispute.mode === "SAFEST" ? "price, paid off-platform" : "price"
+          }
+        />
       </header>
 
-      <div className="grid gap-5 p-4 pl-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
+      <div className="grid gap-8 px-4 py-4 sm:px-5 sm:py-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
         {/* ---- what each side said ---- */}
         <section aria-labelledby={`${headingId}-record`} className="min-w-0">
           <Heading id={`${headingId}-record`}>The record</Heading>
-          <ol className="mt-2.5 flex flex-col gap-2.5">
-            <li>
-              {dispute.raised ? (
+          <ol className="mt-3">
+            {dispute.raised ? (
+              <RecordItem tone="danger">
                 <Entry entry={dispute.raised} raising />
-              ) : (
-                <p className="flex items-start gap-2 rounded-xl border border-danger/35 bg-danger-soft p-3 text-sm text-fg">
+              </RecordItem>
+            ) : (
+              <RecordItem tone="danger">
+                <p className="flex items-start gap-2 rounded-lg border border-danger/25 bg-danger-soft/60 px-3 py-2.5 text-[0.8125rem] leading-relaxed text-fg">
                   <TriangleAlertIcon
                     aria-hidden="true"
                     className="mt-0.5 size-4 shrink-0 text-danger"
@@ -227,73 +292,79 @@ export function DisputeCase({
                   The audit trail has no record of who froze this deal or why.
                   Read the conversation and ask both sides before deciding.
                 </p>
-              )}
-            </li>
+              </RecordItem>
+            )}
             {dispute.since.map((entry) => (
-              <li key={entry.id}>
+              <RecordItem key={entry.id}>
                 <Entry entry={entry} />
-              </li>
+              </RecordItem>
             ))}
           </ol>
           {dispute.raised && dispute.since.length === 0 ? (
-            <p className="mt-2.5 text-xs text-subtle">
+            <p className="mt-3 pl-6 text-xs text-subtle">
               Nothing has been added since it was raised.
             </p>
           ) : null}
           <AddDisputeNote orderId={dispute.orderId} />
 
-          <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1">
+          <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-line pt-4">
             {dispute.conversation ? (
-              <Link
-                href={`/admin/messages/${dispute.conversation.id}`}
-                className="inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-primary-text underline-offset-4 hover:underline"
-              >
-                <MessagesSquareIcon aria-hidden="true" className="size-4" />
-                Read their conversation
-                <span className="tnum font-normal text-subtle">
-                  ({dispute.conversation.messages.toLocaleString("en-US")}{" "}
-                  {dispute.conversation.messages === 1 ? "message" : "messages"}
-                  )
-                </span>
-                {dispute.conversation.flagged ? (
-                  <Badge variant="danger">
-                    <FlagIcon aria-hidden="true" />
-                    flagged
-                  </Badge>
-                ) : null}
-              </Link>
+              <Button asChild size="sm" variant="secondary">
+                <Link href={`/admin/messages/${dispute.conversation.id}`}>
+                  <MessagesSquareIcon aria-hidden="true" />
+                  Read their conversation
+                  <span className="tnum font-normal text-subtle">
+                    ({dispute.conversation.messages.toLocaleString("en-US")}{" "}
+                    {dispute.conversation.messages === 1
+                      ? "message"
+                      : "messages"}
+                    )
+                  </span>
+                  {dispute.conversation.flagged ? (
+                    <Badge variant="danger">
+                      <FlagIcon aria-hidden="true" />
+                      flagged
+                    </Badge>
+                  ) : null}
+                </Link>
+              </Button>
             ) : (
-              <p className="inline-flex min-h-11 items-center text-sm text-subtle">
+              <p className="mr-2 text-[0.8125rem] text-subtle">
                 No conversation is linked to this deal.
               </p>
             )}
-            <Link
-              href={`/dashboard/deals/${dispute.orderId}`}
-              className="inline-flex min-h-11 items-center gap-1.5 text-sm text-primary-text underline-offset-4 hover:underline"
-            >
-              Open the deal
-              <ExternalLinkIcon aria-hidden="true" className="size-3.5" />
-            </Link>
-            <Link
-              href={`/admin/listings/${dispute.listing.id}`}
-              className="inline-flex min-h-11 items-center gap-1.5 text-sm text-primary-text underline-offset-4 hover:underline"
-            >
-              The listing
-            </Link>
+            <Button asChild size="sm" variant="secondary">
+              <Link href={`/dashboard/deals/${dispute.orderId}`}>
+                Open the deal
+                <ArrowUpRightIcon aria-hidden="true" />
+              </Link>
+            </Button>
+            <Button asChild size="sm" variant="ghost">
+              <Link href={`/admin/listings/${dispute.listing.id}`}>
+                <StoreIcon aria-hidden="true" />
+                The listing
+              </Link>
+            </Button>
           </div>
         </section>
 
         {/* ---- where things stand ---- */}
-        <div className="flex min-w-0 flex-col gap-5">
+        <div className="flex min-w-0 flex-col gap-7">
           <section aria-labelledby={`${headingId}-position`}>
             <Heading id={`${headingId}-position`}>Where things stand</Heading>
-            <dl className="mt-1.5">
+            <Facts className="mt-1">
               <Line term="Channel">{facts.asset}</Line>
               <Line term="Money">{facts.money}</Line>
               <Line term="On our books">
-                <Amount cents={dispute.heldUsd} size="sm" />{" "}
-                <span className="text-xs text-subtle">
-                  held by us on this deal, from the ledger
+                <span className="flex flex-wrap items-baseline gap-x-1.5">
+                  <Amount
+                    cents={dispute.heldUsd}
+                    size="sm"
+                    className="items-start"
+                  />
+                  <span className="text-xs text-subtle">
+                    held by us on this deal, from the ledger
+                  </span>
                 </span>
               </Line>
               <Line term="Recoverable">
@@ -304,6 +375,7 @@ export function DisputeCase({
                   Nothing cleared to us. If it is still unpaid at{" "}
                   <time
                     dateTime={dispute.lapsesAt.toISOString()}
+                    className="tnum"
                     suppressHydrationWarning
                   >
                     {when(dispute.lapsesAt)}
@@ -311,42 +383,49 @@ export function DisputeCase({
                   , the payment-window sweep lapses it and frees the listing.
                 </Line>
               ) : null}
-            </dl>
+            </Facts>
           </section>
 
           <section aria-labelledby={`${headingId}-steps`}>
             <Heading id={`${headingId}-steps`}>
-              How far it got · {done} of {dispute.steps.length} steps
+              How far it got{" "}
+              <span className="font-normal text-subtle tabular-nums">
+                · {done} of {dispute.steps.length} steps
+              </span>
             </Heading>
-            <ol className="mt-2 flex flex-col gap-1.5">
+            <ol className="mt-2.5 flex flex-col gap-2">
               {dispute.steps.map((step) => (
-                <li key={step.position} className="flex items-start gap-2">
+                <li key={step.position} className="flex items-start gap-2.5">
                   <span
                     className={cn(
                       "mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full border",
                       step.completedAt
-                        ? "border-verified/40 bg-verified-soft text-verified"
-                        : "border-line-strong",
+                        ? "border-verified/30 bg-verified-soft text-verified"
+                        : "border-line-strong bg-surface",
                     )}
                   >
                     {step.completedAt ? (
-                      <CheckIcon aria-hidden="true" className="size-2.5" />
+                      <CheckIcon
+                        aria-hidden="true"
+                        className="size-2.5"
+                        strokeWidth={3}
+                      />
                     ) : null}
                   </span>
-                  <span className="min-w-0 text-xs leading-relaxed">
+                  <span className="min-w-0 text-[0.8125rem] leading-5">
                     <span
                       className={step.completedAt ? "text-fg" : "text-subtle"}
                     >
                       {step.position}. {step.label}
                     </span>
-                    <span className="text-subtle"> · {step.actor}</span>
+                    <span className="text-xs text-subtle"> · {step.actor}</span>
                     <span className="sr-only">
                       {step.completedAt ? ", done" : ", not done"}
                     </span>
                     {step.completedAt ? (
                       <time
                         dateTime={step.completedAt.toISOString()}
-                        className="tnum block text-subtle"
+                        className="tnum block text-xs text-subtle"
                         suppressHydrationWarning
                       >
                         {when(step.completedAt)}
@@ -357,7 +436,7 @@ export function DisputeCase({
                         href={step.proofUrl}
                         target="_blank"
                         rel="noreferrer"
-                        className="inline-flex min-h-8 items-center gap-1 text-primary-text underline-offset-4 hover:underline"
+                        className="inline-flex min-h-11 items-center gap-1 text-xs font-medium text-muted underline-offset-4 transition-colors hover:text-fg hover:underline pointer-fine:min-h-6"
                       >
                         <PaperclipIcon aria-hidden="true" className="size-3" />
                         Proof attached
@@ -372,9 +451,9 @@ export function DisputeCase({
               ))}
             </ol>
             {dispute.mode === "SAFEST" && dispute.buyerPaymentRef ? (
-              <p className="mt-2 text-xs leading-relaxed text-muted">
+              <p className="mt-3 rounded-lg border border-line bg-surface-2/50 px-3 py-2 text-xs leading-relaxed text-muted">
                 The buyer recorded paying the seller with reference{" "}
-                <code className="rounded bg-surface-2 px-1 py-0.5 font-mono break-all text-fg select-all">
+                <code className="rounded bg-surface px-1 py-0.5 font-mono break-all text-fg ring-1 ring-line select-all">
                   {dispute.buyerPaymentRef}
                 </code>
                 {dispute.sellerConfirmedAt
@@ -386,51 +465,41 @@ export function DisputeCase({
 
           <section aria-labelledby={`${headingId}-people`}>
             <Heading id={`${headingId}-people`}>Who to talk to</Heading>
-            <dl className="mt-1.5">
+            <Facts className="mt-1">
               <Line term="Buyer">
-                <Link
+                <Person
                   href={`/admin/users/${dispute.buyer.id}`}
-                  className="font-medium text-primary-text underline-offset-4 hover:underline"
-                >
-                  {dispute.buyer.name}
-                </Link>
-                <span className="block truncate text-xs text-subtle">
-                  {dispute.buyer.email}
-                </span>
+                  name={dispute.buyer.name}
+                  email={dispute.buyer.email}
+                />
               </Line>
               <Line term="Seller">
-                <Link
+                <Person
                   href={`/admin/users/${dispute.seller.id}`}
-                  className="font-medium text-primary-text underline-offset-4 hover:underline"
-                >
-                  {dispute.seller.name}
-                </Link>
-                <span className="block truncate text-xs text-subtle">
-                  {dispute.seller.email}
-                </span>
+                  name={dispute.seller.name}
+                  email={dispute.seller.email}
+                />
               </Line>
               <Line term="Seller’s WhatsApp">
                 <WhatsAppContact
                   number={dispute.seller.whatsapp}
                   name={dispute.seller.name}
                 />
-                <span className="block text-xs text-subtle">
+                <span className="mt-1 block text-xs text-subtle">
                   Staff only. Never give it to the buyer.
                 </span>
               </Line>
               <Line term="Agent">
                 {dispute.agent ? (
-                  <>
-                    {dispute.agent.name}
-                    <span className="block truncate text-xs text-subtle">
-                      {dispute.agent.email}
-                    </span>
-                  </>
+                  <Person
+                    name={dispute.agent.name}
+                    email={dispute.agent.email}
+                  />
                 ) : (
                   <span className="text-subtle">Nobody holds this deal</span>
                 )}
               </Line>
-            </dl>
+            </Facts>
           </section>
         </div>
       </div>
@@ -438,27 +507,25 @@ export function DisputeCase({
       {/* ---- the decision ---- */}
       <section
         aria-labelledby={`${headingId}-decide`}
-        className="border-t border-line bg-surface-2/60 p-4 pl-5"
+        className="border-t border-line bg-surface-2/40 px-4 py-4 sm:px-5"
       >
         <Heading id={`${headingId}-decide`}>Decide it</Heading>
-        <p className="mt-1.5 max-w-[72ch] text-xs leading-relaxed text-muted">
+        <p className="mt-0.5 max-w-[72ch] text-xs leading-relaxed text-muted">
           {dispute.mode === "SAFEST"
             ? "Safest: we never held the price, so there is none to refund. If the agent holds the channel it goes back to the seller or on to the buyer."
             : "Fastest: we hold the money, so deciding it either way moves money — the buyer back, or the seller paid."}{" "}
           Your note below is the decision’s reason in the audit trail.
         </p>
         {financesCall && !canMoveMoney ? (
-          <p className="mt-2 flex max-w-[72ch] items-start gap-2 rounded-xl border border-danger/30 bg-danger-soft p-3 text-xs leading-relaxed text-fg">
-            <TriangleAlertIcon
-              aria-hidden="true"
-              className="mt-px size-4 shrink-0 text-danger"
-            />
-            <span>
-              Leave this decision to finance. Cancelling here would also return
-              everything we hold to the buyer — the same money as a refund — so
-              add what you know to the record and hand it over.
-            </span>
-          </p>
+          <Callout
+            tone="danger"
+            className="mt-3 max-w-[72ch]"
+            title="Leave this decision to finance."
+          >
+            Cancelling here would also return everything we hold to the buyer —
+            the same money as a refund — so add what you know to the record and
+            hand it over.
+          </Callout>
         ) : null}
         <EndDeal
           orderId={dispute.orderId}

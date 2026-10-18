@@ -6,19 +6,19 @@ import {
 } from "lucide-react";
 import type { Metadata } from "next";
 import {
-  AllClear,
-  Amount,
-  ConsoleHeader,
-  MetaItem,
-  Metric,
-  MetricGrid,
-} from "@/components/admin/console";
-import {
   DECISION_HOURS,
   DisputeCase,
   FIRST_RESPONSE_HOURS,
 } from "@/components/admin/dispute-case";
 import { elapsed, Waited } from "@/components/admin/vocab";
+import {
+  AllClear,
+  MetaItem,
+  PageHeader,
+  Stat,
+  StatGrid,
+} from "@/components/app/kit";
+import { Price } from "@/components/ui/price";
 import { listDisputes } from "@/server/admin-disputes";
 import { requireStaff } from "@/server/session";
 
@@ -57,10 +57,9 @@ export default async function DisputesPage() {
 
   return (
     <>
-      <ConsoleHeader
-        eyebrow="Transfers"
+      <PageHeader
         title="Dispute desk"
-        description="Every frozen deal, the one that has waited longest first. Read what was said, check who holds the channel and the money, then decide it — the decision and its reason go on the record under your name."
+        description="Every frozen deal, longest wait first. The decision and its reason go on the record under your name."
         meta={
           <>
             <MetaItem label="Signed in as">{staff.name}</MetaItem>
@@ -74,8 +73,8 @@ export default async function DisputesPage() {
         }
       />
 
-      <MetricGrid className="mt-6">
-        <Metric
+      <StatGrid columns={canMoveMoney ? 4 : 3}>
+        <Stat
           label="Frozen deals"
           value={disputes.length}
           icon={GavelIcon}
@@ -92,14 +91,14 @@ export default async function DisputesPage() {
           }
           note="Nothing on these moves until somebody decides it."
         />
-        <Metric
+        <Stat
           label="Over 48 hours"
           value={unanswered}
           icon={HourglassIcon}
           tone={unanswered > 0 ? "primary" : "neutral"}
           note="The Terms promise a first response within 48 hours."
         />
-        <Metric
+        <Stat
           label="Past seven days"
           value={overdue}
           icon={CalendarClockIcon}
@@ -108,27 +107,29 @@ export default async function DisputesPage() {
         />
         {/* A money total is finance's figure, as everywhere else in the
             staff area. Each case still shows its own, because nobody can
-            decide a dispute without knowing what we hold on it. */}
+            decide a dispute without knowing what we hold on it. Every figure
+            is integer cents and `Price` takes dollars — the same conversion
+            `Amount` does — drawn at the size of the other figures. */}
         {canMoveMoney ? (
-          <Metric
+          <Stat
             label="We hold"
-            value={<Amount cents={held} size="lg" />}
+            value={<Price usd={held / 100} />}
             icon={WalletIcon}
             note="On our books across every frozen deal."
           />
         ) : null}
-      </MetricGrid>
+      </StatGrid>
 
-      <div className="mt-7">
+      <div className="mt-8">
         {disputes.length === 0 ? (
           <AllClear
             title="No deal is frozen"
-            body="Nothing is waiting on a decision. A deal lands here the moment either side raises a dispute, or the payment processor sends a payment back."
+            body="A deal lands here the moment either side raises a dispute, or the payment processor sends a payment back."
           />
         ) : (
           <ol
             aria-label="Frozen deals, longest wait first"
-            className="flex flex-col gap-5"
+            className="flex flex-col gap-4"
           >
             {disputes.map((dispute) => (
               <li key={dispute.orderId}>

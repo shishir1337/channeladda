@@ -1,7 +1,10 @@
 import {
   ArrowLeftRightIcon,
+  HistoryIcon,
+  MessagesSquareIcon,
   ReceiptIcon,
   SearchIcon,
+  SearchXIcon,
   ShieldAlertIcon,
   ShieldCheckIcon,
   UserRoundIcon,
@@ -11,25 +14,6 @@ import {
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import {
-  AllClear,
-  Amount,
-  ConsoleHeader,
-  ConsoleSection,
-  FilterBar,
-  FilterLink,
-  MetaItem,
-  Metric,
-  MetricGrid,
-  Nothing,
-  Panel,
-  RowHead,
-  RowItem,
-  Rows,
-  TableScroller,
-  Td,
-  Th,
-} from "@/components/admin/console";
 import {
   AssignAgent,
   CheckInvoice,
@@ -41,16 +25,44 @@ import { StuckDeals } from "@/components/admin/stuck-deals";
 import {
   auditLabel,
   DEAL_MODE,
+  DealHead,
   DealModeBadge,
   elapsed,
+  ORDER_STATUS,
   OrderStatusBadge,
   orderStatusLabel,
   Waited,
 } from "@/components/admin/vocab";
+import {
+  AllClear,
+  Amount,
+  Card,
+  EmptyState,
+  FilterBar,
+  FilterLink,
+  hintClass,
+  IconTile,
+  inputClass,
+  List,
+  ListItem,
+  MetaItem,
+  PageHeader,
+  Section,
+  Sep,
+  Stat,
+  StatGrid,
+  TableCard,
+  Td,
+  Th,
+  Tr,
+  TurnFlag,
+} from "@/components/app/kit";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Pagination } from "@/components/ui/pagination";
 import type { OrderStatus } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
+import { cn } from "@/lib/utils";
 import {
   type DealLookupRow,
   type DealSearch,
@@ -75,6 +87,14 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
+function day(date: Date) {
+  return date.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
 /**
  * One deal in a lookup list — search results and the finished view.
  *
@@ -84,63 +104,55 @@ export const metadata: Metadata = {
  */
 function LookupRow({ deal }: { deal: DealLookupRow }) {
   return (
-    <RowItem>
-      <Link
-        href={`/dashboard/deals/${deal.id}`}
-        className="block p-4 transition-colors hover:bg-surface-2"
-      >
-        <RowHead
-          title={deal.listingTitle}
-          reference={deal.reference}
-          tags={
-            <>
-              <DealModeBadge mode={deal.mode} />
-              <OrderStatusBadge status={deal.status} />
-              <span className="text-xs text-subtle">{deal.listingHandle}</span>
-            </>
-          }
-          right={
-            <Amount
-              cents={deal.priceUsd}
-              caption={deal.mode === "SAFEST" ? "price, paid direct" : "price"}
-            />
-          }
-        />
-        <p className="mt-2 grid gap-0.5 text-xs text-muted sm:grid-cols-2 sm:gap-4">
-          <span className="min-w-0 truncate">
-            <span className="text-subtle">Buyer </span>
-            {deal.buyerName} · {deal.buyerEmail}
-          </span>
-          <span className="min-w-0 truncate">
-            <span className="text-subtle">Seller </span>
-            {deal.sellerName} · {deal.sellerEmail}
-          </span>
-        </p>
-        <p className="mt-1.5 text-[0.6875rem] text-subtle">
+    <ListItem href={`/dashboard/deals/${deal.id}`}>
+      <DealHead
+        title={deal.listingTitle}
+        reference={deal.reference}
+        tags={
+          <>
+            <DealModeBadge mode={deal.mode} />
+            <OrderStatusBadge status={deal.status} />
+            <span className="text-xs text-subtle">{deal.listingHandle}</span>
+          </>
+        }
+        amount={
+          <Amount
+            cents={deal.priceUsd}
+            caption={deal.mode === "SAFEST" ? "price, paid direct" : "price"}
+          />
+        }
+        chevron
+      />
+      <p className="mt-2 grid gap-x-6 gap-y-0.5 text-xs text-muted sm:grid-cols-2">
+        <span className="min-w-0 truncate">
+          <span className="text-subtle">Buyer </span>
+          {deal.buyerName} · {deal.buyerEmail}
+        </span>
+        <span className="min-w-0 truncate">
+          <span className="text-subtle">Seller </span>
+          {deal.sellerName} · {deal.sellerEmail}
+        </span>
+      </p>
+      <p className="mt-1 flex flex-wrap items-center gap-x-1.5 text-xs text-subtle">
+        <span>
           Opened{" "}
-          <time dateTime={deal.createdAt.toISOString()}>
-            {deal.createdAt.toLocaleDateString("en-GB", {
-              day: "numeric",
-              month: "short",
-              year: "numeric",
-            })}
+          <time dateTime={deal.createdAt.toISOString()} className="tnum">
+            {day(deal.createdAt)}
           </time>
-          {deal.endedAt ? (
-            <>
-              {" "}
-              · ended{" "}
-              <time dateTime={deal.endedAt.toISOString()}>
-                {deal.endedAt.toLocaleDateString("en-GB", {
-                  day: "numeric",
-                  month: "short",
-                  year: "numeric",
-                })}
+        </span>
+        {deal.endedAt ? (
+          <>
+            <Sep />
+            <span>
+              ended{" "}
+              <time dateTime={deal.endedAt.toISOString()} className="tnum">
+                {day(deal.endedAt)}
               </time>
-            </>
-          ) : null}
-        </p>
-      </Link>
-    </RowItem>
+            </span>
+          </>
+        ) : null}
+      </p>
+    </ListItem>
   );
 }
 
@@ -267,14 +279,17 @@ export default async function AdminDealsPage({
     awaitingPayment.map((order) => order.id),
   );
 
+  // As many columns as there are figures, so a desk with three queues does
+  // not leave a hole where a fourth would be.
+  const figures = 2 + (isFinance ? 1 : 0) + (mineOnly ? 1 : 0);
+
   return (
     <>
-      <ConsoleHeader
-        eyebrow="Transfers"
+      <PageHeader
         title="Deal desk"
         description={
           isStaff
-            ? "Every transfer in flight, and the controls to move or end one. An unpaid deal lapses on its own when its payment window closes; anything else that has sat for days is waiting on somebody reading this page."
+            ? "Every transfer in flight, and the controls to move or end one. Only an unpaid deal lapses on its own; anything else that has sat is waiting on you."
             : "The deals you are holding, and the ones nobody has taken yet. Open a deal to work its steps."
         }
         meta={
@@ -298,11 +313,16 @@ export default async function AdminDealsPage({
         </>
       ) : null}
 
-      <MetricGrid className="mt-6">
-        <Metric
+      {/* The figures link down to their queue, when the queue is drawn. */}
+      <StatGrid
+        columns={figures === 2 ? 2 : figures === 3 ? 3 : 4}
+        className={isStaff ? "mt-6" : undefined}
+      >
+        <Stat
           label="Needs an agent"
           value={needingAgent.length}
           icon={UserRoundIcon}
+          href="#needs-agent"
           tone={needingAgent.length > 0 ? "primary" : "neutral"}
           chip={
             oldestUnheld ? (
@@ -311,18 +331,20 @@ export default async function AdminDealsPage({
           }
           note="Live deals with nobody holding them."
         />
-        <Metric
+        <Stat
           label="Agent can no longer act"
           value={needingReassignment.length}
           icon={ShieldAlertIcon}
+          href={needingReassignment.length > 0 ? "#reassign" : undefined}
           tone={needingReassignment.length > 0 ? "danger" : "neutral"}
           note="Channels held by an account that can no longer act."
         />
         {isFinance ? (
-          <Metric
+          <Stat
             label="Awaiting payment"
             value={awaitingPayment.length}
             icon={WalletIcon}
+            href="#awaiting-payment"
             tone={awaitingPayment.length > 0 ? "primary" : "neutral"}
             chip={
               oldestUnpaid ? (
@@ -333,185 +355,178 @@ export default async function AdminDealsPage({
           />
         ) : null}
         {mineOnly ? (
-          <Metric
+          <Stat
             label="Yours"
             value={mine.length}
             icon={ArrowLeftRightIcon}
+            href="#mine"
             note="Deals you are the agent of record on."
           />
         ) : null}
-      </MetricGrid>
+      </StatGrid>
 
       {/* The two modes are mirror images and staff get the asymmetry wrong
           under pressure, so the difference stays on the page rather than in
           somebody's memory. */}
-      <div className="mt-4 grid gap-2.5 sm:grid-cols-2">
-        <Panel className="flex gap-3 p-3.5" padded={false}>
-          <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-surface-2 text-muted sm:size-9">
-            <ShieldCheckIcon aria-hidden="true" className="size-4" />
-          </span>
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        <Card className="flex items-start gap-3 p-3.5">
+          <IconTile icon={ShieldCheckIcon} size="sm" />
           <p className="min-w-0 text-xs leading-relaxed text-muted">
-            <span className="font-semibold text-fg">
+            <span className="font-medium text-fg">
               {DEAL_MODE.SAFEST.label}
             </span>{" "}
             — {DEAL_MODE.SAFEST.blurb}
           </p>
-        </Panel>
-        <Panel className="flex gap-3 p-3.5" padded={false}>
-          <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-surface-2 text-muted sm:size-9">
-            <ZapIcon aria-hidden="true" className="size-4" />
-          </span>
+        </Card>
+        <Card className="flex items-start gap-3 p-3.5">
+          <IconTile icon={ZapIcon} size="sm" />
           <p className="min-w-0 text-xs leading-relaxed text-muted">
-            <span className="font-semibold text-fg">
+            <span className="font-medium text-fg">
               {DEAL_MODE.FASTEST.label}
             </span>{" "}
             — {DEAL_MODE.FASTEST.blurb}
           </p>
-        </Panel>
+        </Card>
       </div>
 
       {needingReassignment.length > 0 ? (
-        <ConsoleSection
+        <Section
           id="reassign"
           title="Held by an agent who can no longer act"
           count={needingReassignment.length}
           tone="danger"
-          description="These channels are still owned by an agent who was suspended or moved to another role, and who can no longer act on them. Nothing moves until somebody else takes them on, or they go back to the seller."
+          description="Still owned by an agent who was suspended or moved to another role. Nothing moves until somebody else takes them on, or they go back to the seller."
         >
-          <Rows>
+          <List>
             {needingReassignment.map((order) => (
-              <RowItem key={order.id} flag="danger">
-                <div className="p-4 pl-5">
-                  <RowHead
-                    title={order.listing.title}
-                    reference={order.reference}
-                    tags={
-                      <>
-                        <DealModeBadge mode="SAFEST" />
-                        <OrderStatusBadge status={order.status} />
-                        <span className="text-xs text-subtle">
-                          was {order.agent?.name ?? "an agent"}
-                        </span>
-                      </>
-                    }
-                  />
-                  {assignable ? (
-                    <AssignAgent
-                      orderId={order.id}
-                      agents={assignable.agents}
-                      currentAgentId={order.agent?.id ?? null}
-                    />
-                  ) : null}
-                  <EndDeal
+              <ListItem key={order.id} flag="danger">
+                <DealHead
+                  title={order.listing.title}
+                  reference={order.reference}
+                  tags={
+                    <>
+                      <DealModeBadge mode="SAFEST" />
+                      <OrderStatusBadge status={order.status} />
+                      <Waited since={order.createdAt} prefix="open" />
+                      <span className="text-xs text-subtle">
+                        was {order.agent?.name ?? "an agent"}
+                      </span>
+                    </>
+                  }
+                />
+                {assignable ? (
+                  <AssignAgent
                     orderId={order.id}
-                    mode="SAFEST"
-                    status={order.status}
-                    canMoveMoney={isFinance}
+                    agents={assignable.agents}
+                    currentAgentId={order.agent?.id ?? null}
                   />
-                </div>
-              </RowItem>
+                ) : null}
+                <EndDeal
+                  orderId={order.id}
+                  mode="SAFEST"
+                  status={order.status}
+                  canMoveMoney={isFinance}
+                />
+              </ListItem>
             ))}
-          </Rows>
-        </ConsoleSection>
+          </List>
+        </Section>
       ) : null}
 
       {isFinance ? (
-        <ConsoleSection
+        <Section
           id="awaiting-payment"
           title="Waiting on payment"
           count={awaitingPayment.length}
           tone={awaitingPayment.length > 0 ? "primary" : "neutral"}
-          description="Cryptomus tells us when one of these clears, and the sweep picks up anything that callback misses. Each row says what the processor last told us. Record one by hand only when the money reached us some other way — every later step of the deal unlocks behind it, and it cannot be undone."
+          description="Cryptomus tells us when one of these clears, and the sweep picks up anything that callback misses. Record one by hand only when the money reached us some other way — every later step of the deal unlocks behind it, and it cannot be undone."
           actions={
             awaitingPayment.length > 0 ? (
-              <span className="text-xs text-subtle">
-                <Amount cents={owed} caption="owed in total" size="sm" />
-              </span>
+              <Amount cents={owed} caption="owed in total" size="sm" />
             ) : null
           }
         >
           {awaitingPayment.length === 0 ? (
             <AllClear
               title="Every opening payment has cleared"
-              body="Nothing is blocked on money reaching us. The sweep is still watching for callbacks that go missing."
+              body="The sweep is still watching for callbacks that go missing."
             />
           ) : (
-            <Rows>
+            <List>
               {awaitingPayment.map((order) => {
                 const invoice = invoices.get(order.id) ?? null;
                 const line = describeInvoice(invoice);
                 return (
-                  <RowItem
+                  <ListItem
                     key={order.id}
                     flag={line.tone === "danger" ? "danger" : undefined}
                   >
-                    <div className="p-4 pl-5">
-                      <RowHead
-                        title={order.listing.title}
-                        reference={order.reference}
-                        tags={
-                          <>
-                            <DealModeBadge mode={order.mode} />
-                            <OrderStatusBadge status="AWAITING_PAYMENT" />
-                            <Waited since={order.createdAt} prefix="open" />
-                          </>
-                        }
-                        right={
-                          <Amount
-                            cents={order.totalUsd}
-                            caption={
-                              order.mode === "SAFEST"
-                                ? "admin fee due"
-                                : "price + fee due"
-                            }
-                          />
-                        }
-                      />
-                      <div className="mt-3 flex items-start gap-2.5 rounded-card border border-line bg-surface-2 p-3">
-                        <ReceiptIcon
-                          aria-hidden="true"
-                          className="mt-0.5 size-4 shrink-0 text-subtle"
+                    <DealHead
+                      title={order.listing.title}
+                      reference={order.reference}
+                      tags={
+                        <>
+                          <DealModeBadge mode={order.mode} />
+                          <OrderStatusBadge status="AWAITING_PAYMENT" />
+                          <Waited since={order.createdAt} prefix="open" />
+                        </>
+                      }
+                      amount={
+                        <Amount
+                          cents={order.totalUsd}
+                          caption={
+                            order.mode === "SAFEST"
+                              ? "admin fee due"
+                              : "price + fee due"
+                          }
                         />
-                        <div className="min-w-0 text-xs leading-relaxed">
-                          <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                            <span className="font-mono text-[0.625rem] font-semibold tracking-[0.12em] text-subtle uppercase">
-                              Processor
-                            </span>
-                            <Badge variant={INVOICE_VARIANT[line.tone]}>
-                              {line.label}
-                            </Badge>
-                            {invoice ? (
-                              <Waited
-                                since={invoice.settledAt ?? invoice.updatedAt}
-                                prefix={invoice.settledAt ? "paid" : "updated"}
-                                warnAfter={invoice.settledAt ? 0.25 : 12}
-                                lateAfter={invoice.settledAt ? 1 : 24}
-                              />
-                            ) : null}
-                          </p>
-                          <p className="mt-1 text-muted">{line.note}</p>
-                          {invoice?.externalId ? (
-                            <p className="mt-1 break-all text-subtle">
-                              Processor id {invoice.externalId}
-                            </p>
+                      }
+                    />
+                    <div className="mt-3 flex items-start gap-2.5 rounded-lg border border-line bg-surface-2/50 px-3 py-2.5">
+                      <ReceiptIcon
+                        aria-hidden="true"
+                        className="mt-0.5 size-4 shrink-0 text-subtle"
+                      />
+                      <div className="min-w-0 flex-1 text-xs leading-relaxed">
+                        <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                          <span className="font-medium text-fg">Processor</span>
+                          <Badge variant={INVOICE_VARIANT[line.tone]}>
+                            {line.label}
+                          </Badge>
+                          {invoice ? (
+                            <Waited
+                              since={invoice.settledAt ?? invoice.updatedAt}
+                              prefix={invoice.settledAt ? "paid" : "updated"}
+                              warnAfter={invoice.settledAt ? 0.25 : 12}
+                              lateAfter={invoice.settledAt ? 1 : 24}
+                            />
                           ) : null}
-                        </div>
+                        </p>
+                        <p className="mt-1 text-muted">{line.note}</p>
+                        {invoice?.externalId ? (
+                          <p className="mt-1 break-all text-subtle">
+                            Processor id{" "}
+                            <span className="font-mono text-[0.6875rem] text-muted">
+                              {invoice.externalId}
+                            </span>
+                          </p>
+                        ) : null}
                       </div>
-                      {invoice && !invoice.appliedAt ? (
-                        <CheckInvoice reference={invoice.reference} />
-                      ) : null}
-                      <RecordPayment orderId={order.id} />
                     </div>
-                  </RowItem>
+                    {invoice && !invoice.appliedAt ? (
+                      <CheckInvoice reference={invoice.reference} />
+                    ) : null}
+                    <RecordPayment orderId={order.id} />
+                  </ListItem>
                 );
               })}
-            </Rows>
+            </List>
           )}
-        </ConsoleSection>
+        </Section>
       ) : null}
 
       {mineOnly ? (
-        <ConsoleSection
+        <Section
           id="mine"
           title="Your deals"
           count={mine.length}
@@ -520,57 +535,76 @@ export default async function AdminDealsPage({
           {mine.length === 0 ? (
             <AllClear
               title="You are not holding anything"
-              body="Nothing is waiting on you. Take the next unheld deal below when you are ready."
+              body="Take the next unheld deal below when you are ready."
             />
           ) : (
-            <Rows>
-              {mine.map((order) => (
-                <RowItem key={order.id}>
-                  <Link
-                    href={`/dashboard/deals/${order.id}`}
-                    className="block p-4 transition-colors hover:bg-surface-2"
-                  >
-                    <RowHead
-                      title={order.listing.title}
-                      reference={order.reference}
-                      tags={
-                        <>
-                          <DealModeBadge mode={order.mode} />
-                          <OrderStatusBadge status={order.status} />
-                          <Waited since={order.createdAt} prefix="open" />
-                        </>
-                      }
-                      right={
-                        <Amount
-                          cents={order.priceUsd}
-                          caption="channel price"
-                        />
-                      }
-                    />
-                    <p className="mt-2 text-xs font-medium text-primary-text">
-                      Open the deal and work the steps →
-                    </p>
-                  </Link>
-                  {/* Beside the row, not in it: a link inside a link is
-                      not one either browser or screen reader can follow. */}
-                  {order.conversationId ? (
-                    <div className="px-4 pb-3.5">
-                      <Link
-                        href={`/dashboard/messages/${order.conversationId}`}
-                        className="inline-flex min-h-9 items-center text-xs font-medium text-primary-text underline-offset-4 hover:underline"
-                      >
-                        Open the deal chat
-                      </Link>
-                    </div>
-                  ) : null}
-                </RowItem>
-              ))}
-            </Rows>
+            <List>
+              {mine.map((order) => {
+                // Whose move it is, from the status vocabulary: the agent's
+                // own turns earn the gold flag; anybody else's is a quiet
+                // "with the buyer". A handover is shared, so it says nothing.
+                const whose = ORDER_STATUS[order.status]?.whose ?? null;
+                return (
+                  <ListItem key={order.id} padded={false}>
+                    <Link
+                      href={`/dashboard/deals/${order.id}`}
+                      className={cn(
+                        "group block px-4 py-3 transition-colors duration-150 hover:bg-surface-2/60 focus-visible:-outline-offset-2 sm:px-5",
+                        order.conversationId && "pb-2",
+                      )}
+                    >
+                      <DealHead
+                        title={order.listing.title}
+                        reference={order.reference}
+                        tags={
+                          <>
+                            <DealModeBadge mode={order.mode} />
+                            <OrderStatusBadge status={order.status} />
+                            <Waited since={order.createdAt} prefix="open" />
+                            {whose === "agent" ? (
+                              <TurnFlag mine />
+                            ) : whose && whose !== "transfer" ? (
+                              <TurnFlag
+                                mine={false}
+                                who={
+                                  whose === "staff" ? "staff" : `the ${whose}`
+                                }
+                              />
+                            ) : null}
+                          </>
+                        }
+                        amount={
+                          <Amount
+                            cents={order.priceUsd}
+                            caption="channel price"
+                          />
+                        }
+                        chevron
+                      />
+                    </Link>
+                    {/* Beside the row, not in it: a link inside a link is
+                        not one either browser or screen reader can follow. */}
+                    {order.conversationId ? (
+                      <div className="px-4 pb-3 sm:px-5">
+                        <Button asChild size="sm" variant="secondary">
+                          <Link
+                            href={`/dashboard/messages/${order.conversationId}`}
+                          >
+                            <MessagesSquareIcon aria-hidden="true" />
+                            Open the deal chat
+                          </Link>
+                        </Button>
+                      </div>
+                    ) : null}
+                  </ListItem>
+                );
+              })}
+            </List>
           )}
-        </ConsoleSection>
+        </Section>
       ) : null}
 
-      <ConsoleSection
+      <Section
         id="needs-agent"
         title="Needs an agent"
         count={needingAgent.length}
@@ -580,67 +614,60 @@ export default async function AdminDealsPage({
         {needingAgent.length === 0 ? (
           <AllClear
             title="Every live deal has somebody on it"
-            body="Nothing is waiting to be claimed. New deals land here the moment their opening payment clears."
+            body="New deals land here the moment their opening payment clears."
           />
         ) : (
-          <Rows>
+          <List>
             {needingAgent.map((order) => {
               const age = elapsed(order.createdAt);
               return (
-                <RowItem
+                <ListItem
                   key={order.id}
                   flag={age.hours >= 48 ? "danger" : undefined}
                 >
-                  <div className="p-4 pl-5">
-                    <RowHead
-                      title={order.listing.title}
-                      reference={order.reference}
-                      tags={
-                        <>
-                          <DealModeBadge mode={order.mode} />
-                          <OrderStatusBadge status={order.status} />
-                          <Waited
-                            since={order.createdAt}
-                            prefix="unheld"
-                            lateAfter={48}
-                          />
-                        </>
-                      }
-                      right={
-                        <Amount
-                          cents={order.priceUsd}
-                          caption="channel price"
+                  <DealHead
+                    title={order.listing.title}
+                    reference={order.reference}
+                    tags={
+                      <>
+                        <DealModeBadge mode={order.mode} />
+                        <OrderStatusBadge status={order.status} />
+                        <Waited
+                          since={order.createdAt}
+                          prefix="unheld"
+                          lateAfter={48}
                         />
-                      }
-                    />
-                    {isAgent ? (
-                      <ClaimDeal
-                        orderId={order.id}
-                        defaultEmail={identity?.email ?? viewer.email}
-                        defaultBrand={
-                          identity?.brand ?? "Channel Adda Transfers"
-                        }
-                        locked={identity !== null}
-                      />
-                    ) : (
-                      <p className="mt-2.5 text-xs text-subtle">
-                        An agent claims this from their own queue. You can still
-                        end it below.
-                      </p>
-                    )}
-                    <EndDeal
+                      </>
+                    }
+                    amount={
+                      <Amount cents={order.priceUsd} caption="channel price" />
+                    }
+                  />
+                  {isAgent ? (
+                    <ClaimDeal
                       orderId={order.id}
-                      mode={order.mode}
-                      status={order.status}
-                      canMoveMoney={isFinance}
+                      defaultEmail={identity?.email ?? viewer.email}
+                      defaultBrand={identity?.brand ?? "Channel Adda Transfers"}
+                      locked={identity !== null}
                     />
-                  </div>
-                </RowItem>
+                  ) : (
+                    <p className="mt-2 text-xs text-subtle">
+                      An agent claims this from their own queue. You can still
+                      end it below.
+                    </p>
+                  )}
+                  <EndDeal
+                    orderId={order.id}
+                    mode={order.mode}
+                    status={order.status}
+                    canMoveMoney={isFinance}
+                  />
+                </ListItem>
               );
             })}
-          </Rows>
+          </List>
         )}
-      </ConsoleSection>
+      </Section>
 
       {isStaff ? <StuckDeals canMoveMoney={isFinance} /> : null}
 
@@ -648,26 +675,27 @@ export default async function AdminDealsPage({
           hidden. Every reference in here links somewhere an agent gets a 404
           for, and the trail is the whole marketplace's deal history. */}
       {isStaff ? (
-        <ConsoleSection
+        <Section
           id="activity"
           title="Everything that has happened"
           count={activity.length}
-          description="Read from the audit trail, so it is the same record a dispute is settled from. The fifty most recent events."
+          description="The fifty most recent events, read from the audit trail — the same record a dispute is settled from."
         >
           {activity.length === 0 ? (
-            <AllClear
+            <EmptyState
+              icon={HistoryIcon}
               title="No deal activity yet"
               body="Every deal event — opened, paid, assigned, stepped, ended — lands here as it happens."
             />
           ) : (
-            <TableScroller>
+            <TableCard>
               <table className="w-full min-w-[46rem] text-sm">
                 <caption className="sr-only">
                   Deal activity from the audit trail, newest first
                 </caption>
                 <thead>
                   <tr>
-                    <Th>When</Th>
+                    <Th className="w-20">When</Th>
                     <Th>What happened</Th>
                     <Th>Deal</Th>
                     <Th>Status now</Th>
@@ -677,7 +705,7 @@ export default async function AdminDealsPage({
                 </thead>
                 <tbody>
                   {activity.map((row) => (
-                    <tr key={row.id} className="border-t border-line">
+                    <Tr key={row.id}>
                       <Td className="whitespace-nowrap">
                         <time
                           dateTime={row.createdAt.toISOString()}
@@ -690,10 +718,10 @@ export default async function AdminDealsPage({
                       <Td className="font-medium text-fg">
                         {auditLabel(row.action)}
                       </Td>
-                      <Td>
+                      <Td className="whitespace-nowrap">
                         <Link
                           href={`/dashboard/deals/${row.orderId}`}
-                          className="tnum text-xs text-primary-text underline-offset-4 hover:underline"
+                          className="rounded font-mono text-xs text-muted underline-offset-4 transition-colors hover:text-fg hover:underline"
                         >
                           {row.orderReference}
                         </Link>
@@ -709,13 +737,13 @@ export default async function AdminDealsPage({
                       <Td className="text-xs whitespace-nowrap text-subtle">
                         {row.actorName ?? "Channel Adda"}
                       </Td>
-                    </tr>
+                    </Tr>
                   ))}
                 </tbody>
               </table>
-            </TableScroller>
+            </TableCard>
           )}
-        </ConsoleSection>
+        </Section>
       ) : null}
     </>
   );
@@ -737,13 +765,9 @@ function DealSearchForm({
   view: "live" | "finished";
 }) {
   return (
-    <search className="mt-5 block">
-      <form
-        method="get"
-        action="/admin/deals"
-        className="flex flex-wrap items-stretch gap-2"
-      >
-        <div className="relative min-w-56 flex-1">
+    <search className="block max-w-2xl">
+      <form method="get" action="/admin/deals" className="flex gap-2">
+        <div className="relative min-w-0 flex-1">
           <SearchIcon
             aria-hidden="true"
             className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-subtle"
@@ -759,20 +783,17 @@ function DealSearchForm({
             autoComplete="off"
             placeholder="CA-48213, @handle or an email address"
             aria-describedby="deal-q-hint"
-            className="h-12 w-full rounded-xl border border-line bg-surface pr-3 pl-9 text-base text-fg placeholder:text-subtle focus:border-primary/60 focus:outline-none sm:text-sm"
+            className={cn(inputClass, "pl-9")}
           />
         </div>
         {view === "finished" ? (
           <input type="hidden" name="view" value="finished" />
         ) : null}
-        <button
-          type="submit"
-          className="h-12 shrink-0 cursor-pointer rounded-xl bg-primary px-5 text-sm font-medium text-primary-fg shadow-soft transition-opacity hover:opacity-90"
-        >
+        <Button type="submit" size="md" variant="secondary">
           Find
-        </button>
+        </Button>
       </form>
-      <p id="deal-q-hint" className="mt-1.5 text-xs text-subtle">
+      <p id="deal-q-hint" className={hintClass}>
         A deal reference opens that deal. Anything else lists every deal it
         matches, in any status, finished ones included.
       </p>
@@ -783,19 +804,17 @@ function DealSearchForm({
 /** In flight, or finished. The live desk stays the default. */
 function DeskViews({ view }: { view: "live" | "finished" }) {
   return (
-    <div className="mt-3">
-      <FilterBar label="Which deals">
-        <FilterLink href="/admin/deals" active={view === "live"}>
-          In flight
-        </FilterLink>
-        <FilterLink
-          href="/admin/deals?view=finished"
-          active={view === "finished"}
-        >
-          Finished
-        </FilterLink>
-      </FilterBar>
-    </div>
+    <FilterBar label="Which deals" className="mt-5">
+      <FilterLink href="/admin/deals" active={view === "live"}>
+        In flight
+      </FilterLink>
+      <FilterLink
+        href="/admin/deals?view=finished"
+        active={view === "finished"}
+      >
+        Finished
+      </FilterLink>
+    </FilterBar>
   );
 }
 
@@ -807,8 +826,9 @@ function SearchResults({
   search: DealSearch;
 }) {
   return (
-    <ConsoleSection
+    <Section
       id="search"
+      className="mt-6"
       title="Matching deals"
       count={search.total}
       tone={search.total > 0 ? "primary" : "neutral"}
@@ -819,26 +839,24 @@ function SearchResults({
       }
     >
       {search.rows.length === 0 ? (
-        <Nothing
+        <EmptyState
+          icon={SearchXIcon}
           title="No deal matches that"
           body="Try the reference exactly as the customer wrote it, the channel's handle, or the buyer's or seller's email address."
           action={
-            <Link
-              href="/admin/deals"
-              className="inline-flex min-h-11 items-center rounded-xl border border-line px-4 text-sm font-medium text-muted transition-colors hover:border-line-strong hover:text-fg"
-            >
-              Clear the search
-            </Link>
+            <Button asChild size="sm" variant="secondary">
+              <Link href="/admin/deals">Clear the search</Link>
+            </Button>
           }
         />
       ) : (
-        <Rows>
+        <List>
           {search.rows.map((deal) => (
             <LookupRow key={deal.id} deal={deal} />
           ))}
-        </Rows>
+        </List>
       )}
-    </ConsoleSection>
+    </Section>
   );
 }
 
@@ -878,17 +896,20 @@ function FinishedView({
 
   return (
     <>
-      <ConsoleHeader
-        eyebrow="Transfers"
+      <PageHeader
         title="Finished deals"
-        description="Every deal that has stopped, most recent first: completed, refunded, cancelled, returned or lapsed. Open one for its whole record — the steps, the proof and who did what."
+        description="Every deal that has stopped, most recent first. Open one for its whole record — the steps, the proof and who did what."
         meta={
           <>
             <MetaItem label="Signed in as">{viewerName}</MetaItem>
             <MetaItem label="Desk">
               {viewerRole.toLowerCase().replace("_", " ")}
             </MetaItem>
-            <MetaItem label="Finished">{all.toLocaleString("en-US")}</MetaItem>
+            <MetaItem label="Finished">
+              <span className="tabular-nums">
+                {all.toLocaleString("en-US")}
+              </span>
+            </MetaItem>
           </>
         }
       />
@@ -897,30 +918,29 @@ function FinishedView({
       <DeskViews view="finished" />
       {search ? <SearchResults query={query} search={search} /> : null}
 
-      <div className="mt-3">
-        <FilterBar label="How the deal ended">
+      <FilterBar label="How the deal ended" className="mt-6">
+        <FilterLink
+          href="/admin/deals?view=finished"
+          active={status === null}
+          count={all}
+        >
+          All
+        </FilterLink>
+        {FINISHED_STATUSES.map((s) => (
           <FilterLink
-            href="/admin/deals?view=finished"
-            active={status === null}
-            count={all}
+            key={s}
+            href={`/admin/deals?view=finished&status=${s}`}
+            active={status === s}
+            count={finished.counts[s] ?? 0}
           >
-            All
+            {orderStatusLabel(s)}
           </FilterLink>
-          {FINISHED_STATUSES.map((s) => (
-            <FilterLink
-              key={s}
-              href={`/admin/deals?view=finished&status=${s}`}
-              active={status === s}
-              count={finished.counts[s] ?? 0}
-            >
-              {orderStatusLabel(s)}
-            </FilterLink>
-          ))}
-        </FilterBar>
-      </div>
+        ))}
+      </FilterBar>
 
-      <ConsoleSection
+      <Section
         id="finished"
+        className="mt-6"
         title={status ? orderStatusLabel(status) : "All finished deals"}
         count={finished.total}
         description={
@@ -930,17 +950,17 @@ function FinishedView({
         }
       >
         {finished.rows.length === 0 ? (
-          <Nothing
+          <EmptyState
             title="No deal has ended this way"
             body="Deals land here the moment they complete, are refunded, cancelled, returned or lapse."
           />
         ) : (
           <>
-            <Rows>
+            <List>
               {finished.rows.map((deal) => (
                 <LookupRow key={deal.id} deal={deal} />
               ))}
-            </Rows>
+            </List>
             <Pagination
               className="mt-4"
               page={finished.page}
@@ -949,7 +969,7 @@ function FinishedView({
             />
           </>
         )}
-      </ConsoleSection>
+      </Section>
     </>
   );
 }

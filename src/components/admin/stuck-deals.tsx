@@ -1,18 +1,19 @@
-import {
-  AllClear,
-  Amount,
-  ConsoleSection,
-  RowHead,
-  RowItem,
-  Rows,
-} from "@/components/admin/console";
 import { EndDeal } from "@/components/admin/deal-controls";
 import {
+  DealHead,
   DealModeBadge,
   elapsed,
   OrderStatusBadge,
   Waited,
 } from "@/components/admin/vocab";
+import {
+  AllClear,
+  Amount,
+  List,
+  ListItem,
+  Section,
+  Sep,
+} from "@/components/app/kit";
 import { db } from "@/lib/db";
 
 /**
@@ -80,7 +81,7 @@ export async function StuckDeals({
   ).length;
 
   return (
-    <ConsoleSection
+    <Section
       id="in-flight"
       title="Deals in flight"
       count={deals.length}
@@ -88,17 +89,17 @@ export async function StuckDeals({
       description="Every live deal, oldest first. Nothing here times out on its own, so a deal that has sat for days is waiting on somebody reading this list."
       actions={
         deals.length > 0 ? (
-          <p className="text-xs text-subtle">
+          <p className="flex items-center gap-1.5 text-xs text-subtle tabular-nums">
             {disputed > 0 ? (
-              <span className="font-semibold text-danger">
+              <span className="font-medium text-danger">
                 {disputed} disputed
               </span>
             ) : (
               "none disputed"
             )}
-            {" · "}
+            <Sep />
             {stale > 0 ? (
-              <span className="font-semibold text-danger">
+              <span className="font-medium text-danger">
                 {stale} over {STALE_DAYS} days
               </span>
             ) : (
@@ -111,10 +112,10 @@ export async function StuckDeals({
       {deals.length === 0 ? (
         <AllClear
           title="Nothing is in flight"
-          body="Every deal on the platform has either finished or not started. There is nothing to unstick."
+          body="Every deal has either finished or not started. There is nothing to unstick."
         />
       ) : (
-        <Rows>
+        <List>
           {deals.map((order) => {
             const next = order.steps[0];
             const age = elapsed(order.createdAt);
@@ -125,77 +126,73 @@ export async function StuckDeals({
                   ? "primary"
                   : undefined;
             return (
-              <RowItem key={order.id} flag={flag}>
-                <div className="p-4 pl-5">
-                  <RowHead
-                    title={order.listing.title}
-                    reference={order.reference}
-                    tags={
-                      <>
-                        <DealModeBadge mode={order.mode} />
-                        <OrderStatusBadge status={order.status} />
-                        <Waited
-                          since={order.createdAt}
-                          prefix="open"
-                          warnAfter={AGEING_DAYS * 24}
-                          lateAfter={STALE_DAYS * 24}
-                        />
-                      </>
-                    }
-                    right={
-                      <Amount
-                        cents={order.priceUsd}
-                        caption={
-                          order.mode === "SAFEST"
-                            ? "paid off-platform"
-                            : "we hold this"
-                        }
+              <ListItem key={order.id} flag={flag}>
+                <DealHead
+                  title={order.listing.title}
+                  reference={order.reference}
+                  tags={
+                    <>
+                      <DealModeBadge mode={order.mode} />
+                      <OrderStatusBadge status={order.status} />
+                      <Waited
+                        since={order.createdAt}
+                        prefix="open"
+                        warnAfter={AGEING_DAYS * 24}
+                        lateAfter={STALE_DAYS * 24}
                       />
-                    }
-                  />
-                  <dl className="mt-2.5 flex flex-wrap gap-x-5 gap-y-1 text-xs">
+                    </>
+                  }
+                  amount={
+                    <Amount
+                      cents={order.priceUsd}
+                      caption={
+                        order.mode === "SAFEST"
+                          ? "paid off-platform"
+                          : "we hold this"
+                      }
+                    />
+                  }
+                />
+                <dl className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-xs leading-5">
+                  <div className="flex gap-1.5">
+                    <dt className="text-subtle">Agent</dt>
+                    <dd
+                      className={
+                        order.agent ? "text-fg" : "font-medium text-danger"
+                      }
+                    >
+                      {order.agent?.name ?? "nobody"}
+                    </dd>
+                  </div>
+                  {next ? (
+                    <div className="flex min-w-0 gap-1.5">
+                      <dt className="shrink-0 text-subtle">
+                        Step {next.position}, waiting on {next.actor}
+                      </dt>
+                      <dd className="min-w-0 truncate text-fg">{next.label}</dd>
+                    </div>
+                  ) : (
                     <div className="flex gap-1.5">
-                      <dt className="text-subtle">Agent</dt>
-                      <dd
-                        className={
-                          order.agent ? "text-fg" : "font-medium text-danger"
-                        }
-                      >
-                        {order.agent?.name ?? "nobody"}
+                      <dt className="text-subtle">Next step</dt>
+                      <dd className="text-fg">
+                        none outstanding on the template
                       </dd>
                     </div>
-                    {next ? (
-                      <div className="flex min-w-0 gap-1.5">
-                        <dt className="shrink-0 text-subtle">
-                          Step {next.position}, waiting on {next.actor}
-                        </dt>
-                        <dd className="min-w-0 truncate text-fg">
-                          {next.label}
-                        </dd>
-                      </div>
-                    ) : (
-                      <div className="flex gap-1.5">
-                        <dt className="text-subtle">Next step</dt>
-                        <dd className="text-fg">
-                          none outstanding on the template
-                        </dd>
-                      </div>
-                    )}
-                  </dl>
-                  <EndDeal
-                    orderId={order.id}
-                    mode={order.mode}
-                    status={order.status}
-                    canMoveMoney={canMoveMoney}
-                    paid={order.paymentRef !== null}
-                    inCustody={order.custodyAt !== null}
-                  />
-                </div>
-              </RowItem>
+                  )}
+                </dl>
+                <EndDeal
+                  orderId={order.id}
+                  mode={order.mode}
+                  status={order.status}
+                  canMoveMoney={canMoveMoney}
+                  paid={order.paymentRef !== null}
+                  inCustody={order.custodyAt !== null}
+                />
+              </ListItem>
             );
           })}
-        </Rows>
+        </List>
       )}
-    </ConsoleSection>
+    </Section>
   );
 }

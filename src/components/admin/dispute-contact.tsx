@@ -1,4 +1,5 @@
 import { ExternalLinkIcon, PhoneIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 /**
  * The seller's WhatsApp, for staff.
@@ -36,7 +37,7 @@ export function WhatsAppContact({
 
   const href = waMeHref(number);
   return (
-    <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+    <span className="flex flex-wrap items-center gap-x-3 gap-y-2">
       <span className="tnum inline-flex items-center gap-1.5 text-fg select-all">
         <PhoneIcon
           aria-hidden="true"
@@ -45,16 +46,13 @@ export function WhatsAppContact({
         {number}
       </span>
       {href ? (
-        <a
-          href={href}
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex min-h-11 items-center gap-1 text-sm text-primary-text underline-offset-4 hover:underline"
-        >
-          Open in WhatsApp
-          <span className="sr-only"> to message {name}</span>
-          <ExternalLinkIcon aria-hidden="true" className="size-3.5" />
-        </a>
+        <Button asChild size="sm" variant="secondary">
+          <a href={href} target="_blank" rel="noreferrer">
+            Open in WhatsApp
+            <span className="sr-only"> to message {name}</span>
+            <ExternalLinkIcon aria-hidden="true" />
+          </a>
+        </Button>
       ) : null}
     </span>
   );

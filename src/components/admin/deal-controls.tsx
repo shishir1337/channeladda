@@ -7,9 +7,11 @@ import {
   TriangleAlertIcon,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useId, useState, useTransition } from "react";
+import { type ComponentProps, useId, useState, useTransition } from "react";
 import { custodyFacts } from "@/components/admin/vocab";
+import { inputClass, labelClass } from "@/components/app/kit";
 import { TextArea, TextField } from "@/components/auth/fields";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { DealMode, OrderStatus } from "@/generated/prisma/enums";
 import { cn } from "@/lib/utils";
@@ -31,6 +33,37 @@ import type { AssignableAgent } from "@/server/admin-users";
  * recording a payment is a form, and ending a deal is a decision taken behind
  * a disclosure with the consequences written out next to each outcome.
  */
+
+/**
+ * A button label that keeps its width while the busy text shows.
+ *
+ * Both labels sit in one grid cell and the wider of the two holds the size,
+ * so a button does not jump narrower under the pointer the moment it is
+ * pressed. Only the visible one is read out.
+ */
+export function SteadyLabel({
+  pending,
+  idle,
+  busy,
+}: {
+  pending: boolean;
+  idle: string;
+  busy: string;
+}) {
+  return (
+    <span className="inline-grid justify-items-center">
+      <span
+        aria-hidden="true"
+        className="invisible col-start-1 row-start-1 whitespace-nowrap"
+      >
+        {idle.length >= busy.length ? idle : busy}
+      </span>
+      <span className="col-start-1 row-start-1 whitespace-nowrap">
+        {pending ? busy : idle}
+      </span>
+    </span>
+  );
+}
 
 function Outcome({ message, ok }: { message: string | null; ok: boolean }) {
   if (!message) return null;
@@ -58,7 +91,12 @@ function Outcome({ message, ok }: { message: string | null; ok: boolean }) {
   );
 }
 
-/** The frame every control on a row shares, so they stack predictably. */
+/**
+ * The frame every control on a row shares, so they stack predictably.
+ *
+ * A well, not a card: it sits inside a row or a case that already has the
+ * border, and cards never nest.
+ */
 function ControlBox({
   title,
   hint,
@@ -73,22 +111,29 @@ function ControlBox({
   return (
     <div
       className={cn(
-        "mt-3 rounded-card border p-3.5 sm:p-4",
+        "mt-3 rounded-lg border p-3 sm:p-3.5",
         tone === "danger"
-          ? "border-danger/35 bg-danger-soft"
-          : "border-line bg-surface-2",
+          ? "border-danger/25 bg-danger-soft/40"
+          : "border-line bg-surface-2/50",
       )}
     >
-      <p className="font-mono text-[0.625rem] font-semibold tracking-[0.12em] text-subtle uppercase">
-        {title}
-      </p>
+      <p className="text-[0.8125rem] leading-5 font-medium text-fg">{title}</p>
       {hint ? (
-        <p className="mt-1.5 text-xs leading-relaxed text-muted">{hint}</p>
+        <p className="mt-0.5 max-w-[72ch] text-xs leading-relaxed text-muted">
+          {hint}
+        </p>
       ) : null}
       {children}
     </div>
   );
 }
+
+/**
+ * Fields the server fills from a stored identity are shown read-only, and
+ * look it: a well rather than a white input, so nobody tries to edit them.
+ */
+const lockedField =
+  "[&_input]:cursor-default [&_input]:bg-surface-2 [&_input]:text-muted [&_input]:shadow-none";
 
 /** An agent taking the next unheld deal. */
 export function ClaimDeal({
@@ -133,6 +178,7 @@ export function ClaimDeal({
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           readOnly={locked}
+          className={locked ? lockedField : undefined}
           required
         />
         <TextField
@@ -142,6 +188,7 @@ export function ClaimDeal({
           value={brand}
           onChange={(e) => setBrand(e.target.value)}
           readOnly={locked}
+          className={locked ? lockedField : undefined}
           required
         />
         <Button
@@ -162,7 +209,11 @@ export function ClaimDeal({
             });
           }}
         >
-          {pending ? "Claiming…" : "Take this deal"}
+          <SteadyLabel
+            pending={pending}
+            idle="Take this deal"
+            busy="Claiming…"
+          />
         </Button>
         <div className="sm:col-span-3">
           <Outcome message={message} ok={ok} />
@@ -178,6 +229,9 @@ export function ClaimDeal({
  * Stands in for the Cryptomus webhook. Every later step of a deal unlocks
  * behind this, so it is the one control on this page that staff will use on
  * every single deal until payments are wired.
+ *
+ * A secondary button, not the gold one: the processor's callback is the
+ * expected way a payment clears, and this is the exception to it.
  */
 export function RecordPayment({ orderId }: { orderId: string }) {
   const router = useRouter();
@@ -214,6 +268,7 @@ export function RecordPayment({ orderId }: { orderId: string }) {
         <Button
           type="button"
           size="md"
+          variant="secondary"
           disabled={pending || !ref.trim()}
           onClick={() => {
             setMessage(null);
@@ -229,7 +284,11 @@ export function RecordPayment({ orderId }: { orderId: string }) {
             });
           }}
         >
-          {pending ? "Recording…" : "Payment received"}
+          <SteadyLabel
+            pending={pending}
+            idle="Payment received"
+            busy="Recording…"
+          />
         </Button>
         <div className="sm:col-span-3">
           <Outcome message={message} ok={ok} />
@@ -263,7 +322,11 @@ export function CheckInvoice({ reference }: { reference: string }) {
           });
         }}
       >
-        {pending ? "Asking Cryptomus…" : "Check with Cryptomus now"}
+        <SteadyLabel
+          pending={pending}
+          idle="Check with Cryptomus now"
+          busy="Asking Cryptomus…"
+        />
       </Button>
       <Outcome message={message} ok={ok} />
     </div>
@@ -304,43 +367,46 @@ export function AssignAgent({
       hint="The new agent is invited as channel owner. Ownership does not move until the seller accepts that invitation, so tell them it is coming."
     >
       {choices.length === 0 ? (
-        <p className="mt-3 text-sm text-muted">
+        <p className="mt-2 text-[0.8125rem] text-muted">
           There is no other active agent to give it to. Invite one from the Team
           page first.
         </p>
       ) : null}
       <div className="mt-3 grid gap-3 sm:grid-cols-3 sm:items-end">
         <div>
-          <label
-            htmlFor={ids.agent}
-            className="block text-sm font-medium text-fg"
-          >
+          <label htmlFor={ids.agent} className={labelClass}>
             New agent
             <span className="ml-0.5 text-danger">*</span>
           </label>
-          <select
-            id={ids.agent}
-            name="agentId"
-            value={agentId}
-            required
-            onChange={(e) => {
-              const next = agents.find((a) => a.id === e.target.value);
-              setAgentId(e.target.value);
-              // Their stored identity is what the server will use, so the
-              // fields show it; without one, they start empty to be typed.
-              setEmail(next?.agentEmail ?? "");
-              setBrand(next?.agentBrand ?? "Channel Adda Transfers");
-            }}
-            className="mt-2 h-12 w-full cursor-pointer appearance-none rounded-xl border border-line bg-surface-2 px-3.5 text-base text-fg focus:border-primary/60 focus:outline-none sm:text-[0.9375rem]"
-          >
-            <option value="">Choose an agent…</option>
-            {choices.map((agent) => (
-              <option key={agent.id} value={agent.id} disabled={agent.atCap}>
-                {agent.name} — holding {agent.holds}
-                {agent.atCap ? " (at their limit)" : ""}
-              </option>
-            ))}
-          </select>
+          <div className="relative mt-1.5">
+            <select
+              id={ids.agent}
+              name="agentId"
+              value={agentId}
+              required
+              onChange={(e) => {
+                const next = agents.find((a) => a.id === e.target.value);
+                setAgentId(e.target.value);
+                // Their stored identity is what the server will use, so the
+                // fields show it; without one, they start empty to be typed.
+                setEmail(next?.agentEmail ?? "");
+                setBrand(next?.agentBrand ?? "Channel Adda Transfers");
+              }}
+              className={cn(inputClass, "cursor-pointer appearance-none pr-9")}
+            >
+              <option value="">Choose an agent…</option>
+              {choices.map((agent) => (
+                <option key={agent.id} value={agent.id} disabled={agent.atCap}>
+                  {agent.name} — holding {agent.holds}
+                  {agent.atCap ? " (at their limit)" : ""}
+                </option>
+              ))}
+            </select>
+            <ChevronDownIcon
+              aria-hidden="true"
+              className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-subtle"
+            />
+          </div>
         </div>
         <TextField
           id={ids.email}
@@ -350,6 +416,7 @@ export function AssignAgent({
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           readOnly={locked}
+          className={locked ? lockedField : undefined}
           required
         />
         <TextField
@@ -359,6 +426,7 @@ export function AssignAgent({
           value={brand}
           onChange={(e) => setBrand(e.target.value)}
           readOnly={locked}
+          className={locked ? lockedField : undefined}
           required
         />
       </div>
@@ -382,7 +450,11 @@ export function AssignAgent({
           });
         }}
       >
-        {pending ? "Assigning…" : "Reassign this deal"}
+        <SteadyLabel
+          pending={pending}
+          idle="Reassign this deal"
+          busy="Assigning…"
+        />
       </Button>
       <Outcome message={message} ok={ok} />
     </ControlBox>
@@ -473,20 +545,11 @@ const ENDINGS: readonly Ending[] = [
 
 const WEIGHT_TAG: Record<
   Ending["weight"],
-  { label: string; className: string }
+  { label: string; variant: ComponentProps<typeof Badge>["variant"] }
 > = {
-  pause: {
-    label: "Reversible",
-    className: "border-line bg-surface-2 text-muted",
-  },
-  final: {
-    label: "Irreversible",
-    className: "border-danger/30 bg-danger-soft text-danger",
-  },
-  money: {
-    label: "Irreversible · moves money",
-    className: "border-danger/30 bg-danger-soft text-danger",
-  },
+  pause: { label: "Reversible", variant: "neutral" },
+  final: { label: "Irreversible", variant: "danger" },
+  money: { label: "Irreversible · moves money", variant: "danger" },
 };
 
 /**
@@ -499,6 +562,10 @@ const WEIGHT_TAG: Record<
  * consequence for *this* deal's mode is spelled out, and anything final needs
  * a second confirmation. The note is still required, because it is what the
  * audit trail will carry.
+ *
+ * The closed control is deliberately quiet — an outline button that only
+ * turns red under the pointer — so on a row whose real next step is a claim
+ * or a reassignment, the gold button stays the loud one.
  */
 export function EndDeal({
   orderId,
@@ -564,17 +631,19 @@ export function EndDeal({
   if (!open) {
     return (
       <div className="mt-3">
-        <button
+        <Button
           type="button"
+          size="sm"
+          variant="outline"
           onClick={() => setOpen(true)}
           aria-expanded={false}
           aria-controls={ids.panel}
-          className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border border-line px-3.5 text-sm font-medium text-muted transition-colors hover:border-danger/50 hover:text-danger"
+          className="text-muted hover:border-danger/40 hover:bg-danger-soft/40 hover:text-danger app:hover:border-danger/40"
         >
-          <GavelIcon aria-hidden="true" className="size-4" />
+          <GavelIcon aria-hidden="true" />
           End or pause this deal
-          <ChevronDownIcon aria-hidden="true" className="size-4" />
-        </button>
+          <ChevronDownIcon aria-hidden="true" />
+        </Button>
         <Outcome message={message} ok={ok} />
       </div>
     );
@@ -583,21 +652,29 @@ export function EndDeal({
   return (
     <div
       id={ids.panel}
-      className="mt-3 rounded-card border border-danger/35 bg-danger-soft p-3.5 sm:p-4"
+      className="mt-3 rounded-lg border border-danger/30 bg-surface p-3 shadow-xs sm:p-4"
     >
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="font-display text-sm font-bold text-fg">
-            End or pause this deal
-          </p>
-          <p className="mt-1 text-xs leading-relaxed text-muted">
-            Four of these five cannot be undone. Whether one is legal from where
-            this deal stands is decided by the transition table, so an outcome
-            that is not reachable comes back as a refusal.
-          </p>
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-start gap-2.5">
+          <GavelIcon
+            aria-hidden="true"
+            className="mt-0.5 size-4 shrink-0 text-danger"
+          />
+          <div className="min-w-0">
+            <p className="text-sm leading-5 font-semibold text-fg">
+              End or pause this deal
+            </p>
+            <p className="mt-0.5 max-w-[72ch] text-xs leading-relaxed text-muted">
+              Four of these five cannot be undone. Whether one is legal from
+              where this deal stands is decided by the transition table, so an
+              outcome that is not reachable comes back as a refusal.
+            </p>
+          </div>
         </div>
-        <button
+        <Button
           type="button"
+          size="sm"
+          variant="ghost"
           onClick={() => {
             setOpen(false);
             setArmed(false);
@@ -605,34 +682,40 @@ export function EndDeal({
           }}
           aria-expanded
           aria-controls={ids.panel}
-          className="shrink-0 cursor-pointer rounded-lg px-2 py-1 text-xs text-muted underline-offset-4 transition-colors hover:text-fg hover:underline"
+          className="-mt-1 -mr-1 shrink-0"
         >
           Close
-        </button>
+        </Button>
       </div>
 
       {facts ? (
-        <dl className="mt-3.5 grid gap-x-5 gap-y-1.5 rounded-xl border border-line bg-surface p-3 text-xs sm:grid-cols-2">
+        <dl className="mt-3 grid gap-x-6 gap-y-1.5 rounded-lg border border-line bg-surface-2/50 px-3 py-2.5 text-xs leading-relaxed sm:grid-cols-2">
           <div className="flex gap-2">
-            <dt className="shrink-0 text-subtle">Channel</dt>
+            <dt className="w-[4.75rem] shrink-0 text-subtle sm:w-auto">
+              Channel
+            </dt>
             <dd className="min-w-0 text-fg">{facts.asset}</dd>
           </div>
           <div className="flex gap-2">
-            <dt className="shrink-0 text-subtle">Money</dt>
+            <dt className="w-[4.75rem] shrink-0 text-subtle sm:w-auto">
+              Money
+            </dt>
             <dd className="min-w-0 text-fg">{facts.money}</dd>
           </div>
           <div className="flex gap-2 sm:col-span-2">
-            <dt className="shrink-0 text-subtle">Recoverable</dt>
+            <dt className="w-[4.75rem] shrink-0 text-subtle sm:w-auto">
+              Recoverable
+            </dt>
             <dd className="min-w-0 font-medium text-fg">{facts.recoverable}</dd>
           </div>
         </dl>
       ) : null}
 
-      <fieldset className="mt-3.5">
-        <legend className="font-mono text-[0.625rem] font-semibold tracking-[0.12em] text-subtle uppercase">
+      <fieldset className="mt-4">
+        <legend className="text-xs font-medium text-muted">
           What should happen
         </legend>
-        <div className="mt-2 grid gap-2">
+        <div className="mt-2 divide-y divide-line overflow-hidden rounded-lg border border-line">
           {ENDINGS.filter(
             // A disputed deal is already paused; offering it again only
             // produced a refusal.
@@ -645,12 +728,18 @@ export function EndDeal({
               <label
                 key={ending.to}
                 className={cn(
-                  "flex cursor-pointer items-start gap-2.5 rounded-xl border bg-surface p-3 transition-colors",
+                  "relative flex cursor-pointer items-start gap-3 px-3 py-2.5 transition-colors duration-150 has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60",
                   active
-                    ? "border-primary bg-primary-soft"
-                    : "border-line hover:border-line-strong",
+                    ? "bg-primary-soft/50"
+                    : "bg-surface hover:bg-surface-2/60",
                 )}
               >
+                {active ? (
+                  <span
+                    aria-hidden="true"
+                    className="absolute inset-y-0 left-0 w-0.5 bg-primary"
+                  />
+                ) : null}
                 <input
                   type="radio"
                   name={ids.group}
@@ -662,37 +751,26 @@ export function EndDeal({
                     setArmed(false);
                     setMessage(null);
                   }}
-                  className="mt-0.5 size-4 shrink-0 accent-[var(--color-primary)]"
+                  className="mt-0.5 size-4 shrink-0 cursor-[inherit] accent-[var(--color-primary)]"
                 />
                 <span className="min-w-0">
-                  <span className="flex flex-wrap items-center gap-2">
-                    <span className="text-sm font-semibold text-fg">
+                  <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <span className="text-[0.8125rem] leading-5 font-medium text-fg">
                       {ending.label}
                     </span>
-                    <span
-                      className={cn(
-                        "rounded-full border px-1.5 py-0.5 text-[0.625rem] font-semibold whitespace-nowrap",
-                        tag.className,
-                      )}
-                    >
-                      {tag.label}
-                    </span>
+                    <Badge variant={tag.variant}>{tag.label}</Badge>
                     {!reachable ? (
-                      <span className="rounded-full border border-line bg-surface-2 px-1.5 py-0.5 text-[0.625rem] font-semibold whitespace-nowrap text-subtle">
-                        Not this mode
-                      </span>
+                      <Badge variant="neutral">Not this mode</Badge>
                     ) : null}
                     {!canMoveMoney &&
                     (ending.weight === "money" ||
                       (ending.to === "CANCELLED" &&
                         mode === "FASTEST" &&
                         paid === true)) ? (
-                      <span className="rounded-full border border-line bg-surface-2 px-1.5 py-0.5 text-[0.625rem] font-semibold whitespace-nowrap text-subtle">
-                        Finance only
-                      </span>
+                      <Badge variant="neutral">Finance only</Badge>
                     ) : null}
                   </span>
-                  <span className="mt-1 block text-xs leading-relaxed text-muted">
+                  <span className="mt-0.5 block text-xs leading-relaxed text-muted">
                     {ending.consequence(mode)}
                   </span>
                 </span>
@@ -710,7 +788,7 @@ export function EndDeal({
         rows={2}
         value={note}
         onChange={(e) => setNote(e.target.value)}
-        className="mt-3.5"
+        className="mt-4"
         required
       />
 
@@ -727,10 +805,14 @@ export function EndDeal({
           disabled={pending || !ready}
           onClick={() => run(selected.to)}
         >
-          {pending ? "Pausing…" : "Pause it for review"}
+          <SteadyLabel
+            pending={pending}
+            idle="Pause it for review"
+            busy="Pausing…"
+          />
         </Button>
       ) : armed ? (
-        <div className="mt-3 rounded-xl border border-danger/40 bg-surface p-3">
+        <div className="mt-3 rounded-lg border border-danger/30 bg-danger-soft/60 p-3">
           <p className="flex items-start gap-2 text-xs leading-relaxed font-medium text-fg">
             <TriangleAlertIcon
               aria-hidden="true"
@@ -740,7 +822,7 @@ export function EndDeal({
               {selected.label}. {selected.consequence(mode)} There is no undo.
             </span>
           </p>
-          <div className="mt-3 flex flex-wrap gap-2.5">
+          <div className="mt-3 flex flex-wrap gap-2 pl-6">
             <Button
               type="button"
               size="sm"
@@ -748,7 +830,11 @@ export function EndDeal({
               disabled={pending || !ready}
               onClick={() => run(selected.to)}
             >
-              {pending ? "Working…" : `Yes — ${selected.label.toLowerCase()}`}
+              <SteadyLabel
+                pending={pending}
+                idle={`Yes — ${selected.label.toLowerCase()}`}
+                busy="Working…"
+              />
             </Button>
             <Button
               type="button"

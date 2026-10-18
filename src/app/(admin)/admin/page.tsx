@@ -1,31 +1,17 @@
 import {
-  ActivityIcon,
   ArrowRightIcon,
   BadgeCheckIcon,
   CoinsIcon,
   FlagIcon,
+  HistoryIcon,
   LifeBuoyIcon,
   MessageSquareIcon,
   StoreIcon,
   TagIcon,
-  TriangleAlertIcon,
+  Undo2Icon,
 } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import {
-  AllClear,
-  Amount,
-  ConsoleHeader,
-  ConsoleSection,
-  MetaItem,
-  Metric,
-  MetricGrid,
-  RowItem,
-  Rows,
-  TableScroller,
-  Td,
-  Th,
-} from "@/components/admin/console";
 import { ReportQueue } from "@/components/admin/report-queue";
 import {
   auditLabel,
@@ -33,6 +19,27 @@ import {
   ListingStatusTag,
   Waited,
 } from "@/components/admin/vocab";
+import {
+  AllClear,
+  Amount,
+  Callout,
+  Dot,
+  EmptyState,
+  List,
+  ListItem,
+  ListRow,
+  MetaItem,
+  PageHeader,
+  Section,
+  SeeAll,
+  Sep,
+  Stat,
+  StatGrid,
+  TableCard,
+  Td,
+  Th,
+  Tr,
+} from "@/components/app/kit";
 import { Button } from "@/components/ui/button";
 import { getQueueCounts, getReviewQueue } from "@/server/admin-listings";
 import { getAuditTrail } from "@/server/audit";
@@ -123,12 +130,9 @@ function SweepHeartbeat({
 
   if (!stale && failed.length === 0) {
     return (
-      <p className="mt-5 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-card border border-verified/25 bg-verified-soft px-3.5 py-2.5 text-xs text-muted">
-        <ActivityIcon
-          aria-hidden="true"
-          className="size-3.5 shrink-0 text-verified"
-        />
-        <span className="font-semibold text-fg">Scheduled sweep</span>
+      <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.8125rem] leading-5 text-muted">
+        <Dot tone="verified" pulse />
+        <span className="font-medium text-fg">Scheduled sweep</span>
         <span>ran {when}, every job fine.</span>
         <span className="text-subtle">
           {jobs
@@ -144,72 +148,69 @@ function SweepHeartbeat({
   }
 
   return (
-    <div
-      role="alert"
-      className="mt-5 rounded-card border border-danger/40 bg-danger-soft p-4 sm:p-5"
-    >
-      <p className="flex items-start gap-2 font-display text-base font-bold text-fg">
-        <TriangleAlertIcon
-          aria-hidden="true"
-          className="mt-0.5 size-5 shrink-0 text-danger"
-        />
-        <span>
-          {at === null
+    <div role="alert">
+      <Callout
+        tone="danger"
+        title={
+          at === null
             ? "The scheduled sweep has never run"
             : stale
               ? `The scheduled sweep has not run for ${elapsed(at).label}`
-              : `The last sweep ran ${elapsed(at).label === "just now" ? "just now" : `${elapsed(at).label} ago`}, but ${failed.length === 1 ? "one job" : `${failed.length} jobs`} failed`}
-        </span>
-      </p>
+              : `The last sweep ran ${elapsed(at).label === "just now" ? "just now" : `${elapsed(at).label} ago`}, but ${failed.length === 1 ? "one job" : `${failed.length} jobs`} failed`
+        }
+      >
+        {stale ? (
+          <>
+            <p className="max-w-[72ch] text-fg">
+              It should run every ten minutes. Until it does, unpaid deals never
+              expire — so their listings stay reserved for ever — payments whose
+              callback went missing are never applied, old offers stay open and
+              expired chat files are not deleted.
+            </p>
+            <p className="mt-2 max-w-[72ch] text-xs">
+              The server&rsquo;s crontab calls{" "}
+              <code className="rounded bg-surface px-1 py-0.5 font-mono text-[0.6875rem] text-fg ring-1 ring-line">
+                POST /api/cron
+              </code>{" "}
+              with the cron secret; the setup is in the deployment guide.
+              Whoever looks after the server needs to know about this today.
+              {at ? (
+                <>
+                  {" "}
+                  Last run:{" "}
+                  <time dateTime={at.toISOString()} className="tnum">
+                    {at.toLocaleString("en-GB")}
+                  </time>
+                  .
+                </>
+              ) : null}
+            </p>
+          </>
+        ) : null}
 
-      {stale ? (
-        <>
-          <p className="mt-2 max-w-[72ch] text-sm leading-relaxed text-fg">
-            It should run every ten minutes. Until it does, unpaid deals never
-            expire — so their listings stay reserved for ever — payments whose
-            callback went missing are never applied, old offers stay open and
-            expired chat files are not deleted.
+        {failed.length > 0 ? (
+          <ul className="mt-2 grid gap-1.5">
+            {failed.map(([name, message]) => (
+              <li key={name} className="text-xs leading-relaxed">
+                <span className="font-medium text-fg">
+                  {SWEEP_JOBS[name]?.label ?? name}
+                </span>
+                <span> failed: </span>
+                <span className="font-mono break-all text-danger">
+                  {String(message)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+        {failed.length > 0 ? (
+          <p className="mt-2 max-w-[72ch] text-xs">
+            The other jobs still ran. A failing job is retried on the next run,
+            so one failure can be a blip; the same one twice in a row needs
+            somebody to look at the server logs.
           </p>
-          <p className="mt-2 max-w-[72ch] text-xs leading-relaxed text-muted">
-            The server&rsquo;s crontab calls <code>POST /api/cron</code> with
-            the cron secret; the setup is in the deployment guide. Whoever looks
-            after the server needs to know about this today.
-            {at ? (
-              <>
-                {" "}
-                Last run:{" "}
-                <time dateTime={at.toISOString()} className="tnum">
-                  {at.toLocaleString("en-GB")}
-                </time>
-                .
-              </>
-            ) : null}
-          </p>
-        </>
-      ) : null}
-
-      {failed.length > 0 ? (
-        <ul className="mt-3 grid gap-1.5">
-          {failed.map(([name, message]) => (
-            <li key={name} className="text-xs leading-relaxed">
-              <span className="font-semibold text-fg">
-                {SWEEP_JOBS[name]?.label ?? name}
-              </span>
-              <span className="text-muted"> failed: </span>
-              <span className="font-mono break-all text-danger">
-                {String(message)}
-              </span>
-            </li>
-          ))}
-        </ul>
-      ) : null}
-      {failed.length > 0 ? (
-        <p className="mt-2 max-w-[72ch] text-xs leading-relaxed text-muted">
-          The other jobs still ran. A failing job is retried on the next run, so
-          one failure can be a blip; the same one twice in a row needs somebody
-          to look at the server logs.
-        </p>
-      ) : null}
+        ) : null}
+      </Callout>
     </div>
   );
 }
@@ -228,9 +229,11 @@ function oldestOf(dates: readonly Date[]): Date | null {
  * Not a wall of totals: the question somebody arriving at their desk is
  * actually asking is "what is waiting, how long has it waited, and what is
  * unusual". So the first band is only the queues that need a human, each with
- * the age of the oldest thing in it; the second band is the pipeline, which is
- * context rather than work; and the money desk only appears for the roles that
- * can open it — the same gate the nav and the payouts page itself use.
+ * the age of the oldest thing in it, followed by the work itself — reports,
+ * then the head of the review queue. The pipeline is context rather than work,
+ * so it comes after the work, just before the handover trail. The money desk
+ * only appears for the roles that can open it — the same gate the nav and the
+ * payouts page itself use.
  */
 export default async function AdminOverviewPage() {
   const staff = await requireStaff();
@@ -278,8 +281,7 @@ export default async function AdminOverviewPage() {
 
   return (
     <>
-      <ConsoleHeader
-        eyebrow="Staff"
+      <PageHeader
         title={
           waiting === 0
             ? "Every desk is clear"
@@ -289,15 +291,15 @@ export default async function AdminOverviewPage() {
           waiting === 0
             ? "Nothing is queued for a human. New work shows up here the moment it arrives."
             : oldest
-              ? `Queues are worked oldest first. The oldest thing on this page has been waiting ${elapsed(oldest).label}.`
+              ? `Queues are worked oldest first. The oldest thing here has waited ${elapsed(oldest).label}.`
               : "Queues are worked oldest first, so start at the top of whichever one is loudest."
         }
         actions={
           counts.awaitingReview > 0 ? (
-            <Button asChild size="sm">
+            <Button asChild size="md">
               <Link href="/admin/listings">
                 Start reviewing
-                <ArrowRightIcon aria-hidden="true" className="size-4" />
+                <ArrowRightIcon aria-hidden="true" />
               </Link>
             </Button>
           ) : null
@@ -320,14 +322,16 @@ export default async function AdminOverviewPage() {
         result={settings.lastSweepResult}
       />
 
-      <ConsoleSection
+      <Section
         id="waiting"
         title="Waiting on a human"
-        tone={waiting > 0 ? "primary" : "verified"}
         description="Each of these is somebody on the other side of the product waiting for an answer."
       >
-        <MetricGrid>
-          <Metric
+        <StatGrid
+          columns={isFinance ? 3 : 4}
+          className={isFinance ? "xl:grid-cols-5" : undefined}
+        >
+          <Stat
             label="Listings for review"
             value={counts.awaitingReview}
             icon={BadgeCheckIcon}
@@ -340,7 +344,7 @@ export default async function AdminOverviewPage() {
             }
             note="Sellers waiting on a decision."
           />
-          <Metric
+          <Stat
             label="Reported by users"
             value={reports.length}
             icon={FlagIcon}
@@ -353,7 +357,7 @@ export default async function AdminOverviewPage() {
             }
             note="Open reports against live listings."
           />
-          <Metric
+          <Stat
             label="Flagged threads"
             value={flagged}
             icon={MessageSquareIcon}
@@ -361,7 +365,7 @@ export default async function AdminOverviewPage() {
             tone={flagged > 0 ? "danger" : "neutral"}
             note="Someone tried to take a deal off-platform."
           />
-          <Metric
+          <Stat
             label="Open support"
             value={openTickets}
             icon={LifeBuoyIcon}
@@ -370,7 +374,7 @@ export default async function AdminOverviewPage() {
             note="Including people who cannot sign in."
           />
           {isFinance ? (
-            <Metric
+            <Stat
               label="Payouts to send"
               value={payouts.length}
               icon={CoinsIcon}
@@ -389,40 +393,10 @@ export default async function AdminOverviewPage() {
               note="Irreversible once sent."
             />
           ) : null}
-        </MetricGrid>
-      </ConsoleSection>
+        </StatGrid>
+      </Section>
 
-      <ConsoleSection
-        id="pipeline"
-        title="Pipeline"
-        description="Not waiting on us. Here so a quiet queue can be told apart from an empty marketplace."
-      >
-        <MetricGrid>
-          <Metric
-            label="Placing their code"
-            value={counts.awaitingCode}
-            icon={TagIcon}
-            href="/admin/listings?status=CODE_CHECK"
-            note="With the seller, nothing to do."
-          />
-          <Metric
-            label="Live"
-            value={counts.live}
-            icon={StoreIcon}
-            href="/admin/listings?status=LIVE"
-            note="Visible to buyers right now."
-          />
-          <Metric
-            label="Sent back"
-            value={counts.rejected}
-            icon={ArrowRightIcon}
-            href="/admin/listings?status=REJECTED"
-            note="Waiting on the seller to fix something."
-          />
-        </MetricGrid>
-      </ConsoleSection>
-
-      <ConsoleSection
+      <Section
         id="reports"
         title="Reported by users"
         count={reports.length}
@@ -432,7 +406,7 @@ export default async function AdminOverviewPage() {
         {reports.length === 0 ? (
           <AllClear
             title="Nothing reported"
-            body="No open reports against any listing. Buyers and sellers can raise one from any listing page."
+            body="Buyers and sellers can raise a report from any listing page."
           />
         ) : (
           <ReportQueue
@@ -448,71 +422,105 @@ export default async function AdminOverviewPage() {
             }))}
           />
         )}
-      </ConsoleSection>
+      </Section>
 
       {review.length > 0 ? (
-        <ConsoleSection
+        <Section
           id="next-up"
           title="Next up for review"
           count={review.length}
           tone="primary"
-          description="The oldest five in the listing queue. Whoever takes the shift should start here."
-          actions={
-            <Link
-              href="/admin/listings"
-              className="inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-primary-text underline-offset-4 hover:underline"
-            >
-              Open the queue
-              <ArrowRightIcon aria-hidden="true" className="size-4" />
-            </Link>
-          }
+          description="The oldest five in the listing queue. Whoever takes the shift starts here."
+          actions={<SeeAll href="/admin/listings">Open the queue</SeeAll>}
         >
-          <Rows>
+          <List>
             {review.slice(0, 5).map((item) => (
-              <RowItem key={item.id}>
-                <Link
-                  href={`/admin/listings/${item.id}`}
-                  className="flex flex-wrap items-center gap-x-4 gap-y-2 p-4 transition-colors hover:bg-surface-2"
-                >
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-semibold text-fg">
-                      {item.title || item.handle}
-                    </span>
-                    <span className="mt-0.5 block truncate text-xs text-subtle">
-                      {item.handle} · {item.sellerName} ·{" "}
-                      {item.proofCount === 0
-                        ? "no proof attached"
-                        : `${item.proofCount} screenshot${item.proofCount === 1 ? "" : "s"}`}
-                    </span>
-                  </span>
-                  <ListingStatusTag status={item.status} />
-                  <Waited since={item.waitingSince} className="shrink-0" />
-                </Link>
-              </RowItem>
+              <ListItem key={item.id} href={`/admin/listings/${item.id}`}>
+                <ListRow
+                  title={item.title || item.handle}
+                  meta={
+                    <>
+                      <span className="min-w-0 truncate">{item.handle}</span>
+                      <Sep />
+                      <span className="min-w-0 truncate">
+                        {item.sellerName}
+                      </span>
+                      <Sep />
+                      <span>
+                        {item.proofCount === 0
+                          ? "no proof attached"
+                          : `${item.proofCount} screenshot${item.proofCount === 1 ? "" : "s"}`}
+                      </span>
+                    </>
+                  }
+                  trailing={
+                    <>
+                      {/* Every row here is in the review queue, so on a
+                          phone the status gives its room to the title. */}
+                      <span className="hidden sm:inline-flex">
+                        <ListingStatusTag status={item.status} />
+                      </span>
+                      <Waited since={item.waitingSince} />
+                    </>
+                  }
+                  chevron
+                />
+              </ListItem>
             ))}
-          </Rows>
-        </ConsoleSection>
+          </List>
+        </Section>
       ) : null}
 
-      <ConsoleSection
+      <Section
+        id="pipeline"
+        title="Pipeline"
+        description="Not waiting on us. Here so a quiet queue can be told apart from an empty marketplace."
+      >
+        <StatGrid columns={3}>
+          <Stat
+            label="Placing their code"
+            value={counts.awaitingCode}
+            icon={TagIcon}
+            href="/admin/listings?status=CODE_CHECK"
+            note="With the seller, nothing to do."
+          />
+          <Stat
+            label="Live"
+            value={counts.live}
+            icon={StoreIcon}
+            href="/admin/listings?status=LIVE"
+            note="Visible to buyers right now."
+          />
+          <Stat
+            label="Sent back"
+            value={counts.rejected}
+            icon={Undo2Icon}
+            href="/admin/listings?status=REJECTED"
+            note="Waiting on the seller to fix something."
+          />
+        </StatGrid>
+      </Section>
+
+      <Section
         id="done"
         title="What has been done"
-        description="The last twelve privileged actions, from the audit trail. This is the handover: what the previous shift decided, and who decided it."
+        description="The last twelve privileged actions from the audit trail: what the previous shift decided, and who decided it."
       >
         {trail.length === 0 ? (
-          <AllClear
+          <EmptyState
+            icon={HistoryIcon}
             title="No staff actions recorded yet"
             body="Every approval, rejection, removal and settings change is written here as it happens, under the name of whoever did it."
           />
         ) : (
-          <TableScroller>
+          <TableCard>
             <table className="w-full min-w-[34rem] text-sm">
               <caption className="sr-only">
                 Recent staff actions, newest first
               </caption>
               <thead>
                 <tr>
-                  <Th>When</Th>
+                  <Th className="w-20">When</Th>
                   <Th>Who</Th>
                   <Th>Did what</Th>
                   <Th>Target</Th>
@@ -520,7 +528,7 @@ export default async function AdminOverviewPage() {
               </thead>
               <tbody>
                 {trail.map((row) => (
-                  <tr key={row.id} className="border-t border-line">
+                  <Tr key={row.id}>
                     <Td className="whitespace-nowrap">
                       <time
                         dateTime={row.createdAt.toISOString()}
@@ -538,7 +546,7 @@ export default async function AdminOverviewPage() {
                       {row.targetHref ? (
                         <Link
                           href={row.targetHref}
-                          className="font-mono text-xs text-primary-text underline-offset-4 hover:underline"
+                          className="rounded font-mono text-xs text-muted underline-offset-4 transition-colors hover:text-fg hover:underline"
                         >
                           {row.entityId.slice(-8)}
                         </Link>
@@ -550,13 +558,13 @@ export default async function AdminOverviewPage() {
                         </span>
                       )}
                     </Td>
-                  </tr>
+                  </Tr>
                 ))}
               </tbody>
             </table>
-          </TableScroller>
+          </TableCard>
         )}
-      </ConsoleSection>
+      </Section>
     </>
   );
 }

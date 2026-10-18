@@ -4,8 +4,9 @@ import { FlagIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { RowItem, Rows } from "@/components/admin/console";
+import { SteadyLabel } from "@/components/admin/deal-controls";
 import { LISTING_STATUS, Waited } from "@/components/admin/vocab";
+import { Callout, List, ListItem, Sep } from "@/components/app/kit";
 import { Button } from "@/components/ui/button";
 import type { ListingStatus } from "@/generated/prisma/enums";
 import { resolveReport } from "@/server/actions/reports";
@@ -31,54 +32,62 @@ export function ReportQueue({ reports }: { reports: ReportRow[] }) {
   return (
     <>
       {error ? (
-        <p
-          role="alert"
-          className="mb-3 rounded-card border border-danger/30 bg-danger-soft px-4 py-3 text-sm text-fg"
-        >
-          {error}
-        </p>
+        <div role="alert" className="mb-3">
+          <Callout tone="danger" title={error} />
+        </div>
       ) : null}
-      <Rows>
+      <List>
         {reports.map((report) => {
           const status = LISTING_STATUS[report.listingStatus as ListingStatus];
           return (
-            <RowItem key={report.id} flag="danger">
-              <div className="flex flex-wrap items-start gap-x-4 gap-y-3 p-4 pl-5">
-                <FlagIcon
-                  aria-hidden="true"
-                  className="mt-0.5 size-4 shrink-0 text-danger"
-                />
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                    <p className="text-sm font-semibold text-fg">
-                      {report.reason}
+            <ListItem key={report.id} flag="danger">
+              <div className="flex flex-wrap items-start gap-x-4 gap-y-3 sm:flex-nowrap">
+                <div className="flex min-w-0 flex-1 items-start gap-3">
+                  <FlagIcon
+                    aria-hidden="true"
+                    className="mt-0.5 size-4 shrink-0 text-danger"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <p className="text-sm leading-5 font-medium text-fg">
+                        {report.reason}
+                      </p>
+                      <Waited
+                        since={new Date(report.reportedAt)}
+                        prefix="open"
+                      />
+                    </div>
+                    {report.detail ? (
+                      <p className="mt-1 max-w-[72ch] text-[0.8125rem] leading-relaxed break-words text-muted">
+                        {report.detail}
+                      </p>
+                    ) : null}
+                    <p className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-subtle">
+                      <Link
+                        href={`/admin/listings/${report.listingId}`}
+                        className="font-medium text-fg underline-offset-4 hover:underline"
+                      >
+                        {report.listingHandle}
+                      </Link>
+                      <Sep />
+                      <span>
+                        {"listing is "}
+                        {status?.label.toLowerCase() ??
+                          report.listingStatus.toLowerCase().replace("_", " ")}
+                      </span>
+                      <Sep />
+                      <span>
+                        {"reported by "}
+                        {report.reporterName}
+                      </span>
                     </p>
-                    <Waited since={new Date(report.reportedAt)} prefix="open" />
                   </div>
-                  {report.detail ? (
-                    <p className="mt-1.5 text-sm leading-relaxed text-muted">
-                      {report.detail}
-                    </p>
-                  ) : null}
-                  <p className="mt-1.5 text-xs text-subtle">
-                    <Link
-                      href={`/admin/listings/${report.listingId}`}
-                      className="font-medium text-primary-text underline-offset-4 hover:underline"
-                    >
-                      {report.listingHandle}
-                    </Link>
-                    {" · listing is "}
-                    {status?.label.toLowerCase() ??
-                      report.listingStatus.toLowerCase().replace("_", " ")}
-                    {" · reported by "}
-                    {report.reporterName}
-                  </p>
                 </div>
                 <Button
                   type="button"
                   variant="secondary"
                   size="sm"
-                  className="shrink-0"
+                  className="ml-7 shrink-0 sm:ml-0"
                   disabled={pending}
                   onClick={() => {
                     setError(null);
@@ -94,15 +103,17 @@ export function ReportQueue({ reports }: { reports: ReportRow[] }) {
                     });
                   }}
                 >
-                  {pending && working === report.id
-                    ? "Closing…"
-                    : "Mark handled"}
+                  <SteadyLabel
+                    pending={pending && working === report.id}
+                    idle="Mark handled"
+                    busy="Closing…"
+                  />
                 </Button>
               </div>
-            </RowItem>
+            </ListItem>
           );
         })}
-      </Rows>
+      </List>
     </>
   );
 }

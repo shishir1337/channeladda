@@ -1,9 +1,10 @@
 "use client";
 
-import { NotebookPenIcon } from "lucide-react";
+import { CheckCircle2Icon, NotebookPenIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useId, useState, useTransition } from "react";
 import { addDisputeNote } from "@/app/(admin)/admin/disputes/actions";
+import { SteadyLabel } from "@/components/admin/deal-controls";
 import { TextArea } from "@/components/auth/fields";
 import { Button } from "@/components/ui/button";
 
@@ -35,22 +36,29 @@ export function AddDisputeNote({ orderId }: { orderId: string }) {
 
   if (!open) {
     return (
-      <div className="mt-3">
-        <button
+      <div className="mt-4">
+        <Button
           type="button"
+          size="sm"
+          variant="secondary"
           onClick={() => {
             setOpen(true);
             setDone(null);
           }}
           aria-expanded={false}
           aria-controls={panelId}
-          className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border border-line px-3.5 text-sm font-medium text-muted transition-colors hover:border-line-strong hover:text-fg"
         >
-          <NotebookPenIcon aria-hidden="true" className="size-4" />
+          <NotebookPenIcon aria-hidden="true" />
           Add to the record
-        </button>
+        </Button>
         {done ? (
-          <output className="mt-2 block text-xs text-verified">{done}</output>
+          <output className="mt-2 flex items-start gap-1.5 text-xs text-verified">
+            <CheckCircle2Icon
+              aria-hidden="true"
+              className="mt-px size-3.5 shrink-0"
+            />
+            {done}
+          </output>
         ) : null}
       </div>
     );
@@ -59,7 +67,7 @@ export function AddDisputeNote({ orderId }: { orderId: string }) {
   return (
     <div
       id={panelId}
-      className="mt-3 rounded-card border border-line bg-surface-2 p-3.5 sm:p-4"
+      className="mt-4 rounded-lg border border-line bg-surface-2/50 p-3 sm:p-3.5"
     >
       <TextArea
         id={noteId}
@@ -72,7 +80,7 @@ export function AddDisputeNote({ orderId }: { orderId: string }) {
         error={error ?? undefined}
         required
       />
-      <div className="mt-3 flex flex-wrap items-center gap-3">
+      <div className="mt-3 flex flex-wrap items-center gap-2">
         <Button
           type="button"
           size="sm"
@@ -92,7 +100,11 @@ export function AddDisputeNote({ orderId }: { orderId: string }) {
             });
           }}
         >
-          {pending ? "Adding…" : "Add to the record"}
+          <SteadyLabel
+            pending={pending}
+            idle="Add to the record"
+            busy="Adding…"
+          />
         </Button>
         <Button
           type="button"
@@ -107,7 +119,7 @@ export function AddDisputeNote({ orderId }: { orderId: string }) {
           Cancel
         </Button>
         {note.trim().length > 0 && short ? (
-          <span className="text-xs text-subtle">
+          <span className="ml-1 text-xs text-subtle">
             A few more words — this is the record.
           </span>
         ) : null}

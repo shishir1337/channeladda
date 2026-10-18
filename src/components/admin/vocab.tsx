@@ -1,5 +1,11 @@
-import { ShieldCheckIcon, TriangleAlertIcon, ZapIcon } from "lucide-react";
-import type { ComponentProps } from "react";
+import {
+  ChevronRightIcon,
+  ShieldCheckIcon,
+  TriangleAlertIcon,
+  ZapIcon,
+} from "lucide-react";
+import type { ComponentProps, ReactNode } from "react";
+import { Reference } from "@/components/app/kit";
 import { Badge } from "@/components/ui/badge";
 import type {
   DealMode,
@@ -190,6 +196,50 @@ export function DealModeBadge({
       {meta.label}
       <span className="sr-only"> deal, {meta.escrow}</span>
     </Badge>
+  );
+}
+
+/**
+ * The identifying line of a deal, the same on every staff desk.
+ *
+ * The listing first, because that is what a person recognises; then the
+ * reference a customer quotes, and the tags that qualify it — mode, status,
+ * how long it has waited; the amount on the right, where figures line up down
+ * a queue. Presentation only, like everything else here.
+ */
+export function DealHead({
+  title,
+  reference,
+  tags,
+  amount,
+  chevron,
+}: {
+  title: ReactNode;
+  reference: string;
+  tags?: ReactNode;
+  amount?: ReactNode;
+  /** Inside a linked row, so the row reads as a door. */
+  chevron?: boolean;
+}) {
+  return (
+    <div className="flex items-start gap-3">
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm leading-5 font-medium text-fg">
+          {title}
+        </p>
+        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+          <Reference>{reference}</Reference>
+          {tags}
+        </div>
+      </div>
+      {amount ? <div className="shrink-0">{amount}</div> : null}
+      {chevron ? (
+        <ChevronRightIcon
+          aria-hidden="true"
+          className="mt-0.5 size-4 shrink-0 text-subtle transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-muted"
+        />
+      ) : null}
+    </div>
   );
 }
 
@@ -452,17 +502,19 @@ export function ageTone(
 }
 
 const AGE_CLASS: Record<AgeTone, string> = {
-  fresh: "text-subtle",
-  warn: "text-primary-text",
-  late: "font-semibold text-danger",
+  fresh: "bg-surface-2 text-muted ring-line",
+  warn: "bg-primary-soft text-primary-text ring-primary/25",
+  late: "bg-danger-soft font-semibold text-danger ring-danger/20",
 };
 
 /**
  * How long this has been sitting there.
  *
- * Colour alone would not carry it, so something late also changes weight and
- * gains a glyph, and the exact timestamp stays available on hover and to a
- * screen reader.
+ * A small tabular chip — square-cornered, so it never reads as a status pill —
+ * that stays neutral while the wait is ordinary, warms to gold once it is worth
+ * noticing and turns red when it is a problem. Colour alone would not carry it,
+ * so something late also changes weight and gains a glyph, and the exact
+ * timestamp stays available on hover and to a screen reader.
  */
 export function Waited({
   since,
@@ -490,13 +542,13 @@ export function Waited({
       // in the title, must not warn.
       suppressHydrationWarning
       className={cn(
-        "tnum inline-flex items-center gap-1 text-xs whitespace-nowrap",
+        "tnum inline-flex h-5 shrink-0 items-center gap-1 rounded-md px-1.5 text-xs leading-none font-medium whitespace-nowrap ring-1 ring-inset",
         AGE_CLASS[tone],
         className,
       )}
     >
       {tone === "late" ? (
-        <TriangleAlertIcon aria-hidden="true" className="size-3.5 shrink-0" />
+        <TriangleAlertIcon aria-hidden="true" className="size-3 shrink-0" />
       ) : null}
       {prefix ? `${prefix} ` : null}
       {label}
