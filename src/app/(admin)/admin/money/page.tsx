@@ -191,7 +191,8 @@ export default async function AdminMoneyPage({
       label: "In members' wallets",
       value: position.memberBalances.cents,
       display: <Price usd={position.memberBalances.cents / 100} />,
-      tone: "muted",
+      // Solid, not grey: a grey part reads as the empty end of a half-full bar.
+      tone: "neutral",
     },
     ...(oursBelowZero
       ? []
@@ -200,7 +201,7 @@ export default async function AdminMoneyPage({
             label: "Ours",
             value: position.platformOwn,
             display: <Price usd={position.platformOwn / 100} />,
-            tone: "neutral" as const,
+            tone: "verified" as const,
           },
         ]),
   ];
