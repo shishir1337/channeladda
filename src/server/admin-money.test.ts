@@ -25,6 +25,7 @@ import {
   assignAgent,
   createDeal,
   recordOpeningPayment,
+  recordPricePayment,
   resolveDeal,
 } from "@/server/deals";
 import {
@@ -462,6 +463,48 @@ describe("invoices", () => {
       await recordOpeningPayment(created.orderId, created.reference, "USDT");
       const after = await listInvoicesNeedingAttention();
       expect(after.rows[0]?.landed).toBe("deal");
+    }),
+  );
+
+  test(
+    "a safest price invoice that reached its deal is marked as landed",
+    withCleanDb(async () => {
+      const deal = await paidDeal("SAFEST");
+      await db.order.update({
+        where: { id: deal.orderId },
+        data: { agentId: deal.agent.id },
+      });
+      const actors: Record<string, string> = {
+        buyer: deal.buyer.id,
+        seller: deal.seller.id,
+        agent: deal.agent.id,
+      };
+      for (const step of templateFor("SAFEST")) {
+        if (step.position < 2 || step.position >= 6) continue;
+        await runStep({
+          orderId: deal.orderId,
+          position: step.position,
+          userId: actors[step.actor],
+        });
+      }
+      await db.invoice.create({
+        data: {
+          reference: "DEAL-price-1",
+          purpose: "DEAL_PRICE",
+          amountUsd: 10_000,
+          userId: deal.buyer.id,
+          orderId: deal.orderId,
+          lastStatus: "paid",
+          settledAt: new Date(),
+        },
+      });
+      expect((await listInvoicesNeedingAttention()).rows[0]?.landed).toBeNull();
+
+      // The price is the deal's second payment, named on its own field.
+      await recordPricePayment(deal.orderId, "DEAL-price-1", "USDT");
+      expect((await listInvoicesNeedingAttention()).rows[0]?.landed).toBe(
+        "deal",
+      );
     }),
   );
 

@@ -8,7 +8,7 @@ import {
   cryptomusConfig,
   getInvoice,
 } from "@/server/cryptomus";
-import { recordOpeningPayment } from "@/server/deals";
+import { recordOpeningPayment, recordPricePayment } from "@/server/deals";
 import { markApplied, noteCallback } from "@/server/invoices";
 import { creditDeposit } from "@/server/wallet";
 
@@ -219,11 +219,16 @@ async function handle(
   // invoices raised before that was so.
   const invoice = await db.invoice.findUnique({
     where: { reference: orderId },
-    select: { orderId: true },
+    select: { orderId: true, purpose: true, amountUsd: true },
   });
   const order = await db.order.findUnique({
     where: invoice?.orderId ? { id: invoice.orderId } : { reference: orderId },
-    select: { id: true, totalUsd: true, paymentRef: true },
+    select: {
+      id: true,
+      totalUsd: true,
+      paymentRef: true,
+      buyerPaymentRef: true,
+    },
   });
 
   if (!order) {
@@ -250,7 +255,13 @@ async function handle(
   // has gone: left alone, the deal completes normally and credits the
   // seller out of it. Freeze it and put it in front of a human, because
   // reversing a hold is a decision rather than a sweep.
-  if (outcome === "refunded" && order.paymentRef) {
+  // A Safest deal takes two payments; the price is the second.
+  const isPrice = invoice?.purpose === "DEAL_PRICE";
+
+  if (
+    outcome === "refunded" &&
+    (isPrice ? order.buyerPaymentRef : order.paymentRef)
+  ) {
     await freezeRefundedDeal(order.id, orderId, status);
     return "ignored";
   }
@@ -272,20 +283,21 @@ async function handle(
 
   // An underpayment must not start a deal. Cryptomus has its own
   // `wrong_amount` status for this, but a tolerance check here means a
-  // rounding difference in its favour cannot fund a deal short.
-  if (
-    confirmed.paidAmountUsd !== null &&
-    confirmed.paidAmountUsd < order.totalUsd
-  ) {
+  // rounding difference in its favour cannot fund a deal short. Owed is the
+  // invoice's own amount: a Safest price compared with the order's total —
+  // its fee — would pass for anything above $3. Invoices raised before they
+  // were recorded per attempt have no row, and were for the whole total.
+  const owed = invoice?.amountUsd ?? order.totalUsd;
+  if (confirmed.paidAmountUsd !== null && confirmed.paidAmountUsd < owed) {
     console.warn(
-      `[cryptomus] ${orderId} underpaid: ${confirmed.paidAmountUsd} < ${order.totalUsd}`,
+      `[cryptomus] ${orderId} underpaid: ${confirmed.paidAmountUsd} < ${owed}`,
     );
     await recordAudit({
       actorId: null,
       action: "payment.underpaid",
       entity: "order",
       entityId: order.id,
-      after: { paid: confirmed.paidAmountUsd, owed: order.totalUsd },
+      after: { paid: confirmed.paidAmountUsd, owed },
     });
     return "ignored";
   }
@@ -294,7 +306,7 @@ async function handle(
   // name: the sweep applies the same payment under `invoice.reference`, and
   // two names for it meant the second caller saw an unfamiliar reference
   // and credited the buyer the whole deal out of nothing.
-  await recordOpeningPayment(
+  await (isPrice ? recordPricePayment : recordOpeningPayment)(
     order.id,
     orderId,
     confirmed.payerCurrency ?? "USDT",

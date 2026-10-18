@@ -455,6 +455,7 @@ export type InvoiceAttention = {
     mode: DealMode;
     totalUsd: number;
     paymentRef: string | null;
+    buyerPaymentRef: string | null;
   } | null;
   problem: InvoiceProblem;
   /**
@@ -502,6 +503,7 @@ export async function listInvoicesNeedingAttention(
             mode: true,
             totalUsd: true,
             paymentRef: true,
+            buyerPaymentRef: true,
           },
         },
       },
@@ -535,7 +537,11 @@ export async function listInvoicesNeedingAttention(
         ? "wrong-amount"
         : "held-for-review";
 
-    const onDeal = inv.order?.paymentRef === inv.reference;
+    // A Safest deal takes two payments; the price is named on its own field.
+    const onDeal =
+      inv.order !== null &&
+      (inv.order.paymentRef === inv.reference ||
+        inv.order.buyerPaymentRef === inv.reference);
     const inBalance =
       credited.has(`deposit:${inv.reference}`) ||
       credited.has(`late:${inv.reference}`) ||

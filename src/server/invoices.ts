@@ -5,7 +5,7 @@ import type { InvoicePurpose } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
 import { recordAudit } from "@/server/audit";
 import { classifyStatus, lookupInvoice } from "@/server/cryptomus";
-import { recordOpeningPayment } from "@/server/deals";
+import { recordOpeningPayment, recordPricePayment } from "@/server/deals";
 import { creditDeposit } from "@/server/wallet";
 
 /**
@@ -124,6 +124,7 @@ const INVOICE_FOR_RECONCILE = {
   id: true,
   reference: true,
   purpose: true,
+  amountUsd: true,
   userId: true,
   orderId: true,
   lastStatus: true,
@@ -160,6 +161,7 @@ async function reconcileOne(invoice: {
   id: string;
   reference: string;
   purpose: InvoicePurpose;
+  amountUsd: number;
   userId: string;
   orderId: string | null;
   lastStatus: string | null;
@@ -236,14 +238,17 @@ async function reconcileOne(invoice: {
     // cheapest way to get an agent to take custody of a channel was to
     // underpay and make sure the callback never arrived — this is the
     // path that runs when it does not.
+    //
+    // Owed is what this invoice was raised for — the opening payment or,
+    // on Safest, the price — not the order's up-front total.
     const order = await db.order.findUnique({
       where: { id: invoice.orderId },
-      select: { totalUsd: true },
+      select: { id: true },
     });
     if (!order) return false;
     if (
       confirmed.paidAmountUsd !== null &&
-      confirmed.paidAmountUsd < order.totalUsd
+      confirmed.paidAmountUsd < invoice.amountUsd
     ) {
       await recordAudit({
         actorId: null,
@@ -252,7 +257,7 @@ async function reconcileOne(invoice: {
         entityId: invoice.orderId,
         after: {
           paid: confirmed.paidAmountUsd,
-          owed: order.totalUsd,
+          owed: invoice.amountUsd,
           via: "reconcile",
         },
       });
@@ -268,7 +273,11 @@ async function reconcileOne(invoice: {
       data: { settledAt: new Date(), lastStatus: confirmed.status },
     });
 
-    const outcome = await recordOpeningPayment(
+    const record =
+      invoice.purpose === "DEAL_PRICE"
+        ? recordPricePayment
+        : recordOpeningPayment;
+    const outcome = await record(
       invoice.orderId,
       invoice.reference,
       confirmed.payerCurrency ?? "USDT",

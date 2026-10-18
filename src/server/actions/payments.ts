@@ -53,8 +53,17 @@ export async function startPayment(orderId: string): Promise<PayResult> {
   if (deal.viewerRole !== "buyer") {
     return { ok: false, error: "Only the buyer pays this." };
   }
-  if (deal.status !== "AWAITING_PAYMENT") {
-    return { ok: false, error: "This deal has already been paid." };
+  // Which payment the deal is waiting on: the opening one, or — on a Safest
+  // deal the buyer has inspected — the channel price. Each has its own
+  // invoices, so a checkout for one never reopens a page for the other.
+  const stage =
+    deal.status === "AWAITING_PAYMENT"
+      ? ({ purpose: "DEAL", amountUsd: deal.totalUsd } as const)
+      : deal.mode === "SAFEST" && deal.status === "AWAITING_BUYER_PAYMENT"
+        ? ({ purpose: "DEAL_PRICE", amountUsd: deal.priceUsd } as const)
+        : null;
+  if (!stage) {
+    return { ok: false, error: "This deal has nothing left to pay." };
   }
 
   if (!isConfigured()) {
@@ -78,7 +87,7 @@ export async function startPayment(orderId: string): Promise<PayResult> {
     : `${base}/dashboard/deals/${deal.id}`;
   const raise = (reference: string) =>
     createInvoice({
-      amountUsd: deal.totalUsd,
+      amountUsd: stage.amountUsd,
       orderId: reference,
       callbackUrl: `${base}/api/webhooks/cryptomus`,
       successUrl: back,
@@ -92,7 +101,7 @@ export async function startPayment(orderId: string): Promise<PayResult> {
     // hours for payment. Keyed on the deal's reference, every press after
     // the first hour sent the buyer to a dead page.
     const latest = await db.invoice.findFirst({
-      where: { orderId: deal.id, purpose: "DEAL", appliedAt: null },
+      where: { orderId: deal.id, purpose: stage.purpose, appliedAt: null },
       orderBy: { createdAt: "desc" },
       select: { reference: true },
     });
@@ -129,8 +138,8 @@ export async function startPayment(orderId: string): Promise<PayResult> {
     // something to resolve against even if this request then fails.
     await recordInvoice({
       reference,
-      purpose: "DEAL",
-      amountUsd: deal.totalUsd,
+      purpose: stage.purpose,
+      amountUsd: stage.amountUsd,
       userId: user.id,
       orderId: deal.id,
     });
