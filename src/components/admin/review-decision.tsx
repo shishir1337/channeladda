@@ -10,10 +10,15 @@ import {
   UndoDotIcon,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { type ReactNode, useId, useState, useTransition } from "react";
+import {
+  type ReactNode,
+  type SVGProps,
+  useId,
+  useState,
+  useTransition,
+} from "react";
 import { Card, CardBody, CardHeader } from "@/components/app/kit";
 import { FormNotice, TextArea } from "@/components/auth/fields";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
@@ -104,7 +109,6 @@ export function ReviewDecision({ listingId }: { listingId: string }) {
         as="h2"
         title="Your decision"
         description="Recorded against your name in the audit trail either way."
-        actions={<Badge size="sm">Logged</Badge>}
       />
       <CardBody>
         {error ? <FormNotice>{error}</FormNotice> : null}
@@ -313,19 +317,13 @@ export function ReopenListing({ listingId }: { listingId: string }) {
   return (
     <div id={panelId}>
       <Card>
-        <CardHeader as="h2" title="Send it back to review" />
+        <CardHeader
+          as="h2"
+          title="Send it back to review"
+          info="For a listing that came down in error. It goes into the review queue, not onto the marketplace — somebody still approves it there, or sends it back to the seller. The seller is told, and sees your reason."
+        />
         <CardBody>
-          <p className="text-[0.8125rem] leading-relaxed text-muted">
-            For a listing that came down in error. It goes into the review
-            queue, not onto the marketplace — somebody still approves it there,
-            or sends it back to the seller. The seller is told, and sees your
-            reason.
-          </p>
-          {error ? (
-            <div className="mt-4">
-              <FormNotice>{error}</FormNotice>
-            </div>
-          ) : null}
+          {error ? <FormNotice>{error}</FormNotice> : null}
           <TextArea
             id={reasonId}
             name="reason"
@@ -335,7 +333,6 @@ export function ReopenListing({ listingId }: { listingId: string }) {
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             placeholder="The report was about a different channel with a similar name."
-            className="mt-4"
             required
           />
           <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -384,12 +381,22 @@ export function ReopenListing({ listingId }: { listingId: string }) {
   );
 }
 
+/** The header's star, filled gold while the listing is featured. */
+function FilledStar({ className, ...props }: SVGProps<SVGSVGElement>) {
+  return (
+    <StarIcon
+      {...props}
+      className={cn(className, "fill-current text-primary-text")}
+    />
+  );
+}
+
 /**
  * The homepage showcase, by hand.
  *
- * One press either way and reversible, so no confirmation — but it says what
- * the press does, because "featured" is a word for a badge and the real effect
- * is the top of the homepage.
+ * One press either way and reversible, so no confirmation — but its (i) says
+ * what the press does, because "featured" is a word for a badge and the real
+ * effect is the top of the homepage.
  */
 export function FeatureListing({
   listingId,
@@ -407,20 +414,9 @@ export function FeatureListing({
     <Card>
       <CardHeader
         as="h2"
-        title={
-          <span className="inline-flex items-center gap-2">
-            <StarIcon
-              aria-hidden="true"
-              className={
-                featured
-                  ? "size-4 shrink-0 fill-current text-primary-text"
-                  : "size-4 shrink-0 text-subtle"
-              }
-            />
-            {featured ? "Featured on the homepage" : "Not featured"}
-          </span>
-        }
-        description="Featured listings lead the homepage showcase and carry the Featured badge everywhere they appear. Recorded in the audit trail."
+        icon={featured ? FilledStar : StarIcon}
+        title={featured ? "Featured on the homepage" : "Not featured"}
+        info="Featured listings lead the homepage showcase and carry the Featured badge everywhere they appear. Recorded in the audit trail."
       />
       <CardBody className="py-3 sm:py-4">
         <Button

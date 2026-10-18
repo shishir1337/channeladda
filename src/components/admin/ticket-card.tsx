@@ -137,19 +137,21 @@ export function TicketCard({ ticket }: { ticket: TicketView }) {
           className={cn(textareaClass, "mt-1.5 min-h-[4.5rem]")}
         />
         <div className="mt-2.5 flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-          <p
-            className={cn(
-              hintClass,
-              "mt-0 inline-flex items-center gap-1.5",
-              dirty && "text-muted",
-            )}
-          >
-            <Dot tone={dirty ? "primary" : "neutral"} />
-            {dirty
-              ? "Unsaved — the note is written when you move the ticket."
-              : "Saved with the ticket."}
-          </p>
-          <div className="flex flex-wrap gap-2">
+          {/* Only an unsaved note is flagged. "Saved with the ticket" under
+              every ticket in the queue was one sentence said once per row,
+              and the section's (i) already says when a note is written. */}
+          {dirty ? (
+            <p
+              className={cn(
+                hintClass,
+                "mt-0 inline-flex items-center gap-1.5 text-muted",
+              )}
+            >
+              <Dot tone="primary" />
+              Unsaved — the note is written when you move the ticket.
+            </p>
+          ) : null}
+          <div className="flex flex-wrap gap-2 sm:ml-auto">
             {ticket.status !== "ANSWERED" ? (
               <Button
                 type="button"

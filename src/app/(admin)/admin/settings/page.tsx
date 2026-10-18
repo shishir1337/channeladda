@@ -74,7 +74,7 @@ function diffOf(before: unknown, after: unknown) {
 }
 
 export default async function AdminSettingsPage() {
-  const staff = await requireSuperadmin();
+  await requireSuperadmin();
   const settings = await getSettings();
   const trail = await getAuditTrail(
     { entity: "user", entityId: "platform-settings" },
@@ -85,16 +85,13 @@ export default async function AdminSettingsPage() {
     <>
       <PageHeader
         title="Platform settings"
-        description="The figures every future deal is priced and policed by."
+        info="The figures every future deal is priced and policed by."
         meta={
-          <>
-            <MetaItem label="Signed in as">{staff.name}</MetaItem>
-            <MetaItem label="Last changed">
-              {settings.updatedAt && settings.updatedByName
-                ? `${settings.updatedByName}, ${elapsed(settings.updatedAt).label} ago`
-                : "never since launch"}
-            </MetaItem>
-          </>
+          <MetaItem label="Last changed">
+            {settings.updatedAt && settings.updatedByName
+              ? `${settings.updatedByName}, ${elapsed(settings.updatedAt).label} ago`
+              : "never since launch"}
+          </MetaItem>
         }
       />
 
@@ -122,13 +119,13 @@ export default async function AdminSettingsPage() {
         id="history"
         title="Change history"
         count={trail.length}
-        description="The last ten changes, read from the audit trail. Rows are never edited or deleted."
+        info="The last ten changes, read from the audit trail. Rows are never edited or deleted."
       >
         {trail.length === 0 ? (
           <EmptyState
             icon={HistoryIcon}
             title="Never changed since launch"
-            body="The platform is running on its original figures. Every change you make here is written to this list under your name."
+            body="Every change you make here is written to this list under your name."
           />
         ) : (
           <TableCard>

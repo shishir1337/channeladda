@@ -9,6 +9,7 @@ import {
   useState,
   useTransition,
 } from "react";
+import { InfoTip } from "@/components/app/info-tip";
 import {
   Card,
   CardBody,
@@ -45,23 +46,22 @@ function toBp(value: string) {
   return Math.round(n * 100);
 }
 
-/** A group of settings: what it governs, then one row per figure. */
+/**
+ * A group of settings: its name, what it governs behind the (i), then one
+ * row per figure.
+ */
 function Group({
   title,
-  description,
+  info,
   children,
 }: {
   title: string;
-  description: ReactNode;
+  info: ReactNode;
   children: ReactNode;
 }) {
   return (
     <Card>
-      <CardHeader
-        as="h2"
-        title={title}
-        description={<span className="block max-w-[80ch]">{description}</span>}
-      />
+      <CardHeader as="h2" title={title} info={info} />
       <div className="divide-y divide-line">{children}</div>
     </Card>
   );
@@ -75,12 +75,19 @@ function Group({
  * the error announced) so moving to a row layout costs a screen reader
  * nothing. The unit sits inside the field for the eye and is spoken as part
  * of the label, so the accessible name is still "Seller fee (%)".
+ *
+ * `hint` is for what stops a wrong figure being typed and stays in sight;
+ * `tip` is the why, behind an (i) beside the label. A tip is still read out
+ * with the field — a hidden copy sits in `aria-describedby` — so tucking it
+ * away costs a screen reader nothing either. (The (i) is beside the label,
+ * not in it: a button inside a label is invalid and steals its clicks.)
  */
 function SettingRow({
   id,
   label,
   unit,
   hint,
+  tip,
   error,
   ...props
 }: {
@@ -88,7 +95,10 @@ function SettingRow({
   label: string;
   /** Shown inside the field and spoken as part of the label, e.g. "%". */
   unit?: string;
+  /** Kept visible: a format or limit that prevents a mistake. */
   hint?: string;
+  /** The reasoning, behind an (i) beside the label. */
+  tip?: string;
   error?: string;
   name: string;
   value: string;
@@ -99,10 +109,18 @@ function SettingRow({
   return (
     <div className="grid gap-x-8 gap-y-2 px-4 py-4 sm:grid-cols-[minmax(0,1fr)_12rem] sm:items-start sm:px-5">
       <div className="min-w-0 sm:pt-2">
-        <label htmlFor={id} className={cn(labelClass, "text-sm")}>
-          {label}
-          {unit ? <span className="sr-only"> ({unit})</span> : null}
-        </label>
+        <div className="flex items-center gap-1.5">
+          <label htmlFor={id} className={cn(labelClass, "text-sm")}>
+            {label}
+            {unit ? <span className="sr-only"> ({unit})</span> : null}
+          </label>
+          {tip ? <InfoTip label={`About ${label}`}>{tip}</InfoTip> : null}
+        </div>
+        {tip ? (
+          <span id={`${id}-tip`} className="sr-only">
+            {tip}
+          </span>
+        ) : null}
         {hint ? (
           <p id={`${id}-hint`} className={hintClass}>
             {hint}
@@ -118,7 +136,11 @@ function SettingRow({
             required
             aria-invalid={Boolean(error)}
             aria-describedby={
-              [hint ? `${id}-hint` : null, error ? `${id}-error` : null]
+              [
+                hint ? `${id}-hint` : null,
+                tip ? `${id}-tip` : null,
+                error ? `${id}-error` : null,
+              ]
                 .filter(Boolean)
                 .join(" ") || undefined
             }
@@ -297,16 +319,20 @@ export function SettingsForm({
         });
       }}
     >
+      {/* The Fees group's promise is also the callout above the form, which
+          keeps it in sight; here it sits behind the (i). Of the row hints,
+          only one changes what you would type — "0 requires it" — so only it
+          stays visible; the rest are the why, behind each label's (i). */}
       <Group
         title="Fees"
-        description="These apply to sales made from now on. Orders already placed keep the fee they were charged, so changing this never rewrites a past sale."
+        info="These apply to sales made from now on. Orders already placed keep the fee they were charged, so changing this never rewrites a past sale."
       >
         <SettingRow
           id={ids.safest}
           name="buyerFeeBpSafest"
           label="Buyer fee, Safest"
           unit="%"
-          hint="The only thing a Safest buyer pays us."
+          tip="The only thing a Safest buyer pays us."
           inputMode="decimal"
           value={safest}
           onChange={setSafest}
@@ -317,7 +343,7 @@ export function SettingsForm({
           name="buyerFeeBpFastest"
           label="Buyer fee, Fastest"
           unit="%"
-          hint="On top of the price, which we also hold."
+          tip="On top of the price, which we also hold."
           inputMode="decimal"
           value={fastest}
           onChange={setFastest}
@@ -338,13 +364,13 @@ export function SettingsForm({
 
       <Group
         title="Agent safeguards"
-        description="On a Safest deal the agent genuinely owns the channel while they hold it. Google limits how many channels one account can own, and an agent account that gets locked freezes every deal it is holding."
+        info="On a Safest deal the agent genuinely owns the channel while they hold it. Google limits how many channels one account can own, and an agent account that gets locked freezes every deal it is holding."
       >
         <SettingRow
           id={ids.holds}
           name="maxHoldsPerAgent"
           label="Channels one agent may hold"
-          hint="Assignment is refused past this."
+          tip="Assignment is refused past this."
           inputMode="numeric"
           value={holds}
           onChange={setHolds}
@@ -365,7 +391,7 @@ export function SettingsForm({
 
       <Group
         title="Offers"
-        description="How long an offer stands before it lapses. Short enough that listings do not fill up with stale interest, long enough that someone in another time zone gets a fair chance to answer."
+        info="How long an offer stands before it lapses. Short enough that listings do not fill up with stale interest, long enough that someone in another time zone gets a fair chance to answer."
       >
         <SettingRow
           id={ids.offer}
@@ -382,7 +408,7 @@ export function SettingsForm({
           name="paymentWindowHours"
           label="Unpaid deals lapse after"
           unit="hours"
-          hint="How long a buyer has to pay before the listing goes back on sale. A buyer who walks away holds it off the market this long."
+          tip="How long a buyer has to pay before the listing goes back on sale. A buyer who walks away holds it off the market this long."
           inputMode="numeric"
           value={paymentWindow}
           onChange={setPaymentWindow}
@@ -392,7 +418,7 @@ export function SettingsForm({
 
       <Group
         title="Payouts"
-        description={
+        info={
           <>
             The smallest withdrawal we will send. A crypto payout pays the
             chain&rsquo;s fee whatever its size, so below some figure the seller
@@ -414,16 +440,13 @@ export function SettingsForm({
 
       {previewable ? (
         <Card className="overflow-hidden">
+          {/* The currency stays in sight — the rest of the app shows money in
+              whatever the header is set to, and these figures are not. */}
           <CardHeader
             as="h2"
             title="What that means"
-            description={
-              <span className="block max-w-[80ch]">
-                Worked through at the rates typed above, on a Fastest deal — the
-                mode where both fees apply, so it shows the full effect of a
-                change. Figures in US dollars.
-              </span>
-            }
+            description="Figures in US dollars."
+            info="Worked through at the rates typed above, on a Fastest deal — the mode where both fees apply, so it shows the full effect of a change."
             className="border-b-0"
           />
           <div className="overflow-x-auto overscroll-x-contain">
@@ -471,12 +494,16 @@ export function SettingsForm({
         <CardHeader
           as="h2"
           title={
-            <span className="inline-flex items-center gap-2">
-              {changed ? <Dot tone="primary" pulse /> : null}
-              {changed ? "About to change" : "Nothing has changed yet"}
-            </span>
+            changed ? (
+              <span className="inline-flex items-center gap-2">
+                <Dot tone="primary" pulse />
+                About to change
+              </span>
+            ) : (
+              "Nothing has changed yet"
+            )
           }
-          description={
+          info={
             changed
               ? undefined
               : "Edit a figure above and the difference will be listed here before you commit it."

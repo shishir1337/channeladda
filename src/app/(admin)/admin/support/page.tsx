@@ -34,7 +34,7 @@ const TABS = [
 export default async function AdminSupportPage({
   searchParams,
 }: PageProps<"/admin/support">) {
-  const staff = await requireStaff();
+  await requireStaff();
   const params = await searchParams;
   const raw = typeof params.status === "string" ? params.status : "OPEN";
   const status =
@@ -54,20 +54,15 @@ export default async function AdminSupportPage({
     <>
       <PageHeader
         title="Support"
-        description="Everything sent through the contact form, including from people who cannot sign in."
+        info="Everything sent through the contact form, including from people who cannot sign in."
+        // How many are showing is the count beside the section heading, so
+        // the header only says how long the oldest has waited.
         meta={
-          <>
-            <MetaItem label="Signed in as">{staff.name}</MetaItem>
-            <MetaItem label="Showing">
-              {rows.length.toLocaleString("en-US")}{" "}
-              {rows.length === 1 ? "ticket" : "tickets"}
+          oldest && status === "OPEN" ? (
+            <MetaItem label="Oldest open">
+              {elapsed(new Date(oldest)).label}
             </MetaItem>
-            {oldest && status === "OPEN" ? (
-              <MetaItem label="Oldest open">
-                {elapsed(new Date(oldest)).label}
-              </MetaItem>
-            ) : null}
-          </>
+          ) : undefined
         }
       />
 
@@ -89,13 +84,13 @@ export default async function AdminSupportPage({
         title={showing?.label ?? "Tickets"}
         count={rows.length}
         tone={status === "OPEN" && rows.length > 0 ? "primary" : "neutral"}
-        description="A note is saved when you move a ticket, so whoever picks it up next can see what was already tried."
+        info="A note is saved when you move a ticket, so whoever picks it up next can see what was already tried."
       >
         {rows.length === 0 ? (
           status === "OPEN" ? (
             <AllClear
               title="Nothing open"
-              body="Every support request has been answered or closed. New ones arrive from the contact form."
+              body="Every support request has been answered or closed."
             />
           ) : (
             <EmptyState

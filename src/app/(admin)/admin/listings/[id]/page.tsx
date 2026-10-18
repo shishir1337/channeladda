@@ -194,7 +194,7 @@ export default async function ReviewListingPage({
               as="h2"
               icon={FingerprintIcon}
               title="Ownership check"
-              description="Open the account and look for this code. If it is not there, send the listing back — a seller who cannot post to the profile does not control it."
+              info="Open the account and look for this code. If it is not there, send the listing back — a seller who cannot post to the profile does not control it."
             />
             <CardBody className="flex flex-wrap items-center gap-3">
               <code className="rounded-lg border border-line bg-surface-2 px-3 py-2 font-mono text-[0.9375rem] leading-6 font-medium tracking-wider text-fg select-all">
@@ -215,7 +215,7 @@ export default async function ReviewListingPage({
             <CardHeader
               as="h2"
               title="What the seller claims"
-              description="Unverified until the proof below backs it up. Money is shown in whichever currency the header is set to."
+              info="Unverified until the proof below backs it up. Money is shown in whichever currency the header is set to."
             />
             <CardBody className="py-1.5 sm:py-1.5">
               <Facts columns={2} className={pairedFacts}>
@@ -332,6 +332,7 @@ export default async function ReviewListingPage({
                 <CardHeader
                   as="h2"
                   title="Taken down"
+                  info="Hidden from buyers and locked for the seller, who cannot edit or resubmit it. Only staff can bring it back."
                   className="border-danger/15"
                 />
                 <CardBody>
@@ -342,10 +343,6 @@ export default async function ReviewListingPage({
                         took it down and when.
                       </span>
                     )}
-                  </p>
-                  <p className="mt-2 text-xs leading-relaxed text-muted">
-                    Hidden from buyers and locked for the seller, who cannot
-                    edit or resubmit it. Only staff can bring it back.
                   </p>
                 </CardBody>
               </Card>

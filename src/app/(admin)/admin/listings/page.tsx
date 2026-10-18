@@ -67,7 +67,7 @@ const LATE_AFTER = 24;
 export default async function AdminListingsPage({
   searchParams,
 }: PageProps<"/admin/listings">) {
-  const staff = await requireStaff();
+  await requireStaff();
   const params = await searchParams;
 
   const requested = typeof params.status === "string" ? params.status : "";
@@ -93,10 +93,9 @@ export default async function AdminListingsPage({
     <>
       <PageHeader
         title="Listing queue"
-        description="Worked oldest first, so nobody sits at the bottom for ever."
+        info="Worked oldest first, so nobody sits at the bottom for ever."
         meta={
           <>
-            <MetaItem label="Signed in as">{staff.name}</MetaItem>
             {oldest && reviewing ? (
               <MetaItem label="Oldest wait">{elapsed(oldest).label}</MetaItem>
             ) : null}
@@ -140,19 +139,23 @@ export default async function AdminListingsPage({
         title={LISTING_STATUS[active].label}
         count={queue.length}
         tone={reviewing && queue.length > 0 ? "primary" : "neutral"}
+        // What the status means is an explanation; that the list is cut off
+        // at 100 changes what the count beside the heading means, so that
+        // stays in sight.
+        info={LISTING_STATUS[active].note}
         description={
           queue.length === 100
             ? NEWEST_FIRST.includes(active)
               ? "Showing the 100 most recently changed."
               : "Showing the 100 oldest. Clear some and the rest will appear."
-            : LISTING_STATUS[active].note
+            : undefined
         }
       >
         {queue.length === 0 ? (
           reviewing ? (
             <AllClear
               title="The review queue is clear"
-              body="Nothing is waiting on a moderator. A listing lands here the moment a seller sends it for review."
+              body="A listing lands here the moment a seller sends it for review."
             />
           ) : (
             <EmptyState
