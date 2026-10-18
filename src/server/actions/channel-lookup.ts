@@ -2,19 +2,25 @@
 
 import { revalidatePath } from "next/cache";
 import type { ListingStatus } from "@/generated/prisma/enums";
+import { countryName, wholeYearsSince } from "@/lib/channel-pages";
 import {
   containsOwnershipCode,
   handleFromUrl,
   newOwnershipCode,
   normaliseChannelUrl,
+  type ParsedChannel,
   parseChannelUrl,
 } from "@/lib/channel-url";
 import { db } from "@/lib/db";
 import { recordAudit } from "@/server/audit";
+import { storeRemoteImage } from "@/server/remote-image";
 import { requireUser } from "@/server/session";
+import { fetchTelegramChannel, TelegramError } from "@/server/telegram";
 import {
   fetchChannel,
+  fetchChannelPage,
   isYouTubeConfigured,
+  recentEngagement,
   verifyOwnershipCode,
   YouTubeError,
 } from "@/server/youtube";
@@ -22,9 +28,10 @@ import {
 /**
  * Filling a listing in from a link, and proving the seller owns it.
  *
- * Both halves work without a YouTube API key, just more slowly: the seller
- * types the figures and staff read the channel description themselves. The
- * code is issued either way, because it is the ownership check and not a
+ * Both halves work without a YouTube API key. Filling in reads the channel's
+ * public page instead (and Telegram's, which has no API at all); the
+ * ownership check falls back to staff reading the description themselves.
+ * The code is issued either way, because it is the ownership check and not a
  * convenience.
  */
 export type LookupResult =
@@ -36,16 +43,148 @@ export type LookupResult =
       handle: string | null;
       title: string;
       description: string;
+      /** Our own copy of the channel's picture, already uploaded. */
       avatarUrl: string | null;
+      /** Our own copy of the channel's banner, as a listing cover. */
+      coverUrl: string | null;
       subscribers: number;
       subscribersHidden: boolean;
+      /** Shown to help the seller recognise the channel; not saved. */
+      videos: number | null;
+      views: number | null;
       ageYears: number;
       country: string | null;
+      niche: string | null;
+      /** An estimate, with what it was worked out from beside it. */
+      engagement: number | null;
+      engagementBasis: string | null;
       canonicalUrl: string;
       /** True when the figures came from the seller rather than from Google. */
       manual: boolean;
+      /** Where the figures came from, when they did not come from the seller. */
+      source: "api" | "page" | null;
     }
   | { ok: false; error: string };
+
+type Found = Omit<
+  Extract<LookupResult, { ok: true }>,
+  "ok" | "avatarUrl" | "coverUrl"
+> & {
+  /** The platform's own copies, before they are stored as ours. */
+  avatarFrom: string | null;
+  coverFrom: string | null;
+};
+
+/**
+ * From Google's API. Null when the API cannot answer for a reason the
+ * channel's own page might get around — no key, the quota, a legacy link,
+ * a hiccup — so the caller tries the page next.
+ */
+async function youtubeFromApi(
+  parsed: ParsedChannel,
+  url: string,
+): Promise<Found | null> {
+  if (!isYouTubeConfigured()) return null;
+  try {
+    const facts = await fetchChannel(parsed);
+    const engagement = facts.uploadsPlaylistId
+      ? await recentEngagement(facts.uploadsPlaylistId)
+      : null;
+    return {
+      platform: "YOUTUBE",
+      channelId: facts.channelId,
+      // From the canonical URL Google returns, not only from the link the
+      // seller pasted: a /channel/UC… link has no handle in it, but the
+      // channel may still have one.
+      handle: handleFromUrl(facts.canonicalUrl) ?? handleFromUrl(url),
+      title: facts.title,
+      description: facts.description,
+      avatarFrom: facts.avatarUrl,
+      coverFrom: facts.bannerUrl,
+      subscribers: facts.subscribers,
+      subscribersHidden: facts.subscribersHidden,
+      videos: facts.videos,
+      views: facts.views,
+      ageYears: facts.publishedAt ? wholeYearsSince(facts.publishedAt) : 0,
+      country: facts.country ? countryName(facts.country) : null,
+      niche: facts.niche,
+      engagement,
+      engagementBasis:
+        engagement === null ? null : "likes and comments on the last 10 videos",
+      canonicalUrl: facts.canonicalUrl,
+      manual: false,
+      source: "api",
+    };
+  } catch (error) {
+    // A channel that does not exist does not exist on its page either —
+    // except an old /c/ name, which only the page can resolve.
+    if (
+      error instanceof YouTubeError &&
+      error.kind === "not-found" &&
+      parsed.kind !== "legacy"
+    ) {
+      throw error;
+    }
+    if (!(error instanceof YouTubeError)) {
+      console.error("[channel-lookup] api", error);
+    }
+    return null;
+  }
+}
+
+async function youtubeFromPage(parsed: ParsedChannel): Promise<Found> {
+  const page = await fetchChannelPage(parsed);
+  return {
+    platform: "YOUTUBE",
+    channelId: page.channelId,
+    handle: page.handle,
+    title: page.title,
+    description: page.description,
+    avatarFrom: page.avatarUrl,
+    coverFrom: page.bannerUrl,
+    subscribers: page.subscribers ?? 0,
+    subscribersHidden: page.subscribers === null,
+    videos: page.videos,
+    views: page.views,
+    ageYears: page.joinedAt ? wholeYearsSince(page.joinedAt) : 0,
+    country: page.country,
+    niche: null,
+    engagement: null,
+    engagementBasis: null,
+    canonicalUrl: page.handle
+      ? `https://www.youtube.com/@${page.handle}`
+      : `https://www.youtube.com/channel/${page.channelId}`,
+    manual: false,
+    source: "page",
+  };
+}
+
+async function telegramFromPage(name: string): Promise<Found> {
+  const { channel, reach } = await fetchTelegramChannel(name);
+  return {
+    platform: "TELEGRAM",
+    channelId: null,
+    handle: name,
+    title: channel.title,
+    description: channel.description,
+    avatarFrom: channel.avatarUrl,
+    // Telegram channels have no banner.
+    coverFrom: null,
+    subscribers: channel.members ?? 0,
+    subscribersHidden: channel.members === null,
+    videos: null,
+    views: null,
+    ageYears: 0,
+    country: null,
+    niche: null,
+    engagement: reach,
+    engagementBasis:
+      reach === null ? null : "average views on the latest posts",
+    canonicalUrl: `https://t.me/${name}`,
+    manual: false,
+    source: "page",
+  };
+}
 
 /**
  * Lookups per person, per hour.
@@ -96,9 +235,10 @@ export async function lookupChannel(url: string): Promise<LookupResult> {
     };
   }
 
-  // Nothing but YouTube has a usable public API for this, and guessing at
-  // somebody's follower count would be worse than asking.
-  if (parsed.platform !== "YOUTUBE" || !isYouTubeConfigured()) {
+  // YouTube and Telegram show their figures to anyone; Instagram, Facebook
+  // and websites do not, and guessing at somebody's follower count would be
+  // worse than asking.
+  if (parsed.platform !== "YOUTUBE" && parsed.platform !== "TELEGRAM") {
     return {
       ok: true,
       platform: parsed.platform,
@@ -107,55 +247,41 @@ export async function lookupChannel(url: string): Promise<LookupResult> {
       title: "",
       description: "",
       avatarUrl: null,
+      coverUrl: null,
       subscribers: 0,
       subscribersHidden: false,
+      videos: null,
+      views: null,
       ageYears: 0,
       country: null,
+      niche: null,
+      engagement: null,
+      engagementBasis: null,
       // Normalised, not echoed. The listing schema refuses a link with no
       // scheme, and that error had no rendered home.
       canonicalUrl: normaliseChannelUrl(url) ?? url.trim(),
       manual: true,
+      source: null,
     };
   }
 
   try {
-    const facts = await fetchChannel(parsed);
-    const ageYears = facts.publishedAt
-      ? Math.max(
-          0,
-          Math.floor(
-            (Date.now() - facts.publishedAt.getTime()) / 31_557_600_000,
-          ),
-        )
-      : 0;
+    const found =
+      parsed.platform === "TELEGRAM"
+        ? await telegramFromPage(parsed.value)
+        : ((await youtubeFromApi(parsed, url)) ??
+          (await youtubeFromPage(parsed)));
 
-    return {
-      ok: true,
-      platform: "YOUTUBE",
-      channelId: facts.channelId,
-      // From the canonical URL Google returns, not only from the link the
-      // seller pasted: a /channel/UC… link has no handle in it, but the
-      // channel may still have one.
-      handle: handleFromUrl(facts.canonicalUrl) ?? handleFromUrl(url),
-      title: facts.title,
-      description: facts.description,
-      avatarUrl: facts.avatarUrl,
-      subscribers: facts.subscribers,
-      subscribersHidden: facts.subscribersHidden,
-      ageYears,
-      country: facts.country,
-      canonicalUrl: facts.canonicalUrl,
-      manual: false,
-    };
+    const { avatarFrom, coverFrom, ...facts } = found;
+    const [avatarUrl, coverUrl] = await Promise.all([
+      storeRemoteImage(avatarFrom, "avatar", user.id),
+      storeRemoteImage(coverFrom, "cover", user.id),
+    ]);
+
+    return { ok: true, ...facts, avatarUrl, coverUrl };
   } catch (error) {
-    if (error instanceof YouTubeError) {
-      return {
-        ok: false,
-        error:
-          error.kind === "quota"
-            ? "We have hit today's lookup limit with YouTube. Fill the figures in by hand — nothing is lost."
-            : error.message,
-      };
+    if (error instanceof YouTubeError || error instanceof TelegramError) {
+      return { ok: false, error: error.message };
     }
     console.error("[channel-lookup]", error);
     return {

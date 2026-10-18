@@ -1,5 +1,13 @@
 import "server-only";
 
+import {
+  engagementPercent,
+  fullBannerUrl,
+  nicheFromTopics,
+  PAGE_HEADERS,
+  type PublicYouTubeChannel,
+  parseYouTubeAboutPage,
+} from "@/lib/channel-pages";
 import { containsOwnershipCode, type ParsedChannel } from "@/lib/channel-url";
 
 /**
@@ -26,13 +34,20 @@ export type ChannelFacts = {
   title: string;
   description: string;
   avatarUrl: string | null;
+  /** The whole banner at 1600×900, ready to be a listing cover. */
+  bannerUrl: string | null;
   subscribers: number;
   /** Null when the channel hides its subscriber count, which many do. */
   subscribersHidden: boolean;
   videos: number;
   views: number;
+  /** An ISO country code, e.g. "US". */
   country: string | null;
   publishedAt: Date | null;
+  /** From Google's own topic tags, e.g. "Technology". */
+  niche: string | null;
+  /** The playlist of every upload, for reading recent videos' figures. */
+  uploadsPlaylistId: string | null;
   canonicalUrl: string;
 };
 
@@ -66,27 +81,39 @@ type ChannelItem = {
     videoCount?: string;
     viewCount?: string;
   };
+  brandingSettings?: { image?: { bannerExternalUrl?: string } };
+  topicDetails?: { topicCategories?: string[] };
+  contentDetails?: { relatedPlaylists?: { uploads?: string } };
 };
 
-async function query(
+/**
+ * One call to the API.
+ *
+ * Every endpoint used here costs one unit, whichever parts are asked for, so
+ * a channel lookup asks for all the parts the form can use in one go.
+ */
+async function call<T>(
+  endpoint: "channels" | "playlistItems" | "videos",
   params: Record<string, string | undefined>,
-): Promise<ChannelItem[]> {
+): Promise<T[]> {
   const key = process.env.YOUTUBE_API_KEY;
   if (!key) {
     throw new YouTubeError("YOUTUBE_API_KEY is not set.", "not-configured");
   }
 
-  const url = new URL(`${API}/channels`);
-  url.searchParams.set("part", "snippet,statistics");
+  const url = new URL(`${API}/${endpoint}`);
   url.searchParams.set("key", key);
   for (const [name, value] of Object.entries(params)) {
     if (value !== undefined) url.searchParams.set(name, value);
   }
 
-  const response = await fetch(url, { cache: "no-store" });
+  const response = await fetch(url, {
+    cache: "no-store",
+    signal: AbortSignal.timeout(8_000),
+  });
   const text = await response.text();
 
-  let body: { items?: ChannelItem[]; error?: { message?: string } };
+  let body: { items?: T[]; error?: { message?: string } };
   try {
     body = JSON.parse(text) as typeof body;
   } catch {
@@ -114,6 +141,12 @@ async function query(
   return body.items ?? [];
 }
 
+const query = (params: Record<string, string | undefined>) =>
+  call<ChannelItem>("channels", {
+    part: "snippet,statistics,brandingSettings,topicDetails,contentDetails",
+    ...params,
+  });
+
 function toFacts(item: ChannelItem): ChannelFacts {
   const thumbnails = item.snippet?.thumbnails ?? {};
   // Highest resolution first: a listing avatar is rendered at 2x on a retina
@@ -127,17 +160,22 @@ function toFacts(item: ChannelItem): ChannelFacts {
   const hidden = item.statistics?.hiddenSubscriberCount === true;
   const published = item.snippet?.publishedAt;
 
+  const banner = item.brandingSettings?.image?.bannerExternalUrl;
+
   return {
     channelId: item.id,
     title: item.snippet?.title ?? "",
     description: item.snippet?.description ?? "",
     avatarUrl,
+    bannerUrl: banner ? fullBannerUrl(banner) : null,
     subscribers: hidden ? 0 : Number(item.statistics?.subscriberCount ?? 0),
     subscribersHidden: hidden,
     videos: Number(item.statistics?.videoCount ?? 0),
     views: Number(item.statistics?.viewCount ?? 0),
     country: item.snippet?.country ?? null,
     publishedAt: published ? new Date(published) : null,
+    niche: nicheFromTopics(item.topicDetails?.topicCategories ?? []),
+    uploadsPlaylistId: item.contentDetails?.relatedPlaylists?.uploads ?? null,
     canonicalUrl: item.snippet?.customUrl
       ? `https://www.youtube.com/${item.snippet.customUrl}`
       : `https://www.youtube.com/channel/${item.id}`,
@@ -180,6 +218,105 @@ export async function fetchChannel(
   }
 
   return toFacts(items[0]);
+}
+
+/**
+ * Likes and comments over views, across the ten latest uploads.
+ *
+ * Two units: one for the playlist, one for the videos. Null on any failure —
+ * this is an estimate offered to the seller, and a lookup that has already
+ * found the channel must not fail over it.
+ */
+export async function recentEngagement(
+  uploadsPlaylistId: string,
+): Promise<number | null> {
+  try {
+    const items = await call<{ contentDetails?: { videoId?: string } }>(
+      "playlistItems",
+      {
+        part: "contentDetails",
+        playlistId: uploadsPlaylistId,
+        maxResults: "10",
+      },
+    );
+    const ids = items
+      .map((item) => item.contentDetails?.videoId)
+      .filter((id): id is string => Boolean(id));
+    if (ids.length === 0) return null;
+
+    const videos = await call<{
+      statistics?: {
+        viewCount?: string;
+        likeCount?: string;
+        commentCount?: string;
+      };
+    }>("videos", { part: "statistics", id: ids.join(",") });
+
+    return engagementPercent(
+      videos.map((video) => ({
+        views: Number(video.statistics?.viewCount ?? 0),
+        likes: Number(video.statistics?.likeCount ?? 0),
+        comments: Number(video.statistics?.commentCount ?? 0),
+      })),
+    );
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The channel's public /about page, read — for when there is no API key, or
+ * the day's shared quota has gone.
+ *
+ * The address is built here from what `parseChannelUrl` extracted, never
+ * taken from the seller, so this only ever connects to www.youtube.com. It
+ * also reads old /c/ and /user/ links, which the API can only resolve with a
+ * hundred-unit search.
+ */
+export async function fetchChannelPage(
+  parsed: ParsedChannel,
+): Promise<PublicYouTubeChannel> {
+  if (parsed.platform !== "YOUTUBE" || parsed.kind === "domain") {
+    throw new YouTubeError("That is not a YouTube channel.", "failed");
+  }
+
+  const value = encodeURIComponent(parsed.value);
+  const path =
+    parsed.kind === "id"
+      ? `channel/${value}`
+      : parsed.kind === "handle"
+        ? `@${value}`
+        : `c/${value}`;
+
+  let response: Response;
+  try {
+    response = await fetch(`https://www.youtube.com/${path}/about`, {
+      headers: PAGE_HEADERS,
+      cache: "no-store",
+      signal: AbortSignal.timeout(8_000),
+    });
+  } catch {
+    throw new YouTubeError("YouTube did not answer in time.", "failed");
+  }
+
+  if (response.status === 404) {
+    throw new YouTubeError(
+      "No YouTube channel matched that link. Check it opens in a browser.",
+      "not-found",
+    );
+  }
+  if (!response.ok) {
+    throw new YouTubeError(`YouTube returned ${response.status}.`, "failed");
+  }
+
+  const facts = parseYouTubeAboutPage(await response.text());
+  if (!facts) {
+    throw new YouTubeError(
+      "We could not read that channel's page. Fill the figures in by hand — nothing is lost.",
+      "failed",
+    );
+  }
+  return facts;
 }
 
 /**
