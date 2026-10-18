@@ -9,6 +9,10 @@ export const metadata: Metadata = {
   alternates: { canonical: "/forgot-password" },
 };
 
+/** The only auth page with nothing per-request in it, so it is prerendered —
+ *  and the shell's marketplace figures froze at whatever the build saw. */
+export const revalidate = 60;
+
 export default function ForgotPasswordPage() {
   return (
     <AuthShell
