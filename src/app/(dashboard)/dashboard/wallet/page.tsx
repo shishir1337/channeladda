@@ -61,13 +61,13 @@ const KINDS: Record<string, { title: string; meaning: string; icon: Icon }> = {
   ESCROW_HOLD: {
     title: "Paid into a deal",
     meaning:
-      "Taken from your balance to open a deal. Channel Adda holds it until the deal finishes.",
+      "Taken from your balance to pay a deal — the opening payment, or a Safest deal's price. Channel Adda holds it until the deal finishes.",
     icon: LockIcon,
   },
   ESCROW_RELEASE: {
     title: "A sale was paid out to you",
     meaning:
-      "A Fastest deal finished and the buyer confirmed they have control, so the money became yours.",
+      "A deal finished and the channel is the buyer's, so the price Channel Adda was holding became yours.",
     icon: BanknoteIcon,
   },
   SELLER_FEE: {
@@ -84,7 +84,8 @@ const KINDS: Record<string, { title: string; meaning: string; icon: Icon }> = {
   },
   REFUND: {
     title: "Money came back to you",
-    meaning: "A deal did not go ahead, so what you paid was returned in full.",
+    meaning:
+      "A deal did not go ahead, so what Channel Adda was holding for you came back. A Safest admin fee is kept once our agent has held the channel — it pays for that work.",
     icon: RotateCcwIcon,
   },
   WITHDRAWAL: {
@@ -269,19 +270,22 @@ export default async function WalletPage({
           </div>
         </Card>
 
-        {/* In sight, as one quiet line: a Safest seller looking for their
-            money needs to see at once that it was never coming here. */}
+        {/* In sight, as one quiet line: a seller looking for their money
+            needs to see at once when it arrives here, and that it is never
+            paid to them by the buyer directly. */}
         <div className="mt-3 flex items-start gap-2 text-[0.8125rem] leading-relaxed text-muted">
           <InfoIcon
             aria-hidden="true"
             className="mt-[0.1875rem] size-3.5 shrink-0 text-subtle"
           />
           <p className="max-w-[72ch]">
-            Only <strong className="font-semibold text-fg">Fastest</strong>{" "}
-            sales reach this balance, because that is the mode where the buyer
-            pays Channel Adda. On a{" "}
-            <strong className="font-semibold text-fg">Safest</strong> deal the
-            buyer pays you directly, so nothing for that sale ever appears here.{" "}
+            A sale reaches this balance when its transfer completes, on both
+            kinds of deal. Until then the buyer&rsquo;s payment is held by
+            Channel Adda and listed under{" "}
+            <strong className="font-semibold text-fg">
+              Held for your sales
+            </strong>
+            .{" "}
             <Link
               href="/fees"
               className="font-medium text-fg underline decoration-line-strong underline-offset-4 transition-colors duration-150 hover:decoration-fg"
@@ -292,6 +296,58 @@ export default async function WalletPage({
           </p>
         </div>
       </Section>
+
+      {/* ---- held for your sales ---------------------------------------- */}
+      {wallet.heldForSales.length > 0 ? (
+        <Section
+          id="held"
+          title="Held for your sales"
+          count={wallet.heldForSales.length}
+          info="The buyer has paid Channel Adda for these. We hold it until the transfer completes, then it moves to your balance. Until then it cannot be withdrawn, so it can still go back to the buyer if the channel never reaches them."
+          actions={
+            <Price
+              usd={wallet.heldForSalesUsd / 100}
+              className="text-sm leading-5 font-semibold text-fg tabular-nums"
+            />
+          }
+        >
+          <List>
+            {wallet.heldForSales.map((sale) => (
+              <ListItem key={sale.orderId}>
+                <div className="flex items-center gap-3">
+                  <IconTile icon={LockIcon} />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm leading-5 font-medium text-fg">
+                      {sale.title}
+                    </p>
+                    <p className="mt-0.5 text-xs leading-relaxed text-subtle">
+                      <Link
+                        href={`/dashboard/deals/${sale.orderId}`}
+                        className="font-mono text-muted underline decoration-line-strong underline-offset-4 transition-colors duration-150 hover:text-fg hover:decoration-fg"
+                      >
+                        {sale.reference}
+                      </Link>{" "}
+                      · Moves to your balance when the transfer completes.
+                    </p>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <Price
+                      usd={sale.amountUsd / 100}
+                      className="text-sm leading-5 font-semibold text-fg tabular-nums"
+                    />
+                    <p className="mt-0.5 text-xs leading-5 whitespace-nowrap text-subtle">
+                      paid{" "}
+                      <time dateTime={sale.paidAt.toISOString()}>
+                        {longDate(sale.paidAt)}
+                      </time>
+                    </p>
+                  </div>
+                </div>
+              </ListItem>
+            ))}
+          </List>
+        </Section>
+      ) : null}
 
       {/* ---- putting money in, taking it out ----------------------------- */}
       <Section>
@@ -318,7 +374,7 @@ export default async function WalletPage({
           <EmptyState
             icon={CoinsIcon}
             title="Nothing has moved yet"
-            body="When you add funds, complete a Fastest sale or take money out, each movement is listed here with what it was for."
+            body="When you add funds, complete a sale or take money out, each movement is listed here with what it was for."
           />
         ) : (
           <List>

@@ -399,9 +399,9 @@ export default async function DashboardPage() {
           <>
             <p>Lifetime totals. Your spendable balance lives in the wallet.</p>
             <p className="mt-1.5">
-              On a Safest deal the buyer pays you directly, so that money is
-              counted above but never passes through Channel Adda. Only Fastest
-              sales reach your balance.
+              Buyers pay Channel Adda, never you directly. A sale reaches your
+              balance when its transfer completes; until then the wallet shows
+              it as held.
             </p>
           </>
         }

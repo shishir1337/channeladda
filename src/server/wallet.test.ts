@@ -534,3 +534,91 @@ test(
     });
   }),
 );
+
+// --------------------------------------------- what we hold for a seller
+
+test(
+  "a seller sees a paid price as held, not as balance",
+  withCleanDb(async () => {
+    const { orderId, buyer, seller } = await safestAt(6);
+    await fund(buyer.id, 10_000);
+    await payFromWallet(orderId, buyer.id);
+
+    const wallet = await getWallet(seller.id);
+    expect(wallet.heldForSalesUsd).toBe(10_000);
+    expect(wallet.heldForSales).toEqual([
+      expect.objectContaining({
+        orderId,
+        mode: "SAFEST",
+        amountUsd: 10_000,
+        reference: expect.stringMatching(/^CA-/),
+      }),
+    ]);
+    // Not theirs to spend or withdraw until the transfer completes.
+    expect(wallet.balanceUsd).toBe(0);
+    expect(wallet.availableUsd).toBe(0);
+  }),
+);
+
+test(
+  "a held sale moves to the balance on completion",
+  withCleanDb(async () => {
+    const { orderId, buyer, seller, agent } = await safestAt(6);
+    await fund(buyer.id, 10_000);
+    await payFromWallet(orderId, buyer.id);
+    for (const position of [7, 8]) {
+      const r = await runStep({ orderId, position, userId: agent.id });
+      if (!r.ok) throw new Error(`step ${position}: ${r.reason}`);
+    }
+
+    const wallet = await getWallet(seller.id);
+    expect(wallet.heldForSales).toEqual([]);
+    expect(wallet.heldForSalesUsd).toBe(0);
+    expect(wallet.availableUsd).toBe(10_000);
+  }),
+);
+
+test(
+  "a held sale cannot be withdrawn",
+  withCleanDb(async () => {
+    const { orderId, buyer, seller } = await safestAt(6);
+    await fund(buyer.id, 10_000);
+    await payFromWallet(orderId, buyer.id);
+    await db.payoutAddress.create({
+      data: { userId: seller.id, address: "TXyz1234567890", network: "TRON" },
+    });
+
+    expect(await requestWithdrawal(seller.id, 10_000)).toMatchObject({
+      ok: false,
+      reason: "insufficient",
+    });
+  }),
+);
+
+test(
+  "a fastest sale is held the same way",
+  withCleanDb(async () => {
+    const seeded = await seedListing();
+    const created = await createDeal({
+      listingId: seeded.listing.id,
+      buyerId: seeded.buyer.id,
+      mode: "FASTEST",
+    });
+    if (!created.ok) throw new Error(created.reason);
+    await recordOpeningPayment(created.orderId, created.reference, "USDT");
+
+    const wallet = await getWallet(seeded.seller.id);
+    expect(wallet.heldForSalesUsd).toBe(10_000);
+    expect(wallet.heldForSales[0]).toMatchObject({ mode: "FASTEST" });
+  }),
+);
+
+test(
+  "a safest sale whose price is not paid yet is not shown as held",
+  withCleanDb(async () => {
+    // Only the fee is with us; the price has not been paid.
+    const { seller } = await safestAt(6);
+    const wallet = await getWallet(seller.id);
+    expect(wallet.heldForSales).toEqual([]);
+  }),
+);

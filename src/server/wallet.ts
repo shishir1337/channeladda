@@ -1,8 +1,8 @@
 import "server-only";
 
-import type { WithdrawalStatus } from "@/generated/prisma/enums";
+import type { DealMode, WithdrawalStatus } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
-import { canTransition } from "@/lib/deal-machine";
+import { canTransition, TERMINAL_STATUSES } from "@/lib/deal-machine";
 import { OPENING_STATUS, priceStepFor } from "@/lib/deal-templates";
 import { isSerializationFailure } from "@/lib/serialization-failure";
 import { recordAudit } from "@/server/audit";
@@ -72,6 +72,23 @@ export type WalletEntry = {
   createdAt: Date;
 };
 
+/**
+ * A sale whose price the buyer has paid to Channel Adda and we are holding
+ * until the transfer completes. Not part of the balance: it is still the
+ * buyer's money until then, and can go back to them if the channel never
+ * reaches them.
+ */
+export type HeldSale = {
+  orderId: string;
+  reference: string;
+  title: string;
+  mode: DealMode;
+  /** Cents the seller will be credited: the price less the seller fee. */
+  amountUsd: number;
+  /** When the price reached us. */
+  paidAt: Date;
+};
+
 export type Wallet = {
   balanceUsd: number;
   /** Held against withdrawals finance has not settled. */
@@ -80,10 +97,13 @@ export type Wallet = {
   availableUsd: number;
   entries: WalletEntry[];
   payoutAddress: { address: string; network: string } | null;
+  /** Running sales whose price we hold for this seller, newest first. */
+  heldForSales: HeldSale[];
+  heldForSalesUsd: number;
 };
 
 export async function getWallet(userId: string): Promise<Wallet> {
-  const [sum, pending, entries, payoutAddress] = await Promise.all([
+  const [sum, pending, entries, payoutAddress, held] = await Promise.all([
     db.ledgerEntry.aggregate({
       where: { userId },
       _sum: { amountUsd: true },
@@ -108,10 +128,49 @@ export async function getWallet(userId: string): Promise<Wallet> {
       where: { userId },
       select: { address: true, network: true },
     }),
+    // The price is on our books once a Fastest deal is paid, and once a
+    // Safest buyer has paid the price after inspecting the channel — the
+    // Safest opening payment is the fee alone.
+    db.order.findMany({
+      where: {
+        sellerId: userId,
+        status: { notIn: [...TERMINAL_STATUSES] },
+        OR: [
+          { mode: "FASTEST", paymentRef: { not: null } },
+          { mode: "SAFEST", buyerPaidAt: { not: null } },
+        ],
+      },
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        reference: true,
+        mode: true,
+        priceUsd: true,
+        sellerFeeUsd: true,
+        paidAt: true,
+        buyerPaidAt: true,
+        listing: { select: { title: true } },
+      },
+    }),
   ]);
 
   const balanceUsd = sum._sum.amountUsd ?? 0;
   const pendingWithdrawalUsd = pending._sum.amountUsd ?? 0;
+  const heldForSales = held.flatMap((order): HeldSale[] => {
+    const paidAt = order.mode === "SAFEST" ? order.buyerPaidAt : order.paidAt;
+    return paidAt
+      ? [
+          {
+            orderId: order.id,
+            reference: order.reference,
+            title: order.listing.title,
+            mode: order.mode,
+            amountUsd: order.priceUsd - order.sellerFeeUsd,
+            paidAt,
+          },
+        ]
+      : [];
+  });
 
   return {
     balanceUsd,
@@ -119,6 +178,11 @@ export async function getWallet(userId: string): Promise<Wallet> {
     availableUsd: balanceUsd - pendingWithdrawalUsd,
     entries,
     payoutAddress,
+    heldForSales,
+    heldForSalesUsd: heldForSales.reduce(
+      (sum, sale) => sum + sale.amountUsd,
+      0,
+    ),
   };
 }
 
