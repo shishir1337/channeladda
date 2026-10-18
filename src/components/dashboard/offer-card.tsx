@@ -111,9 +111,15 @@ export function OfferCard({
               }
             >
               {offer.bySeller
-                ? offer.counterOf
-                  ? "their counter"
-                  : "their price"
+                ? // Whose it is depends on who is reading: the seller looking
+                  // at their own counter was told it was "their counter".
+                  offer.counterOf
+                  ? viewingAs === "seller"
+                    ? "your counter"
+                    : "their counter"
+                  : viewingAs === "seller"
+                    ? "your price"
+                    : "their price"
                 : atAskingPrice
                   ? "full asking price"
                   : "offered"}

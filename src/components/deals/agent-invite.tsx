@@ -14,6 +14,10 @@ import type { DealView } from "@/server/deals";
  */
 export function AgentInvite({ deal }: { deal: DealView }) {
   if (!deal.agentEmail || deal.viewerRole === "buyer") return null;
+  // Only while the invitation is still in play: sent at step 2, accepted at
+  // step 3 in both modes. After that — and on a finished deal, where it used
+  // to sit with its "stop if the name does not match" warning — it is noise.
+  if (!deal.nextStep || deal.nextStep.position > 3) return null;
 
   return (
     <Card>

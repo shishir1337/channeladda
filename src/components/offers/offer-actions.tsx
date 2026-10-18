@@ -103,7 +103,9 @@ export function OfferActions({
             size="sm"
             disabled={pending}
             onClick={() => {
-              setCounterAmount(String(Math.round(offer.amount)));
+              // Empty, not the offer being answered: a counter equal to it
+              // is the one figure that is never the answer.
+              setCounterAmount("");
               setCountering(true);
             }}
           >
@@ -133,7 +135,10 @@ export function OfferActions({
                 $
               </span>
               <input
+                // biome-ignore lint/a11y/noAutofocus: it appears because "Counter" was just pressed, and it is empty — the cursor belongs in it.
+                autoFocus
                 inputMode="decimal"
+                placeholder="Your price"
                 value={counterAmount}
                 onChange={(e) => setCounterAmount(e.target.value)}
                 className={cn(inputClass, "pl-7 font-normal tabular-nums")}
