@@ -49,6 +49,16 @@ async function disputedDeal(
 }
 
 test(
+  "a disputed safest deal says whether the price reached us, not what the seller claims",
+  withCleanDb(async () => {
+    await disputedDeal();
+    const [row] = (await listDisputes({ role: "MODERATOR" })) ?? [];
+    expect(row?.buyerPaidAt).toBeNull();
+    expect(row).not.toHaveProperty("sellerConfirmedAt");
+  }),
+);
+
+test(
   "the desk shows who raised a dispute, what they said, and every later note in order",
   withCleanDb(async () => {
     const { orderId, buyer, seller, listing, conversationId } =

@@ -38,7 +38,6 @@ export type ChatEvent =
   | { type: "agent-joined" | "agent-changed"; agentName: string }
   | { type: "step-done"; name: string; label: string }
   | { type: "hold-started"; until: Date }
-  | { type: "pay-to-saved"; name: string; changed: boolean }
   | { type: "dispute-raised"; name: string }
   | { type: "deal-ended"; outcome: string };
 
@@ -98,10 +97,6 @@ export function eventText(event: ChatEvent): string {
         month: "long",
         year: "numeric",
       })}. The seller is paid when it ends`;
-    case "pay-to-saved":
-      return event.changed
-        ? `${who(event.name)} changed where to be paid`
-        : `${who(event.name)} added where to be paid`;
     case "dispute-raised":
       return `${who(event.name)} raised a dispute. The deal is paused while Channel Adda looks at it`;
     case "deal-ended":

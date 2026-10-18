@@ -100,11 +100,9 @@ export type DisputeCase = {
   inCustody: boolean;
   paidAt: Date | null;
   custodyAt: Date | null;
-  /** Safest: the buyer says they paid the seller, with this reference. */
+  /** Safest: the price reached Channel Adda, under this payment's name. */
   buyerPaidAt: Date | null;
   buyerPaymentRef: string | null;
-  /** Safest: the seller says that money arrived. */
-  sellerConfirmedAt: Date | null;
   handoverAt: Date | null;
   /**
    * An unpaid dispute lapses on the payment-window clock like any unpaid
@@ -200,7 +198,6 @@ export async function listDisputes(
       custodyAt: true,
       buyerPaidAt: true,
       buyerPaymentRef: true,
-      sellerConfirmedAt: true,
       handoverAt: true,
       buyerId: true,
       sellerId: true,
@@ -310,7 +307,6 @@ export async function listDisputes(
       custodyAt: order.custodyAt,
       buyerPaidAt: order.buyerPaidAt,
       buyerPaymentRef: order.buyerPaymentRef,
-      sellerConfirmedAt: order.sellerConfirmedAt,
       handoverAt: order.handoverAt,
       lapsesAt: paid ? null : new Date(order.createdAt.getTime() + windowMs),
       listing: {

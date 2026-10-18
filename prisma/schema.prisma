@@ -516,18 +516,6 @@ model Order {
   conversationId String?
   conversation   Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
 
-  /// Safest only: where the buyer pays the seller directly, in the seller's
-  /// words. Not filtered for contact details, because a bank account number
-  /// is exactly what the chat filter removes — which is why this field
-  /// exists. Shown to the buyer only once it is their turn to pay.
-  sellerPayTo          String?
-  /// When the seller last saved it.
-  sellerPayToAt        DateTime?
-  /// When the seller last replaced it with something different. A change
-  /// after the buyer could see it is how a hijacked account redirects a
-  /// payment, so the buyer is warned about one.
-  sellerPayToChangedAt DateTime?
-
   priceUsd     Int // cents, agreed price
   buyerFeeUsd  Int // cents
   sellerFeeUsd Int // cents
@@ -549,7 +537,6 @@ model Order {
   /// payment or a payment finance recorded by hand — so a second arrival can
   /// be told from a retry. Set by the system, never typed by the buyer.
   buyerPaymentRef   String?
-  sellerConfirmedAt DateTime? // safest: seller says the money arrived
   handoverAt        DateTime? // Fastest: the BUYER confirmed access (step 5); starts the recovery hold
 
   confirmedAt DateTime? // buyer pressed confirm

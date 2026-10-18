@@ -4,7 +4,6 @@ import { revalidatePath } from "next/cache";
 import type { DealMode } from "@/generated/prisma/enums";
 import { agentIdentity } from "@/server/admin-users";
 import * as repo from "@/server/deals";
-import { type PayToFailure, saveSellerPayTo } from "@/server/pay-to";
 import { requireRole, requireUser } from "@/server/session";
 
 /**
@@ -35,8 +34,6 @@ const MESSAGES: Record<repo.DealFailure, string> = {
   disputed: "This deal is with Channel Adda while the dispute is open.",
   "needs-dispute":
     "One side says this already happened, so reversing it is a decision, not a correction. Pause it for review first — then it can be decided with both accounts of it on the record.",
-  "needs-reference":
-    "Add the transaction reference or bank receipt number. It is the only record that you paid the seller, and the first thing a moderator asks for if they say you did not.",
   "on-hold":
     "This deal is in its recovery hold: the window in which an old owner could still reclaim the account. The seller is paid when it ends — the deal page shows the date.",
   "in-custody":
@@ -45,8 +42,6 @@ const MESSAGES: Record<repo.DealFailure, string> = {
     "Paying somebody out of money Channel Adda is holding is the finance desk’s call, not a moderator’s. Everything else about this deal is yours.",
   "not-disputed":
     "A deal is finished by its last step, not from here. Dispute it first if it is stuck.",
-  "already-paid":
-    "The buyer has already paid the seller, so this cannot be undone here.",
   "bad-proof": "Attach an uploaded file or an https link.",
   "pay-in-checkout":
     "The price is paid to Channel Adda from this page, by crypto or from your balance. The step completes on its own when the money arrives.",
@@ -113,7 +108,7 @@ export async function startDeal(
 export async function completeStep(
   orderId: string,
   position: number,
-  extra?: { proofUrl?: string; paymentRef?: string; approvedById?: string },
+  extra?: { proofUrl?: string; approvedById?: string },
 ): Promise<DealResult> {
   const user = await requireUser();
   const result = await repo.advanceStep({
@@ -336,34 +331,4 @@ export async function endDeal(
     COMPLETED: "Deal completed.",
   } as const;
   return { ok: true, message: messages[to] };
-}
-
-const PAY_TO_MESSAGES: Record<PayToFailure, string> = {
-  "not-found": "That deal is no longer available.",
-  "wrong-actor": "Only the seller says where they are paid.",
-  "not-safest":
-    "On a Fastest deal Channel Adda pays you into your wallet, so there is nothing to add here.",
-  terminal: "This deal is already closed.",
-  locked:
-    "The buyer has already recorded paying you, so these details can no longer change.",
-  empty: "Say where the buyer should send the money.",
-  "too-long": "Keep it under 500 characters.",
-  "has-link":
-    "Payment details cannot include a web address. Write the account or wallet details out instead.",
-};
-
-/** A Safest seller saying where the buyer should pay them. */
-export async function savePayTo(
-  orderId: string,
-  text: string,
-): Promise<DealResult> {
-  const user = await requireUser();
-  const result = await saveSellerPayTo({ orderId, userId: user.id, text });
-  if (!result.ok) return { ok: false, error: PAY_TO_MESSAGES[result.reason] };
-
-  refresh(orderId);
-  return {
-    ok: true,
-    message: "Saved. The buyer sees this when it is their turn to pay you.",
-  };
 }

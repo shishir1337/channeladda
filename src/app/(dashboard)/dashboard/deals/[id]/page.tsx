@@ -28,7 +28,6 @@ import {
 } from "@/components/deals/deal-status";
 import { DealSteps, RaiseDispute } from "@/components/deals/deal-timeline";
 import { PayNow } from "@/components/deals/pay-now";
-import { PayToCard } from "@/components/deals/pay-to";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Price } from "@/components/ui/price";
@@ -201,13 +200,10 @@ export default async function DealPage({
         </div>
 
         {/* ---- what it needs, the money, the people ------------------- */}
-        {/* Not sticky: the payment details, the money, the people and the
-            dispute form together can be taller than a laptop viewport, and
-            a stuck column that tall hides its own end. */}
+        {/* Not sticky: the invite, the money, the people and the dispute
+            form together can be taller than a laptop viewport, and a stuck
+            column that tall hides its own end. */}
         <div className="mt-4 flex min-w-0 flex-col gap-4 lg:mt-0">
-          {/* Safest only: where the buyer pays the seller directly. */}
-          <PayToCard deal={deal} />
-
           {/* The account the seller invites. Never shown to the buyer. */}
           <AgentInvite deal={deal} />
 

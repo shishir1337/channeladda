@@ -509,15 +509,20 @@ export function DisputeCase({
                 </li>
               ))}
             </ol>
-            {dispute.mode === "SAFEST" && dispute.buyerPaymentRef ? (
+            {dispute.mode === "SAFEST" && dispute.buyerPaidAt ? (
               <p className="mt-3 rounded-lg border border-line bg-surface-2/50 px-3 py-2 text-xs leading-relaxed text-muted">
-                The buyer recorded paying the seller with reference{" "}
+                The buyer paid the price to Channel Adda on{" "}
+                {new Date(dispute.buyerPaidAt).toLocaleDateString("en-GB", {
+                  day: "numeric",
+                  month: "long",
+                  year: "numeric",
+                })}
+                , under{" "}
                 <code className="rounded bg-surface px-1 py-0.5 font-mono break-all text-fg ring-1 ring-line select-all">
                   {dispute.buyerPaymentRef}
                 </code>
-                {dispute.sellerConfirmedAt
-                  ? ". The seller confirmed it arrived."
-                  : ". The seller has not confirmed it arrived."}
+                . We are holding it: returning the channel refunds it to the
+                buyer, completing the deal pays it to the seller.
               </p>
             ) : null}
           </section>

@@ -355,11 +355,6 @@ export function isHoldStep(label: string): boolean {
   return label.startsWith("Hold ");
 }
 
-/** Needs a transaction reference: the buyer paying the seller directly. */
-export function needsPaymentRef(label: string): boolean {
-  return label === "Pay the seller directly";
-}
-
 /**
  * What each step actually involves, in words a first-time seller can act on.
  *
@@ -369,7 +364,7 @@ export function needsPaymentRef(label: string): boolean {
  */
 const STEP_HELP: Record<string, string> = {
   "Pay the admin fee":
-    "Channel Adda's fee, and nothing more. The channel's price is paid later, by the buyer, straight to the seller.",
+    "Channel Adda's fee, to start. The channel's price is paid to Channel Adda later, once our agent holds the channel and the buyer has inspected it.",
   "Invite the agent as channel owner":
     "The seller invites our agent's Google account as owner of the channel. The address to invite is on this page.",
   "Accept and confirm custody":
@@ -378,10 +373,8 @@ const STEP_HELP: Record<string, string> = {
     "Google finishes the transfer and our agent confirms the channel is genuinely theirs. Only then is it out of the seller's hands.",
   "Inspect the channel":
     "The buyer checks the channel is what the listing described, while our agent holds it.",
-  "Pay the seller directly":
-    "The buyer sends the channel's price to the seller off-platform, then records the transaction reference here.",
-  "Confirm the payment arrived":
-    "The seller confirms the money is in their account. Our agent keeps the channel until they do.",
+  "Pay the price to Channel Adda":
+    "The buyer pays the channel's price to Channel Adda, by crypto or from their balance — never to the seller. It is held until the channel is theirs, then paid into the seller's Channel Adda wallet.",
   "Transfer ownership to the buyer":
     "Our agent makes the buyer the owner of the channel.",
   "Hold 2 complete, ownership verified":

@@ -6,6 +6,7 @@ import {
   advanceStep,
   assignAgent,
   createDeal,
+  getDealFor,
   recordOpeningPayment,
 } from "@/server/deals";
 import { openConversation, sendMessage } from "@/server/messages";
@@ -193,6 +194,10 @@ test(
     expect(await lastLine(id)).toMatchObject({ kind: "EVENT", senderId: null });
     expect((await lastLine(id)).body).toMatch(/to Channel Adda/);
     expect((await kinds(id)).agent).toBe("step:mine");
+    // Nobody is ever shown where to pay the other side.
+    expect(await getDealFor(buyer.id, order.id)).not.toHaveProperty(
+      "sellerPayTo",
+    );
     await step(7, "agent");
     const done = await advanceStep({
       orderId: order.id,

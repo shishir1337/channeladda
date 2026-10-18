@@ -17,13 +17,12 @@ import {
 } from "@/lib/deal-templates";
 import { orderAmounts } from "@/lib/fees";
 import { keptFee, requiredHold } from "@/lib/holds";
-import { BUYER_PAYS_AFTER_STEP, payToVisibleTo } from "@/lib/pay-to";
 import { isSerializationFailure } from "@/lib/serialization-failure";
 import { keyFromUrl } from "@/lib/upload-keys";
 import { recordAudit } from "@/server/audit";
 import { ensureConversation, postEvent } from "@/server/chat-events";
 import { notifyDealEnded, notifyNextActor } from "@/server/deal-notify";
-import { notify, notifyStaff } from "@/server/notifications";
+import { notifyStaff } from "@/server/notifications";
 import {
   heldByAcceptedOffer,
   notifyClosedOffers,
@@ -61,8 +60,6 @@ export type DealFailure =
   | "not-paid"
   /** Frozen while staff decide a dispute. */
   | "disputed"
-  /** Too late to undo: the buyer has already paid the seller. */
-  | "already-paid"
   /** Reversing a handover is an adjudication, so it needs a dispute. */
   | "needs-dispute"
   /** Finishing a deal is the last step’s job, not a shortcut past it. */
@@ -71,8 +68,6 @@ export type DealFailure =
   | "needs-finance"
   /** The channel is ours to give back, so it cannot just be abandoned. */
   | "in-custody"
-  /** Paying a seller directly is recorded with how, or not at all. */
-  | "needs-reference"
   /** A payment completes this step when it reaches us; nobody presses it. */
   | "pay-in-checkout"
   /** The recovery hold on this platform has not ended yet. */
@@ -1093,13 +1088,7 @@ async function roleOnDeal(
 
 /** Which `Order` timestamp a completed step stamps, if any. */
 const STEP_TIMESTAMP: Partial<
-  Record<
-    DealMode,
-    Record<
-      number,
-      "custodyAt" | "buyerPaidAt" | "sellerConfirmedAt" | "handoverAt"
-    >
-  >
+  Record<DealMode, Record<number, "custodyAt" | "handoverAt">>
 > = {
   // buyerPaidAt is the price arriving, which recordPricePayment stamps.
   SAFEST: {
@@ -1276,7 +1265,6 @@ export async function advanceStep(input: {
   position: number;
   userId: string;
   proofUrl?: string;
-  paymentRef?: string;
   approvedById?: string;
 }): Promise<DealOutcome> {
   const order = await db.order.findUnique({
@@ -1297,7 +1285,6 @@ export async function advanceStep(input: {
       buyerPaidAt: true,
       holdUntil: true,
       conversationId: true,
-      sellerPayTo: true,
       listing: { select: { platform: true } },
       steps: {
         where: { completedAt: null },
@@ -1371,14 +1358,6 @@ export async function advanceStep(input: {
   const stamp = STEP_TIMESTAMP[order.mode]?.[input.position];
   const completing = template.entersStatus === "COMPLETED";
 
-  // A Safest buyer saying they paid the seller. The reference is the only
-  // evidence that payment happened, and the requirement lived only in the
-  // browser — so buyerPaidAt could be stamped blank, which then forces any
-  // return of the channel through a dispute with nothing to decide it on.
-  if (stamp === "buyerPaidAt" && !input.paymentRef?.trim()) {
-    return { ok: false, reason: "needs-reference" };
-  }
-
   // Every listing page promises a recovery hold: the seller's money is not
   // released until the window in which an old owner can reclaim the account
   // has passed. Nothing implemented it — Order.holdUntil was written by
@@ -1434,7 +1413,6 @@ export async function advanceStep(input: {
           ...(template.entersStatus ? { status: template.entersStatus } : {}),
           ...(stamp ? { [stamp]: now } : {}),
           ...(startsHold ? { holdUntil } : {}),
-          ...(input.paymentRef ? { buyerPaymentRef: input.paymentRef } : {}),
           ...(completing ? { completedAt: now } : {}),
         },
       });
@@ -1492,29 +1470,6 @@ export async function advanceStep(input: {
     await notifyDealEnded(order.id, RESOLUTION_LABELS.COMPLETED);
   }
 
-  // The buyer has checked the channel and pays the seller next. A seller
-  // who never said where is reminded — once, because this step completes
-  // once — or the buyer arrives at their turn with nowhere to send it.
-  if (
-    order.mode === "SAFEST" &&
-    input.position === BUYER_PAYS_AFTER_STEP &&
-    !order.sellerPayTo
-  ) {
-    const title = `${doer?.name || "The buyer"} is ready to pay you — add where to be paid`;
-    const body =
-      "They have checked the channel and pay you next. Say where they should send the money, on the deal.";
-    await notify({
-      userId: order.sellerId,
-      kind: "ORDER",
-      title,
-      body,
-      href: order.conversationId
-        ? `/dashboard/messages/${order.conversationId}`
-        : `/dashboard/deals/${order.id}`,
-      email: { subject: title, body },
-    });
-  }
-
   await recordAudit({
     actorId: input.userId,
     action: completing ? "deal.completed" : "deal.step_completed",
@@ -1526,7 +1481,6 @@ export async function advanceStep(input: {
       label: template.label,
       status: template.entersStatus ?? order.status,
       ...(approver ? { approvedById: approver } : {}),
-      ...(input.paymentRef ? { buyerPaymentRef: input.paymentRef } : {}),
     },
   });
 
@@ -1793,7 +1747,6 @@ export async function resolveDeal(input: {
       paymentRef: true,
       buyerPaymentRef: true,
       custodyAt: true,
-      sellerConfirmedAt: true,
       buyerPaidAt: true,
       handoverAt: true,
       reference: true,
@@ -2231,17 +2184,6 @@ export type DealView = {
   steps: DealStepView[];
   /** The lowest incomplete step, or null once the deal has stopped. */
   nextStep: DealStepView | null;
-  /**
-   * Safest only: where the buyer pays the seller, in the seller's words.
-   * Null when this viewer may not see it yet — the buyer, before their turn
-   * to pay — as well as when nothing has been said.
-   */
-  sellerPayTo: string | null;
-  sellerPayToAt: Date | null;
-  /** Changed after the buyer could see it: the buyer is warned. */
-  payToChangedWhileVisible: boolean;
-  /** The buyer's turn to pay the seller has come (it stays come). */
-  buyerPayStepReached: boolean;
 };
 
 /**
@@ -2274,9 +2216,6 @@ export async function getDealFor(
       agentEmail: true,
       agentBrand: true,
       conversationId: true,
-      sellerPayTo: true,
-      sellerPayToAt: true,
-      sellerPayToChangedAt: true,
       listing: { select: { title: true, slug: true } },
       buyer: { select: { name: true } },
       seller: { select: { name: true } },
@@ -2289,18 +2228,6 @@ export async function getDealFor(
 
   const viewerRole = await roleOnDeal(order, userId);
   if (!viewerRole) return null;
-
-  // The seller's payment details, for whoever may see them by now. The
-  // buyer's turn is read from the step, not the status, because it stays
-  // reached through a dispute or an ending.
-  const payStep =
-    order.mode === "SAFEST"
-      ? order.steps.find((s) => s.position === BUYER_PAYS_AFTER_STEP)
-      : undefined;
-  const payStepDoneAt = payStep?.completedAt ?? null;
-  const canSeePayTo =
-    order.mode === "SAFEST" &&
-    payToVisibleTo(viewerRole, payStepDoneAt !== null);
 
   const steps: DealStepView[] = order.steps.map((s) => ({
     position: s.position,
@@ -2344,13 +2271,5 @@ export async function getDealFor(
     nextStep: isTerminal(order.status)
       ? null
       : (steps.find((s) => s.completedAt === null) ?? null),
-    sellerPayTo: canSeePayTo ? order.sellerPayTo : null,
-    sellerPayToAt: canSeePayTo ? order.sellerPayToAt : null,
-    payToChangedWhileVisible:
-      canSeePayTo &&
-      payStepDoneAt !== null &&
-      order.sellerPayToChangedAt !== null &&
-      order.sellerPayToChangedAt > payStepDoneAt,
-    buyerPayStepReached: payStepDoneAt !== null,
   };
 }

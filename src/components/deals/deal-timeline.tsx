@@ -32,7 +32,6 @@ import {
   actorLabel,
   HOLD_NOTE,
   isHoldStep,
-  needsPaymentRef,
   stepHelp,
 } from "@/components/deals/deal-status";
 import { Button } from "@/components/ui/button";
@@ -61,8 +60,6 @@ import type { DealStepView, DealView } from "@/server/deals";
 
 /** Clearer than "Mark this done" where the step is a statement of fact. */
 const CONFIRM_LABELS: Record<string, string> = {
-  "Pay the seller directly": "I have sent the payment",
-  "Confirm the payment arrived": "The money has arrived",
   "Confirm access received": "I have access to the channel",
   "Inspect the channel": "I have checked the channel",
   "Invite the agent as channel owner": "I have sent the invite",
@@ -96,10 +93,12 @@ function stepState(deal: DealView, step: DealStepView) {
     mine: !frozen && !heldUntil && step.actor === deal.viewerRole,
     help: stepHelp(step.label),
     hold: isHoldStep(step.label),
-    // Step 1 is completed by the payment clearing and by nothing else, so the
-    // buyer gets the payment panel rather than a button the server will
-    // refuse.
-    paymentPending: deal.status === "AWAITING_PAYMENT",
+    // Step 1, and a Safest deal's price step, are completed by the payment
+    // clearing and by nothing else, so the buyer gets the payment panel
+    // rather than a button the server will refuse.
+    paymentPending:
+      deal.status === "AWAITING_PAYMENT" ||
+      (deal.mode === "SAFEST" && deal.status === "AWAITING_BUYER_PAYMENT"),
   };
 }
 
@@ -172,8 +171,6 @@ function Whose({ state, who }: { state: StepState; who: string }) {
  */
 const NOTHING_FROM_YOU =
   "Nothing is needed from you right now. Your deals list flags this one under “Waiting on you” the moment it is your turn.";
-const WHY_THE_REFERENCE =
-  "Send the agreed amount to the seller, then paste the transaction reference. It is what lets Channel Adda settle a disagreement about whether the money arrived — without it there is only one person's word against another's.";
 
 /**
  * The (i) beside the step in play's name.
@@ -194,11 +191,7 @@ function StepInfo({
   className?: string;
 }) {
   const parts: string[] = [];
-  if (state.mine) {
-    if (!state.paymentPending && needsPaymentRef(step.label)) {
-      parts.push(WHY_THE_REFERENCE);
-    }
-  } else {
+  if (!state.mine) {
     if (state.help) parts.push(state.help);
     if (!state.frozen) parts.push(NOTHING_FROM_YOU);
   }
@@ -358,37 +351,18 @@ function StepAction({
   staffIds?: StaffList;
 }) {
   const router = useRouter();
-  const refId = useId();
   const approverId = useId();
-  const [paymentRef, setPaymentRef] = useState("");
   const [approvedById, setApprovedById] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  const wantsRef = needsPaymentRef(step.label);
   // Offered whenever the server says this step can need a second signature.
   // The server decides whether it is actually required for this price, so a
   // blank selection is fine below the threshold.
   const wantsApprover = Boolean(staffIds && staffIds.length > 0);
-  const blocked = wantsRef && paymentRef.trim() === "";
 
   return (
     <div className="mt-4 flex flex-col gap-4">
-      {/* Why the reference matters is behind the (i) by the step's name;
-          the step's own line above already says to send, then record. */}
-      {wantsRef ? (
-        <TextField
-          id={refId}
-          name="paymentRef"
-          label="Transaction reference"
-          hint="The id, hash or receipt number your bank or wallet gave you."
-          value={paymentRef}
-          onChange={(e) => setPaymentRef(e.target.value)}
-          className="max-w-sm"
-          required
-        />
-      ) : null}
-
       {wantsApprover ? (
         <div className="max-w-sm">
           <label htmlFor={approverId} className={labelClass}>
@@ -420,12 +394,11 @@ function StepAction({
           type="button"
           size="md"
           className="w-full @sm:w-auto"
-          disabled={pending || blocked}
+          disabled={pending}
           onClick={() => {
             setError(null);
             startTransition(async () => {
               const result = await completeStep(deal.id, step.position, {
-                ...(wantsRef ? { paymentRef: paymentRef.trim() } : {}),
                 ...(approvedById ? { approvedById } : {}),
               });
               if (!result.ok) {
@@ -441,12 +414,6 @@ function StepAction({
             {confirmLabel(step.label)}
           </BusyLabel>
         </Button>
-
-        {blocked ? (
-          <p className="mt-2 text-xs text-subtle">
-            Add the transaction reference to continue.
-          </p>
-        ) : null}
 
         {error ? (
           <p
