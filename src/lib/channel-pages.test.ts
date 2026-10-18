@@ -219,6 +219,14 @@ test("a topic link becomes a niche, skipping the catch-all ones", () => {
   expect(nicheFromTopics([])).toBeNull();
 });
 
+test("Google's own word for teaching channels becomes the one buyers use", () => {
+  // "Knowledge" is how YouTube tags science and education channels — on
+  // its own it is all Veritasium gets.
+  expect(nicheFromTopics(["https://en.wikipedia.org/wiki/Knowledge"])).toBe(
+    "Education",
+  );
+});
+
 test("a country code becomes the name the form asks for", () => {
   expect(countryName("US")).toBe("United States");
   expect(countryName("BD")).toBe("Bangladesh");

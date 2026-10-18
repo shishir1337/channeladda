@@ -302,10 +302,16 @@ export function nicheFromTopics(urls: string[]): string | null {
         .trim();
     })
     .filter(Boolean);
-  return (
-    labels.find((label) => !CATCH_ALL_TOPICS.has(label)) ?? labels[0] ?? null
-  );
+  const niche =
+    labels.find((label) => !CATCH_ALL_TOPICS.has(label)) ?? labels[0] ?? null;
+  return niche ? (BUYERS_WORD[niche] ?? niche) : null;
 }
+
+/** Google's topic names where a buyer would search for another word. */
+const BUYERS_WORD: Record<string, string> = {
+  // YouTube's tag for science and teaching channels.
+  Knowledge: "Education",
+};
 
 /** "US" → "United States": the API gives a code, the form asks for a name. */
 export function countryName(code: string): string | null {
