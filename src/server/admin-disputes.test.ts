@@ -150,11 +150,13 @@ test(
       await addDisputeNote({ orderId, byUserId: moderator.id, note: "  ok  " }),
     ).toEqual({ ok: false, reason: "too-short" });
 
-    // Safest, paid, no custody: cancelling is a moderator's call.
+    // Safest, paid, no custody: cancelling hands the held fee back, so it
+    // is the finance desk's call.
+    const finance = await seedUser("FINANCE");
     const decided = await resolveDeal({
       orderId,
       to: "CANCELLED",
-      byUserId: moderator.id,
+      byUserId: finance.id,
       note: "Seller never invited the agent; nothing changed hands.",
     });
     expect(decided).toEqual({ ok: true });

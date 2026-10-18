@@ -285,10 +285,14 @@ test(
 
     // Nothing moved except the fee, and the agent did nothing for it.
     const refund = await db.ledgerEntry.findFirstOrThrow({
-      where: { orderId, kind: "REFUND" },
+      where: { orderId, kind: "REFUND", userId: null },
     });
-    expect(refund).toMatchObject({ amountUsd: -300, userId: null });
+    expect(refund.amountUsd).toBe(-300);
     expect(await platformPositionFor(orderId)).toBe(0);
+    // It was only ever held, so giving it back is not a fee lost.
+    expect(
+      await db.ledgerEntry.count({ where: { orderId, kind: "BUYER_FEE" } }),
+    ).toBe(0);
   }),
 );
 
@@ -306,6 +310,57 @@ test(
       await db.ledgerEntry.count({ where: { orderId, kind: "REFUND" } }),
     ).toBe(0);
     expect(await platformPositionFor(orderId)).toBe(300);
+    // Held at payment, earned now: the hold is released and the fee is
+    // booked as income, so nothing is left owed to the buyer.
+    const rows = await db.ledgerEntry.findMany({
+      where: {
+        orderId,
+        userId: null,
+        kind: { in: ["ESCROW_RELEASE", "BUYER_FEE"] },
+      },
+      orderBy: { amountUsd: "asc" },
+    });
+    expect(rows).toMatchObject([
+      { kind: "ESCROW_RELEASE", amountUsd: -300 },
+      { kind: "BUYER_FEE", amountUsd: 300 },
+    ]);
+  }),
+);
+
+test(
+  "returning a paid safest deal needs finance",
+  withCleanDb(async () => {
+    const { orderId } = await runTo("SAFEST", 6);
+    const moderator = await seedUser("MODERATOR");
+    expect(
+      await resolveDeal({
+        orderId,
+        to: "RETURNED_TO_SELLER",
+        byUserId: moderator.id,
+        note: "buyer never paid",
+      }),
+    ).toMatchObject({ ok: false, reason: "needs-finance" });
+  }),
+);
+
+test(
+  "a refund refuses an order whose hold does not match",
+  withCleanDb(async () => {
+    const { orderId, staff } = await runTo("SAFEST", 2);
+    // A stray row: the books now claim more than this order ever took.
+    await db.ledgerEntry.create({
+      data: { orderId, userId: null, kind: "ESCROW_HOLD", amountUsd: 1 },
+    });
+    const before = await db.ledgerEntry.count({ where: { orderId } });
+    expect(
+      await resolveDeal({
+        orderId,
+        to: "CANCELLED",
+        byUserId: staff.id,
+        note: "seller never invited the agent",
+      }),
+    ).toMatchObject({ ok: false, reason: "books-mismatch" });
+    expect(await db.ledgerEntry.count({ where: { orderId } })).toBe(before);
   }),
 );
 
@@ -327,6 +382,12 @@ test(
   withCleanDb(async () => {
     const { orderId, seller } = await runTo("SAFEST", 10);
     expect(await platformPositionFor(orderId)).toBe(300);
+    // Earned at completion, not at payment.
+    expect(
+      await db.ledgerEntry.findFirstOrThrow({
+        where: { orderId, userId: null, kind: "BUYER_FEE" },
+      }),
+    ).toMatchObject({ amountUsd: 300 });
     // The price went buyer to seller directly and is on no ledger at all.
     expect(await balanceOf(seller.id)).toBe(0);
   }),

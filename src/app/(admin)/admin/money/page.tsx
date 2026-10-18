@@ -56,7 +56,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Price } from "@/components/ui/price";
 import {
-  fastestHoldMismatches,
+  holdMismatches,
   type InvoiceAttention,
   listInvoicesNeedingAttention,
   moneyPosition,
@@ -152,7 +152,7 @@ export default async function AdminMoneyPage({
   const [figures, position, mismatches, invoices] = await Promise.all([
     monthFigures(month, now),
     moneyPosition(),
-    fastestHoldMismatches(),
+    holdMismatches(),
     listInvoicesNeedingAttention(),
   ]);
 
@@ -169,10 +169,6 @@ export default async function AdminMoneyPage({
       seller: fees.fastest.seller,
     },
   ];
-  const grossFees = feeRows.reduce(
-    (sum, row) => sum + row.buyer.cents + row.seller.cents,
-    0,
-  );
   const unapplied = invoices.rows.filter((row) => row.landed === null);
 
   // Held + members' wallets + ours is exactly what should be on hand. "Ours"
@@ -182,7 +178,7 @@ export default async function AdminMoneyPage({
   const oursBelowZero = position.platformOwn < 0;
   const onHandParts: ComponentProps<typeof SplitBar>["parts"] = [
     {
-      label: "Held for Fastest buyers",
+      label: "Held for buyers",
       value: position.heldForBuyers.cents,
       display: <Price usd={position.heldForBuyers.cents / 100} />,
       tone: "info",
@@ -211,18 +207,18 @@ export default async function AdminMoneyPage({
   // without the sentence saying what it counts.
   const flows: (ComponentProps<typeof MoneyLine> & { note: ReactNode })[] = [
     {
-      label: "Paid into Fastest deals",
-      cents: figures.fastest.paidIn.cents,
-      count: plural(figures.fastest.paidIn.count, "deal"),
+      label: "Paid into deals",
+      cents: figures.deals.paidIn.cents,
+      count: plural(figures.deals.paidIn.count, "payment"),
       icon: ArrowDownLeftIcon,
-      note: "Price plus fee from Fastest buyers, by crypto or from their balance. We hold it until the deal ends.",
+      note: "Everything buyers paid us for deals, by crypto or from their balance: price and fee on Fastest, the fee and then the price on Safest. We hold it until it is earned or given back.",
     },
     {
       label: "Credited to sellers",
-      cents: figures.fastest.toSellers.cents,
-      count: plural(figures.fastest.toSellers.count, "sale"),
+      cents: figures.deals.toSellers.cents,
+      count: plural(figures.deals.toSellers.count, "sale"),
       icon: BanknoteIcon,
-      note: "Sale prices released into sellers' wallets when Fastest deals completed, less the seller fee. Still with us until they withdraw it.",
+      note: "Sale prices released into sellers' wallets when deals completed, less the seller fee. Still with us until they withdraw it.",
     },
     {
       label: "Refunded to buyers",
@@ -238,11 +234,12 @@ export default async function AdminMoneyPage({
           <span className="tabular-nums">
             {exactUsd(figures.refunds.fastest.cents)}
           </span>{" "}
-          of held Fastest money,{" "}
+          from Fastest deals,{" "}
           <span className="tabular-nums">
             {exactUsd(figures.refunds.safest.cents)}
           </span>{" "}
-          of Safest admin fees.
+          from Safest deals. Always money we were holding, never fees we had
+          earned.
         </>
       ),
     },
@@ -446,12 +443,12 @@ export default async function AdminMoneyPage({
       >
         <StatGrid columns={3} className="grid-cols-1 sm:grid-cols-2">
           <MoneyMetric
-            label="Held for Fastest buyers"
+            label="Held for buyers"
             cents={position.heldForBuyers.cents}
             count={plural(position.heldForBuyers.count, "deal")}
             icon={LockIcon}
             note="Not ours"
-            info="Price plus fee on Fastest deals still running, including those waiting out their recovery hold. Not ours: it becomes the seller's when the deal completes, or goes back to the buyer on a refund."
+            info="What buyers have paid into deals still running: price and fee on Fastest, including those waiting out their recovery hold; the fee, and the price once paid, on Safest. Not ours: the price becomes the seller's when the deal completes, the fee ours when it is earned, and anything else goes back to the buyer."
           />
           <MoneyMetric
             label="In members' wallets"
@@ -510,9 +507,9 @@ export default async function AdminMoneyPage({
             <AllClear
               title={
                 <>
-                  The books agree with every Fastest deal{" "}
+                  The books agree with every deal{" "}
                   <InfoTip label="About this check">
-                    Each running Fastest deal has exactly its price plus fee on
+                    Each running deal has exactly what its buyer has paid in on
                     our books, and each finished one has nothing left.
                   </InfoTip>
                 </>
@@ -526,8 +523,8 @@ export default async function AdminMoneyPage({
                 icon={ScaleIcon}
                 title={
                   <>
-                    {plural(mismatches.length, "Fastest deal")} where the books
-                    and the deal disagree
+                    {plural(mismatches.length, "deal")} where the books and the
+                    deal disagree
                   </>
                 }
               >
@@ -539,7 +536,7 @@ export default async function AdminMoneyPage({
               <TableCard className="mt-3">
                 <table className="w-full min-w-[30rem]">
                   <caption className="sr-only">
-                    Fastest deals whose ledger does not match their status
+                    Deals whose ledger does not match their status
                   </caption>
                   <thead>
                     <tr>
@@ -625,7 +622,7 @@ export default async function AdminMoneyPage({
         <Section
           id="fees"
           title="Fees earned"
-          info="Revenue here is fees and nothing else: on a Safest deal the price goes buyer to seller and never touches our books, and on a Fastest deal the price is the seller's money, which we only hold."
+          info="Revenue here is fees and nothing else. A channel price is the seller's money, which we only hold."
         >
           <div className="grid gap-3 lg:grid-cols-[17rem_minmax(0,1fr)]">
             <MoneyMetric
@@ -635,8 +632,8 @@ export default async function AdminMoneyPage({
               note="The month’s revenue"
               info={
                 <>
-                  Every fee in the table, less Safest fees given back. This is
-                  the month&rsquo;s revenue. Channel prices are never revenue.
+                  Every fee in the table. This is the month&rsquo;s revenue.
+                  Channel prices are never revenue.
                 </>
               }
             />
@@ -689,33 +686,10 @@ export default async function AdminMoneyPage({
                       </Td>
                     </Tr>
                   ))}
-                  <Tr>
-                    <Td>
-                      <span className="text-[0.8125rem] text-muted">
-                        Given back
-                      </span>
-                      <span className="mt-0.5 block text-xs text-subtle tabular-nums">
-                        {plural(fees.returned.count, "Safest refund")}
-                      </span>
-                    </Td>
-                    <Td numeric />
-                    <Td numeric />
-                    <Td numeric>
-                      <Amount
-                        cents={0 - fees.returned.cents}
-                        caption={exactUsd(0 - fees.returned.cents)}
-                        tone={fees.returned.cents > 0 ? "danger" : "neutral"}
-                      />
-                    </Td>
-                  </Tr>
                   <tr className="border-t border-line-strong bg-surface-2/50">
                     <Td className="font-semibold text-fg">Net</Td>
                     <Td numeric />
-                    <Td numeric>
-                      <span className="text-xs text-subtle">
-                        gross {exactUsd(grossFees)}
-                      </span>
-                    </Td>
+                    <Td numeric />
                     <Td numeric>
                       <Amount cents={fees.net} caption={exactUsd(fees.net)} />
                     </Td>
@@ -727,9 +701,9 @@ export default async function AdminMoneyPage({
 
           <Disclosure className="mt-3" title="What each fee means">
             <p>
-              A Safest fee is earned when the buyer&rsquo;s opening payment
-              clears; a Fastest fee only when the deal completes, because until
-              then it is part of the money we hold.
+              A fee is earned when the deal completes &mdash; or, for a Safest
+              admin fee, when the deal ends after our agent has taken custody.
+              Until then it is part of the money we hold.
             </p>
             <MoneyTerms
               className="mt-3"
@@ -737,12 +711,16 @@ export default async function AdminMoneyPage({
                 {
                   term: "Safest buyer fee",
                   definition:
-                    "the admin fee Safest buyers paid us, counted when their opening payment cleared.",
+                    "the admin fee from Safest deals that completed this month, or that ended after our agent had taken custody.",
                 },
                 {
                   term: "Safest seller fee",
-                  definition:
-                    "there is none: the price goes buyer to seller, so there is nothing for us to deduct it from.",
+                  definition: (
+                    <>
+                      taken from the seller&rsquo;s price on Safest deals that
+                      completed this month, at the seller-fee rate.
+                    </>
+                  ),
                 },
                 {
                   term: "Fastest buyer fee",
@@ -757,12 +735,6 @@ export default async function AdminMoneyPage({
                       completed this month, at the seller-fee rate.
                     </>
                   ),
-                },
-                {
-                  term: "Given back",
-                  wide: true,
-                  definition:
-                    "Safest admin fees refunded because the deal was cancelled before an agent took the channel. Fastest refunds are not here: they return money we were holding, not money we had earned.",
                 },
               ]}
             />
@@ -809,10 +781,10 @@ export default async function AdminMoneyPage({
         >
           <StatGrid columns={2} className="grid-cols-1 sm:grid-cols-2">
             <MoneyMetric
-              label="Held for Fastest buyers"
+              label="Held for buyers"
               cents={figures.closing.heldForBuyers}
               icon={LockIcon}
-              info="Price plus fee on Fastest deals that were still running when the month closed."
+              info="What buyers had paid into deals that were still running when the month closed."
             />
             <MoneyMetric
               label="In members' wallets"

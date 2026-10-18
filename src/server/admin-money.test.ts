@@ -6,10 +6,9 @@ import {
   centsToDecimal,
   csvCell,
   describeInvoice,
-  expectedHold,
   exportLedger,
   exportPayouts,
-  fastestHoldMismatches,
+  holdMismatches,
   latestInvoicesFor,
   listFinishedDeals,
   listInvoicesNeedingAttention,
@@ -200,11 +199,10 @@ describe("month figures", () => {
       expect(figures.fees.safest.seller).toEqual({ cents: 0, count: 0 });
       expect(figures.fees.fastest.buyer).toEqual({ cents: 300, count: 1 });
       expect(figures.fees.fastest.seller).toEqual({ cents: 500, count: 1 });
-      expect(figures.fees.returned.cents).toBe(0);
       expect(figures.fees.net).toBe(1_100);
 
       // And the ledger agrees: the platform's own rows for the month sum to
-      // exactly the fees, because both Fastest holds have netted to zero.
+      // exactly the fees, because every hold has netted to zero.
       expect(await ledgerSum({ userId: null })).toBe(figures.fees.net);
       expect(
         await ledgerSum({
@@ -213,10 +211,11 @@ describe("month figures", () => {
         }),
       ).toBe(1_100);
 
-      // Two Fastest buyers paid price + fee in; one seller was credited the
-      // price less the 5% seller fee; one buyer got the whole hold back.
-      expect(figures.fastest.paidIn).toEqual({ cents: 20_600, count: 2 });
-      expect(figures.fastest.toSellers).toEqual({ cents: 9_500, count: 1 });
+      // Two Fastest buyers paid price + fee in, and the Safest buyer the fee;
+      // one seller was credited the price less the 5% seller fee; one buyer
+      // got the whole hold back.
+      expect(figures.deals.paidIn).toEqual({ cents: 20_900, count: 3 });
+      expect(figures.deals.toSellers).toEqual({ cents: 9_500, count: 1 });
       expect(figures.refunds.fastest).toEqual({ cents: 10_300, count: 1 });
       expect(figures.refunds.safest.cents).toBe(0);
       expect(figures.refunds.total).toBe(10_300);
@@ -237,7 +236,7 @@ describe("month figures", () => {
   );
 
   test(
-    "a Safest fee given back on a cancellation is taken off the month's fees",
+    "a refunded safest fee is not counted as revenue",
     withCleanDb(async () => {
       const deal = await paidDeal("SAFEST");
       const cancelled = await resolveDeal({
@@ -248,9 +247,10 @@ describe("month figures", () => {
       });
       expect(cancelled).toMatchObject({ ok: true });
 
+      // It was held, never earned, so giving it back takes nothing off the
+      // month: the refund is held money going home.
       const figures = await monthFigures(monthOf(new Date()));
-      expect(figures.fees.safest.buyer.cents).toBe(300);
-      expect(figures.fees.returned).toEqual({ cents: 300, count: 1 });
+      expect(figures.fees.safest.buyer.cents).toBe(0);
       expect(figures.fees.net).toBe(0);
       expect(figures.refunds.safest.cents).toBe(300);
       expect(await ledgerSum({ userId: null })).toBe(0);
@@ -272,11 +272,11 @@ describe("month figures", () => {
 
       const now = await monthFigures(thisMonth);
       expect(now.fees.net).toBe(0);
-      expect(now.fastest.paidIn.count).toBe(0);
+      expect(now.deals.paidIn.count).toBe(0);
 
       const then = await monthFigures(lastMonth);
       expect(then.fees.net).toBe(800);
-      expect(then.fastest.paidIn.cents).toBe(10_300);
+      expect(then.deals.paidIn.cents).toBe(10_300);
       // Closing position of last month is taken at its end.
       expect(then.closing.asOf.getTime()).toBe(lastMonth.end.getTime());
       expect(then.closing.memberBalances).toBe(9_500);
@@ -321,7 +321,7 @@ describe("position", () => {
       expect(position.heldForBuyers).toEqual({ cents: 10_300, count: 1 });
       expect(position.platformOwn).toBe(0);
       expect(position.onHand).toBe(10_300);
-      expect(await fastestHoldMismatches()).toEqual([]);
+      expect(await holdMismatches()).toEqual([]);
 
       await resolveDeal({
         orderId: deal.orderId,
@@ -342,7 +342,7 @@ describe("position", () => {
     "the books check catches a Fastest deal whose ledger disagrees",
     withCleanDb(async () => {
       const deal = await completedDeal("FASTEST");
-      expect(await fastestHoldMismatches()).toEqual([]);
+      expect(await holdMismatches()).toEqual([]);
 
       // Lose the release row: the platform now claims to hold money it has
       // already paid the seller.
@@ -350,7 +350,7 @@ describe("position", () => {
         where: { orderId: deal.orderId, userId: null, kind: "ESCROW_RELEASE" },
       });
 
-      expect(await fastestHoldMismatches()).toEqual([
+      expect(await holdMismatches()).toEqual([
         expect.objectContaining({
           reference: deal.reference,
           status: "COMPLETED",
@@ -361,13 +361,38 @@ describe("position", () => {
     }),
   );
 
-  test("what a Fastest deal should hold, by state", () => {
-    expect(expectedHold("AGENT_VERIFYING", true, 10_300)).toBe(10_300);
-    expect(expectedHold("DISPUTED", true, 10_300)).toBe(10_300);
-    expect(expectedHold("DISPUTED", false, 10_300)).toBe(0);
-    expect(expectedHold("COMPLETED", true, 10_300)).toBe(0);
-    expect(expectedHold("REFUNDED", true, 10_300)).toBe(0);
-  });
+  test(
+    "a running Safest deal holds its fee for the buyer",
+    withCleanDb(async () => {
+      await paidDeal("SAFEST");
+      const position = await moneyPosition();
+      expect(position.heldForBuyers).toEqual({ cents: 300, count: 1 });
+      expect(position.platformOwn).toBe(0);
+      expect(await holdMismatches()).toEqual([]);
+    }),
+  );
+
+  test(
+    "a safest hold that does not match its order is reported",
+    withCleanDb(async () => {
+      const deal = await paidDeal("SAFEST");
+      await db.ledgerEntry.create({
+        data: {
+          orderId: deal.orderId,
+          userId: null,
+          kind: "ESCROW_HOLD",
+          amountUsd: 1,
+        },
+      });
+      expect(await holdMismatches()).toEqual([
+        expect.objectContaining({
+          reference: deal.reference,
+          heldUsd: 301,
+          expectedUsd: 300,
+        }),
+      ]);
+    }),
+  );
 });
 
 // ---------------------------------------------------------------- invoices

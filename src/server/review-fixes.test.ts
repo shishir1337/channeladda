@@ -232,7 +232,8 @@ test(
   "cancelling a wallet-paid safest deal returns the fee to the wallet",
   withCleanDb(async () => {
     const seeded = await seedListing();
-    const staff = await seedUser("MODERATOR");
+    // Handing held money back is the finance desk’s, in both modes.
+    const staff = await seedUser("FINANCE");
     await creditDeposit(seeded.buyer.id, 1_000, "topup-2", "USDT");
 
     const created = await createDeal({

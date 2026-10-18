@@ -9,6 +9,7 @@ import type {
 } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
 import { isTerminal, TERMINAL_STATUSES } from "@/lib/deal-machine";
+import { requiredHold } from "@/lib/holds";
 
 /**
  * The money desk, and the lookups the operator audit found missing.
@@ -22,17 +23,18 @@ import { isTerminal, TERMINAL_STATUSES } from "@/lib/deal-machine";
  * what was written down, and a report that disagreed with the ledger would be
  * a second set of books. Which rows mean what, in short:
  *
- * - **Platform rows** have `userId: null`. A Safest opening payment is one
- *   `BUYER_FEE` row (the fee is all we ever hold). A Fastest opening payment
- *   is one `ESCROW_HOLD` row for price + fee; completion writes
- *   `ESCROW_RELEASE` for minus that, then `BUYER_FEE` and `SELLER_FEE` for
- *   what we keep. A refund is `REFUND` for minus what goes back.
+ * - **Platform rows** have `userId: null`. Every payment a buyer makes is one
+ *   `ESCROW_HOLD` row: price + fee on a Fastest opening payment, the fee on
+ *   a Safest one and the price when a Safest buyer pays it later. Completion
+ *   writes `ESCROW_RELEASE` for minus the whole hold, then `BUYER_FEE` and
+ *   `SELLER_FEE` for what we keep. A refund is `REFUND` for minus what goes
+ *   back; a Safest fee kept after custody is released and booked as
+ *   `BUYER_FEE` the same way.
  * - **Member rows** carry a `userId`, and their sum is that member's balance.
  *
  * So "fees earned" is the platform's `BUYER_FEE` and `SELLER_FEE` rows,
- * "held for buyers" is the platform's hold, release and refund rows on
- * Fastest deals (they net to zero once a deal ends), and revenue is never
- * the price.
+ * "held for buyers" is the platform's hold, release and refund rows (they
+ * net to zero once a deal ends), and revenue is never the price.
  *
  * Months run midnight to midnight UTC, and say so on the page.
  */
@@ -118,17 +120,17 @@ function onMode(mode: DealMode): Prisma.LedgerEntryWhereInput {
 }
 
 /**
- * Money the platform is holding on behalf of Fastest buyers.
+ * Money the platform is holding on behalf of buyers, in both modes.
  *
- * The hold, its release and any refund on a Fastest deal. They sum to
- * price + fee while a deal is running and to exactly zero once it has ended
- * either way — the fee we keep is booked separately as `BUYER_FEE`, so it is
- * not counted here.
+ * The holds, their release and any refund. They sum to what a running deal
+ * has paid in — price and fee on Fastest, the fee and then the price on
+ * Safest — and to exactly zero once it has ended either way. Fees we keep
+ * are booked separately as `BUYER_FEE` and `SELLER_FEE`, so they are not
+ * counted here.
  */
 const HELD_FOR_BUYERS: Prisma.LedgerEntryWhereInput = {
   userId: null,
   kind: { in: ["ESCROW_HOLD", "ESCROW_RELEASE", "REFUND"] },
-  order: { is: { mode: "FASTEST" } },
 };
 
 async function figure(
@@ -160,21 +162,23 @@ export type MonthFigures = {
   fees: {
     safest: { buyer: Figure; seller: Figure };
     fastest: { buyer: Figure; seller: Figure };
-    /** Safest admin fees handed back on a cancellation. Positive. */
-    returned: Figure;
-    /** Every fee above, less what was given back. The month's revenue. */
+    /**
+     * Every fee above: the month's revenue. A fee is booked only when it is
+     * earned, so a refund is never revenue given back — it is held money
+     * going home, and is counted under `refunds`.
+     */
     net: number;
   };
-  fastest: {
-    /** Price + fee from Fastest buyers, arriving into our hold. */
+  deals: {
+    /** Everything buyers paid into our hold: fees and prices, both modes. */
     paidIn: Figure;
     /** Credited to sellers' wallets on completion: price less seller fee. */
     toSellers: Figure;
   };
   refunds: {
-    /** The whole hold, returned on a Fastest deal that did not complete. */
+    /** What was still held, returned on a Fastest deal that did not complete. */
     fastest: Figure;
-    /** The admin fee alone, returned on a Safest cancellation. */
+    /** What was still held, less any fee earned, on a Safest deal that ended. */
     safest: Figure;
     total: number;
   };
@@ -233,7 +237,7 @@ export async function monthFigures(
     figure(rows(PLATFORM, { kind: "SELLER_FEE" }, onMode("FASTEST"))),
     figure(rows(PLATFORM, { kind: "REFUND" }, onMode("SAFEST")), true),
     figure(rows(PLATFORM, { kind: "REFUND" }, onMode("FASTEST")), true),
-    figure(rows(PLATFORM, { kind: "ESCROW_HOLD" }, onMode("FASTEST"))),
+    figure(rows(PLATFORM, { kind: "ESCROW_HOLD" })),
     figure(rows(MEMBER, { kind: "ESCROW_RELEASE" })),
     figure(rows(MEMBER, { kind: "SELLER_FEE" })),
     figure(rows(MEMBER, { kind: "DEPOSIT", orderId: null })),
@@ -261,10 +265,9 @@ export async function monthFigures(
     fees: {
       safest: { buyer: safestBuyer, seller: safestSeller },
       fastest: { buyer: fastestBuyer, seller: fastestSeller },
-      returned: refundedSafest,
-      net: earned - refundedSafest.cents,
+      net: earned,
     },
-    fastest: {
+    deals: {
       paidIn,
       // The seller's fee is its own (negative) row, so what actually landed
       // in sellers' wallets is the release plus that.
@@ -294,7 +297,7 @@ const PENDING_WITHDRAWAL: readonly WithdrawalStatus[] = [
 ];
 
 export type Position = {
-  /** Price + fee on Fastest deals still running. `count` is deals, not rows. */
+  /** What running deals have paid in. `count` is deals, not rows. */
   heldForBuyers: Figure;
   /** Every member balance added together: what we owe members. */
   memberBalances: Figure;
@@ -357,29 +360,15 @@ export type HoldMismatch = {
 };
 
 /**
- * What a Fastest deal in this state should have on our books.
+ * Deals whose ledger disagrees with the deal, in both modes.
  *
- * The whole amount from the moment it is paid until it ends, and nothing
- * after — a completed deal has paid the seller and booked its fee, and a
- * refunded or cancelled one has handed everything back.
+ * Should always be empty. A running deal holds what it has paid in
+ * (`requiredHold`); an ended one holds nothing — a completed deal has paid
+ * the seller and booked its fee, and a refunded, cancelled or returned one
+ * has handed the rest back. Completion and refunds refuse to move money on a
+ * deal that fails this, so this list is where such a deal surfaces.
  */
-export function expectedHold(
-  status: OrderStatus,
-  paid: boolean,
-  totalUsd: number,
-): number {
-  if (isTerminal(status)) return 0;
-  return paid ? totalUsd : 0;
-}
-
-/**
- * Fastest deals whose ledger disagrees with the deal.
- *
- * Should always be empty. `platformPositionFor` documents the invariant for
- * one deal; this checks it for all of them, which is the only way a book
- * error would be noticed before somebody's money went missing.
- */
-export async function fastestHoldMismatches(): Promise<HoldMismatch[]> {
+export async function holdMismatches(): Promise<HoldMismatch[]> {
   const holding = await db.ledgerEntry.groupBy({
     by: ["orderId"],
     where: HELD_FOR_BUYERS,
@@ -393,7 +382,6 @@ export async function fastestHoldMismatches(): Promise<HoldMismatch[]> {
 
   const orders = await db.order.findMany({
     where: {
-      mode: "FASTEST",
       OR: [
         // Holding something: is it the right amount, and should it be?
         { id: { in: [...held.keys()] } },
@@ -409,18 +397,18 @@ export async function fastestHoldMismatches(): Promise<HoldMismatch[]> {
       id: true,
       reference: true,
       status: true,
+      mode: true,
       totalUsd: true,
+      buyerFeeUsd: true,
+      priceUsd: true,
       paymentRef: true,
+      buyerPaidAt: true,
     },
   });
 
   return orders.flatMap((order) => {
     const heldUsd = held.get(order.id) ?? 0;
-    const expectedUsd = expectedHold(
-      order.status,
-      order.paymentRef !== null,
-      order.totalUsd,
-    );
+    const expectedUsd = isTerminal(order.status) ? 0 : requiredHold(order);
     return heldUsd === expectedUsd
       ? []
       : [

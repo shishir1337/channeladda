@@ -94,6 +94,31 @@ test(
 );
 
 test(
+  "paying a safest fee from the balance holds it",
+  withCleanDb(async () => {
+    const seeded = await seedListing();
+    const created = await createDeal({
+      listingId: seeded.listing.id,
+      buyerId: seeded.buyer.id,
+      mode: "SAFEST",
+    });
+    if (!created.ok) throw new Error(created.reason);
+
+    await fund(seeded.buyer.id, 10_000);
+    await payFromWallet(created.orderId, seeded.buyer.id);
+
+    const rows = await db.ledgerEntry.findMany({
+      where: { orderId: created.orderId },
+      orderBy: { amountUsd: "asc" },
+    });
+    expect(rows).toMatchObject([
+      { kind: "ESCROW_HOLD", userId: seeded.buyer.id, amountUsd: -300 },
+      { kind: "ESCROW_HOLD", userId: null, amountUsd: 300 },
+    ]);
+  }),
+);
+
+test(
   "a wallet payment is refused when the balance is short",
   withCleanDb(async () => {
     const seeded = await seedListing();

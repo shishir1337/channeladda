@@ -112,21 +112,24 @@ test(
 );
 
 test(
-  "a paid safest deal records the fee and nothing else",
+  "a paid safest deal holds the fee, it does not earn it yet",
   withCleanDb(async () => {
     const { orderId, seller } = await openDeal("SAFEST");
     await recordOpeningPayment(orderId, "cryptomus-1", "USDT");
 
+    // Held, like everything a buyer pays: the fee only becomes income when
+    // the agent has done the work, so a refund before custody is not a
+    // fee given back.
     const rows = await db.ledgerEntry.findMany({ where: { orderId } });
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
-      kind: "BUYER_FEE",
+      kind: "ESCROW_HOLD",
       amountUsd: 300,
       userId: null,
     });
-
-    // The $100 never passed through the platform, so it has no ledger row and
-    // the seller has no balance yet.
+    expect(
+      await db.ledgerEntry.count({ where: { orderId, kind: "BUYER_FEE" } }),
+    ).toBe(0);
     expect(await balanceOf(seller.id)).toBe(0);
 
     const order = await db.order.findUniqueOrThrow({ where: { id: orderId } });

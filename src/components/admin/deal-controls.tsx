@@ -508,7 +508,7 @@ const ENDINGS: readonly Ending[] = [
     consequence: (mode) =>
       mode === "FASTEST"
         ? "Safest only. On a Fastest deal the agent never owns the channel, so there is nothing to hand back."
-        : "The agent gives ownership back to the seller. The buyer ends up with no channel. The admin fee is not returned by this.",
+        : "The agent gives ownership back to the seller and the buyer ends up with no channel. Anything we hold goes back to the buyer's balance, except the admin fee once our agent has taken custody — that is kept for the work.",
   },
   {
     to: "REFUNDED",
@@ -517,7 +517,7 @@ const ENDINGS: readonly Ending[] = [
     applies: (mode) => mode !== "SAFEST",
     consequence: (mode) =>
       mode === "SAFEST"
-        ? "Fastest only. On a Safest deal the price went straight from buyer to seller and we never held it, so there is no price here to refund."
+        ? "Fastest only. On a Safest deal, return the channel to the seller instead: that refunds whatever we are holding for the buyer."
         : "Returns the price and the fee we are holding to the buyer. The seller is paid nothing.",
   },
   {
@@ -539,7 +539,7 @@ const ENDINGS: readonly Ending[] = [
       mode === "FASTEST"
         ? "Marks the deal complete and credits the seller's wallet with the money we are holding. This pays out."
         : mode === "SAFEST"
-          ? "Marks the deal complete as it stands. The buyer paid the seller directly, so no money moves here."
+          ? "Marks the deal complete and releases what we are holding: the price to the seller's wallet once the buyer has paid it, and the admin fee to us."
           : "Marks the deal complete. On a Fastest deal this also credits the seller's wallet with the money we are holding.",
   },
 ];
@@ -770,10 +770,13 @@ export function EndDeal({
                     {!reachable ? (
                       <Badge variant="neutral">Not this mode</Badge>
                     ) : null}
+                    {/* The same rule as movesPlatformMoney on the server:
+                        handing held money back is a refund whatever it is
+                        called, in either mode. */}
                     {!canMoveMoney &&
                     (ending.weight === "money" ||
-                      (ending.to === "CANCELLED" &&
-                        mode === "FASTEST" &&
+                      ((ending.to === "CANCELLED" ||
+                        ending.to === "RETURNED_TO_SELLER") &&
                         paid === true)) ? (
                       <Badge variant="neutral">Finance only</Badge>
                     ) : null}

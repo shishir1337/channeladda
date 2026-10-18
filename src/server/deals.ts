@@ -12,6 +12,7 @@ import {
 } from "@/lib/deal-machine";
 import { OPENING_STATUS, templateFor } from "@/lib/deal-templates";
 import { orderAmounts } from "@/lib/fees";
+import { keptFee, requiredHold } from "@/lib/holds";
 import { BUYER_PAYS_AFTER_STEP, payToVisibleTo } from "@/lib/pay-to";
 import { isSerializationFailure } from "@/lib/serialization-failure";
 import { keyFromUrl } from "@/lib/upload-keys";
@@ -70,6 +71,11 @@ export type DealFailure =
   | "needs-reference"
   /** The recovery hold on this platform has not ended yet. */
   | "on-hold"
+  /**
+   * The platform's hold on this deal is not what the deal says it should
+   * be, so nothing is paid out or refunded until staff have looked.
+   */
+  | "books-mismatch"
   | "bad-proof";
 
 export type DealOutcome<T = Record<never, never>> =
@@ -118,6 +124,28 @@ function isSafeProofUrl(url: string): boolean {
 export async function platformPositionFor(orderId: string): Promise<number> {
   const { _sum } = await db.ledgerEntry.aggregate({
     where: { orderId, userId: null },
+    _sum: { amountUsd: true },
+  });
+  return _sum.amountUsd ?? 0;
+}
+
+type Tx = Parameters<Parameters<typeof db.$transaction>[0]>[0];
+
+/**
+ * What the platform is holding for a deal's buyer right now: its holds, less
+ * what has been released or refunded. Earned fees are not in it — they are
+ * the platform's, not the buyer's.
+ *
+ * Read inside the transaction that is about to move the money, so the
+ * check and the movement see the same rows.
+ */
+async function platformHoldFor(tx: Tx, orderId: string): Promise<number> {
+  const { _sum } = await tx.ledgerEntry.aggregate({
+    where: {
+      orderId,
+      userId: null,
+      kind: { in: ["ESCROW_HOLD", "ESCROW_RELEASE", "REFUND"] },
+    },
     _sum: { amountUsd: true },
   });
   return _sum.amountUsd ?? 0;
@@ -623,14 +651,6 @@ export async function recordOpeningPayment(
     return "credited-to-balance";
   }
 
-  // Safest records only the platform's fee. The channel price goes straight
-  // from buyer to seller and never passes through the platform, so a ledger
-  // row for it would be a claim about money the platform never held.
-  const ledger =
-    order.mode === "FASTEST"
-      ? { kind: "ESCROW_HOLD" as const, amountUsd: order.totalUsd }
-      : { kind: "BUYER_FEE" as const, amountUsd: order.buyerFeeUsd };
-
   const now = new Date();
   let claimed = true;
   await db.$transaction(async (tx) => {
@@ -671,8 +691,12 @@ export async function recordOpeningPayment(
         // Platform-held funds and platform revenue carry no userId, so they
         // never count towards anybody's withdrawable balance.
         userId: null,
-        kind: ledger.kind,
-        amountUsd: ledger.amountUsd,
+        // Held, in both modes: price and fee on Fastest, the fee on Safest.
+        // None of it is ours until it is earned — at completion, or for a
+        // Safest fee when a deal fails after custody — so a refund before
+        // then is held money going home, not revenue given back.
+        kind: "ESCROW_HOLD",
+        amountUsd: order.totalUsd,
         note: `${order.mode} opening payment`,
       },
     });
@@ -728,7 +752,7 @@ export async function recordOpeningPayment(
       status: target,
       paymentRef: ref,
       asset,
-      amountUsd: ledger.amountUsd,
+      amountUsd: order.totalUsd,
     },
   });
 
@@ -984,6 +1008,8 @@ export async function advanceStep(input: {
       sellerFeeUsd: true,
       buyerFeeUsd: true,
       totalUsd: true,
+      paymentRef: true,
+      buyerPaidAt: true,
       holdUntil: true,
       conversationId: true,
       sellerPayTo: true,
@@ -1253,10 +1279,12 @@ type CompletableOrder = {
   sellerFeeUsd: number;
   buyerFeeUsd: number;
   totalUsd: number;
+  paymentRef: string | null;
+  buyerPaidAt: Date | null;
 };
 
 /**
- * Finishing a deal: the listing is sold and, on Fastest, the money moves.
+ * Finishing a deal: the listing is sold and the money moves.
  *
  * Shared by the last step of the happy path and by staff resolving a dispute
  * in the buyer's favour, so the two cannot drift apart in what they pay out.
@@ -1267,18 +1295,23 @@ type CompletableOrder = {
  * twice — invisible while nothing read those rows, and about to be wrong in
  * the wallet phase that does.
  */
-async function completeOrder(
-  tx: Parameters<Parameters<typeof db.$transaction>[0]>[0],
-  order: CompletableOrder,
-) {
+async function completeOrder(tx: Tx, order: CompletableOrder) {
+  // Everything paid in is released at once, so it has to be exactly what the
+  // deal says was paid in. A deal whose books disagree stops here rather than
+  // crediting a seller from money that never arrived.
+  const held = requiredHold(order);
+  if ((await platformHoldFor(tx, order.id)) !== held) {
+    throw new DealAbort("books-mismatch");
+  }
+
   await tx.listing.update({
     where: { id: order.listingId },
     data: { status: "SOLD" },
   });
 
-  // Only Fastest pays anybody: it is the mode where the platform took the
-  // money. A Safest seller was paid directly by the buyer at step 6.
-  if (order.mode !== "FASTEST") return;
+  // The seller is paid from the hold only when the price is in it: always on
+  // Fastest, and on Safest once the buyer has paid the price to us.
+  const priceHeld = held === order.priceUsd + order.buyerFeeUsd;
 
   await tx.ledgerEntry.createMany({
     data: [
@@ -1286,16 +1319,20 @@ async function completeOrder(
         orderId: order.id,
         userId: null,
         kind: "ESCROW_RELEASE",
-        amountUsd: -order.totalUsd,
+        amountUsd: -held,
         note: "Hold released",
       },
-      {
-        orderId: order.id,
-        userId: order.sellerId,
-        kind: "ESCROW_RELEASE",
-        amountUsd: order.priceUsd,
-        note: "Sale released to seller",
-      },
+      ...(priceHeld
+        ? [
+            {
+              orderId: order.id,
+              userId: order.sellerId,
+              kind: "ESCROW_RELEASE" as const,
+              amountUsd: order.priceUsd,
+              note: "Sale released to seller",
+            },
+          ]
+        : []),
       {
         orderId: order.id,
         userId: null,
@@ -1307,7 +1344,7 @@ async function completeOrder(
       // was written before, so the moment the rate stopped being zero the
       // seller fee vanished from the books and the platform's position no
       // longer netted to what it had actually kept.
-      ...(order.sellerFeeUsd > 0
+      ...(priceHeld && order.sellerFeeUsd > 0
         ? [
             {
               orderId: order.id,
@@ -1422,21 +1459,20 @@ async function expireStale(scope: { listingId?: string }): Promise<number> {
 /**
  * Whether an outcome pays somebody out of the platform's position.
  *
- * `COMPLETED` credits the seller the whole price on a Fastest deal and
- * `REFUNDED` returns the whole hold to the buyer. So does `CANCELLED` on a
- * paid Fastest deal — we hold the whole price there, and cancelling hands
- * it back: a refund under another name, which made the finance gate one
- * radio button wide. Cancelling a paid Safest deal returns the buyer's
- * admin fee at most, the same fee-sized move any staff member could always
- * make. `RETURNED_TO_SELLER` and `DISPUTED` move nothing.
+ * `COMPLETED` releases the hold and `REFUNDED` returns it. `CANCELLED` and
+ * `RETURNED_TO_SELLER` on a paid deal hand back whatever is still held — on
+ * Safest that can be the whole price once the buyer has paid it to us — so
+ * they are refunds under other names, and leaving them off made the finance
+ * gate one radio button wide. `DISPUTED` moves nothing.
  */
 function movesPlatformMoney(
   to: string,
   order: { mode: string; paymentRef: string | null },
 ): boolean {
   if (to === "COMPLETED" || to === "REFUNDED") return true;
-  if (to === "CANCELLED") {
-    return order.mode === "FASTEST" && order.paymentRef !== null;
+  // Both now hand back held money, in either mode, once anything was paid.
+  if (to === "CANCELLED" || to === "RETURNED_TO_SELLER") {
+    return order.paymentRef !== null;
   }
   return false;
 }
@@ -1685,16 +1721,23 @@ export async function resolveDeal(input: {
         });
       };
 
+      // What is handed back is whatever is still held, less a Safest fee the
+      // agent has already earned by taking custody. The hold is checked
+      // against what the deal says was paid in first, so a refund can never
+      // hand back money the platform does not have.
+      const held = await platformHoldFor(tx, order.id);
+      if (held !== requiredHold(order)) throw new DealAbort("books-mismatch");
+      const kept = Math.min(keptFee(order), held);
+
       if (input.to === "REFUNDED") {
         // Returns the whole hold, so the platform's own position nets to zero.
-        await refund(order.totalUsd, input.note);
+        await refund(held, input.note);
         return;
       }
 
-      // A cancellation returns whatever the platform is still holding, and
-      // what that is depends on the mode.
+      // A cancellation or a return hands back whatever is still held.
       //
-      // This used to be `buyerFeeUsd` whenever `!order.custodyAt` — and
+      // This once refunded `buyerFeeUsd` whenever `!order.custodyAt` — and
       // custodyAt is stamped on Safest step 4 and nowhere else, so on every
       // paid *Fastest* deal the condition held and the refund was the admin
       // fee. The platform kept the channel price, the order went terminal,
@@ -1702,20 +1745,34 @@ export async function resolveDeal(input: {
       // no path remained that could ever return it. A $100 deal cancelled
       // after payment left $100 of the buyer's money on our books for good.
       //
-      // On Fastest we hold price and fee, so all of it goes back: a deal
-      // that did not happen does not earn a fee. On Safest we only ever
-      // held the fee, and once an agent has taken custody that fee is the
-      // work they did — which /fees states. A fee never collected is not
-      // refunded at all, or the platform's position goes negative from a
-      // buyer cancelling their own unpaid deal.
-      if (order.paymentRef) {
-        const held =
-          order.mode === "FASTEST"
-            ? order.totalUsd
-            : order.custodyAt
-              ? 0
-              : order.buyerFeeUsd;
-        if (held > 0) await refund(held, `Refunded: ${input.note}`);
+      // On Fastest all of it goes back: a deal that did not happen does not
+      // earn a fee. On Safest, once an agent has taken custody the fee is the
+      // work they did — which /fees states — so it is kept and booked as
+      // earned, and only the rest goes back. An unpaid deal holds nothing, so
+      // nothing is refunded and the platform's position cannot go negative.
+      if (held - kept > 0) {
+        await refund(held - kept, `Refunded: ${input.note}`);
+      }
+      if (kept > 0) {
+        // Earned, so it leaves the hold and becomes the platform's.
+        await tx.ledgerEntry.createMany({
+          data: [
+            {
+              orderId: order.id,
+              userId: null,
+              kind: "ESCROW_RELEASE",
+              amountUsd: -kept,
+              note: "Fee earned: the agent took custody",
+            },
+            {
+              orderId: order.id,
+              userId: null,
+              kind: "BUYER_FEE",
+              amountUsd: kept,
+              note: "Buyer fee",
+            },
+          ],
+        });
       }
     });
   } catch (error) {

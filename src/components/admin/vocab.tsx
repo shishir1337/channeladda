@@ -270,9 +270,12 @@ export function custodyFacts(
   const agentHolds =
     mode === "SAFEST" &&
     (AGENT_HOLDS.includes(status) || (disputed && facts?.inCustody === true));
+  // Every paid, running deal has money with us: price and fee on Fastest,
+  // the admin fee (and the price once paid) on Safest, where every state the
+  // agent holds the channel in comes after the opening payment.
   const platformHolds =
-    mode === "FASTEST" &&
-    (PLATFORM_HOLDS.includes(status) || (disputed && facts?.paid === true));
+    (mode === "FASTEST" ? PLATFORM_HOLDS : AGENT_HOLDS).includes(status) ||
+    (disputed && facts?.paid === true);
   const unknown = disputed && facts === undefined;
   const beforeAnything = status === "AWAITING_PAYMENT";
 
@@ -287,10 +290,10 @@ export function custodyFacts(
   const money = unknown
     ? "Paused. Check whether the opening payment cleared."
     : platformHolds
-      ? "We are holding the price and the fee."
-      : mode === "SAFEST"
-        ? "We only ever hold the admin fee. The price goes buyer to seller off-platform."
-        : "Nothing has cleared to us yet.";
+      ? mode === "SAFEST"
+        ? "We are holding the admin fee, and the price once the buyer has paid it."
+        : "We are holding the price and the fee."
+      : "Nothing has cleared to us yet.";
 
   let recoverable: string;
   if (finished) {
@@ -302,13 +305,10 @@ export function custodyFacts(
     recoverable = "Nothing has moved. Cancelling costs nobody anything.";
   } else if (agentHolds) {
     recoverable =
-      "The channel has to go back to the seller, or on to the buyer. There is no price to refund — we never held it.";
+      "The channel has to go back to the seller, or on to the buyer. Returning it refunds whatever we hold except the admin fee, which the agent has earned; finance decides.";
   } else if (platformHolds) {
     recoverable =
       "We hold the full amount. Refunding or cancelling returns all of it to the buyer; finance decides which.";
-  } else if (mode === "SAFEST") {
-    recoverable =
-      "The price never passed through us, so only the admin fee is ours to return.";
   } else {
     recoverable =
       "Nothing has cleared to us, so there is nothing of the buyer’s to return.";

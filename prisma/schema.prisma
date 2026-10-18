@@ -102,9 +102,9 @@ enum WithdrawalStatus {
 enum LedgerKind {
   ESCROW_HOLD // buyer funds received, held by the platform
   ESCROW_RELEASE // released to the seller on completion
-  SELLER_FEE
-  BUYER_FEE
-  REFUND
+  SELLER_FEE // earned on completion, taken from the seller's price
+  BUYER_FEE // earned on completion, or a Safest fee once custody was reached
+  REFUND // held money handed back to the buyer
   WITHDRAWAL
   ADJUSTMENT
   DEPOSIT // wallet top-up

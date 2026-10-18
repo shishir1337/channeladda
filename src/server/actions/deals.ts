@@ -48,6 +48,8 @@ const MESSAGES: Record<repo.DealFailure, string> = {
   "already-paid":
     "The buyer has already paid the seller, so this cannot be undone here.",
   "bad-proof": "Attach an uploaded file or an https link.",
+  "books-mismatch":
+    "What Channel Adda is holding for this deal does not match what the deal says was paid, so nothing has been moved. It is listed on the money desk for a developer to look at.",
 };
 
 function fail(reason: repo.DealFailure): DealResult {

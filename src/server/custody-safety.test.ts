@@ -299,7 +299,7 @@ test(
     const result = await resolveDeal({
       orderId: o.orderId,
       to: "RETURNED_TO_SELLER",
-      byUserId: o.staff.id,
+      byUserId: o.finance.id,
       note: "checked the chain, nothing was sent",
     });
 
@@ -537,7 +537,7 @@ test(
       await resolveDeal({
         orderId: o.orderId,
         to: "RETURNED_TO_SELLER",
-        byUserId: o.staff.id,
+        byUserId: o.finance.id,
         note: "giving the channel back",
       }),
     ).toMatchObject({ ok: true });

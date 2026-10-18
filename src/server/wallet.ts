@@ -273,9 +273,8 @@ export async function payFromWallet(
           data: {
             orderId: order.id,
             userId: null,
-            kind: order.mode === "FASTEST" ? "ESCROW_HOLD" : "BUYER_FEE",
-            amountUsd:
-              order.mode === "FASTEST" ? order.totalUsd : order.buyerFeeUsd,
+            kind: "ESCROW_HOLD",
+            amountUsd: order.totalUsd,
             note: `${order.mode} opening payment from wallet`,
           },
         });

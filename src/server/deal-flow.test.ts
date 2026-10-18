@@ -94,12 +94,15 @@ test(
     expect(order.handoverAt).not.toBeNull();
     expect(await listingStatus(listing.id)).toBe("SOLD");
 
-    // The platform never held the price, so it never released it either.
+    // The fee was held and is now earned; nothing is released to the seller.
     expect(
       await db.ledgerEntry.count({
-        where: { orderId, kind: "ESCROW_RELEASE" },
+        where: { orderId, kind: "ESCROW_RELEASE", userId: seller.id },
       }),
     ).toBe(0);
+    expect(
+      await db.ledgerEntry.count({ where: { orderId, kind: "BUYER_FEE" } }),
+    ).toBe(1);
     expect(await balanceOf(seller.id)).toBe(0);
   }),
 );
