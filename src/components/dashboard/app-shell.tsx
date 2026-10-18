@@ -73,6 +73,11 @@ export type NavItem = {
 
 export type NavGroup = { label: string | null; items: NavItem[] };
 
+/** The member and staff inboxes, which lay out three panes across the page. */
+function isInbox(pathname: string) {
+  return /^\/(dashboard|admin)\/messages(\/|$)/.test(pathname);
+}
+
 function isActive(pathname: string, item: NavItem) {
   if (item.section) {
     return pathname === item.href || pathname.startsWith(`${item.href}/`);
@@ -575,7 +580,21 @@ export function AppShell({
               id="main"
               className="px-4 pt-6 pb-16 sm:px-6 lg:px-10 lg:pt-8 lg:pb-20"
             >
-              <div className="mx-auto w-full max-w-6xl">{children}</div>
+              {/* The inbox is an app view — threads, the conversation and
+                  the deal side by side — so it takes the width there is.
+                  Every other page keeps a reading measure, opening up a
+                  little on a big screen instead of floating in a 1152px
+                  column with a third of the window empty around it. */}
+              <div
+                className={cn(
+                  "mx-auto w-full",
+                  isInbox(pathname)
+                    ? "max-w-[112rem]"
+                    : "max-w-6xl 2xl:max-w-7xl",
+                )}
+              >
+                {children}
+              </div>
             </main>
           </div>
 

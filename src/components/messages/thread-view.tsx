@@ -153,6 +153,54 @@ function displayName(message: ThreadMessageView) {
  */
 const GROUP_MS = 5 * 60_000;
 
+/**
+ * Sends a photo or clip to the upload route; never throws.
+ *
+ * Outside the component on purpose: the React Compiler gives up on a whole
+ * component over a try statement, and the thread re-renders on every
+ * keystroke in the message box.
+ */
+async function sendAttachment(
+  file: File,
+): Promise<
+  | { ok: true; key: string; bytes: number; video: boolean }
+  | { ok: false; error: string }
+> {
+  try {
+    const form = new FormData();
+    form.set("kind", "message");
+    form.set("file", file);
+    const response = await fetch("/api/uploads", {
+      method: "POST",
+      body: form,
+    });
+    const data = (await response.json()) as {
+      url?: string;
+      key?: string;
+      bytes?: number;
+      contentType?: string;
+      error?: string;
+    };
+    if (!response.ok || !data.url || !data.key) {
+      return {
+        ok: false,
+        error: data.error ?? "That file could not be attached.",
+      };
+    }
+    return {
+      ok: true,
+      key: data.key,
+      bytes: data.bytes ?? file.size,
+      video: data.contentType?.startsWith("video/") ?? false,
+    };
+  } catch {
+    return {
+      ok: false,
+      error: "That upload did not finish. Check your connection.",
+    };
+  }
+}
+
 function sameTurn(a: ThreadMessageView, b: ThreadMessageView) {
   return (
     a.kind === "TEXT" &&
@@ -332,10 +380,42 @@ export function ThreadView({
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  /** Whether the reader is following the newest message. */
+  const following = useRef(true);
 
-  // Land on the newest message, the way every other chat does.
+  // Land on the newest message, the way every other chat does — and stay
+  // there while the box changes size. In the window-height view the messages
+  // scroll inside their own box, which is only its final size once styles,
+  // fonts and images have settled; a single scroll on mount often ran before
+  // that and left the conversation open at the top. Someone who has scrolled
+  // up to read is left exactly where they are.
   useEffect(() => {
+    const scroller = scrollerRef.current;
+    if (!scroller) return;
+    const ownScroll = () => getComputedStyle(scroller).overflowY === "auto";
+
     endRef.current?.scrollIntoView({ block: "end" });
+
+    const onScroll = () => {
+      following.current =
+        scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 80;
+    };
+    // Only the box's own scroll, never the page's: on a phone the page is
+    // what scrolls, and dragging it back to the bottom would be hostile.
+    const keepAtEnd = () => {
+      if (following.current && ownScroll()) {
+        scroller.scrollTop = scroller.scrollHeight;
+      }
+    };
+    const observer = new ResizeObserver(keepAtEnd);
+    observer.observe(scroller);
+    for (const child of scroller.children) observer.observe(child);
+    scroller.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      observer.disconnect();
+      scroller.removeEventListener("scroll", onScroll);
+    };
   }, []);
 
   const over = draft.length > MAX_MESSAGE;
@@ -366,121 +446,110 @@ export function ThreadView({
   async function upload(file: File) {
     setError(null);
     setUploading(true);
-    try {
-      const form = new FormData();
-      form.set("kind", "message");
-      form.set("file", file);
-      const response = await fetch("/api/uploads", {
-        method: "POST",
-        body: form,
-      });
-      const data = (await response.json()) as {
-        url?: string;
-        key?: string;
-        bytes?: number;
-        contentType?: string;
-        error?: string;
-      };
-      if (!response.ok || !data.url || !data.key) {
-        setError(data.error ?? "That file could not be attached.");
-        return;
-      }
+    const sent = await sendAttachment(file);
+    if (sent.ok) {
       setAttachment({
-        key: data.key,
+        key: sent.key,
         // A local blob, not the server URL. Nothing references the file yet,
         // so the serving route will not release it to anybody — including the
         // person who just uploaded it — until a message points at it.
         url: URL.createObjectURL(file),
-        kind: data.contentType?.startsWith("video/") ? "VIDEO" : "IMAGE",
-        bytes: data.bytes ?? file.size,
+        kind: sent.video ? "VIDEO" : "IMAGE",
+        bytes: sent.bytes,
         name: file.name,
       });
-    } catch {
-      setError("That upload did not finish. Check your connection.");
-    } finally {
-      setUploading(false);
-      if (fileRef.current) fileRef.current.value = "";
+    } else {
+      setError(sent.error);
     }
+    setUploading(false);
+    if (fileRef.current) fileRef.current.value = "";
   }
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      {/* A quiet line rather than a box: it is read once, before the first
+      {/* The scrolling part. In the window-height view (see the thread page)
+          only this moves; everywhere else it is simply the page. */}
+      <div
+        ref={scrollerRef}
+        className="lg:@3xl:min-h-0 lg:@3xl:flex-1 lg:@3xl:overflow-y-auto lg:@3xl:overscroll-contain lg:@3xl:pr-2 lg:@3xl:[scrollbar-width:thin]"
+      >
+        {/* A quiet line rather than a box: it is read once, before the first
           message, and should not compete with the conversation after that.
           The words stay exactly as they are — this is the rule itself. */}
-      <p className="mx-auto flex max-w-[66ch] items-start gap-2 px-1 text-xs leading-relaxed text-muted">
-        <EyeIcon
-          aria-hidden="true"
-          className="mt-0.5 size-3.5 shrink-0 text-subtle"
-        />
-        <span>
-          <strong className="font-medium text-fg">
-            Channel Adda can read this conversation
-          </strong>{" "}
-          and will step in if something goes wrong. Phone numbers, emails and
-          links are removed automatically. Photos and clips are deleted after 48
-          hours, and a thread with no deal on it clears after 10 days.
-        </span>
-      </p>
+        <p className="mx-auto flex max-w-[66ch] items-start gap-2 px-1 text-xs leading-relaxed text-muted">
+          <EyeIcon
+            aria-hidden="true"
+            className="mt-0.5 size-3.5 shrink-0 text-subtle"
+          />
+          <span>
+            <strong className="font-medium text-fg">
+              Channel Adda can read this conversation
+            </strong>{" "}
+            and will step in if something goes wrong. Phone numbers, emails and
+            links are removed automatically. Photos and clips are deleted after
+            48 hours, and a thread with no deal on it clears after 10 days.
+          </span>
+        </p>
 
-      {messages.length === 0 ? (
-        <EmptyState
-          bare
-          className="py-14"
-          icon={MessageSquareIcon}
-          title="No messages yet"
-          body={`Ask ${otherSide} whatever you need to know before you commit — revenue, where the traffic comes from, strikes, why they are selling.`}
-        />
-      ) : (
-        <ul className="mt-6 flex flex-col gap-5">
-          {messages.map((message, index) => {
-            const prev = messages[index - 1];
-            const next = messages[index + 1];
-            return message.kind === "EVENT" ? (
-              <EventLine
-                key={message.id}
-                message={message}
-                // A run of history lines reads as one block of record.
-                className={prev?.kind === "EVENT" ? "-mt-3" : undefined}
-              />
-            ) : message.kind === "OFFER" && message.offer ? (
-              <ChatOfferCard
-                key={message.id}
-                offer={message.offer}
-                viewerRole={viewerRole}
-                senderName={message.mine ? "You" : displayName(message)}
-                mine={message.mine}
-                createdAt={message.createdAt}
-                actions={
-                  (viewerRole === "buyer" || viewerRole === "seller") &&
-                  message.offer.effectiveStatus === "OPEN" ? (
-                    <OfferActions
-                      offer={{
-                        id: message.offer.id,
-                        amount: message.offer.amountCents / 100,
-                        awaiting: message.offer.awaiting,
-                        bySeller: message.offer.bySeller,
-                        effectiveStatus: message.offer.effectiveStatus,
-                      }}
-                      viewingAs={viewerRole}
-                    />
-                  ) : undefined
-                }
-              />
-            ) : (
-              <Bubble
-                key={message.id}
-                message={message}
-                first={!prev || !sameTurn(prev, message)}
-                last={!next || !sameTurn(message, next)}
-              />
-            );
-          })}
-        </ul>
-      )}
-      {/* The margin lands the message box on screen with the newest
+        {messages.length === 0 ? (
+          <EmptyState
+            bare
+            className="py-14"
+            icon={MessageSquareIcon}
+            title="No messages yet"
+            body={`Ask ${otherSide} whatever you need to know before you commit — revenue, where the traffic comes from, strikes, why they are selling.`}
+          />
+        ) : (
+          <ul className="mt-6 flex flex-col gap-5">
+            {messages.map((message, index) => {
+              const prev = messages[index - 1];
+              const next = messages[index + 1];
+              return message.kind === "EVENT" ? (
+                <EventLine
+                  key={message.id}
+                  message={message}
+                  // A run of history lines reads as one block of record.
+                  className={prev?.kind === "EVENT" ? "-mt-3" : undefined}
+                />
+              ) : message.kind === "OFFER" && message.offer ? (
+                <ChatOfferCard
+                  key={message.id}
+                  offer={message.offer}
+                  viewerRole={viewerRole}
+                  senderName={message.mine ? "You" : displayName(message)}
+                  mine={message.mine}
+                  createdAt={message.createdAt}
+                  actions={
+                    (viewerRole === "buyer" || viewerRole === "seller") &&
+                    message.offer.effectiveStatus === "OPEN" ? (
+                      <OfferActions
+                        offer={{
+                          id: message.offer.id,
+                          amount: message.offer.amountCents / 100,
+                          awaiting: message.offer.awaiting,
+                          bySeller: message.offer.bySeller,
+                          effectiveStatus: message.offer.effectiveStatus,
+                        }}
+                        viewingAs={viewerRole}
+                      />
+                    ) : undefined
+                  }
+                />
+              ) : (
+                <Bubble
+                  key={message.id}
+                  message={message}
+                  first={!prev || !sameTurn(prev, message)}
+                  last={!next || !sameTurn(message, next)}
+                />
+              );
+            })}
+          </ul>
+        )}
+        {/* The margin lands the message box on screen with the newest
           message, rather than leaving it just under the fold. */}
-      <div ref={endRef} className="scroll-mb-48" />
+        <div ref={endRef} className="scroll-mb-48" />
+      </div>
 
       {closed ? (
         <p className="mt-6 flex items-start justify-center gap-2 rounded-card border border-line bg-surface-2/60 px-4 py-3 text-[0.8125rem] leading-relaxed text-muted">

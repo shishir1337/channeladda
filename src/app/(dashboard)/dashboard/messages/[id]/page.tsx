@@ -42,7 +42,19 @@ export const metadata: Metadata = {
  * size container (see the messages layout), so this follows the sidebar.
  */
 const PANEL_COLUMN =
-  "lg:@3xl:sticky lg:@3xl:top-[5.5rem] lg:@3xl:col-start-2 lg:@3xl:row-start-1 lg:@3xl:-m-1 lg:@3xl:max-h-[calc(100dvh-6.5rem)] lg:@3xl:overflow-y-auto lg:@3xl:overscroll-contain lg:@3xl:p-1 lg:@3xl:[scrollbar-width:thin]";
+  "lg:@3xl:col-start-2 lg:@3xl:row-start-1 lg:@3xl:-m-1 lg:@3xl:min-h-0 lg:@3xl:overflow-y-auto lg:@3xl:overscroll-contain lg:@3xl:p-1 lg:@3xl:[scrollbar-width:thin]";
+
+/**
+ * On a computer, with room for the deal beside it, the conversation is an
+ * app view of the window's height: the header holds the top, the message
+ * box holds the bottom, and only the messages scroll between them — the deal
+ * panel scrolling on its own beside them. Pinning each of those to a page
+ * that scrolled as a whole left the box jumping a few pixels at the end of
+ * the page and the panel sliding under the header. Narrower layouts keep the
+ * page's own scroll, where stacking makes that the only sensible choice.
+ */
+const FIXED_VIEW =
+  "lg:@3xl:flex lg:@3xl:h-[calc(100dvh-6.5rem)] lg:@3xl:flex-col";
 
 /**
  * One conversation: the people, the negotiation and the deal, in one place.
@@ -129,7 +141,7 @@ export default async function ThreadPage({
       : null;
 
   return (
-    <>
+    <div className={FIXED_VIEW}>
       <LiveRefresh conversationId={thread.id} fingerprint={fingerprint} />
 
       <ThreadHeader
@@ -187,9 +199,8 @@ export default async function ThreadPage({
 
       <div
         className={cn(
-          "mt-5 grid gap-5",
-          panel &&
-            "lg:@3xl:grid-cols-[minmax(0,1fr)_19rem] lg:@3xl:items-start lg:@3xl:gap-6",
+          "mt-5 grid gap-5 lg:@3xl:min-h-0 lg:@3xl:flex-1 lg:@3xl:grid-rows-[minmax(0,1fr)]",
+          panel && "lg:@3xl:grid-cols-[minmax(0,1fr)_19rem] lg:@3xl:gap-6",
         )}
       >
         {panel ? (
@@ -252,7 +263,7 @@ export default async function ThreadPage({
 
         <div
           className={cn(
-            "min-w-0",
+            "min-w-0 lg:@3xl:flex lg:@3xl:min-h-0 lg:@3xl:flex-col",
             panel && "lg:@3xl:col-start-1 lg:@3xl:row-start-1",
           )}
         >
@@ -266,6 +277,6 @@ export default async function ThreadPage({
           />
         </div>
       </div>
-    </>
+    </div>
   );
 }

@@ -95,7 +95,10 @@ export function ThreadHeader({
   actions?: ReactNode;
 }) {
   return (
-    <header className="border-b border-line pb-4">
+    // Pinned under the app bar (h-14): in a long conversation the one thing
+    // that must not scroll away is who it is with and where the deal stands.
+    // Frosted rather than opaque, so the thread reads as passing beneath it.
+    <header className="sticky top-14 z-10 -mt-3 border-b border-line bg-bg/85 pt-3 pb-3 backdrop-blur-xl backdrop-saturate-150 lg:-mt-4 lg:pt-4">
       {back ? (
         <Link
           href={back.href}
@@ -112,7 +115,10 @@ export function ThreadHeader({
         </Link>
       ) : null}
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      {/* One row on anything wider than a phone: who, then where the deal
+          stands and the way to it, on the right. A second row for the
+          status cost the conversation a line of every screen. */}
+      <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
         <div className="flex min-w-0 items-center gap-3">
           {people.length > 1 ? (
             <span className="flex shrink-0 -space-x-2">
@@ -144,18 +150,17 @@ export function ThreadHeader({
             </Link>
           </div>
         </div>
-        {actions ? (
-          <div className="flex shrink-0 flex-wrap items-center gap-2">
+        {meta || actions ? (
+          <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 sm:shrink-0 sm:justify-end">
+            {meta ? (
+              <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-subtle">
+                {meta}
+              </div>
+            ) : null}
             {actions}
           </div>
         ) : null}
       </div>
-
-      {meta ? (
-        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-subtle">
-          {meta}
-        </div>
-      ) : null}
     </header>
   );
 }

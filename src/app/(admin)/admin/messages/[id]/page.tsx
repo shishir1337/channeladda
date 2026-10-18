@@ -31,78 +31,85 @@ export default async function AdminThreadPage({
   const closed = thread.closedAt !== null;
 
   return (
-    <>
-      <LiveRefresh conversationId={thread.id} fingerprint={fingerprint} />
+    // The same window-height view as the member thread: header on top,
+    // message box at the bottom, only the messages scrolling between, and
+    // the staff controls scrolling on their own. The container decides, so a
+    // narrow layout keeps the page's own scroll.
+    <div className="@container lg:-mb-16">
+      <div className="lg:@3xl:flex lg:@3xl:h-[calc(100dvh-6.5rem)] lg:@3xl:flex-col">
+        <LiveRefresh conversationId={thread.id} fingerprint={fingerprint} />
 
-      <ThreadHeader
-        back={{ href: "/admin/messages", label: "All conversations" }}
-        people={[thread.buyerName, thread.sellerName]}
-        title={`${thread.buyerName} and ${thread.sellerName}`}
-        listing={{
-          href: `/listing/${thread.listingSlug}`,
-          handle: thread.listingHandle,
-          title: thread.listingTitle,
-        }}
-        meta={
-          flagged || closed || thread.staffName ? (
-            <>
-              {flagged ? (
-                <Badge variant="danger" size="sm">
-                  <FlagIcon aria-hidden="true" />
-                  Flagged
-                </Badge>
-              ) : null}
-              {closed ? <Badge size="sm">Closed</Badge> : null}
-              {thread.staffName ? (
-                <Badge variant="info" size="sm">
-                  Claimed by {thread.staffName}
-                </Badge>
-              ) : null}
-            </>
-          ) : null
-        }
-      />
-
-      {flagged ? (
-        // The reason is the headline: "Flagged" is already the badge in the
-        // header above, and the flag icon says it again.
-        <Callout
-          tone="danger"
-          icon={FlagIcon}
-          title={
-            thread.flagReason ?? "Someone tried to move this off the platform."
+        <ThreadHeader
+          back={{ href: "/admin/messages", label: "All conversations" }}
+          people={[thread.buyerName, thread.sellerName]}
+          title={`${thread.buyerName} and ${thread.sellerName}`}
+          listing={{
+            href: `/listing/${thread.listingSlug}`,
+            handle: thread.listingHandle,
+            title: thread.listingTitle,
+          }}
+          meta={
+            flagged || closed || thread.staffName ? (
+              <>
+                {flagged ? (
+                  <Badge variant="danger" size="sm">
+                    <FlagIcon aria-hidden="true" />
+                    Flagged
+                  </Badge>
+                ) : null}
+                {closed ? <Badge size="sm">Closed</Badge> : null}
+                {thread.staffName ? (
+                  <Badge variant="info" size="sm">
+                    Claimed by {thread.staffName}
+                  </Badge>
+                ) : null}
+              </>
+            ) : null
           }
-          className="mt-5"
-        >
-          Taking a deal off Channel Adda is how both sides lose their
-          protection, so read the whole thread before deciding.
-        </Callout>
-      ) : null}
+        />
 
-      <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start lg:gap-6">
-        <div className="min-w-0">
-          <ThreadView
-            conversationId={thread.id}
-            otherSide={`${thread.buyerName} and ${thread.sellerName}`}
-            closed={false}
-            viewerRole="staff"
-            messages={toMessageViews(thread.messages)}
-          />
-          <p className="mt-2 px-1 text-xs leading-relaxed text-subtle">
-            Anything you write here is sent as Channel Adda, not as {staff.name}
-            . Both sides see it.
-          </p>
-        </div>
+        {flagged ? (
+          // The reason is the headline: "Flagged" is already the badge in the
+          // header above, and the flag icon says it again.
+          <Callout
+            tone="danger"
+            icon={FlagIcon}
+            title={
+              thread.flagReason ??
+              "Someone tried to move this off the platform."
+            }
+            className="mt-5"
+          >
+            Taking a deal off Channel Adda is how both sides lose their
+            protection, so read the whole thread before deciding.
+          </Callout>
+        ) : null}
 
-        <div className="min-w-0 lg:sticky lg:top-[5.5rem]">
-          <StaffControls
-            conversationId={thread.id}
-            claimedBy={thread.staffName}
-            flagged={flagged}
-            closed={closed}
-          />
+        <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start lg:gap-6 lg:@3xl:min-h-0 lg:@3xl:flex-1 lg:@3xl:grid-rows-[minmax(0,1fr)] lg:@3xl:items-stretch">
+          <div className="min-w-0 lg:@3xl:flex lg:@3xl:min-h-0 lg:@3xl:flex-col">
+            <ThreadView
+              conversationId={thread.id}
+              otherSide={`${thread.buyerName} and ${thread.sellerName}`}
+              closed={false}
+              viewerRole="staff"
+              messages={toMessageViews(thread.messages)}
+            />
+            <p className="mt-2 px-1 text-xs leading-relaxed text-subtle">
+              Anything you write here is sent as Channel Adda, not as{" "}
+              {staff.name}. Both sides see it.
+            </p>
+          </div>
+
+          <div className="min-w-0 lg:@3xl:-m-1 lg:@3xl:min-h-0 lg:@3xl:overflow-y-auto lg:@3xl:overscroll-contain lg:@3xl:p-1 lg:@3xl:[scrollbar-width:thin]">
+            <StaffControls
+              conversationId={thread.id}
+              claimedBy={thread.staffName}
+              flagged={flagged}
+              closed={closed}
+            />
+          </div>
         </div>
       </div>
-    </>
+    </div>
   );
 }
