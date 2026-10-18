@@ -72,14 +72,19 @@ export default async function DealsPage() {
 
   return (
     <>
+      {/* The one line on the page is the count that needs the reader; what
+          the page is for sits behind the (i). */}
       <PageHeader
         title="Deals"
         description={
+          mine.length > 0
+            ? `${mine.length} of your ${deals.length} ${deals.length === 1 ? "deal" : "deals"} ${mine.length === 1 ? "needs" : "need"} something from you.`
+            : undefined
+        }
+        info={
           deals.length === 0
             ? "The steps that move an account from its seller to its buyer, with Channel Adda in the middle."
-            : mine.length > 0
-              ? `${mine.length} of your ${deals.length} ${deals.length === 1 ? "deal" : "deals"} ${mine.length === 1 ? "needs" : "need"} something from you.`
-              : "Everything in progress, on either side. Each row says who it is waiting on."
+            : "Everything in progress, on either side. Each row says who it is waiting on."
         }
         actions={
           deals.length > 0 ? (
@@ -112,7 +117,7 @@ export default async function DealsPage() {
               title="Waiting on you"
               count={mine.length}
               tone="primary"
-              description="Nothing on these moves until you act."
+              info="Nothing on these moves until you act."
             >
               <DealRows deals={mine} />
             </Section>
@@ -123,7 +128,7 @@ export default async function DealsPage() {
               id="paused"
               title="Paused with Channel Adda"
               count={paused.length}
-              description="A moderator is reading the record. Nothing moves until they decide."
+              info="A moderator is reading the record. Nothing moves until they decide."
             >
               <DealRows deals={paused} />
             </Section>
@@ -134,7 +139,7 @@ export default async function DealsPage() {
               id="with-the-other-side"
               title="With the other side"
               count={theirs.length}
-              description="In progress. A deal moves up to “Waiting on you” when it is your turn."
+              info="In progress. A deal moves up to “Waiting on you” when it is your turn."
             >
               <DealRows deals={theirs} />
             </Section>

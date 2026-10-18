@@ -2,8 +2,8 @@ import { HandCoinsIcon, InboxIcon, TagIcon } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { InfoTip } from "@/components/app/info-tip";
 import {
-  Callout,
   Dot,
   EmptyState,
   List,
@@ -46,17 +46,38 @@ function toCard(offer: OfferView): OfferCardData {
   };
 }
 
+/**
+ * An empty group's title, with what offers are for behind the (i): a
+ * newcomer needs that once, and the empty card stays a title and a button.
+ */
+function EmptyTitle({
+  children,
+  label,
+  info,
+}: {
+  children: ReactNode;
+  label: string;
+  info: ReactNode;
+}) {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      {children}
+      <InfoTip label={label}>{info}</InfoTip>
+    </span>
+  );
+}
+
 function Group({
   id,
   title,
-  description,
+  info,
   offers,
   viewingAs,
   empty,
 }: {
   id: string;
   title: string;
-  description: string;
+  info: string;
   offers: OfferCardData[];
   viewingAs: "buyer" | "seller";
   empty: ReactNode;
@@ -67,7 +88,7 @@ function Group({
     <Section
       id={id}
       title={title}
-      description={description}
+      info={info}
       count={offers.length > 0 ? offers.length : undefined}
       actions={
         // Gold only for what is waiting on the reader, and said in words.
@@ -106,12 +127,14 @@ export default async function OffersPage() {
 
   return (
     <>
+      {/* Only the count that needs the reader gets a line; the two section
+          headings already say what the page holds. */}
       <PageHeader
         title="Offers"
         description={
           waiting > 0
             ? `${waiting} ${waiting === 1 ? "offer needs" : "offers need"} an answer from you.`
-            : "Everything you have offered, and everything offered to you."
+            : undefined
         }
         actions={
           <Button asChild variant="secondary" size="md">
@@ -123,15 +146,21 @@ export default async function OffersPage() {
       <Group
         id="received"
         title="Offers on your listings"
-        description="What buyers have offered you. Accept, counter or decline."
+        info="What buyers have offered you. Accept, counter or decline."
         offers={received.map(toCard)}
         viewingAs="seller"
         empty={
           <EmptyState
             as="h3"
             icon={InboxIcon}
-            title="Nobody has made you an offer yet"
-            body="Buyers can offer below your asking price on any live listing of yours, and you can counter without losing the buyer."
+            title={
+              <EmptyTitle
+                label="About offers on your listings"
+                info="Buyers can offer below your asking price on any live listing of yours, and you can counter without losing the buyer."
+              >
+                Nobody has made you an offer yet
+              </EmptyTitle>
+            }
             action={
               <Button asChild variant="secondary" size="sm">
                 <Link href="/dashboard/listings">See your listings</Link>
@@ -145,15 +174,21 @@ export default async function OffersPage() {
       <Group
         id="made"
         title="Offers you have made"
-        description="What you have offered on other people's listings."
+        info="What you have offered on other people's listings."
         offers={made.map(toCard)}
         viewingAs="buyer"
         empty={
           <EmptyState
             as="h3"
             icon={TagIcon}
-            title="You have not made any offers"
-            body="Make an offer on any listing for less than its asking price — the seller can accept it, counter it, or let it lapse."
+            title={
+              <EmptyTitle
+                label="About making offers"
+                info="Make an offer on any listing for less than its asking price — the seller can accept it, counter it, or let it lapse."
+              >
+                You have not made any offers
+              </EmptyTitle>
+            }
             action={
               <Button asChild size="sm">
                 <Link href="/browse">Find an account</Link>
@@ -164,16 +199,22 @@ export default async function OffersPage() {
         }
       />
 
-      <Callout
-        tone="neutral"
-        icon={HandCoinsIcon}
-        title="An offer is not a payment."
-        className="mt-8"
-      >
-        Accepting one reserves the listing for that buyer and hides it from
-        everyone else; no money moves until a deal is opened and the handover
-        begins.
-      </Callout>
+      {/* Money copy, so it stays on the page word for word — as one quiet
+          line under the lists rather than a box competing with them. */}
+      <p className="mt-10 flex max-w-[100ch] items-start gap-2.5 text-[0.8125rem] leading-relaxed text-muted">
+        <HandCoinsIcon
+          aria-hidden="true"
+          className="mt-0.5 size-4 shrink-0 text-subtle"
+        />
+        <span className="min-w-0">
+          <span className="font-medium text-fg">
+            An offer is not a payment.
+          </span>{" "}
+          Accepting one reserves the listing for that buyer and hides it from
+          everyone else; no money moves until a deal is opened and the handover
+          begins.
+        </span>
+      </p>
     </>
   );
 }

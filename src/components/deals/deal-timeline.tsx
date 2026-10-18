@@ -16,12 +16,14 @@ import {
   useState,
   useTransition,
 } from "react";
+import { InfoTip } from "@/components/app/info-tip";
 import {
   Card,
   Dot,
   hintClass,
   inputClass,
   labelClass,
+  Ring,
   TurnFlag,
 } from "@/components/app/kit";
 import { TextField } from "@/components/auth/fields";
@@ -162,6 +164,57 @@ function Whose({ state, who }: { state: StepState; who: string }) {
   );
 }
 
+/**
+ * Said word for word by the step before the calm pass, now behind the (i)
+ * beside its name: the first to whoever is waiting on somebody else, the
+ * second to the buyer about to record a payment, under the step's own line
+ * that already says what to do.
+ */
+const NOTHING_FROM_YOU =
+  "Nothing is needed from you right now. Your deals list flags this one under “Waiting on you” the moment it is your turn.";
+const WHY_THE_REFERENCE =
+  "Send the agreed amount to the seller, then paste the transaction reference. It is what lets Channel Adda settle a disagreement about whether the money arrived — without it there is only one person's word against another's.";
+
+/**
+ * The (i) beside the step in play's name.
+ *
+ * Whoever does the step reads what it involves on the page, because that is
+ * what they are about to confirm; only the reasoning behind its form is
+ * folded. Everybody else is only watching, so what the step involves and
+ * that nothing is needed from them are both one tap away. A paused step
+ * keeps its line on the page: the pause is news.
+ */
+function StepInfo({
+  step,
+  state,
+  className,
+}: {
+  step: DealStepView;
+  state: StepState;
+  className?: string;
+}) {
+  const parts: string[] = [];
+  if (state.mine) {
+    if (!state.paymentPending && needsPaymentRef(step.label)) {
+      parts.push(WHY_THE_REFERENCE);
+    }
+  } else {
+    if (state.help) parts.push(state.help);
+    if (!state.frozen) parts.push(NOTHING_FROM_YOU);
+  }
+  if (parts.length === 0) return null;
+
+  return (
+    <InfoTip label="About this step" className={className}>
+      {parts.map((text, index) => (
+        <p key={text} className={index > 0 ? "mt-2" : undefined}>
+          {text}
+        </p>
+      ))}
+    </InfoTip>
+  );
+}
+
 /** A quiet aside inside a step: a waiting period, why there is no button. */
 function Note({
   icon: Icon = InfoIcon,
@@ -216,12 +269,15 @@ export function DealNextStep({
             Step {step.position} of {deal.steps.length}
           </span>
         </div>
-        <h2
-          id="next-step-heading"
-          className="mt-2.5 text-[0.9375rem] leading-6 font-semibold text-fg"
-        >
-          {step.label}
-        </h2>
+        <div className="mt-2.5 flex items-start gap-1.5">
+          <h2
+            id="next-step-heading"
+            className="min-w-0 text-[0.9375rem] leading-6 font-semibold text-fg"
+          >
+            {step.label}
+          </h2>
+          <StepInfo step={step} state={state} className="mt-0.5" />
+        </div>
         <StepDetail deal={deal} step={step} state={state} staffIds={staffIds} />
       </section>
     </Card>
@@ -229,8 +285,9 @@ export function DealNextStep({
 }
 
 /**
- * Everything under the step in play: what it involves, what is in the way,
- * and — for the person whose step it is — the button.
+ * Everything under the step in play: what it involves (for the person whose
+ * step it is — anyone else finds it behind the (i) by its name), what is in
+ * the way, and the button.
  */
 function StepDetail({
   deal,
@@ -245,17 +302,16 @@ function StepDetail({
 }) {
   return (
     <>
-      {state.help ? (
+      {state.mine && state.help ? (
         <p className="mt-1.5 max-w-[62ch] text-[0.8125rem] leading-relaxed text-muted">
           {state.help}
         </p>
       ) : null}
 
-      {!state.mine ? (
+      {state.frozen ? (
         <p className="mt-2 max-w-[62ch] text-[0.8125rem] leading-relaxed text-subtle">
-          {state.frozen
-            ? "This step is where the deal stopped. It stays here until a moderator decides the dispute."
-            : "Nothing is needed from you right now. Your deals list flags this one under “Waiting on you” the moment it is your turn."}
+          This step is where the deal stopped. It stays here until a moderator
+          decides the dispute.
         </p>
       ) : null}
 
@@ -318,25 +374,19 @@ function StepAction({
 
   return (
     <div className="mt-4 flex flex-col gap-4">
+      {/* Why the reference matters is behind the (i) by the step's name;
+          the step's own line above already says to send, then record. */}
       {wantsRef ? (
-        <div>
-          <p className="max-w-[62ch] text-[0.8125rem] leading-relaxed text-muted">
-            Send the agreed amount to the seller, then paste the transaction
-            reference. It is what lets Channel Adda settle a disagreement about
-            whether the money arrived — without it there is only one person's
-            word against another's.
-          </p>
-          <TextField
-            id={refId}
-            name="paymentRef"
-            label="Transaction reference"
-            hint="The id, hash or receipt number your bank or wallet gave you."
-            value={paymentRef}
-            onChange={(e) => setPaymentRef(e.target.value)}
-            className="mt-3 max-w-sm"
-            required
-          />
-        </div>
+        <TextField
+          id={refId}
+          name="paymentRef"
+          label="Transaction reference"
+          hint="The id, hash or receipt number your bank or wallet gave you."
+          value={paymentRef}
+          onChange={(e) => setPaymentRef(e.target.value)}
+          className="max-w-sm"
+          required
+        />
       ) : null}
 
       {wantsApprover ? (
@@ -435,50 +485,53 @@ export function DealSteps({
 }) {
   const total = deal.steps.length;
   const doneCount = deal.steps.filter((s) => s.completedAt !== null).length;
-  const percent = total > 0 ? Math.round((doneCount / total) * 100) : 0;
   const terminal = isTerminal(deal.status);
+  const completed = deal.status === "COMPLETED";
   const next = deal.nextStep;
   const state = next ? stepState(deal, next) : null;
+  const progressLabel = `${doneCount} of ${total} steps complete`;
 
   return (
     <section aria-labelledby="steps-heading" className="p-4 sm:p-5">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+      <div className="flex items-center justify-between gap-4">
         <h2
           id="steps-heading"
           className="text-sm leading-6 font-semibold text-fg"
         >
           What happens, in order
         </h2>
-        <p className="text-xs text-subtle tabular-nums">
-          {doneCount} of {total} done
-        </p>
+        {/* How far along, as a figure in a ring rather than a line of text.
+            Green once finished; a deal that stopped short keeps its arc in
+            the quiet grey of something that is no longer moving (the kit's
+            ring has no muted tone, so the arc is recoloured here). */}
+        {total > 0 ? (
+          <span
+            role="progressbar"
+            aria-valuenow={doneCount}
+            aria-valuemin={0}
+            aria-valuemax={total}
+            aria-label={progressLabel}
+            className={cn(
+              "inline-flex shrink-0",
+              terminal &&
+                !completed &&
+                "[&_circle:last-child]:stroke-line-strong",
+            )}
+          >
+            <Ring
+              value={doneCount}
+              max={total}
+              label={progressLabel}
+              tone={completed ? "verified" : "neutral"}
+              size={40}
+            >
+              {doneCount}/{total}
+            </Ring>
+          </span>
+        ) : null}
       </div>
 
-      {total > 0 ? (
-        <div
-          role="progressbar"
-          aria-valuenow={doneCount}
-          aria-valuemin={0}
-          aria-valuemax={total}
-          aria-label={`${doneCount} of ${total} steps complete`}
-          className="mt-3 h-1 w-full overflow-hidden rounded-full bg-surface-3"
-        >
-          <span
-            aria-hidden="true"
-            className={cn(
-              "block h-full rounded-full transition-[width] duration-500 ease-out",
-              deal.status === "COMPLETED"
-                ? "bg-verified"
-                : terminal
-                  ? "bg-line-strong"
-                  : "bg-muted",
-            )}
-            style={{ width: `${percent}%` }}
-          />
-        </div>
-      ) : null}
-
-      <ol className="mt-5">
+      <ol className="mt-4">
         {deal.steps.map((step, index) => (
           <Step
             key={step.position}
@@ -538,9 +591,12 @@ function Step({
       >
         {current ? (
           <>
-            <p className="text-sm leading-5 font-semibold text-fg">
-              {step.label}
-            </p>
+            <div className="flex items-start gap-1.5">
+              <p className="min-w-0 text-sm leading-5 font-semibold text-fg">
+                {step.label}
+              </p>
+              <StepInfo step={step} state={current} />
+            </div>
             <div className="mt-1.5">
               <Whose
                 state={current}

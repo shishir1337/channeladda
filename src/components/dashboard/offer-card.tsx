@@ -2,7 +2,7 @@
 
 import { ClockIcon, MessagesSquareIcon } from "lucide-react";
 import Link from "next/link";
-import { Callout, TurnFlag } from "@/components/app/kit";
+import { Callout, Meter, TurnFlag } from "@/components/app/kit";
 import { OfferActions } from "@/components/offers/offer-actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -82,6 +82,13 @@ export function OfferCard({
   // When `OfferActions` draws anything — an open offer somebody is waiting
   // on — so the column for its buttons only takes room when it has some.
   const hasActions = open && offer.awaiting !== null;
+  // How close the figure is to the asking price, seen as a bar before it is
+  // read. Floored, so an offer a dollar short never claims 100%.
+  const fullAsk = atAskingPrice && !offer.bySeller;
+  const share =
+    offer.listingPrice > 0
+      ? Math.floor((offer.amount / offer.listingPrice) * 100)
+      : null;
 
   return (
     <li className="px-4 py-4 sm:px-5">
@@ -90,7 +97,7 @@ export function OfferCard({
           <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
             <span
               className={cn(
-                "text-lg leading-7 font-semibold tracking-[-0.01em] tabular-nums",
+                "text-[1.375rem] leading-7 font-semibold tracking-[-0.02em] tabular-nums",
                 past ? "text-muted" : "text-fg",
               )}
             >
@@ -98,7 +105,7 @@ export function OfferCard({
             </span>
             <span
               className={
-                atAskingPrice && !offer.bySeller
+                fullAsk
                   ? "text-xs font-medium text-verified"
                   : "text-xs text-subtle"
               }
@@ -113,10 +120,28 @@ export function OfferCard({
             </span>
           </div>
 
+          {share !== null ? (
+            <div className="mt-1.5 flex max-w-[15rem] items-center gap-2.5">
+              <Meter
+                value={offer.amount}
+                max={offer.listingPrice}
+                label={`${share}% of the asking price`}
+                tone={fullAsk ? "verified" : "neutral"}
+                className={cn("flex-1", past && "opacity-50")}
+              />
+              {/* "full asking price" beside the figure already says 100%. */}
+              {fullAsk && share === 100 ? null : (
+                <span className="shrink-0 text-xs text-subtle tabular-nums">
+                  {share}% of asking
+                </span>
+              )}
+            </div>
+          ) : null}
+
           <Link
             href={`/listing/${offer.listingSlug}`}
             className={cn(
-              "mt-0.5 block truncate text-sm font-medium underline-offset-4 transition-colors duration-150 hover:text-fg hover:underline",
+              "mt-2 block truncate text-sm font-medium underline-offset-4 transition-colors duration-150 hover:text-fg hover:underline",
               past ? "text-muted" : "text-fg",
             )}
           >

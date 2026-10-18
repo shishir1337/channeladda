@@ -9,10 +9,12 @@ import {
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import type { ComponentType, ReactNode, SVGProps } from "react";
+import type { ReactNode } from "react";
+import { InfoTip } from "@/components/app/info-tip";
 import {
   Callout,
   Card,
+  CardHeader,
   MetaItem,
   PageHeader,
   Reference,
@@ -203,9 +205,12 @@ export default async function DealPage({
           {/* ---- the money --------------------------------------------- */}
           <Card>
             <section aria-labelledby="money-heading">
-              <CardHead id="money-heading" icon={BanknoteIcon}>
-                The money, and where it is
-              </CardHead>
+              <CardHeader
+                as="h2"
+                id="money-heading"
+                icon={BanknoteIcon}
+                title="The money, and where it is"
+              />
               <dl className="px-4 sm:px-5">
                 <Line
                   label="Channel price"
@@ -263,9 +268,12 @@ export default async function DealPage({
           {/* ---- who is on it ------------------------------------------ */}
           <Card>
             <section aria-labelledby="people-heading">
-              <CardHead id="people-heading" icon={UsersIcon}>
-                Who is on this deal
-              </CardHead>
+              <CardHeader
+                as="h2"
+                id="people-heading"
+                icon={UsersIcon}
+                title="Who is on this deal"
+              />
               <dl className="px-4 sm:px-5">
                 <Line
                   label="Buyer"
@@ -315,30 +323,12 @@ export default async function DealPage({
   );
 }
 
-/** A side card's heading, kept an `h2` so the page's outline stays flat. */
-function CardHead({
-  id,
-  icon: Icon,
-  children,
-}: {
-  id: string;
-  icon: ComponentType<SVGProps<SVGSVGElement>>;
-  children: ReactNode;
-}) {
-  return (
-    <div className="flex items-center gap-2 border-b border-line px-4 py-3 sm:px-5">
-      <Icon aria-hidden="true" className="size-4 shrink-0 text-subtle" />
-      <h2 id={id} className="min-w-0 text-sm leading-6 font-semibold text-fg">
-        {children}
-      </h2>
-    </div>
-  );
-}
-
 /**
- * One fact: what it is, its value, and a line on what it means for the
- * reader. The note is what stops a Safest buyer reading the price as
- * something Channel Adda is holding.
+ * One fact: what it is and its value, with a line on what it means for the
+ * reader behind the (i) beside the label. While the deal is live the card's
+ * own sentence under the rows says where the money is in full, which is
+ * what stops a Safest buyer reading the price as something Channel Adda is
+ * holding; the notes add the detail line by line.
  */
 function Line({
   label,
@@ -352,8 +342,11 @@ function Line({
   money?: boolean;
 }) {
   return (
-    <div className="grid grid-cols-[auto_minmax(0,1fr)] items-baseline gap-x-4 border-b border-line py-3 last:border-b-0">
-      <dt className="text-[0.8125rem] text-muted">{label}</dt>
+    <div className="flex items-baseline justify-between gap-4 border-b border-line py-3 last:border-b-0">
+      <dt className="inline-flex shrink-0 items-center gap-1 text-[0.8125rem] text-muted">
+        {label}
+        <InfoTip label={`About ${label}`}>{note}</InfoTip>
+      </dt>
       <dd
         className={cn(
           "min-w-0 text-right break-words text-fg tabular-nums",
@@ -361,9 +354,6 @@ function Line({
         )}
       >
         {value}
-      </dd>
-      <dd className="col-span-2 mt-0.5 text-xs leading-relaxed text-subtle">
-        {note}
       </dd>
     </div>
   );
