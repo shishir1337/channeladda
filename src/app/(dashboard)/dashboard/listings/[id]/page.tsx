@@ -142,7 +142,13 @@ export default async function SellerListingPage({
       <PageHeader
         back={{ href: "/dashboard/listings", label: "Your listings" }}
         title={listing.title || listing.handle}
-        description={meta.note}
+        description={
+          // A returned listing's note says this, with the moderator's words,
+          // just below — the line is not needed twice.
+          listing.status === "REJECTED" && listing.rejectionReason
+            ? undefined
+            : meta.note
+        }
         meta={
           <>
             <ListingStatusBadge status={listing.status} size="sm" />
@@ -299,7 +305,15 @@ export default async function SellerListingPage({
       {verified ? (
         <Section
           title="Ownership check"
-          description="Done. This is the part buyers trust most."
+          info={
+            <>
+              <p>This is the part buyers trust most.</p>
+              <p className="mt-1.5">
+                We read your code from the {platformName} account itself, so
+                buyers see a verified badge on this listing.
+              </p>
+            </>
+          }
         >
           <AllClear
             title={
@@ -313,7 +327,7 @@ export default async function SellerListingPage({
                 ) : null}
               </>
             }
-            body={`We read your code from the ${platformName} account itself, so buyers see a verified badge on this listing. You can take the code out of your description now.`}
+            body="You can take the code out of your description now."
           />
         </Section>
       ) : null}
@@ -321,7 +335,7 @@ export default async function SellerListingPage({
       {showOwnership ? (
         <Section
           title="Ownership check"
-          description={
+          info={
             listing.status === "CODE_CHECK"
               ? "Until we can see the code, nothing goes in front of buyers."
               : listing.status === "ADMIN_REVIEW"
@@ -349,7 +363,7 @@ export default async function SellerListingPage({
           title={
             listing.status === "REJECTED" ? "Fix and resend" : "The listing"
           }
-          description={
+          info={
             listing.status === "REJECTED"
               ? "Everything you sent is still here. Change what the note asks for and send it back."
               : "Everything buyers will see. Save a draft at any point."
@@ -393,7 +407,7 @@ export default async function SellerListingPage({
       {HAS_CONTROLS.includes(listing.status) ? (
         <Section
           title="Manage this listing"
-          description={
+          info={
             listing.status === "LIVE"
               ? "Pausing hides it from buyers without losing anything."
               : listing.status === "ADMIN_REVIEW"
@@ -437,7 +451,7 @@ function ReadOnlySummary({
   return (
     <Section
       title="The details"
-      description="Locked while this listing is with us. Pull it back to make changes."
+      info="Locked while this listing is with us. Pull it back to make changes."
     >
       <Card>
         <CardBody className="py-2 sm:py-2.5">

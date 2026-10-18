@@ -4,11 +4,11 @@ import {
   CheckIcon,
   CircleAlertIcon,
   CopyIcon,
-  LinkIcon,
   Loader2Icon,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { type ReactNode, useId, useState, useTransition } from "react";
+import { InfoTip } from "@/components/app/info-tip";
 import { Button } from "@/components/ui/button";
 import { platforms } from "@/data/platforms";
 import type { ListingStatus } from "@/generated/prisma/enums";
@@ -122,18 +122,20 @@ export function OwnershipPanel({
       aria-labelledby={headingId}
       className="rounded-card border border-line bg-surface shadow-xs"
     >
-      <div className="border-b border-line px-4 py-3 sm:px-5">
+      {/* Why the check works lives behind the (i): the steps below are what
+          the seller reads, and they are enough to do it. */}
+      <div className="flex items-center gap-1.5 border-b border-line px-4 py-3 sm:px-5">
         <h3 id={headingId} className="text-sm leading-6 font-semibold text-fg">
           Prove the {meta.name} account is yours
         </h3>
-        <p className="max-w-[68ch] text-[0.8125rem] leading-relaxed text-muted">
+        <InfoTip label="About the ownership check">
           Anyone can paste a link. Only the owner can edit {how.place} — so put
           this code there and{" "}
           {how.automatic
             ? "we will read it back"
             : "a moderator will look for it"}
           . It can come out again once the listing is approved.
-        </p>
+        </InfoTip>
       </div>
 
       <div className="p-4 sm:p-5">
@@ -177,9 +179,18 @@ export function OwnershipPanel({
                 </Step>
               ))}
               <Step n={how.steps.length + 1}>
-                {how.automatic
-                  ? "Come back and press check. It is usually instant."
-                  : "Come back here and tell us it is there."}
+                {how.automatic ? (
+                  "Come back and press check. It is usually instant."
+                ) : (
+                  <>
+                    Come back here and tell us it is there.{" "}
+                    <InfoTip label="About the check by hand">
+                      {meta.name} has no public way for us to read {how.place}{" "}
+                      automatically, so a moderator opens the account and checks
+                      it by hand — usually within a few hours of you sending it.
+                    </InfoTip>
+                  </>
+                )}
               </Step>
             </ol>
           </>
@@ -207,20 +218,6 @@ export function OwnershipPanel({
             )}
           </Button>
         )}
-
-        {!how.automatic && code ? (
-          <p className="mt-5 flex items-start gap-2.5 rounded-lg border border-info/20 bg-info-soft/70 px-3 py-2.5 text-[0.8125rem] leading-relaxed text-fg">
-            <LinkIcon
-              aria-hidden="true"
-              className="mt-0.5 size-3.5 shrink-0 text-info"
-            />
-            <span>
-              {meta.name} has no public way for us to read {how.place}{" "}
-              automatically, so a moderator opens the account and checks it by
-              hand — usually within a few hours of you sending it.
-            </span>
-          </p>
-        ) : null}
 
         {waitingOnSeller && code && !hasProof ? (
           <p className="mt-4 flex items-start gap-2 text-[0.8125rem] leading-relaxed text-danger">

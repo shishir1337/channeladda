@@ -9,6 +9,7 @@ import {
   SearchIcon,
 } from "lucide-react";
 import { useId, useState, useTransition } from "react";
+import { InfoTip } from "@/components/app/info-tip";
 import { IconTile, Skeleton } from "@/components/app/kit";
 import { TextField } from "@/components/auth/fields";
 import { Button } from "@/components/ui/button";
@@ -148,20 +149,22 @@ export function ChannelImport({
       aria-labelledby={`${id}-heading`}
       className="rounded-card border border-line bg-surface shadow-xs"
     >
-      <div className="flex items-start gap-3 border-b border-line px-4 py-3 sm:px-5">
-        <IconTile icon={LinkIcon} size="sm" className="mt-0.5" />
-        <div className="min-w-0">
+      <div className="flex items-center gap-3 border-b border-line px-4 py-3 sm:px-5">
+        <IconTile icon={LinkIcon} size="sm" />
+        <div className="flex min-w-0 items-center gap-1.5">
           <h2
             id={`${id}-heading`}
             className="text-sm leading-6 font-semibold text-fg"
           >
             Start from your channel link
           </h2>
-          <p className="max-w-[68ch] text-[0.8125rem] leading-relaxed text-muted">
+          {/* The field's own hint says what to paste; why it is worth it is
+              one tap away. */}
+          <InfoTip label="About the channel link">
             Paste the link you see when you open the channel. We read the name,
             the picture and the subscriber count from it, so the listing matches
             what buyers will find.
-          </p>
+          </InfoTip>
         </div>
       </div>
 

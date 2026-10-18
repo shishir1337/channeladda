@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { InfoTip } from "@/components/app/info-tip";
 import {
   Card,
   EmptyState,
@@ -19,8 +20,7 @@ import {
   PageHeader,
   Section,
   Sep,
-  Stat,
-  StatGrid,
+  SplitBar,
   TurnFlag,
 } from "@/components/app/kit";
 import {
@@ -121,16 +121,19 @@ export default async function MyListingsPage() {
     </Button>
   );
 
+  const watching = onSale.reduce((n, l) => n + l.watching, 0);
+
   return (
     <>
       <PageHeader
         title="Your listings"
         description={
           listings.length === 0
-            ? "Nothing here yet. A listing is free, and it stays private until you send it."
+            ? "A listing is free, and it stays private until you send it."
             : needsYou.length > 0
               ? `${needsYou.length} ${needsYou.length === 1 ? "listing needs" : "listings need"} something from you.`
-              : `${onSale.length} on sale, ${archive.length} sold.`
+              : // How many are on sale and sold is the bar just below.
+                undefined
         }
         actions={listings.length === 0 ? undefined : newButton}
       />
@@ -140,8 +143,18 @@ export default async function MyListingsPage() {
           <EmptyState
             bare
             icon={PlusIcon}
-            title="List your first account"
-            body="Three steps and about ten minutes. Nothing goes in front of buyers until you have proved the account is yours and a moderator has checked it — and you can stop halfway and come back to a saved draft."
+            title={
+              <>
+                List your first account{" "}
+                <InfoTip label="About listing an account">
+                  Three steps and about ten minutes. Nothing goes in front of
+                  buyers until you have proved the account is yours and a
+                  moderator has checked it — and you can stop halfway and come
+                  back to a saved draft.
+                </InfoTip>
+              </>
+            }
+            body="Three steps and about ten minutes."
             action={
               <>
                 {newButton}
@@ -161,53 +174,71 @@ export default async function MyListingsPage() {
                   <step.icon aria-hidden="true" className="size-3.5" />
                   <span className="tabular-nums">Step {i + 1}</span>
                 </div>
-                <h2 className="mt-2 text-sm font-semibold text-fg">
-                  {step.title}
-                </h2>
-                <p className="mt-1 text-[0.8125rem] leading-relaxed text-muted">
-                  {step.body}
-                </p>
+                <div className="mt-2 flex items-start gap-1.5">
+                  <h2 className="text-sm leading-5 font-semibold text-fg">
+                    {step.title}
+                  </h2>
+                  <InfoTip label={`About step ${i + 1}`}>{step.body}</InfoTip>
+                </div>
               </li>
             ))}
           </ol>
         </Card>
       ) : (
-        <StatGrid>
-          <Stat
-            label="Waiting on you"
-            value={needsYou.length}
-            note={
-              needsYou.length > 0
-                ? "Will not move until you act"
-                : "Nothing to do"
-            }
-            tone={needsYou.length > 0 ? "primary" : "neutral"}
-            href={
-              needsYou.length > 0 ? "/dashboard/listings#waiting" : undefined
-            }
+        // The stages as one bar rather than four boxes of numbers: how the
+        // listings split is the thing to see, and the sections below hold
+        // the detail.
+        <Card padded>
+          <div className="flex items-end justify-between gap-6">
+            <div className="min-w-0">
+              <p className="text-[0.8125rem] leading-5 font-medium text-muted">
+                All listings
+              </p>
+              <p className="mt-1 text-[1.625rem] leading-8 font-semibold tracking-[-0.02em] text-fg tabular-nums">
+                {listings.length.toLocaleString("en-US")}
+              </p>
+            </div>
+            <div className="min-w-0 text-right">
+              <p className="text-[0.8125rem] leading-5 font-medium text-muted">
+                Watching
+              </p>
+              <p className="mt-1 text-[1.625rem] leading-8 font-semibold tracking-[-0.02em] text-fg tabular-nums">
+                {watching.toLocaleString("en-US")}
+              </p>
+            </div>
+          </div>
+          <SplitBar
+            className="mt-4"
+            label="Your listings by stage"
+            parts={[
+              {
+                label:
+                  needsYou.length > 0 ? (
+                    <Link
+                      href="/dashboard/listings#waiting"
+                      className="relative rounded-sm font-medium text-fg underline decoration-line-strong underline-offset-4 transition-colors duration-150 hover:decoration-fg pointer-coarse:after:absolute pointer-coarse:after:-inset-3 pointer-coarse:after:content-['']"
+                    >
+                      Waiting on you
+                    </Link>
+                  ) : (
+                    "Waiting on you"
+                  ),
+                value: needsYou.length,
+                tone: "primary",
+              },
+              { label: "On sale", value: onSale.length, tone: "verified" },
+              { label: "Not live yet", value: inProgress.length, tone: "info" },
+              { label: "Sold", value: archive.length, tone: "muted" },
+            ]}
           />
-          <Stat
-            label="On sale"
-            value={onSale.length}
-            note={`${onSale
-              .reduce((n, l) => n + l.watching, 0)
-              .toLocaleString("en-US")} watching`}
-            tone={onSale.length > 0 ? "verified" : "neutral"}
-          />
-          <Stat
-            label="Not live yet"
-            value={inProgress.length}
-            note="Drafts and reviews"
-          />
-          <Stat label="Sold" value={archive.length} note="Changed hands" />
-        </StatGrid>
+        </Card>
       )}
 
       {needsYou.length > 0 ? (
         <Section
           id="waiting"
           title="Waiting on you"
-          description="These will not move until you act."
+          info="These will not move until you act."
           count={needsYou.length}
           tone="primary"
           className="scroll-mt-24"
@@ -223,7 +254,7 @@ export default async function MyListingsPage() {
       {onSale.length > 0 ? (
         <Section
           title="On sale"
-          description="Live listings are visible to buyers. A paused one keeps its place and can go back up any time."
+          info="Live listings are visible to buyers. A paused one keeps its place and can go back up any time."
           count={onSale.length}
         >
           <List>
@@ -237,7 +268,7 @@ export default async function MyListingsPage() {
       {inProgress.length > 0 ? (
         <Section
           title="Not live yet"
-          description="Drafts are private. Anything in review is with a moderator."
+          info="Drafts are private. Anything in review is with a moderator."
           count={inProgress.length}
         >
           <List>
@@ -269,16 +300,24 @@ export default async function MyListingsPage() {
   );
 }
 
-/** The ownership check, as a seller needs to see it on a list. */
+/**
+ * The ownership check, as a seller needs to see it on a list.
+ *
+ * Verified is the normal state of a listing on sale, so on a row it is a
+ * tick beside the name — the badge a buyer sees — rather than a chip on every
+ * line. Only the exception gets words.
+ */
+function VerifiedMark() {
+  return (
+    <span title="Ownership verified" className="inline-flex shrink-0">
+      <BadgeCheckIcon aria-hidden="true" className="size-4 text-verified" />
+      <span className="sr-only">Ownership verified</span>
+    </span>
+  );
+}
+
 function OwnershipChip({ listing }: { listing: SellerListing }) {
-  if (listing.ownershipVerifiedAt) {
-    return (
-      <Badge variant="verified">
-        <BadgeCheckIcon aria-hidden="true" />
-        Ownership verified
-      </Badge>
-    );
-  }
+  if (listing.ownershipVerifiedAt) return null;
   // A draft has not been asked for a code yet, so saying it is unverified
   // would be telling someone off for something they cannot have done. And at
   // CODE_CHECK the status badge beside this already reads "Waiting on your
@@ -300,8 +339,11 @@ function ListingRow({
   listing: SellerListing;
   needsYou?: boolean;
 }) {
-  const meta = statusMeta(listing.status);
   const move = NEXT_MOVE[listing.status];
+  // The one status whose meaning no badge or section on this page says.
+  const note =
+    move ??
+    (listing.status === "RESERVED" ? statusMeta(listing.status).note : null);
   const platform = platforms.find((p) => p.id === listing.platform);
 
   return (
@@ -341,8 +383,11 @@ function ListingRow({
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="truncate text-sm leading-5 font-medium text-fg">
-                {listing.title || listing.handle}
+              <p className="flex min-w-0 items-center gap-1.5 text-sm leading-5 font-medium text-fg">
+                <span className="truncate">
+                  {listing.title || listing.handle}
+                </span>
+                {listing.ownershipVerifiedAt ? <VerifiedMark /> : null}
               </p>
               <p className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-1.5 text-[0.8125rem] leading-5 text-muted">
                 <span className="capitalize">
@@ -381,17 +426,21 @@ function ListingRow({
             <ListingStatusBadge status={listing.status} size="sm" />
             <OwnershipChip listing={listing} />
             {needsYou ? <TurnFlag mine /> : null}
-            {/* What this status means, in the seller's language, on every row
-                — "ADMIN_REVIEW" and "CODE_CHECK" tell nobody anything. The
-                line is louder when the move is the seller's. */}
-            <span
-              className={cn(
-                "basis-full text-[0.8125rem] leading-5 sm:basis-auto",
-                needsYou ? "text-fg" : "text-muted",
-              )}
-            >
-              {move ?? meta.note}
-            </span>
+            {/* What to do next, in the seller's language — "CODE_CHECK"
+                tells nobody anything. Only where there is a move: what a live,
+                paused or in-review listing means is said once, beside its
+                section's heading, not again on every row. The line is louder
+                when the move is the seller's. */}
+            {note ? (
+              <span
+                className={cn(
+                  "basis-full text-[0.8125rem] leading-5 sm:basis-auto",
+                  needsYou ? "text-fg" : "text-muted",
+                )}
+              >
+                {note}
+              </span>
+            ) : null}
           </div>
 
           {listing.status === "REJECTED" && listing.rejectionReason ? (

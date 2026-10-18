@@ -38,23 +38,14 @@ const choices: PlatformChoice[] = platforms.map((p) => ({
  * Said before the form rather than discovered inside it: the two things that
  * send people away mid-listing are a screenshot they have not taken and a
  * price they have not decided, and both are quicker to fetch than to guess.
+ *
+ * Names only. What each one is for is said where it is used — the link box,
+ * the proof step and the price step below — so it is not said twice here.
  */
 const NEEDED = [
-  {
-    icon: LinkIcon,
-    title: "The link to your account",
-    body: "Paste it and we fill in the name, the picture and the subscriber count for you.",
-  },
-  {
-    icon: CameraIcon,
-    title: "A screenshot or two from inside it",
-    body: "Analytics or revenue, taken from the account itself. One is enough to start.",
-  },
-  {
-    icon: TagIcon,
-    title: "A price in mind",
-    body: "You set it, buyers can make an offer, and you never have to accept one.",
-  },
+  { icon: LinkIcon, title: "The link to your account" },
+  { icon: CameraIcon, title: "A screenshot or two from inside it" },
+  { icon: TagIcon, title: "A price in mind" },
 ];
 
 const PROMISES = [
@@ -72,41 +63,40 @@ export default async function NewListingPage() {
       <PageHeader
         back={{ href: "/dashboard/listings", label: "Your listings" }}
         title="List an account"
-        description="Free to list, and about ten minutes with the link to hand. Nothing is shown to buyers until you have proved the account is yours and a moderator has checked it."
+        description="Free to list, and about ten minutes with the link to hand."
+        info="Free to list, and about ten minutes with the link to hand. Nothing is shown to buyers until you have proved the account is yours and a moderator has checked it."
       />
 
       <Card>
-        <ul className="grid divide-y divide-line sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+        <ul
+          aria-label="Have these to hand"
+          className="flex flex-wrap gap-x-6 gap-y-2.5 px-4 py-3 sm:px-5"
+        >
           {NEEDED.map((item) => (
-            <li key={item.title} className="flex gap-3 p-4 sm:p-5">
+            <li
+              key={item.title}
+              className="inline-flex items-center gap-2.5 text-[0.8125rem] leading-5 font-medium text-fg"
+            >
               <IconTile icon={item.icon} size="sm" />
-              <div className="min-w-0">
-                <h2 className="text-sm leading-7 font-semibold text-fg">
-                  {item.title}
-                </h2>
-                <p className="mt-0.5 text-[0.8125rem] leading-relaxed text-muted">
-                  {item.body}
-                </p>
-              </div>
+              {item.title}
+            </li>
+          ))}
+        </ul>
+        <ul className="flex flex-wrap gap-x-5 gap-y-1.5 rounded-b-[inherit] border-t border-line bg-surface-2/50 px-4 py-2.5 sm:px-5">
+          {PROMISES.map((point) => (
+            <li
+              key={point.label}
+              className="inline-flex items-center gap-1.5 text-xs text-muted"
+            >
+              <point.icon
+                aria-hidden="true"
+                className="size-3.5 shrink-0 text-verified"
+              />
+              {point.label}
             </li>
           ))}
         </ul>
       </Card>
-
-      <ul className="mt-3 flex flex-wrap gap-x-5 gap-y-1.5 px-1">
-        {PROMISES.map((point) => (
-          <li
-            key={point.label}
-            className="inline-flex items-center gap-1.5 text-[0.8125rem] text-muted"
-          >
-            <point.icon
-              aria-hidden="true"
-              className="size-3.5 shrink-0 text-verified"
-            />
-            {point.label}
-          </li>
-        ))}
-      </ul>
 
       <div className="mt-6">
         <ListingForm platforms={choices} listingId={null} fees={fees} />

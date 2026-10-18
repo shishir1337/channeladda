@@ -17,7 +17,8 @@ import {
 import { useRouter } from "next/navigation";
 import type { ComponentType, ReactNode, SVGProps } from "react";
 import { useEffect, useId, useRef, useState, useTransition } from "react";
-import { IconTile, inputClass, labelClass } from "@/components/app/kit";
+import { InfoTip } from "@/components/app/info-tip";
+import { IconTile, inputClass, labelClass, Meter } from "@/components/app/kit";
 import { FormNotice, TextArea, TextField } from "@/components/auth/fields";
 import {
   ChannelImport,
@@ -183,6 +184,7 @@ function FormSection({
   of,
   title,
   description,
+  info,
   icon: Icon,
   state,
   statusLabel,
@@ -192,7 +194,10 @@ function FormSection({
   step: number;
   of: number;
   title: string;
+  /** One short line, or nothing. Anything longer belongs in `info`. */
   description?: ReactNode;
+  /** The longer explanation, behind an (i) beside the title. */
+  info?: ReactNode;
   icon: ComponentType<SVGProps<SVGSVGElement>>;
   state: StepState;
   statusLabel: string;
@@ -226,12 +231,15 @@ function FormSection({
             Step <span className="tabular-nums">{step}</span> of{" "}
             <span className="tabular-nums">{of}</span>
           </p>
-          <h2
-            id={`${id}-title`}
-            className="text-sm leading-5 font-semibold text-fg"
-          >
-            {title}
-          </h2>
+          <div className="flex items-center gap-1.5">
+            <h2
+              id={`${id}-title`}
+              className="text-sm leading-5 font-semibold text-fg"
+            >
+              {title}
+            </h2>
+            {info ? <InfoTip label={`About ${title}`}>{info}</InfoTip> : null}
+          </div>
           {description ? (
             <p className="mt-1 max-w-[72ch] text-[0.8125rem] leading-relaxed text-muted">
               {description}
@@ -260,6 +268,37 @@ function FormSection({
 
       <div className="flex flex-col gap-5 p-4 sm:p-5">{children}</div>
     </section>
+  );
+}
+
+/**
+ * The reason behind a field, as an (i) on its label line instead of a second
+ * sentence under it. What prevents a mistake — a format, a limit, who sees
+ * it — stays in the field's own hint.
+ *
+ * `TextField` takes its label as a string, so the tip sits at the right end
+ * of the label row (where `PasswordField` puts its aside) rather than inside
+ * the `<label>`, where every click on the label would also press it.
+ */
+function FieldInfo({
+  label,
+  info,
+  className,
+  children,
+}: {
+  /** The field's label, for the button's name. */
+  label: string;
+  info: ReactNode;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className={cn("relative", className)}>
+      <InfoTip label={`About ${label}`} className="absolute -top-px right-0">
+        {info}
+      </InfoTip>
+      {children}
+    </div>
   );
 }
 
@@ -646,22 +685,13 @@ export function ListingForm({
               {totalDone}/{totalRequired}
             </p>
           </div>
-          <div
-            role="progressbar"
-            aria-label="How much of this listing is filled in"
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={percent}
-            className="mt-2 h-1 overflow-hidden rounded-full bg-surface-3"
-          >
-            <div
-              className={cn(
-                "h-full rounded-full transition-[width,background-color] duration-500 ease-[var(--ease-out-soft)]",
-                percent === 100 ? "bg-verified" : "bg-primary",
-              )}
-              style={{ width: `${percent}%` }}
-            />
-          </div>
+          <Meter
+            className="mt-2"
+            value={percent}
+            max={100}
+            label="How much of this listing is filled in"
+            tone={percent === 100 ? "verified" : "primary"}
+          />
           <ul className="no-scrollbar -mx-1 mt-1.5 flex gap-0.5 overflow-x-auto px-1">
             {steps.map((s, i) => {
               const state = stepState(s);
@@ -822,19 +852,19 @@ export function ListingForm({
                   aria-hidden="true"
                   className="mt-0.5 size-3.5 shrink-0 text-subtle"
                 />
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <p className="text-xs text-subtle">
                     The link this listing points at
                   </p>
                   <p className="mt-0.5 text-[0.8125rem] font-medium break-all text-fg">
                     {draft.sourceUrl || "Nothing yet"}
                   </p>
-                  <p className="mt-1 text-xs leading-relaxed text-muted">
-                    Set by the box at the top of this page. It is the account
-                    your ownership code is read from, so it has to be the one
-                    you are selling.
-                  </p>
                 </div>
+                <InfoTip label="About the link this listing points at">
+                  Set by the box at the top of this page. It is the account your
+                  ownership code is read from, so it has to be the one you are
+                  selling.
+                </InfoTip>
               </div>
               {/* The schema can reject this and there is no input for it, so
                   without this line a bad link stops every save with nothing
@@ -858,12 +888,14 @@ export function ListingForm({
             placeholder="@dailytechbrief"
             required
           />
-          <div>
+          <FieldInfo
+            label="Listing title"
+            info="What a buyer sees first. Say what it is and why it is worth having."
+          >
             <TextField
               id={ids.title}
               name="title"
               label="Listing title"
-              hint="What a buyer sees first. Say what it is and why it is worth having."
               value={draft.title}
               onChange={(e) => set("title", e.target.value)}
               error={errors.title}
@@ -886,7 +918,7 @@ export function ListingForm({
                 </>
               )}
             </p>
-          </div>
+          </FieldInfo>
           <div className="grid gap-x-4 gap-y-5 sm:grid-cols-2">
             <TextField
               id={ids.niche}
@@ -920,7 +952,8 @@ export function ListingForm({
           state={stepState(steps[1])}
           statusLabel={stepStatus(steps[1])}
           title="The numbers"
-          description="Buyers check these against the screenshots you upload below, and so does a moderator. Put down what is actually there — a figure that does not match is the most common reason a listing comes back."
+          description="Put down what is actually there."
+          info="Buyers check these against the screenshots you upload below, and so does a moderator. Put down what is actually there — a figure that does not match is the most common reason a listing comes back."
         >
           <div className="grid gap-x-4 gap-y-5 sm:grid-cols-2">
             <TextField
@@ -968,17 +1001,21 @@ export function ListingForm({
               error={errors.monthlyRevenue}
               placeholder="0"
             />
-            <TextField
-              id={ids.yearly}
-              name="yearlyRevenue"
+            <FieldInfo
               label="Last 12 months (USD)"
-              hint="Asked separately because twelve times a good month is a number buyers do not believe."
-              inputMode="decimal"
-              value={draft.yearlyRevenue}
-              onChange={(e) => set("yearlyRevenue", e.target.value)}
-              error={errors.yearlyRevenue}
-              placeholder="0"
-            />
+              info="Asked separately because twelve times a good month is a number buyers do not believe."
+            >
+              <TextField
+                id={ids.yearly}
+                name="yearlyRevenue"
+                label="Last 12 months (USD)"
+                inputMode="decimal"
+                value={draft.yearlyRevenue}
+                onChange={(e) => set("yearlyRevenue", e.target.value)}
+                error={errors.yearlyRevenue}
+                placeholder="0"
+              />
+            </FieldInfo>
           </div>
 
           <div>
@@ -1097,7 +1134,9 @@ export function ListingForm({
           state={stepState(steps[3])}
           statusLabel={stepStatus(steps[3])}
           title="Images"
-          description="A cover for the listing card and a profile picture for the account itself. Both are needed before this can go in front of buyers — a draft saves fine without them."
+          // The "Needed to publish" chips on each uploader say the second
+          // half at a glance; the whole sentence is behind the (i).
+          info="A cover for the listing card and a profile picture for the account itself. Both are needed before this can go in front of buyers — a draft saves fine without them."
         >
           <div className="grid gap-x-4 gap-y-5 sm:grid-cols-2">
             {/* The chip sits on the uploader's own label line, so whether a
@@ -1164,7 +1203,8 @@ export function ListingForm({
           state={stepState(steps[4])}
           statusLabel={stepStatus(steps[4])}
           title="Proof the account is yours"
-          description="Screenshots from inside the account — analytics, revenue, the account settings page. This is what a moderator checks your numbers against, and it is never shown to buyers in full. At least one is needed, up to eight."
+          description="Screenshots from inside the account — analytics, revenue, the account settings page."
+          info="Screenshots from inside the account — analytics, revenue, the account settings page. This is what a moderator checks your numbers against, and it is never shown to buyers in full. At least one is needed, up to eight."
         >
           <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
             <p className="text-[0.8125rem] font-medium text-fg">
@@ -1362,12 +1402,15 @@ export function ListingForm({
             placeholder="Brand Account, 2FA on the owner email"
           />
 
-          <div>
+          <FieldInfo
+            label="About this account"
+            info="The fields above cannot carry 'the audience moved from shorts to long-form in March'."
+          >
             <TextArea
               id={ids.description}
               name="description"
               label="About this account (optional)"
-              hint="What it is, who watches it, how it earns, and anything a buyer would be annoyed to find out later. The fields above cannot carry 'the audience moved from shorts to long-form in March'."
+              hint="What it is, who watches it, how it earns, and anything a buyer would be annoyed to find out later."
               rows={6}
               value={draft.description}
               onChange={(e) => set("description", e.target.value)}
@@ -1377,37 +1420,52 @@ export function ListingForm({
               <span className="tabular-nums">{draft.description.length}</span>{" "}
               of 4,000 characters.
             </p>
-          </div>
+          </FieldInfo>
 
-          <TextField
-            id={ids.whatsapp}
-            name="whatsapp"
-            label="WhatsApp number (Channel Adda only)"
+          <FieldInfo
+            label="WhatsApp number"
             className="sm:max-w-sm"
-            hint="Never shown to buyers. We use it to reach you if a transfer stalls, which is the one moment email is too slow."
-            inputMode="tel"
-            value={draft.whatsapp}
-            onChange={(e) => set("whatsapp", e.target.value)}
-            error={errors.whatsapp}
-            placeholder="+8801712345678"
-          />
+            info="We use it to reach you if a transfer stalls, which is the one moment email is too slow."
+          >
+            <TextField
+              id={ids.whatsapp}
+              name="whatsapp"
+              label="WhatsApp number (Channel Adda only)"
+              hint="Never shown to buyers."
+              inputMode="tel"
+              value={draft.whatsapp}
+              onChange={(e) => set("whatsapp", e.target.value)}
+              error={errors.whatsapp}
+              placeholder="+8801712345678"
+            />
+          </FieldInfo>
         </FormSection>
 
         <section
           aria-labelledby="listing-requirements-title"
           className="rounded-card border border-line bg-surface shadow-xs"
         >
-          <div className="border-b border-line px-4 py-3.5 sm:px-5">
+          {/* What happens after these three is the "how it works" a seller
+              reads once, so it is behind the (i) with the rest. */}
+          <div className="flex items-center gap-1.5 border-b border-line px-4 py-3.5 sm:px-5">
             <h2
               id="listing-requirements-title"
               className="text-sm leading-6 font-semibold text-fg"
             >
               Before buyers can see it
             </h2>
-            <p className="text-[0.8125rem] leading-relaxed text-muted">
-              A draft saves without any of this. These three are what the next
-              button needs.
-            </p>
+            <InfoTip label="About what buyers need to see">
+              <p>
+                A draft saves without any of this. These three are what the next
+                button needs.
+              </p>
+              <p className="mt-1.5">
+                After that you get a one-time code to put in your{" "}
+                {platform?.name ?? "account"} description. We read it back to
+                prove the account is yours, then a moderator checks the listing
+                — usually within a few hours.
+              </p>
+            </InfoTip>
           </div>
           <ul className="flex flex-col gap-2.5 p-4 sm:p-5">
             <Requirement
@@ -1426,12 +1484,6 @@ export function ListingForm({
               target={STEP.proof}
             />
           </ul>
-          <p className="rounded-b-[inherit] border-t border-line bg-surface-2/50 px-4 py-3 text-xs leading-relaxed text-subtle sm:px-5">
-            After that you get a one-time code to put in your{" "}
-            {platform?.name ?? "account"} description. We read it back to prove
-            the account is yours, then a moderator checks the listing — usually
-            within a few hours.
-          </p>
         </section>
 
         {/* The save buttons follow the page down. A draft being safe is the
