@@ -10,6 +10,7 @@ import { PayoutDecision } from "@/components/admin/payout-decision";
 import { Waited } from "@/components/admin/vocab";
 import {
   AllClear,
+  Callout,
   List,
   ListItem,
   MetaItem,
@@ -42,9 +43,13 @@ export const metadata: Metadata = {
  * and where, then the decision on a quieter band beneath it. Never side by
  * side — the confirmation tells finance to check "the address above", and
  * the eye should pass the address on its way to the button.
+ *
+ * The page explains itself behind (i)s, but the warning that sending cannot
+ * be undone sits in plain sight above everything, and so does every line on
+ * a row that is about getting the address right.
  */
 export default async function AdminPayoutsPage() {
-  const staff = await requireRole("FINANCE");
+  await requireRole("FINANCE");
   const pending = await listPendingWithdrawals();
 
   const total = pending.reduce((sum, payout) => sum + payout.amountUsd, 0);
@@ -58,19 +63,22 @@ export default async function AdminPayoutsPage() {
     <>
       <PageHeader
         title="Payouts"
-        description="Each amount is already held against the seller's balance, so nothing here can be spent twice while you decide. Sending is irreversible — read the address against what the seller saved before you do."
+        info="Every decision here is written to the audit trail under your name, with the hash or the refusal reason attached. Amounts are stored as integer cents and shown in whichever currency the header is set to."
         meta={
-          <>
-            <MetaItem label="Signed in as">{staff.name}</MetaItem>
-            <MetaItem label="Desk">
-              {staff.role.toLowerCase().replace("_", " ")}
-            </MetaItem>
-            <MetaItem label="Read">
-              {new Date().toLocaleString("en-GB")}
-            </MetaItem>
-          </>
+          <MetaItem label="Read">{new Date().toLocaleString("en-GB")}</MetaItem>
         }
       />
+
+      {/* The page's one warning, word for word and in sight: this is the
+          desk where money leaves for good. */}
+      <Callout
+        tone="warning"
+        className="mb-6"
+        title="Sending is irreversible — read the address against what the seller saved before you do."
+      >
+        Each amount is already held against the seller&rsquo;s balance, so
+        nothing here can be spent twice while you decide.
+      </Callout>
 
       <StatGrid columns={3} className="grid-cols-1 sm:grid-cols-3">
         <Stat
@@ -83,13 +91,13 @@ export default async function AdminPayoutsPage() {
               <Waited since={oldest} prefix="oldest" lateAfter={48} />
             ) : null
           }
-          note="Oldest first, same as every other queue."
+          info="Oldest first, same as every other queue."
         />
         <MoneyMetric
           label="Held in total"
           cents={total}
           icon={LockIcon}
-          note="Held against the sellers’ available balances, so it cannot be spent twice. Debited only when you send it."
+          info="Held against the sellers’ available balances, so it cannot be spent twice. Debited only when you send it."
         />
         <MoneyMetric
           label="Largest single"
@@ -104,12 +112,12 @@ export default async function AdminPayoutsPage() {
         title="Waiting to be sent"
         count={pending.length}
         tone={pending.length > 0 ? "primary" : "neutral"}
-        description="Send the funds on-chain, then record the hash here. The hash is the only answer to a seller who says the money never arrived."
+        info="Send the funds on-chain, then record the hash here. The hash is the only answer to a seller who says the money never arrived."
       >
         {pending.length === 0 ? (
           <AllClear
             title="Nothing waiting to be sent"
-            body="Every requested payout has been settled or refused. Requests land here as sellers make them."
+            body="Requests land here as sellers make them."
           />
         ) : (
           <List>
@@ -174,15 +182,6 @@ export default async function AdminPayoutsPage() {
           </List>
         )}
       </Section>
-
-      <p className="mt-10 flex max-w-[96ch] items-start gap-2 text-xs leading-relaxed text-subtle">
-        <LockIcon aria-hidden="true" className="mt-px size-3.5 shrink-0" />
-        <span>
-          Every decision here is written to the audit trail under your name,
-          with the hash or the refusal reason attached. Amounts are stored as
-          integer cents and shown in whichever currency the header is set to.
-        </span>
-      </p>
     </>
   );
 }

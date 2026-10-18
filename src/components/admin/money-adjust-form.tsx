@@ -157,7 +157,7 @@ export function MoneyAdjustForm({
     <Card>
       <CardHeader
         title="New correction"
-        description="Every correction is two ledger rows — one on the member, the opposite one on Channel Adda — so the books still balance, and both go on the audit trail under your name."
+        info="Every correction is two ledger rows — one on the member, the opposite one on Channel Adda — so the books still balance, and both go on the audit trail under your name."
       />
 
       <CardBody className="space-y-5">

@@ -74,33 +74,50 @@ export function RefLink({
 }
 
 /**
+ * What a figure counts. One of the two is required: a non-technical owner
+ * reads these and acts on them, so a number without a sentence saying what
+ * it counts is a number somebody will misread.
+ */
+type Explained =
+  | {
+      /** The full sentence, behind the (i) beside the label. */
+      info: ReactNode;
+      /** A few words at most, under the figure. */
+      note?: ReactNode;
+    }
+  | { info?: ReactNode; note: ReactNode };
+
+/**
  * One money figure, what it counts, and the exact amount.
  *
- * `note` is the one-line explanation, and it is not optional: a
- * non-technical owner reads these and acts on them, so a number without a
- * sentence saying what it counts is a number somebody will misread.
+ * The explanation sits behind the (i) beside the label, so the figure is
+ * what gets read first; `note` is only the few words worth seeing without
+ * opening it.
  */
 export function MoneyMetric({
   label,
   cents,
+  info,
   note,
   count,
   tone = "neutral",
   icon,
   href,
+  visual,
   className,
 }: {
   label: string;
   /** Integer cents, exactly as summed from the ledger. */
   cents: number;
-  note: ReactNode;
   /** e.g. "4 deals" — what the figure was summed over. */
   count?: string;
   tone?: Tone;
   icon?: Icon;
   href?: string;
+  /** A small picture of the figure — how it splits — at the foot. */
+  visual?: ReactNode;
   className?: string;
-}) {
+} & Explained) {
   return (
     <Stat
       label={label}
@@ -108,20 +125,52 @@ export function MoneyMetric({
       tone={tone}
       icon={icon}
       href={href}
+      info={info}
       className={className}
-      // The exact figure sits tight under the rounded one, and the sentence
-      // saying what it counts a step further down, so the two figures read
-      // as one amount and the note as its definition.
+      // The exact figure sits tight under the rounded one so the two read
+      // as one amount, the few words under that, and any picture last.
       chip={
         <>
           <p className="-mt-1 text-[0.8125rem] text-muted tabular-nums">
             {exactUsd(cents)}
             {count ? <span className="text-subtle"> · {count}</span> : null}
           </p>
-          <p className="mt-3 text-xs leading-relaxed text-subtle">{note}</p>
+          {note ? (
+            <p className="mt-1.5 text-xs leading-snug text-subtle">{note}</p>
+          ) : null}
+          {visual ? <div className="mt-4">{visual}</div> : null}
         </>
       }
     />
+  );
+}
+
+/**
+ * What each line of a report means, as "term — definition" pairs, for the
+ * block folded under it. The rows stay a title and a figure; the words are
+ * one tap away and said once.
+ */
+export function MoneyTerms({
+  terms,
+  className,
+}: {
+  terms: readonly {
+    term: string;
+    definition: ReactNode;
+    /** Across both columns, for a definition too long for one. */
+    wide?: boolean;
+  }[];
+  className?: string;
+}) {
+  return (
+    <dl className={cn("grid gap-x-8 gap-y-2 sm:grid-cols-2", className)}>
+      {terms.map((item) => (
+        <div key={item.term} className={cn(item.wide && "sm:col-span-2")}>
+          <dt className="inline font-medium text-fg">{item.term}</dt>
+          <dd className="inline"> — {item.definition}</dd>
+        </div>
+      ))}
+    </dl>
   );
 }
 
@@ -130,13 +179,13 @@ export function MoneyMetric({
  * counts on the left, the amount — rounded, then exact — on the right.
  *
  * Rows rather than cards so the amounts line up in one column and read
- * down like a statement. Same contract as `MoneyMetric`: the note is not
- * optional.
+ * down like a statement. What each row counts is said once, in the
+ * `MoneyTerms` folded under the list rather than under every row; the page
+ * builds both from one list, so no row goes without its definition.
  */
 export function MoneyLine({
   label,
   cents,
-  note,
   count,
   icon,
   href,
@@ -144,35 +193,29 @@ export function MoneyLine({
   label: string;
   /** Integer cents, exactly as summed from the ledger. */
   cents: number;
-  note: ReactNode;
   count?: string;
   icon?: Icon;
   href?: string;
 }) {
   return (
     <ListItem href={href}>
-      <div className="flex items-start gap-3">
+      <div className="flex items-center gap-3">
         {icon ? (
           <IconTile icon={icon} size="sm" className="hidden sm:inline-flex" />
         ) : null}
-        <div className="min-w-0 flex-1">
-          <p className="flex flex-wrap items-baseline gap-x-1.5 text-sm leading-5 font-medium text-fg">
-            {label}
-            {count ? (
-              <span className="text-[0.8125rem] font-normal text-subtle tabular-nums">
-                · {count}
-              </span>
-            ) : null}
-          </p>
-          <p className="mt-0.5 max-w-[64ch] text-xs leading-relaxed text-subtle">
-            {note}
-          </p>
-        </div>
+        <p className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-1.5 text-sm leading-5 font-medium text-fg">
+          {label}
+          {count ? (
+            <span className="text-[0.8125rem] font-normal text-subtle tabular-nums">
+              · {count}
+            </span>
+          ) : null}
+        </p>
         <Amount cents={cents} caption={exactUsd(cents)} className="shrink-0" />
         {href ? (
           <ChevronRightIcon
             aria-hidden="true"
-            className="mt-0.5 size-4 shrink-0 text-subtle transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-muted"
+            className="size-4 shrink-0 text-subtle transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-muted"
           />
         ) : null}
       </div>
@@ -256,8 +299,9 @@ export function MonthPicker({
         <ChevronLeftIcon aria-hidden="true" className="size-4" />
       </Link>
       <form method="get" action={action} className="flex items-center gap-2">
-        {/* The page says months run midnight to midnight UTC right beside
-            this, so the label only needs to reach a screen reader. */}
+        {/* The report's heading beside this says, behind its (i), that
+            months run midnight to midnight UTC, so the label only needs to
+            reach a screen reader. */}
         <label htmlFor="money-month" className="sr-only">
           Month (UTC)
         </label>

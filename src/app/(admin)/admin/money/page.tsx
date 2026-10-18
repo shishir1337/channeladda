@@ -15,12 +15,14 @@ import {
 } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
+import type { ComponentProps, ReactNode } from "react";
 import {
   DownloadLink,
   exactUsd,
   linkClass,
   MoneyLine,
   MoneyMetric,
+  MoneyTerms,
   MonthPicker,
   plural,
   RefLink,
@@ -30,10 +32,12 @@ import {
   OrderStatusBadge,
   Waited,
 } from "@/components/admin/vocab";
+import { InfoTip } from "@/components/app/info-tip";
 import {
   AllClear,
   Amount,
   Callout,
+  Disclosure,
   IconTile,
   List,
   ListItem,
@@ -41,6 +45,7 @@ import {
   PageHeader,
   Section,
   Sep,
+  SplitBar,
   StatGrid,
   TableCard,
   Td,
@@ -49,6 +54,7 @@ import {
 } from "@/components/app/kit";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Price } from "@/components/ui/price";
 import {
   fastestHoldMismatches,
   type InvoiceAttention,
@@ -114,10 +120,13 @@ function invoiceAdvice(row: InvoiceAttention): string {
  *
  * FINANCE and SUPERADMIN only — the same gate as `/admin/payouts`.
  *
- * Written for an owner reading it, not an engineer: every figure says in
- * one line what it counts, revenue is only ever fees, and the order is the
- * order somebody should act in — what needs a person, then where the money
- * is right now, then the month's report and its exports.
+ * Written for an owner reading it, not an engineer: every figure says what
+ * it counts — behind the (i) beside it, or folded under its list, so the
+ * figures are what gets read first — revenue is only ever fees, and the
+ * order is the order somebody should act in — what needs a person, then
+ * where the money is right now, then the month's report and its exports.
+ * Warnings about money at risk and anything that cannot be undone stay in
+ * plain sight.
  *
  * The exports stay at the foot of the month's report rather than in the
  * page header: each file is for the month picked there, and a download
@@ -128,7 +137,7 @@ export default async function AdminMoneyPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const staff = await requireRole("FINANCE");
+  await requireRole("FINANCE");
   const params = await searchParams;
 
   const now = new Date();
@@ -166,11 +175,128 @@ export default async function AdminMoneyPage({
   );
   const unapplied = invoices.rows.filter((row) => row.landed === null);
 
+  // Held + members' wallets + ours is exactly what should be on hand. "Ours"
+  // can be below zero — corrections we paid for can outrun the fees — and a
+  // bar cannot draw a negative part, so then it is named beside the bar
+  // instead of drawn in it.
+  const oursBelowZero = position.platformOwn < 0;
+  const onHandParts: ComponentProps<typeof SplitBar>["parts"] = [
+    {
+      label: "Held for Fastest buyers",
+      value: position.heldForBuyers.cents,
+      display: <Price usd={position.heldForBuyers.cents / 100} />,
+      tone: "info",
+    },
+    {
+      label: "In members' wallets",
+      value: position.memberBalances.cents,
+      display: <Price usd={position.memberBalances.cents / 100} />,
+      tone: "muted",
+    },
+    ...(oursBelowZero
+      ? []
+      : [
+          {
+            label: "Ours",
+            value: position.platformOwn,
+            display: <Price usd={position.platformOwn / 100} />,
+            tone: "neutral" as const,
+          },
+        ]),
+  ];
+
+  // Everything else that moved in the month. The rows and the definitions
+  // folded under them are drawn from this one list, so no row is ever
+  // without the sentence saying what it counts.
+  const flows: (ComponentProps<typeof MoneyLine> & { note: ReactNode })[] = [
+    {
+      label: "Paid into Fastest deals",
+      cents: figures.fastest.paidIn.cents,
+      count: plural(figures.fastest.paidIn.count, "deal"),
+      icon: ArrowDownLeftIcon,
+      note: "Price plus fee from Fastest buyers, by crypto or from their balance. We hold it until the deal ends.",
+    },
+    {
+      label: "Credited to sellers",
+      cents: figures.fastest.toSellers.cents,
+      count: plural(figures.fastest.toSellers.count, "sale"),
+      icon: BanknoteIcon,
+      note: "Sale prices released into sellers' wallets when Fastest deals completed, less the seller fee. Still with us until they withdraw it.",
+    },
+    {
+      label: "Refunded to buyers",
+      cents: figures.refunds.total,
+      count: plural(
+        figures.refunds.fastest.count + figures.refunds.safest.count,
+        "refund",
+      ),
+      icon: RotateCcwIcon,
+      note: (
+        <>
+          Returned to buyers&rsquo; Channel Adda balances:{" "}
+          <span className="tabular-nums">
+            {exactUsd(figures.refunds.fastest.cents)}
+          </span>{" "}
+          of held Fastest money,{" "}
+          <span className="tabular-nums">
+            {exactUsd(figures.refunds.safest.cents)}
+          </span>{" "}
+          of Safest admin fees.
+        </>
+      ),
+    },
+    {
+      label: "Deposits",
+      cents: figures.deposits.topUps.cents,
+      count: plural(figures.deposits.topUps.count, "top-up"),
+      icon: ArrowDownLeftIcon,
+      note: "Money members paid in to their own balance.",
+    },
+    {
+      label: "Deal payments to balances",
+      cents: figures.deposits.dealPayments.cents,
+      count: plural(figures.deposits.dealPayments.count, "payment"),
+      icon: WalletIcon,
+      note: "Deal payments that arrived after the deal had stopped, or paid a deal twice. Credited to the payer's balance rather than lost.",
+    },
+    {
+      label: "Paid from balances",
+      cents: figures.spentFromBalances.cents,
+      count: plural(figures.spentFromBalances.count, "deal"),
+      icon: WalletIcon,
+      note: "Members paying a deal's opening payment out of their balance instead of by crypto. Moves their money into our hold or our fees.",
+    },
+    {
+      label: "Payouts sent",
+      cents: figures.payouts.cents,
+      count: plural(figures.payouts.count, "payout"),
+      icon: ArrowUpRightIcon,
+      href: "/admin/payouts",
+      note: "Withdrawals finance marked as sent. This is money that left us for members' own crypto wallets.",
+    },
+    {
+      label: "Corrections added",
+      cents: figures.adjustments.credits.cents,
+      count: plural(figures.adjustments.credits.count, "correction"),
+      icon: SlidersHorizontalIcon,
+      href: "/admin/money/adjust",
+      note: "Added to members' balances by hand. Each one came out of our own money, so the books still balance.",
+    },
+    {
+      label: "Corrections taken",
+      cents: figures.adjustments.debits.cents,
+      count: plural(figures.adjustments.debits.count, "correction"),
+      icon: SlidersHorizontalIcon,
+      href: "/admin/money/adjust",
+      note: "Taken from members' balances by hand, usually a credit made by mistake. Each one went back into our own money.",
+    },
+  ];
+
   return (
     <>
       <PageHeader
         title="Money desk"
-        description="What Channel Adda earned, what it is holding for other people, and what it paid out — month by month, straight from the ledger."
+        info="What Channel Adda earned, what it is holding for other people, and what it paid out — month by month, straight from the ledger."
         actions={
           <Button asChild variant="secondary">
             <Link href="/admin/money/adjust">
@@ -179,15 +305,7 @@ export default async function AdminMoneyPage({
             </Link>
           </Button>
         }
-        meta={
-          <>
-            <MetaItem label="Signed in as">{staff.name}</MetaItem>
-            <MetaItem label="Desk">
-              {staff.role.toLowerCase().replace("_", " ")}
-            </MetaItem>
-            <MetaItem label="Read">{now.toLocaleString("en-GB")}</MetaItem>
-          </>
-        }
+        meta={<MetaItem label="Read">{now.toLocaleString("en-GB")}</MetaItem>}
       />
 
       {/* --------------------------------------------- needs a person */}
@@ -196,7 +314,8 @@ export default async function AdminMoneyPage({
         title="Paid at the processor, not applied"
         count={invoices.total}
         tone={unapplied.length > 0 ? "danger" : "neutral"}
-        description="The sweep retries every ten minutes, so anything here for longer than that needs you. Check each one in the processor's dashboard by its reference before acting: recording a payment by hand cannot be undone."
+        info="The sweep retries every ten minutes, so anything here for longer than that needs you."
+        description="Check each one in the processor's dashboard by its reference before acting: recording a payment by hand cannot be undone."
       >
         {invoices.rows.length === 0 ? (
           <AllClear
@@ -322,7 +441,7 @@ export default async function AdminMoneyPage({
       <Section
         id="now"
         title="Right now"
-        description="Where the money is at this moment, whatever month is selected below. Everything here is worked out from the ledger rows, not from what the deals say should have happened."
+        info="Where the money is at this moment, whatever month is selected below. Everything here is worked out from the ledger rows, not from what the deals say should have happened."
       >
         <StatGrid columns={3} className="grid-cols-1 sm:grid-cols-2">
           <MoneyMetric
@@ -330,14 +449,16 @@ export default async function AdminMoneyPage({
             cents={position.heldForBuyers.cents}
             count={plural(position.heldForBuyers.count, "deal")}
             icon={LockIcon}
-            note="Price plus fee on Fastest deals still running, including those waiting out their recovery hold. Not ours: it becomes the seller's when the deal completes, or goes back to the buyer on a refund."
+            note="Not ours"
+            info="Price plus fee on Fastest deals still running, including those waiting out their recovery hold. Not ours: it becomes the seller's when the deal completes, or goes back to the buyer on a refund."
           />
           <MoneyMetric
             label="In members' wallets"
             cents={position.memberBalances.cents}
             count={plural(position.memberBalances.count, "member")}
             icon={WalletIcon}
-            note="Every member balance added together — money we owe members, which they can spend on a deal or withdraw."
+            note="Money we owe members"
+            info="Every member balance added together — money we owe members, which they can spend on a deal or withdraw."
           />
           <MoneyMetric
             label="Payouts waiting"
@@ -346,28 +467,57 @@ export default async function AdminMoneyPage({
             icon={CoinsIcon}
             href="/admin/payouts"
             tone={position.pendingPayouts.count > 0 ? "primary" : "neutral"}
-            note="Asked for and not sent yet. Already counted inside members' wallets — it is the part of their money they have asked to take out."
+            note="Already counted inside members' wallets"
+            info="Asked for and not sent yet. Already counted inside members' wallets — it is the part of their money they have asked to take out."
           />
           <MoneyMetric
             label="Ours"
             cents={position.platformOwn}
             icon={PiggyBankIcon}
-            note="Every fee earned since the start, less fees given back and balance corrections we paid for. The only part of the money here that belongs to Channel Adda."
+            note="Belongs to Channel Adda"
+            info="Every fee earned since the start, less fees given back and balance corrections we paid for. The only part of the money here that belongs to Channel Adda."
           />
           <MoneyMetric
             label="Should be on hand"
             cents={position.onHand}
             icon={LandmarkIcon}
             className="sm:col-span-2"
-            note="The three above added up: what our crypto accounts should hold, before processor and network fees. If they hold much less, stop and find out why."
+            // The warning stays in sight: it is the one line on this desk
+            // that says money may be missing.
+            note="What our crypto accounts should hold. If they hold much less, stop and find out why."
+            info="The three above added up: what our crypto accounts should hold, before processor and network fees. If they hold much less, stop and find out why."
+            visual={
+              <>
+                <SplitBar
+                  label="Where the money that should be on hand sits"
+                  parts={onHandParts}
+                />
+                {oursBelowZero ? (
+                  <p className="mt-1.5 inline-flex items-center gap-1.5 text-xs text-muted">
+                    Ours
+                    <span className="font-medium text-danger tabular-nums">
+                      <Price usd={position.platformOwn / 100} />
+                    </span>
+                  </p>
+                ) : null}
+              </>
+            }
           />
         </StatGrid>
 
         <div className="mt-3">
           {mismatches.length === 0 ? (
             <AllClear
-              title="The books agree with every Fastest deal"
-              body="Each running Fastest deal has exactly its price plus fee on our books, and each finished one has nothing left. Checked every time this page loads."
+              title={
+                <>
+                  The books agree with every Fastest deal{" "}
+                  <InfoTip label="About this check">
+                    Each running Fastest deal has exactly its price plus fee on
+                    our books, and each finished one has nothing left.
+                  </InfoTip>
+                </>
+              }
+              body="Checked every time this page loads."
             />
           ) : (
             <>
@@ -444,15 +594,20 @@ export default async function AdminMoneyPage({
               {isCurrent ? (
                 <span className="text-sm font-normal text-subtle">so far</span>
               ) : null}
-            </h2>
-            <p className="mt-1 max-w-[68ch] text-[0.8125rem] leading-relaxed text-muted">
-              Months run from midnight to midnight UTC.
-              {later
-                ? " This month has not started yet, so everything below is empty."
-                : isCurrent
+              <InfoTip label="About the monthly report" className="self-center">
+                Months run from midnight to midnight UTC.
+                {isCurrent
                   ? " This month is not over, so these figures will still grow."
                   : ""}
-            </p>
+              </InfoTip>
+            </h2>
+            {/* Said in sight, because otherwise a page of zeroes reads as a
+                month in which nothing happened. */}
+            {later ? (
+              <p className="mt-1 max-w-[68ch] text-[0.8125rem] leading-relaxed text-muted">
+                This month has not started yet, so everything below is empty.
+              </p>
+            ) : null}
           </div>
           <MonthPicker
             action="/admin/money"
@@ -466,14 +621,15 @@ export default async function AdminMoneyPage({
         <Section
           id="fees"
           title="Fees earned"
-          description="Revenue here is fees and nothing else: on a Safest deal the price goes buyer to seller and never touches our books, and on a Fastest deal the price is the seller's money, which we only hold."
+          info="Revenue here is fees and nothing else: on a Safest deal the price goes buyer to seller and never touches our books, and on a Fastest deal the price is the seller's money, which we only hold."
         >
           <div className="grid gap-3 lg:grid-cols-[17rem_minmax(0,1fr)]">
             <MoneyMetric
               label="Net fees earned"
               cents={fees.net}
               icon={ReceiptIcon}
-              note={
+              note="The month’s revenue"
+              info={
                 <>
                   Every fee in the table, less Safest fees given back. This is
                   the month&rsquo;s revenue. Channel prices are never revenue.
@@ -565,153 +721,75 @@ export default async function AdminMoneyPage({
             </TableCard>
           </div>
 
-          <div className="mt-4 max-w-[96ch] text-xs leading-relaxed text-muted">
+          <Disclosure className="mt-3" title="What each fee means">
             <p>
               A Safest fee is earned when the buyer&rsquo;s opening payment
               clears; a Fastest fee only when the deal completes, because until
               then it is part of the money we hold.
             </p>
-            <dl className="mt-2 grid gap-x-8 gap-y-1.5 sm:grid-cols-2">
-              <div>
-                <dt className="inline font-medium text-fg">Safest buyer fee</dt>
-                <dd className="inline">
-                  {" "}
-                  — the admin fee Safest buyers paid us, counted when their
-                  opening payment cleared.
-                </dd>
-              </div>
-              <div>
-                <dt className="inline font-medium text-fg">
-                  Safest seller fee
-                </dt>
-                <dd className="inline">
-                  {" "}
-                  — there is none: the price goes buyer to seller, so there is
-                  nothing for us to deduct it from.
-                </dd>
-              </div>
-              <div>
-                <dt className="inline font-medium text-fg">
-                  Fastest buyer fee
-                </dt>
-                <dd className="inline">
-                  {" "}
-                  — the fee on top of the price, from Fastest deals that
-                  completed this month.
-                </dd>
-              </div>
-              <div>
-                <dt className="inline font-medium text-fg">
-                  Fastest seller fee
-                </dt>
-                <dd className="inline">
-                  {" "}
-                  — taken from the seller&rsquo;s price on Fastest deals that
-                  completed this month, at the seller-fee rate.
-                </dd>
-              </div>
-              <div className="sm:col-span-2">
-                <dt className="inline font-medium text-fg">Given back</dt>
-                <dd className="inline">
-                  {" "}
-                  — Safest admin fees refunded because the deal was cancelled
-                  before an agent took the channel. Fastest refunds are not
-                  here: they return money we were holding, not money we had
-                  earned.
-                </dd>
-              </div>
-            </dl>
-          </div>
+            <MoneyTerms
+              className="mt-3"
+              terms={[
+                {
+                  term: "Safest buyer fee",
+                  definition:
+                    "the admin fee Safest buyers paid us, counted when their opening payment cleared.",
+                },
+                {
+                  term: "Safest seller fee",
+                  definition:
+                    "there is none: the price goes buyer to seller, so there is nothing for us to deduct it from.",
+                },
+                {
+                  term: "Fastest buyer fee",
+                  definition:
+                    "the fee on top of the price, from Fastest deals that completed this month.",
+                },
+                {
+                  term: "Fastest seller fee",
+                  definition: (
+                    <>
+                      taken from the seller&rsquo;s price on Fastest deals that
+                      completed this month, at the seller-fee rate.
+                    </>
+                  ),
+                },
+                {
+                  term: "Given back",
+                  wide: true,
+                  definition:
+                    "Safest admin fees refunded because the deal was cancelled before an agent took the channel. Fastest refunds are not here: they return money we were holding, not money we had earned.",
+                },
+              ]}
+            />
+          </Disclosure>
         </Section>
 
         <Section
           id="flows"
           title="Money that moved"
-          description="Everything else that went in or out during the month. None of it is revenue; most of it is other people's money passing through."
+          info="Everything else that went in or out during the month. None of it is revenue; most of it is other people's money passing through."
         >
           <List>
-            <MoneyLine
-              label="Paid into Fastest deals"
-              cents={figures.fastest.paidIn.cents}
-              count={plural(figures.fastest.paidIn.count, "deal")}
-              icon={ArrowDownLeftIcon}
-              note="Price plus fee from Fastest buyers, by crypto or from their balance. We hold it until the deal ends."
-            />
-            <MoneyLine
-              label="Credited to sellers"
-              cents={figures.fastest.toSellers.cents}
-              count={plural(figures.fastest.toSellers.count, "sale")}
-              icon={BanknoteIcon}
-              note="Sale prices released into sellers' wallets when Fastest deals completed, less the seller fee. Still with us until they withdraw it."
-            />
-            <MoneyLine
-              label="Refunded to buyers"
-              cents={figures.refunds.total}
-              count={plural(
-                figures.refunds.fastest.count + figures.refunds.safest.count,
-                "refund",
-              )}
-              icon={RotateCcwIcon}
-              note={
-                <>
-                  Returned to buyers&rsquo; Channel Adda balances:{" "}
-                  <span className="tabular-nums">
-                    {exactUsd(figures.refunds.fastest.cents)}
-                  </span>{" "}
-                  of held Fastest money,{" "}
-                  <span className="tabular-nums">
-                    {exactUsd(figures.refunds.safest.cents)}
-                  </span>{" "}
-                  of Safest admin fees.
-                </>
-              }
-            />
-            <MoneyLine
-              label="Deposits"
-              cents={figures.deposits.topUps.cents}
-              count={plural(figures.deposits.topUps.count, "top-up")}
-              icon={ArrowDownLeftIcon}
-              note="Money members paid in to their own balance."
-            />
-            <MoneyLine
-              label="Deal payments to balances"
-              cents={figures.deposits.dealPayments.cents}
-              count={plural(figures.deposits.dealPayments.count, "payment")}
-              icon={WalletIcon}
-              note="Deal payments that arrived after the deal had stopped, or paid a deal twice. Credited to the payer's balance rather than lost."
-            />
-            <MoneyLine
-              label="Paid from balances"
-              cents={figures.spentFromBalances.cents}
-              count={plural(figures.spentFromBalances.count, "deal")}
-              icon={WalletIcon}
-              note="Members paying a deal's opening payment out of their balance instead of by crypto. Moves their money into our hold or our fees."
-            />
-            <MoneyLine
-              label="Payouts sent"
-              cents={figures.payouts.cents}
-              count={plural(figures.payouts.count, "payout")}
-              icon={ArrowUpRightIcon}
-              href="/admin/payouts"
-              note="Withdrawals finance marked as sent. This is money that left us for members' own crypto wallets."
-            />
-            <MoneyLine
-              label="Corrections added"
-              cents={figures.adjustments.credits.cents}
-              count={plural(figures.adjustments.credits.count, "correction")}
-              icon={SlidersHorizontalIcon}
-              href="/admin/money/adjust"
-              note="Added to members' balances by hand. Each one came out of our own money, so the books still balance."
-            />
-            <MoneyLine
-              label="Corrections taken"
-              cents={figures.adjustments.debits.cents}
-              count={plural(figures.adjustments.debits.count, "correction")}
-              icon={SlidersHorizontalIcon}
-              href="/admin/money/adjust"
-              note="Taken from members' balances by hand, usually a credit made by mistake. Each one went back into our own money."
-            />
+            {flows.map((flow) => (
+              <MoneyLine
+                key={flow.label}
+                label={flow.label}
+                cents={flow.cents}
+                count={flow.count}
+                icon={flow.icon}
+                href={flow.href}
+              />
+            ))}
           </List>
+          <Disclosure className="mt-3" title="What each line counts">
+            <MoneyTerms
+              terms={flows.map((flow) => ({
+                term: flow.label,
+                definition: flow.note,
+              }))}
+            />
+          </Disclosure>
         </Section>
 
         <Section
@@ -719,7 +797,7 @@ export default async function AdminMoneyPage({
           title={
             isCurrent || later ? "Position so far" : "At the close of the month"
           }
-          description={
+          info={
             isCurrent || later
               ? "The month has not closed, so these match right now."
               : `What we were holding for other people at midnight UTC on ${figures.closing.asOf.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" })} — the figures an accountant carries into the next month.`
@@ -730,13 +808,13 @@ export default async function AdminMoneyPage({
               label="Held for Fastest buyers"
               cents={figures.closing.heldForBuyers}
               icon={LockIcon}
-              note="Price plus fee on Fastest deals that were still running when the month closed."
+              info="Price plus fee on Fastest deals that were still running when the month closed."
             />
             <MoneyMetric
               label="In members' wallets"
               cents={figures.closing.memberBalances}
               icon={WalletIcon}
-              note="Every member balance added together when the month closed: what we owed members."
+              info="Every member balance added together when the month closed: what we owed members."
             />
           </StatGrid>
         </Section>
@@ -744,54 +822,46 @@ export default async function AdminMoneyPage({
         <Section
           id="exports"
           title="For the accountant"
-          description={`Spreadsheet files for ${month.label}, in exact US dollars and cents. Each download is written to the audit trail under your name.`}
+          info={`Spreadsheet files for ${month.label}, in exact US dollars and cents. Each download is written to the audit trail under your name.`}
         >
           <List>
             <ListItem>
-              <div className="flex items-start gap-3">
+              <div className="flex items-center gap-3">
                 <IconTile icon={FileSpreadsheetIcon} />
-                <div className="flex min-w-0 flex-1 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
-                  <div className="min-w-0">
-                    <p className="text-sm leading-5 font-medium text-fg">
-                      Ledger entries
-                    </p>
-                    <p className="mt-0.5 max-w-[72ch] text-[0.8125rem] leading-relaxed text-muted">
-                      Every row written this month: when, what kind, whose side
-                      (a member&rsquo;s or ours), the amount, the deal and the
-                      note. The platform&rsquo;s rows have no member.
-                    </p>
-                  </div>
-                  <div className="shrink-0">
-                    <DownloadLink
-                      href={`/api/admin/export/ledger?month=${month.key}`}
-                    >
-                      Ledger CSV
-                    </DownloadLink>
-                  </div>
+                <p className="flex min-w-0 flex-1 items-center gap-1.5 text-sm leading-5 font-medium text-fg">
+                  Ledger entries
+                  <InfoTip label="About the ledger file">
+                    Every row written this month: when, what kind, whose side (a
+                    member&rsquo;s or ours), the amount, the deal and the note.
+                    The platform&rsquo;s rows have no member.
+                  </InfoTip>
+                </p>
+                <div className="shrink-0">
+                  <DownloadLink
+                    href={`/api/admin/export/ledger?month=${month.key}`}
+                  >
+                    Ledger CSV
+                  </DownloadLink>
                 </div>
               </div>
             </ListItem>
             <ListItem>
-              <div className="flex items-start gap-3">
+              <div className="flex items-center gap-3">
                 <IconTile icon={FileSpreadsheetIcon} />
-                <div className="flex min-w-0 flex-1 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
-                  <div className="min-w-0">
-                    <p className="text-sm leading-5 font-medium text-fg">
-                      Payouts sent
-                    </p>
-                    <p className="mt-0.5 max-w-[72ch] text-[0.8125rem] leading-relaxed text-muted">
-                      Every withdrawal marked as sent this month, with the
-                      member, the address, the network, the transaction hash and
-                      who sent it.
-                    </p>
-                  </div>
-                  <div className="shrink-0">
-                    <DownloadLink
-                      href={`/api/admin/export/payouts?month=${month.key}`}
-                    >
-                      Payouts CSV
-                    </DownloadLink>
-                  </div>
+                <p className="flex min-w-0 flex-1 items-center gap-1.5 text-sm leading-5 font-medium text-fg">
+                  Payouts sent
+                  <InfoTip label="About the payouts file">
+                    Every withdrawal marked as sent this month, with the member,
+                    the address, the network, the transaction hash and who sent
+                    it.
+                  </InfoTip>
+                </p>
+                <div className="shrink-0">
+                  <DownloadLink
+                    href={`/api/admin/export/payouts?month=${month.key}`}
+                  >
+                    Payouts CSV
+                  </DownloadLink>
                 </div>
               </div>
             </ListItem>
@@ -799,16 +869,15 @@ export default async function AdminMoneyPage({
         </Section>
       </section>
 
-      <p className="mt-10 flex max-w-[96ch] items-start gap-2 text-xs leading-relaxed text-subtle">
-        <LockIcon aria-hidden="true" className="mt-px size-3.5 shrink-0" />
-        <span>
+      <Disclosure bare className="mt-10" title="About these figures">
+        <p className="max-w-[96ch]">
           Large figures are shown in whichever currency the header is set to,
           rounded to whole units; the exact US-dollar amount is under each one,
           and the downloads carry it to the cent. Every figure is a sum of
           ledger rows — the record each payout, refund and correction writes as
           it happens — so a deal&rsquo;s status never changes a past month.
-        </span>
-      </p>
+        </p>
+      </Disclosure>
     </>
   );
 }

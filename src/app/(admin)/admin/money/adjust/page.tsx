@@ -16,7 +16,6 @@ import {
   Fact,
   Facts,
   inputClass,
-  MetaItem,
   PageHeader,
   Section,
   TableCard,
@@ -87,20 +86,15 @@ export default async function AdminAdjustPage({
         back={{ href: "/admin/money", label: "Money desk" }}
         title="Correct a balance"
         description="For when we owe somebody money, or credited them by mistake."
-        meta={
-          <>
-            <MetaItem label="Signed in as">{staff.name}</MetaItem>
-            <MetaItem label="Desk">
-              {staff.role.toLowerCase().replace("_", " ")}
-            </MetaItem>
-          </>
-        }
       />
 
+      {/* The limits themselves and the callout under them stay in sight:
+          they are the rules money moves by. Only why they hold goes behind
+          the (i). */}
       <Section
         id="rules"
         title="The rules"
-        description="The server enforces every one of these, whatever the form says."
+        info="The server enforces every one of these, whatever the form says."
       >
         <Card className="px-4 sm:px-5">
           <Facts className="lg:grid-cols-2">
@@ -314,7 +308,7 @@ export default async function AdminAdjustPage({
         id="recent"
         title="Recent corrections"
         count={recent.length}
-        description="The last 25, newest first, across every member. The reason is exactly what the member sees."
+        info="The last 25, newest first, across every member. The reason is exactly what the member sees."
       >
         {recent.length === 0 ? (
           <EmptyState
