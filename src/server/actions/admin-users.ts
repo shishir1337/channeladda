@@ -517,8 +517,11 @@ export async function acceptInvite(
     after: { email: result.email, role: result.role },
   });
 
-  revalidatePath("/admin/team");
-  revalidatePath("/admin/users");
+  // No revalidatePath here. A revalidation from an action re-renders the page
+  // it was called from — the invite page — which then found the token used
+  // and swapped "Your account is ready" for "This invitation cannot be used",
+  // so every new teammate was told their invitation had failed. The team and
+  // people pages render on every request; there is nothing cached to clear.
   return {
     ok: true,
     message: `Your account is ready as ${repo.ROLE_LABELS[result.role].toLowerCase()}.`,
