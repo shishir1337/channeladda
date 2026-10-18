@@ -1,15 +1,18 @@
+import { HistoryIcon } from "lucide-react";
 import type { Metadata } from "next";
-import {
-  AllClear,
-  ConsoleHeader,
-  ConsoleSection,
-  MetaItem,
-  TableScroller,
-  Td,
-  Th,
-} from "@/components/admin/console";
 import { SettingsForm } from "@/components/admin/settings-form";
 import { elapsed } from "@/components/admin/vocab";
+import {
+  Callout,
+  EmptyState,
+  MetaItem,
+  PageHeader,
+  Section,
+  TableCard,
+  Td,
+  Th,
+  Tr,
+} from "@/components/app/kit";
 import { getAuditTrail } from "@/server/audit";
 import { requireSuperadmin } from "@/server/session";
 import { getSettings } from "@/server/settings";
@@ -80,10 +83,9 @@ export default async function AdminSettingsPage() {
 
   return (
     <>
-      <ConsoleHeader
-        eyebrow="Superadmin only"
+      <PageHeader
         title="Platform settings"
-        description="The figures every future deal is priced and policed by. Nothing here rewrites a past sale: an order keeps the fee it was charged, and a deal in flight keeps the safeguards it started under."
+        description="The figures every future deal is priced and policed by."
         meta={
           <>
             <MetaItem label="Signed in as">{staff.name}</MetaItem>
@@ -96,42 +98,48 @@ export default async function AdminSettingsPage() {
         }
       />
 
-      <div className="mt-6">
-        <SettingsForm
-          current={{
-            buyerFeeBpSafest: settings.buyerFeeBpSafest,
-            buyerFeeBpFastest: settings.buyerFeeBpFastest,
-            maxHoldsPerAgent: settings.maxHoldsPerAgent,
-            secondApprovalAboveUsd: settings.secondApprovalAboveUsd,
-            sellerFeeBp: settings.sellerFeeBp,
-            offerExpiryHours: settings.offerExpiryHours,
-            minWithdrawalUsd: settings.minWithdrawalUsd,
-            paymentWindowHours: settings.paymentWindowHours,
-          }}
-        />
-      </div>
+      {/* The promise that matters most on this page, kept word for word from
+          the old header and given its own line so it is not lost in it. */}
+      <Callout title="Nothing here rewrites a past sale" className="mb-6">
+        An order keeps the fee it was charged, and a deal in flight keeps the
+        safeguards it started under.
+      </Callout>
 
-      <ConsoleSection
+      <SettingsForm
+        current={{
+          buyerFeeBpSafest: settings.buyerFeeBpSafest,
+          buyerFeeBpFastest: settings.buyerFeeBpFastest,
+          maxHoldsPerAgent: settings.maxHoldsPerAgent,
+          secondApprovalAboveUsd: settings.secondApprovalAboveUsd,
+          sellerFeeBp: settings.sellerFeeBp,
+          offerExpiryHours: settings.offerExpiryHours,
+          minWithdrawalUsd: settings.minWithdrawalUsd,
+          paymentWindowHours: settings.paymentWindowHours,
+        }}
+      />
+
+      <Section
         id="history"
         title="Change history"
         count={trail.length}
         description="The last ten changes, read from the audit trail. Rows are never edited or deleted."
       >
         {trail.length === 0 ? (
-          <AllClear
+          <EmptyState
+            icon={HistoryIcon}
             title="Never changed since launch"
             body="The platform is running on its original figures. Every change you make here is written to this list under your name."
           />
         ) : (
-          <TableScroller>
+          <TableCard>
             <table className="w-full min-w-[34rem] text-sm">
               <caption className="sr-only">
                 Platform settings changes, newest first
               </caption>
               <thead>
                 <tr>
-                  <Th>When</Th>
-                  <Th>Who</Th>
+                  <Th className="w-32">When</Th>
+                  <Th className="w-44">Who</Th>
                   <Th>What moved</Th>
                 </tr>
               </thead>
@@ -139,12 +147,12 @@ export default async function AdminSettingsPage() {
                 {trail.map((row) => {
                   const diff = diffOf(row.before, row.after);
                   return (
-                    <tr key={row.id} className="border-t border-line">
+                    <Tr key={row.id}>
                       <Td className="align-top whitespace-nowrap">
                         <time
                           dateTime={row.createdAt.toISOString()}
                           title={row.createdAt.toLocaleString("en-GB")}
-                          className="tnum text-xs text-subtle"
+                          className="tnum text-[0.8125rem] text-muted"
                         >
                           {row.createdAt.toLocaleDateString("en-GB")}
                         </time>
@@ -154,7 +162,7 @@ export default async function AdminSettingsPage() {
                       </Td>
                       <Td className="align-top">
                         {diff.length === 0 ? (
-                          <span className="text-xs text-subtle">
+                          <span className="text-[0.8125rem] text-subtle">
                             no recorded difference
                           </span>
                         ) : (
@@ -162,12 +170,13 @@ export default async function AdminSettingsPage() {
                             {diff.map((change) => (
                               <li
                                 key={change.key}
-                                className="flex flex-wrap gap-x-2 text-xs"
+                                className="flex flex-wrap items-baseline gap-x-2 text-[0.8125rem]"
                               >
                                 <span className="text-muted">
                                   {change.label}
                                 </span>
-                                <span className="tnum text-subtle line-through">
+                                <span className="sr-only">changed from</span>
+                                <span className="tnum text-subtle line-through decoration-subtle/60">
                                   {change.from}
                                 </span>
                                 <span
@@ -176,7 +185,8 @@ export default async function AdminSettingsPage() {
                                 >
                                   →
                                 </span>
-                                <span className="tnum font-semibold text-fg">
+                                <span className="sr-only">to</span>
+                                <span className="tnum font-medium text-fg">
                                   {change.to}
                                 </span>
                               </li>
@@ -184,14 +194,14 @@ export default async function AdminSettingsPage() {
                           </ul>
                         )}
                       </Td>
-                    </tr>
+                    </Tr>
                   );
                 })}
               </tbody>
             </table>
-          </TableScroller>
+          </TableCard>
         )}
-      </ConsoleSection>
+      </Section>
     </>
   );
 }

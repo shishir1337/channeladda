@@ -2,11 +2,30 @@
 
 import { CheckCircle2Icon, TriangleAlertIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useId, useState, useTransition } from "react";
-import { Panel, TableScroller, Td, Th } from "@/components/admin/console";
-import { FormNotice, TextField } from "@/components/auth/fields";
+import {
+  type HTMLAttributes,
+  type ReactNode,
+  useId,
+  useState,
+  useTransition,
+} from "react";
+import {
+  Card,
+  CardBody,
+  CardFooter,
+  CardHeader,
+  Dot,
+  hintClass,
+  inputClass,
+  labelClass,
+  Td,
+  Th,
+  Tr,
+} from "@/components/app/kit";
+import { FormNotice } from "@/components/auth/fields";
 import { Button } from "@/components/ui/button";
 import { formatRate, quote } from "@/lib/fees";
+import { cn } from "@/lib/utils";
 import { saveSettings } from "@/server/actions/settings";
 
 const EXAMPLES = [99, 4_500, 42_500];
@@ -24,6 +43,111 @@ function toBp(value: string) {
   const n = Number(value);
   if (!Number.isFinite(n)) return Number.NaN;
   return Math.round(n * 100);
+}
+
+/** A group of settings: what it governs, then one row per figure. */
+function Group({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <Card>
+      <CardHeader
+        title={title}
+        description={<span className="block max-w-[80ch]">{description}</span>}
+      />
+      <div className="divide-y divide-line">{children}</div>
+    </Card>
+  );
+}
+
+/**
+ * One setting: what it is on the left, the figure on the right — stacked on
+ * a phone.
+ *
+ * Wired exactly like `TextField` (hint and error both in `aria-describedby`,
+ * the error announced) so moving to a row layout costs a screen reader
+ * nothing. The unit sits inside the field for the eye and is spoken as part
+ * of the label, so the accessible name is still "Seller fee (%)".
+ */
+function SettingRow({
+  id,
+  label,
+  unit,
+  hint,
+  error,
+  ...props
+}: {
+  id: string;
+  label: string;
+  /** Shown inside the field and spoken as part of the label, e.g. "%". */
+  unit?: string;
+  hint?: string;
+  error?: string;
+  name: string;
+  value: string;
+  inputMode: HTMLAttributes<HTMLInputElement>["inputMode"];
+  onChange: (value: string) => void;
+}) {
+  const { onChange, ...input } = props;
+  return (
+    <div className="grid gap-x-8 gap-y-2 px-4 py-4 sm:grid-cols-[minmax(0,1fr)_12rem] sm:items-start sm:px-5">
+      <div className="min-w-0 sm:pt-2">
+        <label htmlFor={id} className={cn(labelClass, "text-sm")}>
+          {label}
+          {unit ? <span className="sr-only"> ({unit})</span> : null}
+        </label>
+        {hint ? (
+          <p id={`${id}-hint`} className={hintClass}>
+            {hint}
+          </p>
+        ) : null}
+      </div>
+      <div className="min-w-0">
+        <div className="relative">
+          <input
+            id={id}
+            {...input}
+            onChange={(e) => onChange(e.target.value)}
+            required
+            aria-invalid={Boolean(error)}
+            aria-describedby={
+              [hint ? `${id}-hint` : null, error ? `${id}-error` : null]
+                .filter(Boolean)
+                .join(" ") || undefined
+            }
+            className={cn(
+              inputClass,
+              "tabular-nums",
+              unit && (unit.length > 1 ? "pr-14" : "pr-8"),
+            )}
+          />
+          {unit ? (
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-[0.8125rem] text-subtle"
+            >
+              {unit}
+            </span>
+          ) : null}
+        </div>
+        {error ? (
+          <p
+            id={`${id}-error`}
+            role="alert"
+            className="mt-1.5 text-xs leading-relaxed text-danger"
+          >
+            {error}
+          </p>
+        ) : null}
+      </div>
+    </div>
+  );
 }
 
 export function SettingsForm({
@@ -147,7 +271,7 @@ export function SettingsForm({
 
   return (
     <form
-      className="flex flex-col gap-4"
+      className="flex flex-col gap-6"
       onSubmit={(e) => {
         e.preventDefault();
         setErrors({});
@@ -172,239 +296,273 @@ export function SettingsForm({
         });
       }}
     >
-      {errors.form ? <FormNotice>{errors.form}</FormNotice> : null}
-      {saved ? (
-        <output className="flex items-start gap-2 rounded-card border border-verified/30 bg-verified-soft px-4 py-3 text-sm text-fg">
-          <CheckCircle2Icon
-            aria-hidden="true"
-            className="mt-0.5 size-4 shrink-0 text-verified"
-          />
-          {saved}
-        </output>
-      ) : null}
+      <Group
+        title="Fees"
+        description="These apply to sales made from now on. Orders already placed keep the fee they were charged, so changing this never rewrites a past sale."
+      >
+        <SettingRow
+          id={ids.safest}
+          name="buyerFeeBpSafest"
+          label="Buyer fee, Safest"
+          unit="%"
+          hint="The only thing a Safest buyer pays us."
+          inputMode="decimal"
+          value={safest}
+          onChange={setSafest}
+          error={errors.buyerFeeBpSafest}
+        />
+        <SettingRow
+          id={ids.fastest}
+          name="buyerFeeBpFastest"
+          label="Buyer fee, Fastest"
+          unit="%"
+          hint="On top of the price, which we also hold."
+          inputMode="decimal"
+          value={fastest}
+          onChange={setFastest}
+          error={errors.buyerFeeBpFastest}
+        />
+        <SettingRow
+          id={ids.seller}
+          name="sellerFeeBp"
+          label="Seller fee"
+          unit="%"
+          hint="Fastest only — a Safest price never reaches us."
+          inputMode="decimal"
+          value={seller}
+          onChange={setSeller}
+          error={errors.sellerFeeBp}
+        />
+      </Group>
 
-      <Panel>
-        <h2 className="font-display text-base font-bold text-fg">Fees</h2>
-        <p className="mt-1.5 max-w-[72ch] text-sm leading-relaxed text-muted">
-          These apply to sales made from now on. Orders already placed keep the
-          fee they were charged, so changing this never rewrites a past sale.
-        </p>
+      <Group
+        title="Agent safeguards"
+        description="On a Safest deal the agent genuinely owns the channel while they hold it. Google limits how many channels one account can own, and an agent account that gets locked freezes every deal it is holding."
+      >
+        <SettingRow
+          id={ids.holds}
+          name="maxHoldsPerAgent"
+          label="Channels one agent may hold"
+          hint="Assignment is refused past this."
+          inputMode="numeric"
+          value={holds}
+          onChange={setHolds}
+          error={errors.maxHoldsPerAgent}
+        />
+        <SettingRow
+          id={ids.approval}
+          name="secondApprovalAbove"
+          label="Second approval above"
+          unit="USD"
+          hint="0 requires it on every handover."
+          inputMode="decimal"
+          value={approval}
+          onChange={setApproval}
+          error={errors.secondApprovalAbove}
+        />
+      </Group>
 
-        <div className="mt-4 grid gap-4 sm:grid-cols-2">
-          <TextField
-            id={ids.safest}
-            name="buyerFeeBpSafest"
-            label="Buyer fee, Safest (%)"
-            hint="The only thing a Safest buyer pays us."
-            inputMode="decimal"
-            value={safest}
-            onChange={(e) => setSafest(e.target.value)}
-            error={errors.buyerFeeBpSafest}
-            required
-          />
-          <TextField
-            id={ids.fastest}
-            name="buyerFeeBpFastest"
-            label="Buyer fee, Fastest (%)"
-            hint="On top of the price, which we also hold."
-            inputMode="decimal"
-            value={fastest}
-            onChange={(e) => setFastest(e.target.value)}
-            error={errors.buyerFeeBpFastest}
-            required
-          />
-          <TextField
-            id={ids.seller}
-            name="sellerFeeBp"
-            label="Seller fee (%)"
-            hint="Fastest only — a Safest price never reaches us."
-            inputMode="decimal"
-            value={seller}
-            onChange={(e) => setSeller(e.target.value)}
-            error={errors.sellerFeeBp}
-            required
-          />
-        </div>
-      </Panel>
-
-      <Panel>
-        <h2 className="font-display text-base font-bold text-fg">
-          Agent safeguards
-        </h2>
-        <p className="mt-1.5 max-w-[72ch] text-sm leading-relaxed text-muted">
-          On a Safest deal the agent genuinely owns the channel while they hold
-          it. Google limits how many channels one account can own, and an agent
-          account that gets locked freezes every deal it is holding.
-        </p>
-        <div className="mt-4 grid gap-4 sm:grid-cols-2">
-          <TextField
-            id={ids.holds}
-            name="maxHoldsPerAgent"
-            label="Channels one agent may hold"
-            hint="Assignment is refused past this."
-            inputMode="numeric"
-            value={holds}
-            onChange={(e) => setHolds(e.target.value)}
-            error={errors.maxHoldsPerAgent}
-            required
-          />
-          <TextField
-            id={ids.approval}
-            name="secondApprovalAbove"
-            label="Second approval above (USD)"
-            hint="0 requires it on every handover."
-            inputMode="decimal"
-            value={approval}
-            onChange={(e) => setApproval(e.target.value)}
-            error={errors.secondApprovalAbove}
-            required
-          />
-        </div>
-      </Panel>
-
-      <Panel>
-        <h2 className="font-display text-base font-bold text-fg">Offers</h2>
-        <p className="mt-1.5 max-w-[72ch] text-sm leading-relaxed text-muted">
-          How long an offer stands before it lapses. Short enough that listings
-          do not fill up with stale interest, long enough that someone in
-          another time zone gets a fair chance to answer.
-        </p>
-        <TextField
+      <Group
+        title="Offers"
+        description="How long an offer stands before it lapses. Short enough that listings do not fill up with stale interest, long enough that someone in another time zone gets a fair chance to answer."
+      >
+        <SettingRow
           id={ids.offer}
           name="offerExpiryHours"
-          label="Offers expire after (hours)"
+          label="Offers expire after"
+          unit="hours"
           inputMode="numeric"
           value={offerHours}
-          onChange={(e) => setOfferHours(e.target.value)}
+          onChange={setOfferHours}
           error={errors.offerExpiryHours}
-          className="mt-4 max-w-xs"
-          required
         />
-        <TextField
+        <SettingRow
           id={ids.paymentWindow}
           name="paymentWindowHours"
-          label="Unpaid deals lapse after (hours)"
+          label="Unpaid deals lapse after"
+          unit="hours"
           hint="How long a buyer has to pay before the listing goes back on sale. A buyer who walks away holds it off the market this long."
           inputMode="numeric"
           value={paymentWindow}
-          onChange={(e) => setPaymentWindow(e.target.value)}
+          onChange={setPaymentWindow}
           error={errors.paymentWindowHours}
-          className="mt-4 max-w-xs"
-          required
         />
-      </Panel>
+      </Group>
 
-      <Panel>
-        <h2 className="font-display text-base font-bold text-fg">Payouts</h2>
-        <p className="mt-1.5 max-w-[72ch] text-sm leading-relaxed text-muted">
-          The smallest withdrawal we will send. A crypto payout pays the
-          chain&rsquo;s fee whatever its size, so below some figure the seller
-          loses money by collecting it. Raise this when network fees do.
-        </p>
-        <TextField
+      <Group
+        title="Payouts"
+        description={
+          <>
+            The smallest withdrawal we will send. A crypto payout pays the
+            chain&rsquo;s fee whatever its size, so below some figure the seller
+            loses money by collecting it. Raise this when network fees do.
+          </>
+        }
+      >
+        <SettingRow
           id={ids.minWithdrawal}
           name="minWithdrawal"
-          label="Smallest withdrawal (USD)"
+          label="Smallest withdrawal"
+          unit="USD"
           inputMode="decimal"
           value={minWithdrawal}
-          onChange={(e) => setMinWithdrawal(e.target.value)}
+          onChange={setMinWithdrawal}
           error={errors.minWithdrawal}
-          className="mt-4 max-w-xs"
-          required
         />
-      </Panel>
+      </Group>
 
       {previewable ? (
-        <Panel>
-          <h2 className="font-display text-base font-bold text-fg">
-            What that means
-          </h2>
-          <p className="mt-1.5 text-sm text-muted">
-            Worked through at the rates typed above, on a Fastest deal — the
-            mode where both fees apply, so it shows the full effect of a change.
-            Figures in US dollars.
-          </p>
-          <TableScroller className="mt-4">
+        <Card className="overflow-hidden">
+          <CardHeader
+            title="What that means"
+            description={
+              <span className="block max-w-[80ch]">
+                Worked through at the rates typed above, on a Fastest deal — the
+                mode where both fees apply, so it shows the full effect of a
+                change. Figures in US dollars.
+              </span>
+            }
+            className="border-b-0"
+          />
+          <div className="overflow-x-auto overscroll-x-contain">
             <table className="w-full min-w-[30rem] text-sm">
               <caption className="sr-only">
                 Worked examples at the rates currently typed
               </caption>
               <thead>
                 <tr>
-                  <Th>Listed at</Th>
-                  <Th numeric>Buyer pays</Th>
-                  <Th numeric>Seller gets</Th>
-                  <Th numeric>We keep</Th>
+                  <Th className="border-t">Listed at</Th>
+                  <Th numeric className="border-t">
+                    Buyer pays
+                  </Th>
+                  <Th numeric className="border-t">
+                    Seller gets
+                  </Th>
+                  <Th numeric className="border-t">
+                    We keep
+                  </Th>
                 </tr>
               </thead>
               <tbody>
                 {EXAMPLES.map((price) => {
                   const q = quote(price, draft, "FASTEST");
                   return (
-                    <tr key={price} className="border-t border-line">
-                      <Td className="tnum">{usd(price)}</Td>
+                    <Tr key={price}>
+                      <Td className="tnum text-muted">{usd(price)}</Td>
                       <Td numeric>{usd(q.total)}</Td>
-                      <Td numeric className="text-verified">
-                        {usd(q.payout)}
-                      </Td>
-                      <Td numeric className="font-medium text-primary-text">
+                      <Td numeric>{usd(q.payout)}</Td>
+                      <Td numeric className="font-medium text-fg">
                         {usd(q.buyerFee + q.sellerFee)}
                       </Td>
-                    </tr>
+                    </Tr>
                   );
                 })}
               </tbody>
             </table>
-          </TableScroller>
-        </Panel>
+          </div>
+        </Card>
       ) : null}
 
-      <Panel tone={changed ? "primary" : "neutral"}>
-        <h2 className="font-display text-base font-bold text-fg">
-          {changed ? "About to change" : "Nothing has changed yet"}
-        </h2>
-        {changed ? (
-          <>
-            <ul className="mt-3 flex flex-col gap-1.5 text-sm">
-              {pendingChanges.map((row) => (
-                <li key={row.label} className="flex flex-wrap gap-x-2">
-                  <span className="text-muted">{row.label}</span>
-                  <span className="tnum text-subtle line-through">
-                    {row.from}
+      {/* Gold edge while something is waiting to be saved: the one thing on
+          this page that is the reader's move. */}
+      <Card className={cn(changed && "border-primary/40")}>
+        <CardHeader
+          title={
+            <span className="inline-flex items-center gap-2">
+              {changed ? <Dot tone="primary" pulse /> : null}
+              {changed ? "About to change" : "Nothing has changed yet"}
+            </span>
+          }
+          description={
+            changed
+              ? undefined
+              : "Edit a figure above and the difference will be listed here before you commit it."
+          }
+          className={changed || errors.form ? undefined : "border-b-0"}
+        />
+        {changed || errors.form ? (
+          <CardBody>
+            {errors.form ? <FormNotice>{errors.form}</FormNotice> : null}
+            {changed ? (
+              <>
+                <ul className="divide-y divide-line">
+                  {pendingChanges.map((row) => (
+                    <li
+                      key={row.label}
+                      className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5 py-2 text-sm first:pt-0"
+                    >
+                      <span className="text-muted">{row.label}</span>
+                      <span className="inline-flex items-baseline gap-2">
+                        <span className="sr-only">changed from</span>
+                        <span className="tnum text-subtle line-through decoration-subtle/60">
+                          {row.from}
+                        </span>
+                        <span aria-hidden="true" className="text-subtle">
+                          →
+                        </span>
+                        <span className="sr-only">to</span>
+                        <span className="tnum font-medium text-fg">
+                          {row.to}
+                        </span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-3 flex items-start gap-1.5 text-xs leading-relaxed text-muted">
+                  <TriangleAlertIcon
+                    aria-hidden="true"
+                    className="mt-px size-3.5 shrink-0 text-primary-text"
+                  />
+                  <span>
+                    Applies to every sale made after you save, and is recorded
+                    in the change history below under your name.
                   </span>
-                  <span aria-hidden="true" className="text-subtle">
-                    →
-                  </span>
-                  <span className="tnum font-semibold text-fg">{row.to}</span>
-                </li>
-              ))}
-            </ul>
-            <p className="mt-3 flex items-start gap-1.5 text-xs leading-relaxed text-muted">
-              <TriangleAlertIcon
-                aria-hidden="true"
-                className="mt-px size-3.5 shrink-0 text-primary"
-              />
-              <span>
-                Applies to every sale made after you save, and is recorded in
-                the change history below under your name.
+                </p>
+              </>
+            ) : null}
+          </CardBody>
+        ) : null}
+        <CardFooter className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            {saved ? (
+              <output className="flex items-start gap-1.5 text-[0.8125rem] leading-relaxed text-fg">
+                <CheckCircle2Icon
+                  aria-hidden="true"
+                  className="mt-0.5 size-3.5 shrink-0 text-verified"
+                />
+                {saved}
+              </output>
+            ) : null}
+          </div>
+          <Button
+            type="submit"
+            size="md"
+            className="self-end sm:self-auto"
+            disabled={pending || !changed}
+          >
+            {/* Both labels share one cell, so the button keeps the width of
+                the wider one while it saves. */}
+            <span className="inline-grid">
+              <span
+                className={cn(
+                  "col-start-1 row-start-1",
+                  pending && "invisible",
+                )}
+              >
+                Save these settings
               </span>
-            </p>
-          </>
-        ) : (
-          <p className="mt-1.5 text-sm text-muted">
-            Edit a figure above and the difference will be listed here before
-            you commit it.
-          </p>
-        )}
-        <Button
-          type="submit"
-          size="md"
-          className="mt-4"
-          disabled={pending || !changed}
-        >
-          {pending ? "Saving…" : "Save these settings"}
-        </Button>
-      </Panel>
+              <span
+                className={cn(
+                  "col-start-1 row-start-1",
+                  !pending && "invisible",
+                )}
+              >
+                Saving…
+              </span>
+            </span>
+          </Button>
+        </CardFooter>
+      </Card>
     </form>
   );
 }

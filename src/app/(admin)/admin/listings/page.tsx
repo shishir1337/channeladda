@@ -1,22 +1,32 @@
-import { ImageIcon, StarIcon, TriangleAlertIcon } from "lucide-react";
-import type { Metadata } from "next";
-import Link from "next/link";
 import {
-  AllClear,
-  ConsoleHeader,
-  ConsoleSection,
-  FilterBar,
-  FilterLink,
-  MetaItem,
-  Nothing,
-} from "@/components/admin/console";
+  ChevronRightIcon,
+  ImageIcon,
+  StarIcon,
+  TriangleAlertIcon,
+} from "lucide-react";
+import type { Metadata } from "next";
 import {
   elapsed,
   LISTING_STATUS,
   ListingStatusTag,
   Waited,
 } from "@/components/admin/vocab";
+import {
+  AllClear,
+  EmptyState,
+  FilterBar,
+  FilterLink,
+  IconTile,
+  List,
+  ListItem,
+  MetaItem,
+  PageHeader,
+  Section,
+  Sep,
+} from "@/components/app/kit";
+import { Badge } from "@/components/ui/badge";
 import { Price } from "@/components/ui/price";
+import { platforms } from "@/data/platforms";
 import type { ListingStatus } from "@/generated/prisma/enums";
 import {
   getQueueCounts,
@@ -81,10 +91,9 @@ export default async function AdminListingsPage({
 
   return (
     <>
-      <ConsoleHeader
-        eyebrow="Moderation"
+      <PageHeader
         title="Listing queue"
-        description="Worked oldest first, so nobody sits at the bottom for ever. Open a listing to see the ownership code, what the seller claims, and the proof they attached."
+        description="Worked oldest first, so nobody sits at the bottom for ever."
         meta={
           <>
             <MetaItem label="Signed in as">{staff.name}</MetaItem>
@@ -92,7 +101,7 @@ export default async function AdminListingsPage({
               <MetaItem label="Oldest wait">{elapsed(oldest).label}</MetaItem>
             ) : null}
             {late > 0 ? (
-              <span className="inline-flex items-center gap-1.5 font-semibold text-danger">
+              <span className="inline-flex items-center gap-1.5 font-medium text-danger">
                 <TriangleAlertIcon aria-hidden="true" className="size-3.5" />
                 {late} over {LATE_AFTER}h
               </span>
@@ -107,27 +116,27 @@ export default async function AdminListingsPage({
         }
       />
 
-      <div className="mt-5">
-        <FilterBar label="Filter by status">
-          {TABS.map((tab) => (
-            <FilterLink
-              key={tab.status}
-              href={
-                tab.status === "ADMIN_REVIEW"
-                  ? "/admin/listings"
-                  : `/admin/listings?status=${tab.status}`
-              }
-              active={tab.status === active}
-              count={counts[tab.key]}
-            >
-              {tab.label}
-            </FilterLink>
-          ))}
-        </FilterBar>
-      </div>
+      <FilterBar label="Filter by status">
+        {TABS.map((tab) => (
+          <FilterLink
+            key={tab.status}
+            href={
+              tab.status === "ADMIN_REVIEW"
+                ? "/admin/listings"
+                : `/admin/listings?status=${tab.status}`
+            }
+            active={tab.status === active}
+            count={counts[tab.key]}
+            tone={tab.status === "ADMIN_REVIEW" ? "primary" : "neutral"}
+          >
+            {tab.label}
+          </FilterLink>
+        ))}
+      </FilterBar>
 
-      <ConsoleSection
+      <Section
         id="queue"
+        className="mt-6"
         title={LISTING_STATUS[active].label}
         count={queue.length}
         tone={reviewing && queue.length > 0 ? "primary" : "neutral"}
@@ -146,92 +155,98 @@ export default async function AdminListingsPage({
               body="Nothing is waiting on a moderator. A listing lands here the moment a seller sends it for review."
             />
           ) : (
-            <Nothing
+            <EmptyState
               title="Nothing in this view"
               body={`No listing is currently ${LISTING_STATUS[active].label.toLowerCase()}. Try another filter above.`}
             />
           )
         ) : (
-          <ul className="grid gap-px overflow-hidden rounded-card border border-line bg-line">
+          <List>
             {queue.map((item) => {
               const urgent =
                 reviewing && elapsed(item.waitingSince).hours >= LATE_AFTER;
+              const platform = platforms.find((p) => p.id === item.platform);
               return (
-                <li key={item.id} className="relative bg-surface">
-                  {urgent ? (
-                    <span
-                      aria-hidden="true"
-                      className="absolute inset-y-0 left-0 w-[3px] bg-danger"
-                    />
-                  ) : null}
-                  <Link
-                    href={`/admin/listings/${item.id}`}
-                    className="flex flex-wrap items-center gap-x-4 gap-y-2.5 p-4 pl-5 transition-colors hover:bg-surface-2"
-                  >
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-semibold text-fg">
-                        {item.title || item.handle}
-                      </span>
-                      <span className="mt-0.5 block truncate text-xs text-subtle">
-                        {item.handle} · {item.sellerName}
-                      </span>
-                      <span className="mt-1.5 flex flex-wrap items-center gap-2">
-                        <ListingStatusTag status={item.status} />
-                        <span className="text-[0.6875rem] text-subtle capitalize">
-                          {item.platform}
+                <ListItem
+                  key={item.id}
+                  href={`/admin/listings/${item.id}`}
+                  flag={urgent ? "danger" : undefined}
+                >
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-2.5">
+                    <div className="flex min-w-0 flex-1 basis-64 items-center gap-3">
+                      <IconTile icon={platform?.icon ?? ImageIcon} />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex min-w-0 items-center gap-2">
+                          <span className="truncate text-sm leading-5 font-medium text-fg">
+                            {item.title || item.handle}
+                          </span>
+                          {item.featured && item.status === "LIVE" ? (
+                            <span className="inline-flex shrink-0 items-center gap-1 text-xs text-muted">
+                              <StarIcon
+                                aria-hidden="true"
+                                className="size-3 fill-current text-primary-text"
+                              />
+                              Featured
+                            </span>
+                          ) : null}
+                        </div>
+                        <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[0.8125rem] leading-5 text-muted">
+                          <span className="truncate">{item.handle}</span>
+                          <Sep />
+                          <span className="truncate">{item.sellerName}</span>
+                          <Sep />
+                          <span className="capitalize">
+                            {platform?.name ?? item.platform}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="ml-11 flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2 sm:ml-0">
+                      {item.proofCount === 0 ? (
+                        <Badge variant="danger" size="sm">
+                          <TriangleAlertIcon aria-hidden="true" />
+                          No proof
+                        </Badge>
+                      ) : (
+                        <span className="tnum inline-flex items-center gap-1 text-xs whitespace-nowrap text-subtle">
+                          <ImageIcon aria-hidden="true" className="size-3.5" />
+                          {item.proofCount} screenshot
+                          {item.proofCount === 1 ? "" : "s"}
                         </span>
-                        {item.featured && item.status === "LIVE" ? (
-                          <span className="inline-flex items-center gap-1 text-[0.6875rem] font-semibold text-primary-text">
-                            <StarIcon
-                              aria-hidden="true"
-                              className="size-3 fill-current"
-                            />
-                            featured
-                          </span>
-                        ) : null}
-                        {item.proofCount === 0 ? (
-                          <span className="inline-flex items-center gap-1 rounded-full border border-danger/30 bg-danger-soft px-1.5 py-0.5 text-[0.625rem] font-semibold text-danger">
-                            <TriangleAlertIcon
-                              aria-hidden="true"
-                              className="size-3"
-                            />
-                            no proof
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 text-[0.6875rem] text-subtle">
-                            <ImageIcon aria-hidden="true" className="size-3" />
-                            {item.proofCount} screenshot
-                            {item.proofCount === 1 ? "" : "s"}
-                          </span>
-                        )}
+                      )}
+                      <ListingStatusTag status={item.status} />
+                      <span className="flex flex-col items-end gap-0.5 sm:w-32">
+                        <span className="flex items-baseline gap-1.5">
+                          <span className="text-xs text-subtle">Asking</span>
+                          <Price
+                            usd={item.price}
+                            className="text-sm font-medium text-fg"
+                          />
+                        </span>
+                        <Waited
+                          since={item.waitingSince}
+                          prefix={reviewing ? "waiting" : "changed"}
+                          warnAfter={
+                            reviewing ? WARN_AFTER : Number.POSITIVE_INFINITY
+                          }
+                          lateAfter={
+                            reviewing ? LATE_AFTER : Number.POSITIVE_INFINITY
+                          }
+                        />
                       </span>
-                    </span>
-                    <span className="flex shrink-0 flex-col items-end gap-1">
-                      <Price
-                        usd={item.price}
-                        className="font-display text-base font-bold text-fg"
+                      <ChevronRightIcon
+                        aria-hidden="true"
+                        className="hidden size-4 shrink-0 text-subtle transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-muted sm:block"
                       />
-                      <span className="text-[0.625rem] tracking-wide text-subtle uppercase">
-                        asking
-                      </span>
-                      <Waited
-                        since={item.waitingSince}
-                        prefix={reviewing ? "waiting" : "changed"}
-                        warnAfter={
-                          reviewing ? WARN_AFTER : Number.POSITIVE_INFINITY
-                        }
-                        lateAfter={
-                          reviewing ? LATE_AFTER : Number.POSITIVE_INFINITY
-                        }
-                      />
-                    </span>
-                  </Link>
-                </li>
+                    </div>
+                  </div>
+                </ListItem>
               );
             })}
-          </ul>
+          </List>
         )}
-      </ConsoleSection>
+      </Section>
     </>
   );
 }

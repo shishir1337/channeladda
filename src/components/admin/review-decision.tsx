@@ -2,16 +2,20 @@
 
 import {
   CheckCircle2Icon,
+  CheckIcon,
   RotateCcwIcon,
   StarIcon,
   StarOffIcon,
   TriangleAlertIcon,
+  UndoDotIcon,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useId, useState, useTransition } from "react";
-import { Panel } from "@/components/admin/console";
+import { type ReactNode, useId, useState, useTransition } from "react";
+import { Card, CardBody, CardHeader } from "@/components/app/kit";
 import { FormNotice, TextArea } from "@/components/auth/fields";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import {
   approveListing,
   rejectListing,
@@ -21,6 +25,46 @@ import {
 } from "@/server/actions/admin";
 
 const MIN_REASON = 10;
+
+/**
+ * A button label that swaps for its busy form without the button changing
+ * width: both are laid in the same grid cell and the one not in use is
+ * hidden, so the wider of the two sets the size. `invisible` also takes the
+ * hidden one out of the accessible name.
+ */
+function Swap({
+  busy,
+  idle,
+  label,
+}: {
+  busy: boolean;
+  idle: ReactNode;
+  label: string;
+}) {
+  return (
+    <span className="inline-grid">
+      <span className={cn("col-start-1 row-start-1", busy && "invisible")}>
+        {idle}
+      </span>
+      <span className={cn("col-start-1 row-start-1", !busy && "invisible")}>
+        {label}
+      </span>
+    </span>
+  );
+}
+
+/** "A few more words" — shown under a reason that is still too short to send. */
+function TooShort({
+  reason,
+  children,
+}: {
+  reason: string;
+  children: ReactNode;
+}) {
+  const length = reason.trim().length;
+  if (length === 0 || length >= MIN_REASON) return null;
+  return <p className="mt-2 text-xs text-subtle">{children}</p>;
+}
 
 /**
  * Approve, or send it back with a reason.
@@ -53,92 +97,93 @@ export function ReviewDecision({ listingId }: { listingId: string }) {
   }
 
   return (
-    <Panel className="border-primary/35">
-      <div className="flex flex-wrap items-start justify-between gap-x-5 gap-y-2">
-        <div className="min-w-0">
-          <h2 className="font-display text-base font-bold text-fg">
-            Your decision
-          </h2>
-          <p className="mt-1.5 max-w-[62ch] text-sm leading-relaxed text-muted">
-            Recorded against your name in the audit trail either way. Approving
-            publishes the listing to the marketplace at once and lets buyers
-            open a deal on it.
-          </p>
-        </div>
-        <span className="rounded-full border border-line bg-surface-2 px-2 py-0.5 text-[0.6875rem] font-semibold text-muted">
-          Logged
-        </span>
-      </div>
+    // The one card on the page waiting on the reader, so it carries the gold
+    // edge; everything else on the review page stays neutral.
+    <Card className="border-primary/40">
+      <CardHeader
+        title="Your decision"
+        description="Recorded against your name in the audit trail either way."
+        actions={<Badge size="sm">Logged</Badge>}
+      />
+      <CardBody>
+        {error ? <FormNotice>{error}</FormNotice> : null}
 
-      {error ? (
-        <div className="mt-4">
-          <FormNotice>{error}</FormNotice>
-        </div>
-      ) : null}
-
-      {mode === "idle" ? (
-        <div className="mt-4 flex flex-wrap gap-3">
-          <Button
-            type="button"
-            size="md"
-            disabled={pending}
-            onClick={() => act(() => approveListing(listingId))}
-          >
-            {pending ? "Working…" : "Approve and publish"}
-          </Button>
-          <Button
-            type="button"
-            variant="secondary"
-            size="md"
-            disabled={pending}
-            onClick={() => setMode("rejecting")}
-          >
-            Send back to the seller
-          </Button>
-        </div>
-      ) : (
-        <div className="mt-4">
-          <TextArea
-            id={reasonId}
-            name="reason"
-            label="What needs changing?"
-            hint="The seller sees this word for word. Be specific enough to act on."
-            rows={4}
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            placeholder="The revenue screenshot is from a different channel than the one in the listing."
-            required
-          />
-          <div className="mt-3 flex flex-wrap items-center gap-3">
-            <Button
-              type="button"
-              size="md"
-              disabled={pending || reason.trim().length < MIN_REASON}
-              onClick={() => act(() => rejectListing(listingId, reason))}
-            >
-              {pending ? "Sending…" : "Send it back"}
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="md"
-              disabled={pending}
-              onClick={() => {
-                setMode("idle");
-                setError(null);
-              }}
-            >
-              Cancel
-            </Button>
-            {reason.trim().length > 0 && reason.trim().length < MIN_REASON ? (
-              <span className="text-xs text-subtle">
-                A few more words — this is the whole message.
-              </span>
-            ) : null}
-          </div>
-        </div>
-      )}
-    </Panel>
+        {mode === "idle" ? (
+          <>
+            <p className="text-[0.8125rem] leading-relaxed text-muted">
+              Approving publishes the listing to the marketplace at once and
+              lets buyers open a deal on it.
+            </p>
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap lg:flex-col">
+              <Button
+                type="button"
+                size="md"
+                className="w-full sm:w-auto lg:w-full"
+                disabled={pending}
+                onClick={() => act(() => approveListing(listingId))}
+              >
+                <CheckIcon aria-hidden="true" />
+                <Swap
+                  busy={pending}
+                  idle="Approve and publish"
+                  label="Working…"
+                />
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="md"
+                className="w-full sm:w-auto lg:w-full"
+                disabled={pending}
+                onClick={() => setMode("rejecting")}
+              >
+                <UndoDotIcon aria-hidden="true" />
+                Send back to the seller
+              </Button>
+            </div>
+          </>
+        ) : (
+          <>
+            <TextArea
+              id={reasonId}
+              name="reason"
+              label="What needs changing?"
+              hint="The seller sees this word for word. Be specific enough to act on."
+              rows={4}
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="The revenue screenshot is from a different channel than the one in the listing."
+              required
+            />
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                size="md"
+                disabled={pending || reason.trim().length < MIN_REASON}
+                onClick={() => act(() => rejectListing(listingId, reason))}
+              >
+                <Swap busy={pending} idle="Send it back" label="Sending…" />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="md"
+                disabled={pending}
+                onClick={() => {
+                  setMode("idle");
+                  setError(null);
+                }}
+              >
+                Cancel
+              </Button>
+            </div>
+            <TooShort reason={reason}>
+              A few more words — this is the whole message.
+            </TooShort>
+          </>
+        )}
+      </CardBody>
+    </Card>
   );
 }
 
@@ -154,81 +199,76 @@ export function RemoveListing({ listingId }: { listingId: string }) {
   if (!open) {
     return (
       <div>
-        <button
+        <Button
           type="button"
+          variant="outline"
+          size="md"
           onClick={() => setOpen(true)}
           aria-expanded={false}
-          className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border border-line px-4 text-sm font-medium text-muted transition-colors hover:border-danger/50 hover:text-danger"
+          className="w-full text-muted hover:border-danger/40 hover:text-danger sm:w-auto lg:w-full app:hover:border-danger/40"
         >
-          <TriangleAlertIcon aria-hidden="true" className="size-4" />
+          <TriangleAlertIcon aria-hidden="true" />
           Take this listing down
-        </button>
+        </Button>
       </div>
     );
   }
 
   return (
-    <Panel tone="danger">
-      <h2 className="font-display text-base font-bold text-fg">
-        Take this listing down
-      </h2>
-      <p className="mt-1.5 max-w-[62ch] text-sm leading-relaxed text-muted">
-        It disappears from the marketplace and from search. Open offers and
-        deals on it are not undone by this — end those on the deal desk.
-      </p>
-      {error ? (
-        <div className="mt-4">
-          <FormNotice>{error}</FormNotice>
-        </div>
-      ) : null}
-      <TextArea
-        id={reasonId}
-        name="reason"
-        label="Why is this coming down?"
-        hint="Recorded against your name in the audit trail."
-        rows={3}
-        value={reason}
-        onChange={(e) => setReason(e.target.value)}
-        className="mt-4"
-        required
+    <Card tone="danger">
+      <CardHeader
+        title="Take this listing down"
+        description="It disappears from the marketplace and from search. Open offers and deals on it are not undone by this — end those on the deal desk."
+        className="border-danger/15"
       />
-      <div className="mt-3 flex flex-wrap items-center gap-3">
-        <Button
-          type="button"
-          size="md"
-          variant="danger"
-          disabled={pending || reason.trim().length < MIN_REASON}
-          onClick={() => {
-            setError(null);
-            startTransition(async () => {
-              const result = await removeListing(listingId, reason);
-              if (!result.ok) {
-                setError(result.error);
-                return;
-              }
-              router.push("/admin/listings");
-              router.refresh();
-            });
-          }}
-        >
-          {pending ? "Removing…" : "Take it down"}
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="md"
-          disabled={pending}
-          onClick={() => setOpen(false)}
-        >
-          Cancel
-        </Button>
-        {reason.trim().length > 0 && reason.trim().length < MIN_REASON ? (
-          <span className="text-xs text-subtle">
-            A few more words — this is the record.
-          </span>
-        ) : null}
-      </div>
-    </Panel>
+      <CardBody>
+        {error ? <FormNotice>{error}</FormNotice> : null}
+        <TextArea
+          id={reasonId}
+          name="reason"
+          label="Why is this coming down?"
+          hint="Recorded against your name in the audit trail."
+          rows={3}
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          required
+        />
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            size="md"
+            variant="danger"
+            disabled={pending || reason.trim().length < MIN_REASON}
+            onClick={() => {
+              setError(null);
+              startTransition(async () => {
+                const result = await removeListing(listingId, reason);
+                if (!result.ok) {
+                  setError(result.error);
+                  return;
+                }
+                router.push("/admin/listings");
+                router.refresh();
+              });
+            }}
+          >
+            <Swap busy={pending} idle="Take it down" label="Removing…" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="md"
+            disabled={pending}
+            onClick={() => setOpen(false)}
+          >
+            Cancel
+          </Button>
+        </div>
+        <TooShort reason={reason}>
+          A few more words — this is the record.
+        </TooShort>
+      </CardBody>
+    </Card>
   );
 }
 
@@ -252,87 +292,92 @@ export function ReopenListing({ listingId }: { listingId: string }) {
   if (!open) {
     return (
       <div>
-        <button
+        <Button
           type="button"
+          variant="outline"
+          size="md"
           onClick={() => setOpen(true)}
           aria-expanded={false}
           aria-controls={panelId}
-          className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border border-line px-4 text-sm font-medium text-muted transition-colors hover:border-line-strong hover:text-fg"
+          className="w-full sm:w-auto lg:w-full"
         >
-          <RotateCcwIcon aria-hidden="true" className="size-4" />
+          <RotateCcwIcon aria-hidden="true" />
           Send it back to review
-        </button>
+        </Button>
       </div>
     );
   }
 
   return (
     <div id={panelId}>
-      <Panel>
-        <h2 className="font-display text-base font-bold text-fg">
-          Send it back to review
-        </h2>
-        <p className="mt-1.5 max-w-[62ch] text-sm leading-relaxed text-muted">
-          For a listing that came down in error. It goes into the review queue,
-          not onto the marketplace — somebody still approves it there, or sends
-          it back to the seller. The seller is told, and sees your reason.
-        </p>
-        {error ? (
-          <div className="mt-4">
-            <FormNotice>{error}</FormNotice>
-          </div>
-        ) : null}
-        <TextArea
-          id={reasonId}
-          name="reason"
-          label="Why is it coming back?"
-          hint="The seller sees this word for word, and it is recorded against your name in the audit trail."
-          rows={3}
-          value={reason}
-          onChange={(e) => setReason(e.target.value)}
-          placeholder="The report was about a different channel with a similar name."
-          className="mt-4"
-          required
-        />
-        <div className="mt-3 flex flex-wrap items-center gap-3">
-          <Button
-            type="button"
-            size="md"
-            disabled={pending || reason.trim().length < MIN_REASON}
-            onClick={() => {
-              setError(null);
-              startTransition(async () => {
-                const result = await reopenListing(listingId, reason);
-                if (!result.ok) {
-                  setError(result.error);
-                  return;
-                }
-                router.push("/admin/listings");
-                router.refresh();
-              });
-            }}
-          >
-            {pending ? "Sending…" : "Send it to the review queue"}
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="md"
-            disabled={pending}
-            onClick={() => {
-              setOpen(false);
-              setError(null);
-            }}
-          >
-            Cancel
-          </Button>
-          {reason.trim().length > 0 && reason.trim().length < MIN_REASON ? (
-            <span className="text-xs text-subtle">
-              A few more words — this is the record.
-            </span>
+      <Card>
+        <CardHeader title="Send it back to review" />
+        <CardBody>
+          <p className="text-[0.8125rem] leading-relaxed text-muted">
+            For a listing that came down in error. It goes into the review
+            queue, not onto the marketplace — somebody still approves it there,
+            or sends it back to the seller. The seller is told, and sees your
+            reason.
+          </p>
+          {error ? (
+            <div className="mt-4">
+              <FormNotice>{error}</FormNotice>
+            </div>
           ) : null}
-        </div>
-      </Panel>
+          <TextArea
+            id={reasonId}
+            name="reason"
+            label="Why is it coming back?"
+            hint="The seller sees this word for word, and it is recorded against your name in the audit trail."
+            rows={3}
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="The report was about a different channel with a similar name."
+            className="mt-4"
+            required
+          />
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              size="md"
+              disabled={pending || reason.trim().length < MIN_REASON}
+              onClick={() => {
+                setError(null);
+                startTransition(async () => {
+                  const result = await reopenListing(listingId, reason);
+                  if (!result.ok) {
+                    setError(result.error);
+                    return;
+                  }
+                  router.push("/admin/listings");
+                  router.refresh();
+                });
+              }}
+            >
+              <Swap
+                busy={pending}
+                idle="Send it to the review queue"
+                label="Sending…"
+              />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="md"
+              disabled={pending}
+              onClick={() => {
+                setOpen(false);
+                setError(null);
+              }}
+            >
+              Cancel
+            </Button>
+          </div>
+          <TooShort reason={reason}>
+            A few more words — this is the record.
+          </TooShort>
+        </CardBody>
+      </Card>
     </div>
   );
 }
@@ -357,10 +402,10 @@ export function FeatureListing({
   const [pending, startTransition] = useTransition();
 
   return (
-    <Panel>
-      <div className="flex flex-wrap items-start justify-between gap-x-5 gap-y-3">
-        <div className="min-w-0">
-          <h2 className="flex items-center gap-2 font-display text-base font-bold text-fg">
+    <Card>
+      <CardHeader
+        title={
+          <span className="inline-flex items-center gap-2">
             <StarIcon
               aria-hidden="true"
               className={
@@ -370,16 +415,16 @@ export function FeatureListing({
               }
             />
             {featured ? "Featured on the homepage" : "Not featured"}
-          </h2>
-          <p className="mt-1.5 max-w-[58ch] text-sm leading-relaxed text-muted">
-            Featured listings lead the homepage showcase and carry the Featured
-            badge everywhere they appear. Recorded in the audit trail.
-          </p>
-        </div>
+          </span>
+        }
+        description="Featured listings lead the homepage showcase and carry the Featured badge everywhere they appear. Recorded in the audit trail."
+      />
+      <CardBody className="py-3 sm:py-4">
         <Button
           type="button"
           size="sm"
           variant={featured ? "secondary" : "primary"}
+          className="w-full sm:w-auto lg:w-full"
           disabled={pending}
           aria-pressed={featured}
           onClick={() => {
@@ -393,36 +438,39 @@ export function FeatureListing({
           }}
         >
           {featured ? (
-            <StarOffIcon aria-hidden="true" className="size-4" />
+            <StarOffIcon aria-hidden="true" />
           ) : (
-            <StarIcon aria-hidden="true" className="size-4" />
+            <StarIcon aria-hidden="true" />
           )}
-          {pending ? "Saving…" : featured ? "Stop featuring it" : "Feature it"}
+          <Swap
+            busy={pending}
+            idle={featured ? "Stop featuring it" : "Feature it"}
+            label="Saving…"
+          />
         </Button>
-      </div>
-      {message ? (
-        <p
-          role={ok ? "status" : "alert"}
-          className={
-            ok
-              ? "mt-3 flex items-start gap-1.5 text-sm text-verified"
-              : "mt-3 flex items-start gap-1.5 text-sm text-danger"
-          }
-        >
-          {ok ? (
-            <CheckCircle2Icon
-              aria-hidden="true"
-              className="mt-0.5 size-4 shrink-0"
-            />
-          ) : (
-            <TriangleAlertIcon
-              aria-hidden="true"
-              className="mt-0.5 size-4 shrink-0"
-            />
-          )}
-          <span>{message}</span>
-        </p>
-      ) : null}
-    </Panel>
+        {message ? (
+          <p
+            role={ok ? "status" : "alert"}
+            className={cn(
+              "mt-3 flex items-start gap-1.5 text-[0.8125rem] leading-relaxed",
+              ok ? "text-verified" : "text-danger",
+            )}
+          >
+            {ok ? (
+              <CheckCircle2Icon
+                aria-hidden="true"
+                className="mt-0.5 size-3.5 shrink-0"
+              />
+            ) : (
+              <TriangleAlertIcon
+                aria-hidden="true"
+                className="mt-0.5 size-3.5 shrink-0"
+              />
+            )}
+            <span>{message}</span>
+          </p>
+        ) : null}
+      </CardBody>
+    </Card>
   );
 }

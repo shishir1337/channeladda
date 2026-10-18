@@ -4,6 +4,16 @@ import { TriangleAlertIcon } from "lucide-react";
 import Link from "next/link";
 import { useState, useTransition } from "react";
 import { Waited } from "@/components/admin/vocab";
+import {
+  Dot,
+  hintClass,
+  ListItem,
+  labelClass,
+  Reference,
+  Sep,
+  textareaClass,
+} from "@/components/app/kit";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { setTicketStatus } from "@/server/actions/support";
@@ -31,10 +41,10 @@ export type TicketView = {
   staffNote: string | null;
 };
 
-const STATUS_STYLES = {
-  OPEN: "border-primary/30 bg-primary-soft text-primary-text",
-  ANSWERED: "border-verified/30 bg-verified-soft text-verified",
-  CLOSED: "border-line bg-surface-2 text-subtle",
+const STATUS_VARIANT = {
+  OPEN: "primary",
+  ANSWERED: "verified",
+  CLOSED: "neutral",
 } as const;
 
 const STATUS_LABELS = {
@@ -49,6 +59,9 @@ export function TicketCard({ ticket }: { ticket: TicketView }) {
   const [pending, startTransition] = useTransition();
 
   const dirty = note.trim() !== (ticket.staffNote ?? "").trim();
+  // Open tickets are the queue; the rest are kept for the record, so they
+  // read a step quieter.
+  const open = ticket.status === "OPEN";
 
   function move(status: TicketView["status"]) {
     setError(null);
@@ -59,125 +72,151 @@ export function TicketCard({ ticket }: { ticket: TicketView }) {
   }
 
   return (
-    <li className="relative bg-surface p-4 sm:p-5">
-      {ticket.status === "OPEN" ? (
-        <span
-          aria-hidden="true"
-          className="absolute inset-y-0 left-0 w-[3px] bg-primary"
-        />
-      ) : null}
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-        <span
-          className={cn(
-            "rounded-full border px-2 py-0.5 text-[0.6875rem] font-semibold",
-            STATUS_STYLES[ticket.status],
-          )}
-        >
-          {STATUS_LABELS[ticket.status]}
-        </span>
-        <span className="text-sm font-semibold text-fg">{ticket.topic}</span>
-        {ticket.orderRef ? (
-          <span className="tnum rounded-md bg-surface-2 px-1.5 py-0.5 text-[0.6875rem] text-muted">
-            {ticket.orderRef}
-          </span>
-        ) : null}
-        <span className="ml-auto">
+    <ListItem flag={open ? "primary" : undefined} className="py-4 sm:py-5">
+      <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+        <div className="min-w-0 flex-1 basis-60">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <span className="text-sm leading-5 font-medium text-fg">
+              {ticket.topic}
+            </span>
+            {ticket.orderRef ? <Reference>{ticket.orderRef}</Reference> : null}
+          </div>
+          <p className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[0.8125rem] leading-5 text-muted">
+            {ticket.fromId ? (
+              <Link
+                href={`/admin/users/${ticket.fromId}`}
+                className="font-medium text-fg underline decoration-line-strong underline-offset-4 transition-colors hover:decoration-fg"
+              >
+                {ticket.fromName}
+              </Link>
+            ) : (
+              <span>Not signed in</span>
+            )}
+            <Sep />
+            <span className="break-all">{ticket.email}</span>
+            {ticket.handledBy ? (
+              <>
+                <Sep />
+                <span>handled by {ticket.handledBy}</span>
+              </>
+            ) : null}
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-3">
           <Waited
             since={new Date(ticket.createdAt)}
             prefix="sent"
             warnAfter={24}
             lateAfter={72}
           />
-        </span>
+          <Badge variant={STATUS_VARIANT[ticket.status]} size="sm">
+            {STATUS_LABELS[ticket.status]}
+          </Badge>
+        </div>
       </div>
 
-      <p className="mt-1.5 text-xs text-subtle">
-        {ticket.fromId ? (
-          <Link
-            href={`/admin/users/${ticket.fromId}`}
-            className="font-medium text-primary-text underline-offset-4 hover:underline"
-          >
-            {ticket.fromName}
-          </Link>
-        ) : (
-          <span>Not signed in</span>
+      <p
+        className={cn(
+          "mt-3 max-w-[80ch] border-l-2 border-line pl-3 text-sm leading-[1.6] break-words whitespace-pre-wrap",
+          open ? "text-fg" : "text-muted",
         )}
-        <span className="text-subtle/70"> · </span>
-        <span className="break-all">{ticket.email}</span>
-        {ticket.handledBy ? ` · handled by ${ticket.handledBy}` : ""}
-      </p>
-
-      <p className="mt-3 rounded-card border border-line bg-surface-2 p-3 text-sm leading-relaxed whitespace-pre-wrap text-fg">
+      >
         {ticket.message}
       </p>
 
-      <label
-        htmlFor={`note-${ticket.id}`}
-        className="mt-3 block text-xs font-medium text-fg"
-      >
-        What was done about it
-      </label>
-      <textarea
-        id={`note-${ticket.id}`}
-        rows={2}
-        value={note}
-        onChange={(event) => setNote(event.target.value)}
-        placeholder="What you did about it, for whoever picks this up next"
-        className="mt-1.5 w-full rounded-xl border border-line bg-surface px-3 py-2.5 text-base text-fg placeholder:text-subtle focus:border-primary/60 focus:outline-none sm:text-xs"
-      />
-      <p className="mt-1 text-[0.6875rem] text-subtle">
-        {dirty
-          ? "Unsaved — the note is written when you move the ticket."
-          : "Saved with the ticket."}
-      </p>
+      <div className="mt-4">
+        <label htmlFor={`note-${ticket.id}`} className={labelClass}>
+          What was done about it
+        </label>
+        <textarea
+          id={`note-${ticket.id}`}
+          rows={2}
+          value={note}
+          onChange={(event) => setNote(event.target.value)}
+          placeholder="What you did about it, for whoever picks this up next"
+          className={cn(textareaClass, "mt-1.5 min-h-[4.5rem]")}
+        />
+        <div className="mt-2.5 flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+          <p
+            className={cn(
+              hintClass,
+              "mt-0 inline-flex items-center gap-1.5",
+              dirty && "text-muted",
+            )}
+          >
+            <Dot tone={dirty ? "primary" : "neutral"} />
+            {dirty
+              ? "Unsaved — the note is written when you move the ticket."
+              : "Saved with the ticket."}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {ticket.status !== "ANSWERED" ? (
+              <Button
+                type="button"
+                size="sm"
+                disabled={pending}
+                onClick={() => move("ANSWERED")}
+              >
+                {/* Both labels share one cell, so the button keeps the width
+                    of the wider one while it saves. */}
+                <span className="inline-grid">
+                  <span
+                    className={cn(
+                      "col-start-1 row-start-1",
+                      pending && "invisible",
+                    )}
+                  >
+                    Mark answered
+                  </span>
+                  <span
+                    className={cn(
+                      "col-start-1 row-start-1",
+                      !pending && "invisible",
+                    )}
+                  >
+                    Saving…
+                  </span>
+                </span>
+              </Button>
+            ) : null}
+            {ticket.status !== "CLOSED" ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                disabled={pending}
+                onClick={() => move("CLOSED")}
+              >
+                Close it
+              </Button>
+            ) : null}
+            {ticket.status !== "OPEN" ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                disabled={pending}
+                onClick={() => move("OPEN")}
+              >
+                Put back in the queue
+              </Button>
+            ) : null}
+          </div>
+        </div>
 
-      <div className="mt-2.5 flex flex-wrap gap-2">
-        {ticket.status !== "ANSWERED" ? (
-          <Button
-            type="button"
-            size="sm"
-            disabled={pending}
-            onClick={() => move("ANSWERED")}
+        {error ? (
+          <p
+            role="alert"
+            className="mt-2 flex items-start gap-1.5 text-xs text-danger"
           >
-            {pending ? "Saving…" : "Mark answered"}
-          </Button>
-        ) : null}
-        {ticket.status !== "CLOSED" ? (
-          <Button
-            type="button"
-            size="sm"
-            variant="secondary"
-            disabled={pending}
-            onClick={() => move("CLOSED")}
-          >
-            Close it
-          </Button>
-        ) : null}
-        {ticket.status !== "OPEN" ? (
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            disabled={pending}
-            onClick={() => move("OPEN")}
-          >
-            Put back in the queue
-          </Button>
+            <TriangleAlertIcon
+              aria-hidden="true"
+              className="mt-px size-3.5 shrink-0"
+            />
+            <span>{error}</span>
+          </p>
         ) : null}
       </div>
-
-      {error ? (
-        <p
-          role="alert"
-          className="mt-2 flex items-start gap-1.5 text-xs text-danger"
-        >
-          <TriangleAlertIcon
-            aria-hidden="true"
-            className="mt-px size-3.5 shrink-0"
-          />
-          <span>{error}</span>
-        </p>
-      ) : null}
-    </li>
+    </ListItem>
   );
 }

@@ -1,15 +1,17 @@
+import { InboxIcon } from "lucide-react";
 import type { Metadata } from "next";
-import {
-  AllClear,
-  ConsoleHeader,
-  ConsoleSection,
-  FilterBar,
-  FilterLink,
-  MetaItem,
-  Nothing,
-} from "@/components/admin/console";
 import { TicketCard, type TicketView } from "@/components/admin/ticket-card";
 import { elapsed } from "@/components/admin/vocab";
+import {
+  AllClear,
+  EmptyState,
+  FilterBar,
+  FilterLink,
+  List,
+  MetaItem,
+  PageHeader,
+  Section,
+} from "@/components/app/kit";
 import { requireStaff } from "@/server/session";
 import { listTickets } from "@/server/support";
 
@@ -50,10 +52,9 @@ export default async function AdminSupportPage({
 
   return (
     <>
-      <ConsoleHeader
-        eyebrow="Inbox"
+      <PageHeader
         title="Support"
-        description="Everything sent through the contact form. People who cannot sign in end up here too, so this is where a locked-out seller gets found."
+        description="Everything sent through the contact form, including from people who cannot sign in."
         meta={
           <>
             <MetaItem label="Signed in as">{staff.name}</MetaItem>
@@ -70,22 +71,21 @@ export default async function AdminSupportPage({
         }
       />
 
-      <div className="mt-5">
-        <FilterBar label="Filter by status">
-          {TABS.map((tab) => (
-            <FilterLink
-              key={tab.label}
-              href={tab.href}
-              active={(status ?? "") === tab.value}
-            >
-              {tab.label}
-            </FilterLink>
-          ))}
-        </FilterBar>
-      </div>
+      <FilterBar label="Filter by status">
+        {TABS.map((tab) => (
+          <FilterLink
+            key={tab.label}
+            href={tab.href}
+            active={(status ?? "") === tab.value}
+          >
+            {tab.label}
+          </FilterLink>
+        ))}
+      </FilterBar>
 
-      <ConsoleSection
+      <Section
         id="tickets"
+        className="mt-6"
         title={showing?.label ?? "Tickets"}
         count={rows.length}
         tone={status === "OPEN" && rows.length > 0 ? "primary" : "neutral"}
@@ -98,19 +98,20 @@ export default async function AdminSupportPage({
               body="Every support request has been answered or closed. New ones arrive from the contact form."
             />
           ) : (
-            <Nothing
+            <EmptyState
+              icon={InboxIcon}
               title="Nothing in this view"
               body="No ticket has that status right now. Try another filter above."
             />
           )
         ) : (
-          <ul className="grid gap-px overflow-hidden rounded-card border border-line bg-line">
+          <List>
             {rows.map((ticket) => (
               <TicketCard key={ticket.id} ticket={ticket} />
             ))}
-          </ul>
+          </List>
         )}
-      </ConsoleSection>
+      </Section>
     </>
   );
 }

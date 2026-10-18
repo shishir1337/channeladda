@@ -1,16 +1,16 @@
 import {
-  ArrowLeftIcon,
   ExternalLinkIcon,
   FingerprintIcon,
+  HistoryIcon,
   ImageIcon,
   StarIcon,
   TriangleAlertIcon,
+  UserRoundIcon,
 } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
-import { Fact, Facts, Panel } from "@/components/admin/console";
 import { WhatsAppContact } from "@/components/admin/dispute-contact";
 import {
   FeatureListing,
@@ -18,8 +18,25 @@ import {
   ReopenListing,
   ReviewDecision,
 } from "@/components/admin/review-decision";
-import { auditLabel, ListingStatusTag, Waited } from "@/components/admin/vocab";
+import {
+  auditLabel,
+  LISTING_STATUS,
+  ListingStatusTag,
+  Waited,
+} from "@/components/admin/vocab";
+import {
+  Callout,
+  Card,
+  CardBody,
+  CardHeader,
+  Count,
+  Fact,
+  Facts,
+  MetaItem,
+  PageHeader,
+} from "@/components/app/kit";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Price } from "@/components/ui/price";
 import { platforms } from "@/data/platforms";
 import { getListingForReview } from "@/server/admin-listings";
@@ -31,11 +48,15 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-function SubHeading({ children }: { children: ReactNode }) {
-  return (
-    <h2 className="font-display text-base font-bold text-fg">{children}</h2>
-  );
-}
+/** A quiet in-text link: the colour stays with the words, the rule says "link". */
+const textLink =
+  "font-medium text-fg underline decoration-line-strong underline-offset-4 transition-colors hover:decoration-fg";
+
+/**
+ * Two-column facts end on a row of two, and both of that row's hairlines have
+ * to go — the kit drops only the very last one.
+ */
+const pairedFacts = "sm:[&>*:nth-last-child(2):nth-child(odd)]:border-b-0";
 
 export default async function ReviewListingPage({
   params,
@@ -70,114 +91,112 @@ export default async function ReviewListingPage({
     ["Asking price", <Price key="price" usd={listing.price} />],
   ];
 
+  const sentBack =
+    listing.status === "REJECTED" && Boolean(listing.rejectionReason);
+  const removed = listing.status === "REMOVED";
+  const readOnlyNote =
+    !canModerate &&
+    (inReview ||
+      listing.status === "LIVE" ||
+      listing.status === "PAUSED" ||
+      listing.status === "REMOVED");
+  // The side column holds where the listing stands and what can be done about
+  // it. A status with neither — reserved, sold, waiting on the seller's code —
+  // still gets a card there, so the layout never shows an empty column.
+  const hasSide =
+    (inReview && canModerate) ||
+    sentBack ||
+    removed ||
+    (canModerate &&
+      (listing.status === "LIVE" || listing.status === "PAUSED")) ||
+    readOnlyNote;
+  const PlatformIcon = platform?.icon;
+
   return (
     <>
-      <Link
-        href="/admin/listings"
-        className="inline-flex min-h-11 items-center gap-1.5 text-sm text-muted transition-colors hover:text-fg"
-      >
-        <ArrowLeftIcon aria-hidden="true" className="size-4" />
-        Listing queue
-      </Link>
-
-      <header className="mt-2 border-b border-line pb-5">
-        <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-4">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <ListingStatusTag status={listing.status} size="md" />
-              <Badge className="capitalize">
-                {platform?.name ?? listing.platform}
+      <PageHeader
+        back={{ href: "/admin/listings", label: "Listing queue" }}
+        title={listing.title}
+        meta={
+          <>
+            <ListingStatusTag status={listing.status} />
+            <Badge className="capitalize">
+              {PlatformIcon ? <PlatformIcon aria-hidden="true" /> : null}
+              {platform?.name ?? listing.platform}
+            </Badge>
+            {listing.featured ? (
+              <Badge variant="primary">
+                <StarIcon aria-hidden="true" />
+                Featured
               </Badge>
-              {listing.featured ? (
-                <Badge variant="primary">
-                  <StarIcon aria-hidden="true" />
-                  Featured
-                </Badge>
-              ) : null}
-              {inReview ? (
-                <Waited
-                  since={listing.updatedAt}
-                  warnAfter={12}
-                  lateAfter={24}
-                />
-              ) : null}
-            </div>
-            <h1 className="mt-3 font-display text-[1.6rem] leading-[1.1] font-black tracking-tight text-fg sm:text-[1.9rem]">
-              {listing.title}
-            </h1>
-            <p className="mt-1.5 text-sm text-subtle">
-              {listing.handle} · submitted{" "}
-              {listing.createdAt.toLocaleDateString("en-GB")}
-            </p>
-          </div>
-          <div className="flex shrink-0 flex-wrap items-center gap-2">
-            {listing.status === "LIVE" ? (
-              <Link
-                href={`/listing/${listing.slug}`}
-                className="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-line px-4 text-sm text-muted transition-colors hover:border-line-strong hover:text-fg"
-              >
-                View live
-                <ExternalLinkIcon aria-hidden="true" className="size-4" />
-              </Link>
             ) : null}
-          </div>
-        </div>
-      </header>
+            <span className="text-muted">{listing.handle}</span>
+            <MetaItem label="Submitted">
+              {listing.createdAt.toLocaleDateString("en-GB")}
+            </MetaItem>
+            {inReview ? (
+              <Waited since={listing.updatedAt} warnAfter={12} lateAfter={24} />
+            ) : null}
+          </>
+        }
+        actions={
+          listing.status === "LIVE" ? (
+            <Button asChild variant="outline" size="md">
+              <Link href={`/listing/${listing.slug}`}>
+                View live
+                <ExternalLinkIcon aria-hidden="true" />
+              </Link>
+            </Button>
+          ) : null
+        }
+      />
 
       {duplicates.length > 0 ? (
-        <Panel tone="danger" className="mt-5">
-          <h2 className="flex items-center gap-2 font-display text-base font-bold text-fg">
-            <TriangleAlertIcon
-              aria-hidden="true"
-              className="size-5 shrink-0 text-danger"
-            />
-            The same screenshot appears on another listing
-          </h2>
-          <p className="mt-2 text-sm leading-relaxed text-fg">
+        <Callout
+          tone="danger"
+          title="The same screenshot appears on another listing"
+          className="mb-6"
+        >
+          <p className="text-fg">
             Identical files, byte for byte. At least one of these sellers does
             not own what they are selling.
           </p>
-          <ul className="mt-3 flex flex-col gap-1.5">
+          <ul className="mt-2 flex flex-col gap-1">
             {duplicates.flatMap((proof) =>
               proof.alsoUsedOn.map((other) => (
-                <li key={`${proof.id}-${other.listingId}`} className="text-sm">
-                  <span className="text-muted">
-                    {proof.label || "Screenshot"} — also on{" "}
-                  </span>
+                <li key={`${proof.id}-${other.listingId}`}>
+                  {proof.label || "Screenshot"} — also on{" "}
                   <Link
                     href={`/admin/listings/${other.listingId}`}
-                    className="font-medium text-danger underline-offset-4 hover:underline"
+                    className="font-medium text-danger underline decoration-danger/40 underline-offset-4 transition-colors hover:decoration-danger"
                   >
                     {other.handle}
-                  </Link>
-                  <span className="text-muted"> by {other.sellerName}</span>
+                  </Link>{" "}
+                  by {other.sellerName}
                 </li>
               )),
             )}
           </ul>
-        </Panel>
+        </Callout>
       ) : null}
 
-      <div className="mt-5 grid gap-4 lg:grid-cols-[1fr_20rem] lg:items-start">
-        <div className="flex min-w-0 flex-col gap-4">
-          {/* ---- ownership ---- */}
-          <Panel>
-            <SubHeading>
-              <span className="flex items-center gap-2">
-                <FingerprintIcon
-                  aria-hidden="true"
-                  className="size-4 shrink-0 text-subtle"
-                />
-                Ownership check
-              </span>
-            </SubHeading>
-            <p className="mt-1.5 text-sm leading-relaxed text-muted">
-              Open the account and look for this code. If it is not there, send
-              the listing back — a seller who cannot post to the profile does
-              not control it.
-            </p>
-            <div className="mt-4 flex flex-wrap items-center gap-3">
-              <code className="rounded-card border border-line-strong bg-surface-2 px-4 py-3 font-mono text-base font-semibold tracking-wider text-fg select-all">
+      {/*
+       * Three blocks, in reading order: the evidence, then the decision, then
+       * who is selling and what staff have done. On a wide screen the
+       * decision moves into its own column and stays in view while the proof
+       * scrolls past; on a phone it sits straight after the proof.
+       */}
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] xl:grid-cols-[minmax(0,1fr)_21.5rem]">
+        {/* ---- the evidence ---- */}
+        <div className="flex min-w-0 flex-col gap-6 lg:col-start-1 lg:row-start-1">
+          <Card>
+            <CardHeader
+              icon={FingerprintIcon}
+              title="Ownership check"
+              description="Open the account and look for this code. If it is not there, send the listing back — a seller who cannot post to the profile does not control it."
+            />
+            <CardBody className="flex flex-wrap items-center gap-3">
+              <code className="rounded-lg border border-line bg-surface-2 px-3 py-2 font-mono text-[0.9375rem] leading-6 font-medium tracking-wider text-fg select-all">
                 {listing.ownershipCode ?? "not issued"}
               </code>
               {listing.ownershipVerifiedAt ? (
@@ -188,183 +207,225 @@ export default async function ReviewListingPage({
               ) : (
                 <Badge size="md">Not confirmed yet</Badge>
               )}
-            </div>
-          </Panel>
+            </CardBody>
+          </Card>
 
-          {/* ---- what they claim ---- */}
-          <Panel>
-            <SubHeading>What the seller claims</SubHeading>
-            <p className="mt-1.5 text-sm text-muted">
-              Unverified until the proof below backs it up. Money is shown in
-              whichever currency the header is set to.
-            </p>
-            <Facts className="mt-3">
-              {facts.map(([label, value]) => (
-                <Fact key={label} label={label}>
-                  {value}
-                </Fact>
-              ))}
-            </Facts>
-            {listing.transferProfile ? (
-              <p className="mt-4 text-sm leading-relaxed text-muted">
-                <span className="text-subtle">Handover notes: </span>
-                {listing.transferProfile}
-              </p>
-            ) : null}
-          </Panel>
-
-          {/* ---- proof ---- */}
-          <Panel>
-            <SubHeading>
-              <span className="flex items-center gap-2">
-                <ImageIcon
-                  aria-hidden="true"
-                  className="size-4 shrink-0 text-subtle"
-                />
-                Proof ({listing.proofs.length})
-              </span>
-            </SubHeading>
-            {listing.proofs.length === 0 ? (
-              <p className="mt-3 flex items-start gap-2 rounded-card border border-danger/30 bg-danger-soft p-3 text-sm text-fg">
-                <TriangleAlertIcon
-                  aria-hidden="true"
-                  className="mt-0.5 size-4 shrink-0 text-danger"
-                />
-                Nothing attached. There is nothing here to check the numbers
-                against, so there is nothing to approve.
-              </p>
-            ) : (
-              <ul className="mt-4 grid gap-4 sm:grid-cols-2">
-                {listing.proofs.map((proof) => (
-                  <li key={proof.id}>
-                    <a
-                      href={proof.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="block"
-                    >
-                      {/* biome-ignore lint/performance/noImgElement: seller
-                          uploads reviewed at full size; the optimiser adds
-                          nothing here. */}
-                      <img
-                        src={proof.url}
-                        alt={proof.label || "Proof screenshot"}
-                        width={400}
-                        height={240}
-                        className={`w-full rounded-card border object-cover ${
-                          proof.alsoUsedOn.length > 0
-                            ? "border-danger"
-                            : "border-line"
-                        }`}
-                      />
-                    </a>
-                    <p className="mt-1.5 flex flex-wrap items-center gap-2 text-sm text-muted">
-                      {proof.label || (
-                        <span className="text-subtle">no label</span>
-                      )}
-                      {proof.alsoUsedOn.length > 0 ? (
-                        <Badge variant="danger">reused elsewhere</Badge>
-                      ) : null}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Panel>
-
-          {inReview && canModerate ? (
-            <ReviewDecision listingId={listing.id} />
-          ) : null}
-
-          {listing.status === "REJECTED" && listing.rejectionReason ? (
-            <Panel>
-              <SubHeading>Sent back with</SubHeading>
-              <p className="mt-2 text-sm leading-relaxed text-muted">
-                {listing.rejectionReason}
-              </p>
-            </Panel>
-          ) : null}
-
-          {listing.status === "REMOVED" ? (
-            <Panel tone="danger">
-              <SubHeading>Taken down</SubHeading>
-              <p className="mt-2 text-sm leading-relaxed text-fg">
-                {listing.rejectionReason ?? (
-                  <span className="text-muted">
-                    No reason is on the listing. The history panel has who took
-                    it down and when.
-                  </span>
-                )}
-              </p>
-              <p className="mt-2 text-xs leading-relaxed text-muted">
-                Hidden from buyers and locked for the seller, who cannot edit or
-                resubmit it. Only staff can bring it back.
-              </p>
-            </Panel>
-          ) : null}
-
-          {listing.status === "LIVE" && canModerate ? (
-            <FeatureListing
-              listingId={listing.id}
-              featured={listing.featured}
+          <Card>
+            <CardHeader
+              title="What the seller claims"
+              description="Unverified until the proof below backs it up. Money is shown in whichever currency the header is set to."
             />
-          ) : null}
+            <CardBody className="py-1.5 sm:py-1.5">
+              <Facts columns={2} className={pairedFacts}>
+                {facts.map(([label, value]) => (
+                  <Fact key={label} label={label}>
+                    {value}
+                  </Fact>
+                ))}
+              </Facts>
+            </CardBody>
+            {listing.transferProfile ? (
+              <div className="border-t border-line px-4 py-4 sm:px-5">
+                <p className="text-xs font-medium text-muted">Handover notes</p>
+                <p className="mt-1.5 max-w-[72ch] text-sm leading-[1.6] break-words whitespace-pre-line text-fg">
+                  {listing.transferProfile}
+                </p>
+              </div>
+            ) : null}
+          </Card>
 
-          {(listing.status === "LIVE" || listing.status === "PAUSED") &&
-          canModerate ? (
-            <RemoveListing listingId={listing.id} />
-          ) : null}
-
-          {listing.status === "REMOVED" && canModerate ? (
-            <ReopenListing listingId={listing.id} />
-          ) : null}
-
-          {!canModerate &&
-          (inReview ||
-            listing.status === "LIVE" ||
-            listing.status === "PAUSED" ||
-            listing.status === "REMOVED") ? (
-            <p className="text-sm text-subtle">
-              Listing decisions are made by moderators. Everything they see is
-              on this page.
-            </p>
-          ) : null}
+          <Card>
+            <CardHeader
+              icon={ImageIcon}
+              title={
+                <span className="inline-flex items-center gap-2">
+                  Proof
+                  <Count value={listing.proofs.length} label="screenshots" />
+                </span>
+              }
+            />
+            <CardBody>
+              {listing.proofs.length === 0 ? (
+                <p className="flex items-start gap-2.5 text-sm leading-relaxed text-fg">
+                  <TriangleAlertIcon
+                    aria-hidden="true"
+                    className="mt-0.5 size-4 shrink-0 text-danger"
+                  />
+                  Nothing attached. There is nothing here to check the numbers
+                  against, so there is nothing to approve.
+                </p>
+              ) : (
+                <ul className="grid gap-x-4 gap-y-5 sm:grid-cols-2">
+                  {listing.proofs.map((proof) => {
+                    const reused = proof.alsoUsedOn.length > 0;
+                    return (
+                      <li key={proof.id} className="min-w-0">
+                        <a
+                          href={proof.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className={`group relative flex aspect-[4/3] items-center justify-center overflow-hidden rounded-lg border bg-surface-2 transition-colors duration-150 ${
+                            reused
+                              ? "border-danger"
+                              : "border-line hover:border-line-strong"
+                          }`}
+                        >
+                          {/* biome-ignore lint/performance/noImgElement: seller
+                              uploads reviewed at full size; the optimiser adds
+                              nothing here. */}
+                          <img
+                            src={proof.url}
+                            alt={proof.label || "Proof screenshot"}
+                            width={400}
+                            height={240}
+                            // Contained, never cropped: a number cut off at
+                            // the edge of a thumbnail is evidence nobody saw.
+                            className="size-full object-contain transition-opacity duration-150 group-hover:opacity-90"
+                          />
+                          <span
+                            aria-hidden="true"
+                            className="absolute top-2 right-2 inline-flex size-7 items-center justify-center rounded-md border border-line bg-surface/90 text-muted opacity-0 shadow-xs transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100"
+                          >
+                            <ExternalLinkIcon className="size-3.5" />
+                          </span>
+                        </a>
+                        <p className="mt-2 flex flex-wrap items-center gap-2 text-[0.8125rem] text-muted">
+                          {proof.label || (
+                            <span className="text-subtle">No label</span>
+                          )}
+                          {reused ? (
+                            <Badge variant="danger">Reused elsewhere</Badge>
+                          ) : null}
+                        </p>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </CardBody>
+          </Card>
         </div>
 
-        {/* ---- who is selling ---- */}
-        <aside className="flex min-w-0 flex-col gap-4">
-          <Panel>
-            <SubHeading>The seller</SubHeading>
-            <dl className="mt-3 flex flex-col gap-2.5 text-sm">
-              <div>
-                <dt className="text-xs text-subtle">Name</dt>
-                <dd className="font-medium text-fg">
+        {/* ---- where it stands, and the decision ---- */}
+        <div className="min-w-0 lg:col-start-2 lg:row-span-2 lg:row-start-1">
+          <div className="flex flex-col gap-4 lg:sticky lg:top-20">
+            {inReview && canModerate ? (
+              <ReviewDecision listingId={listing.id} />
+            ) : null}
+
+            {sentBack ? (
+              <Card>
+                <CardHeader title="Sent back with" />
+                <CardBody>
+                  <p className="text-sm leading-[1.6] break-words text-fg">
+                    {listing.rejectionReason}
+                  </p>
+                </CardBody>
+              </Card>
+            ) : null}
+
+            {removed ? (
+              <Card tone="danger">
+                <CardHeader title="Taken down" className="border-danger/15" />
+                <CardBody>
+                  <p className="text-sm leading-[1.6] break-words text-fg">
+                    {listing.rejectionReason ?? (
+                      <span className="text-muted">
+                        No reason is on the listing. The history panel has who
+                        took it down and when.
+                      </span>
+                    )}
+                  </p>
+                  <p className="mt-2 text-xs leading-relaxed text-muted">
+                    Hidden from buyers and locked for the seller, who cannot
+                    edit or resubmit it. Only staff can bring it back.
+                  </p>
+                </CardBody>
+              </Card>
+            ) : null}
+
+            {listing.status === "LIVE" && canModerate ? (
+              <FeatureListing
+                listingId={listing.id}
+                featured={listing.featured}
+              />
+            ) : null}
+
+            {(listing.status === "LIVE" || listing.status === "PAUSED") &&
+            canModerate ? (
+              <RemoveListing listingId={listing.id} />
+            ) : null}
+
+            {listing.status === "REMOVED" && canModerate ? (
+              <ReopenListing listingId={listing.id} />
+            ) : null}
+
+            {readOnlyNote ? (
+              <Callout title="Listing decisions are made by moderators.">
+                Everything they see is on this page.
+              </Callout>
+            ) : null}
+
+            {hasSide ? null : (
+              <Card padded>
+                <ListingStatusTag status={listing.status} />
+                <p className="mt-2 text-[0.8125rem] leading-relaxed text-muted">
+                  {LISTING_STATUS[listing.status].note}
+                </p>
+              </Card>
+            )}
+          </div>
+        </div>
+
+        {/* ---- who is selling, and what staff have done ---- */}
+        <div className="flex min-w-0 flex-col gap-6 lg:col-start-1 lg:row-start-2">
+          <Card>
+            <CardHeader
+              icon={UserRoundIcon}
+              title="The seller"
+              actions={
+                listing.seller.slug ? (
+                  <Link
+                    href={`/seller/${listing.seller.slug}`}
+                    className="group inline-flex min-h-11 items-center gap-1 rounded-md text-[0.8125rem] font-medium text-muted transition-colors hover:text-fg pointer-fine:min-h-6"
+                  >
+                    Public seller page
+                    <ExternalLinkIcon
+                      aria-hidden="true"
+                      className="size-3.5 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
+                    />
+                  </Link>
+                ) : null
+              }
+            />
+            <CardBody className="py-1.5 sm:py-1.5">
+              <Facts columns={2} className={pairedFacts}>
+                <Fact label="Name">
                   <Link
                     href={`/admin/users/${listing.seller.id}`}
-                    className="text-primary-text underline-offset-4 hover:underline"
+                    className={textLink}
                   >
                     {listing.seller.name}
                   </Link>
-                </dd>
-              </div>
-              <div>
-                <dt className="text-xs text-subtle">Email</dt>
-                <dd className="truncate text-fg">{listing.seller.email}</dd>
-              </div>
-              <div>
-                <dt className="text-xs text-subtle">
-                  WhatsApp <span className="text-subtle/80">· staff only</span>
-                </dt>
-                <dd>
-                  <WhatsAppContact
-                    number={listing.whatsapp}
-                    name={listing.seller.name}
-                  />
-                </dd>
-              </div>
-              <div>
-                <dt className="text-xs text-subtle">Identity check</dt>
-                <dd>
+                </Fact>
+                <Fact label="Email">
+                  <span className="font-normal">{listing.seller.email}</span>
+                </Fact>
+                <Fact
+                  label={
+                    <>
+                      WhatsApp <span className="text-subtle">· staff only</span>
+                    </>
+                  }
+                >
+                  <span className="font-normal">
+                    <WhatsAppContact
+                      number={listing.whatsapp}
+                      name={listing.seller.name}
+                    />
+                  </span>
+                </Fact>
+                <Fact label="Identity check">
                   <Badge
                     variant={
                       listing.seller.kycStatus === "APPROVED"
@@ -376,59 +437,62 @@ export default async function ReviewListingPage({
                   >
                     {listing.seller.kycStatus.toLowerCase().replace("_", " ")}
                   </Badge>
-                </dd>
-              </div>
-              <div>
-                <dt className="text-xs text-subtle">Member since</dt>
-                <dd className="tnum text-fg">
+                </Fact>
+                <Fact label="Member since">
                   {listing.seller.joinedAt.toLocaleDateString("en-GB")}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-xs text-subtle">Track record</dt>
-                <dd className="tnum text-fg">
+                </Fact>
+                <Fact label="Track record">
                   {listing.seller.completedSales} sold ·{" "}
                   {listing.seller.liveListings} live
-                </dd>
-              </div>
-            </dl>
-            {listing.seller.slug ? (
-              <Link
-                href={`/seller/${listing.seller.slug}`}
-                className="mt-3 inline-flex min-h-11 items-center gap-1.5 text-sm text-primary-text underline-offset-4 hover:underline"
-              >
-                Public seller page
-                <ExternalLinkIcon aria-hidden="true" className="size-3.5" />
-              </Link>
-            ) : null}
-          </Panel>
+                </Fact>
+              </Facts>
+            </CardBody>
+          </Card>
 
-          <Panel>
-            <SubHeading>History</SubHeading>
-            {trail.length === 0 ? (
-              <p className="mt-3 text-sm text-subtle">
-                No staff action on this listing yet.
-              </p>
-            ) : (
-              <ul className="mt-3 flex flex-col gap-3 text-sm">
-                {trail.map((row) => (
-                  <li
-                    key={row.id}
-                    className="border-b border-line pb-3 last:border-b-0 last:pb-0"
-                  >
-                    <p className="text-fg">{auditLabel(row.action)}</p>
-                    <p className="mt-0.5 text-xs text-subtle">
-                      {row.actorName ?? "unknown"} ·{" "}
-                      <time dateTime={row.createdAt.toISOString()}>
-                        {row.createdAt.toLocaleString("en-GB")}
-                      </time>
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Panel>
-        </aside>
+          <Card>
+            <CardHeader icon={HistoryIcon} title="History" />
+            <CardBody>
+              {trail.length === 0 ? (
+                <p className="text-[0.8125rem] text-muted">
+                  No staff action on this listing yet.
+                </p>
+              ) : (
+                <ol>
+                  {trail.map((row, index) => (
+                    <li key={row.id} className="relative pb-4 pl-5 last:pb-0">
+                      {index < trail.length - 1 ? (
+                        <span
+                          aria-hidden="true"
+                          className="absolute top-4 bottom-0 left-[3px] w-px bg-line"
+                        />
+                      ) : null}
+                      <span
+                        aria-hidden="true"
+                        className="absolute top-[0.4375rem] left-0 size-[7px] rounded-full border border-line-strong bg-surface"
+                      />
+                      <p className="text-sm leading-5 text-fg">
+                        <span className="font-medium">
+                          {row.actorName ?? "Unknown"}
+                        </span>{" "}
+                        <span className="text-muted">
+                          {auditLabel(row.action)}
+                        </span>
+                      </p>
+                      <p className="mt-0.5 text-xs text-subtle">
+                        <time
+                          dateTime={row.createdAt.toISOString()}
+                          className="tnum"
+                        >
+                          {row.createdAt.toLocaleString("en-GB")}
+                        </time>
+                      </p>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </CardBody>
+          </Card>
+        </div>
       </div>
     </>
   );
