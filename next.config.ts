@@ -37,6 +37,12 @@ const nextConfig: NextConfig = {
   // the internal address and redirects land on http://localhost:3000.
   poweredByHeader: false,
 
+  // Next logs every Server Function call with its arguments in development —
+  // and the arguments here include passwords: accepting a staff invitation
+  // printed the new teammate's password in the terminal. Dev logs get pasted
+  // into chats and tickets, so the arguments are never logged.
+  logging: { serverFunctions: false },
+
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },
