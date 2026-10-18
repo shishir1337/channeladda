@@ -138,6 +138,45 @@ export async function platformPositionFor(orderId: string): Promise<number> {
 type Tx = Parameters<Parameters<typeof db.$transaction>[0]>[0];
 
 /**
+ * How much of a deal's applied payments the processor has refunded to the
+ * payer itself, by the audit rows the webhook and the sweep write when
+ * Cryptomus reports one. Only a payment applied to this deal counts — an
+ * invoice refunded before it ever landed was never on the deal's books.
+ */
+async function refundedByProcessor(
+  tx: Tx,
+  order: {
+    id: string;
+    paymentRef: string | null;
+    buyerPaymentRef: string | null;
+  },
+): Promise<number> {
+  const rows = await tx.auditLog.findMany({
+    where: {
+      entity: "order",
+      entityId: order.id,
+      action: "payment.refunded_by_processor",
+    },
+    select: { after: true },
+  });
+  const refunded = new Set(
+    rows.flatMap((row) => {
+      const after = row.after as { reference?: unknown } | null;
+      return typeof after?.reference === "string" ? [after.reference] : [];
+    }),
+  );
+  const applied = [order.paymentRef, order.buyerPaymentRef].filter(
+    (ref): ref is string => ref !== null && refunded.has(ref),
+  );
+  if (applied.length === 0) return 0;
+  const invoices = await tx.invoice.findMany({
+    where: { reference: { in: applied } },
+    select: { amountUsd: true },
+  });
+  return invoices.reduce((sum, invoice) => sum + invoice.amountUsd, 0);
+}
+
+/**
  * What the platform is holding for a deal's buyer right now: its holds, less
  * what has been released or refunded. Earned fees are not in it — they are
  * the platform's, not the buyer's.
@@ -459,7 +498,32 @@ export type PaymentOutcome =
   /** A reference we do not recognise on a deal already paid. Nothing done. */
   | "reference-mismatch"
   /** The deal could not accept it, so it became the buyer's balance. */
-  | "credited-to-balance";
+  | "credited-to-balance"
+  /**
+   * Refused before anything was written: a Cryptomus invoice for this
+   * payment is open or already paid, so the money finance saw may be that
+   * one. Recording it by hand as well is how one payment got credited twice.
+   */
+  | "invoice-open";
+
+/**
+ * Whether a checkout invoice for this payment could be the money finance is
+ * about to record by hand: still open, so the buyer may be paying it, or
+ * already paid. A dead or never-paid invoice is neither.
+ */
+async function checkoutInPlay(
+  orderId: string,
+  purpose: "DEAL" | "DEAL_PRICE",
+): Promise<boolean> {
+  const count = await db.invoice.count({
+    where: {
+      orderId,
+      purpose,
+      OR: [{ appliedAt: null }, { settledAt: { not: null } }],
+    },
+  });
+  return count > 0;
+}
 /**
  * Finance recording a payment that reached us outside Cryptomus.
  *
@@ -484,6 +548,17 @@ export async function recordManualPayment(
     select: { reference: true },
   });
   if (!order) throw new Error(`No such order: ${orderId}`);
+
+  if (await checkoutInPlay(orderId, "DEAL")) {
+    await recordAudit({
+      actorId: null,
+      action: "payment.manual_refused",
+      entity: "order",
+      entityId: orderId,
+      after: { txid, asset, reason: "invoice-open" },
+    });
+    return "invoice-open";
+  }
 
   await recordAudit({
     actorId: null,
@@ -947,6 +1022,17 @@ export async function recordManualPricePayment(
     select: { reference: true },
   });
   if (!order) throw new Error(`No such order: ${orderId}`);
+
+  if (await checkoutInPlay(orderId, "DEAL_PRICE")) {
+    await recordAudit({
+      actorId: null,
+      action: "payment.manual_refused",
+      entity: "order",
+      entityId: orderId,
+      after: { txid, asset, reason: "invoice-open", stage: "price" },
+    });
+    return "invoice-open";
+  }
 
   await recordAudit({
     actorId: null,
@@ -1705,6 +1791,7 @@ export async function resolveDeal(input: {
       buyerFeeUsd: true,
       sellerFeeUsd: true,
       paymentRef: true,
+      buyerPaymentRef: true,
       custodyAt: true,
       sellerConfirmedAt: true,
       buyerPaidAt: true,
@@ -1920,13 +2007,31 @@ export async function resolveDeal(input: {
       // hand back money the platform does not have.
       const held = await platformHoldFor(tx, order.id);
       if (held !== requiredHold(order)) throw new DealAbort("books-mismatch");
-      const kept = Math.min(keptFee(order), held);
+
+      // Money the processor has already sent back to the payer left our
+      // account without passing through the ledger. It comes off the hold
+      // with nobody credited: crediting the buyer's balance as well paid
+      // them back twice.
+      const gone = Math.min(held, await refundedByProcessor(tx, order));
+      if (gone > 0) {
+        await tx.ledgerEntry.create({
+          data: {
+            orderId: order.id,
+            userId: null,
+            kind: "REFUND",
+            amountUsd: -gone,
+            note: "Refunded by the processor",
+          },
+        });
+      }
+      const remaining = held - gone;
 
       if (input.to === "REFUNDED") {
         // Returns the whole hold, so the platform's own position nets to zero.
-        await refund(held, input.note);
+        if (remaining > 0) await refund(remaining, input.note);
         return;
       }
+      const kept = Math.min(keptFee(order), remaining);
 
       // A cancellation or a return hands back whatever is still held.
       //
@@ -1943,8 +2048,8 @@ export async function resolveDeal(input: {
       // work they did — which /fees states — so it is kept and booked as
       // earned, and only the rest goes back. An unpaid deal holds nothing, so
       // nothing is refunded and the platform's position cannot go negative.
-      if (held - kept > 0) {
-        await refund(held - kept, `Refunded: ${input.note}`);
+      if (remaining - kept > 0) {
+        await refund(remaining - kept, `Refunded: ${input.note}`);
       }
       if (kept > 0) {
         // Earned, so it leaves the hold and becomes the platform's.

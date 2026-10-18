@@ -206,6 +206,8 @@ export async function markOpeningPaymentReceived(
       "This deal is already paid under another reference, and there is no settled invoice matching this one. Nothing was credited — the mismatch is in the audit trail for you to reconcile.",
     "credited-to-balance":
       "This deal had already stopped, so that payment went to the buyer's balance rather than opening it.",
+    "invoice-open":
+      "This deal has a Cryptomus checkout that is still open or already paid, so the money you saw may be that payment. Use “Check now” on the money desk instead — recording it here as well would count it twice. Nothing was recorded.",
   };
 
   try {
@@ -219,7 +221,7 @@ export async function markOpeningPaymentReceived(
     // A mismatch is not a failure of the request — the money may well be
     // real — but it is not what the clerk thinks they just did, so it comes
     // back as an error rather than a tick.
-    if (outcome === "reference-mismatch") {
+    if (outcome === "reference-mismatch" || outcome === "invoice-open") {
       return { ok: false, error: outcomes[outcome] };
     }
     return { ok: true, message: outcomes[outcome] };
@@ -265,6 +267,8 @@ export async function markPriceReceived(
       "The price is already paid under another reference, and there is no settled invoice matching this one. Nothing was credited — the mismatch is in the audit trail for you to reconcile.",
     "credited-to-balance":
       "This deal is not waiting on its price, so that payment went to the buyer's balance.",
+    "invoice-open":
+      "This deal has a Cryptomus checkout for the price that is still open or already paid, so the money you saw may be that payment. Use “Check now” on the money desk instead — recording it here as well would count it twice. Nothing was recorded.",
   };
 
   try {
@@ -274,7 +278,7 @@ export async function markPriceReceived(
       asset.trim() || "USDT",
     );
     refresh(orderId);
-    if (outcome === "reference-mismatch") {
+    if (outcome === "reference-mismatch" || outcome === "invoice-open") {
       return { ok: false, error: outcomes[outcome] };
     }
     return { ok: true, message: outcomes[outcome] };

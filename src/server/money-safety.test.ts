@@ -1,13 +1,19 @@
 import { expect, test } from "vitest";
 import { db } from "@/lib/db";
+import { templateFor } from "@/lib/deal-templates";
 import {
   balanceOf,
   createDeal,
   expireStaleDeals,
+  platformPositionFor,
+  recordManualPayment,
+  recordManualPricePayment,
   recordOpeningPayment,
+  resolveDeal,
 } from "@/server/deals";
 import { reconcileInvoices } from "@/server/invoices";
 import { seedListing, seedUser, withCleanDb } from "@/test/db";
+import { runStep } from "@/test/deal-steps";
 
 async function paidFastestDeal() {
   const seeded = await seedListing();
@@ -414,5 +420,191 @@ test(
   withCleanDb(async () => {
     const { reconcileInvoice } = await import("@/server/invoices");
     expect(await reconcileInvoice("CA-00000")).toBe("not-found");
+  }),
+);
+
+// ------------------------- one payment, recorded by hand and by Cryptomus
+
+async function openInvoice(
+  orderId: string,
+  buyerId: string,
+  purpose: "DEAL" | "DEAL_PRICE",
+  amountUsd: number,
+  settled = false,
+) {
+  const reference = `DEAL-${purpose}-${orderId}`;
+  await db.invoice.create({
+    data: {
+      reference,
+      purpose,
+      amountUsd,
+      userId: buyerId,
+      orderId,
+      lastStatus: settled ? "paid" : "check",
+      settledAt: settled ? new Date() : null,
+    },
+  });
+  return reference;
+}
+
+test(
+  "a payment recorded by hand is refused while a checkout invoice is open",
+  withCleanDb(async () => {
+    // Finance sees money arrive and records it — but it was the buyer paying
+    // the open Cryptomus invoice. When that invoice then lands, it is a
+    // second payment under a second name, and the buyer is credited the
+    // whole deal again.
+    const seeded = await seedListing();
+    const created = await createDeal({
+      listingId: seeded.listing.id,
+      buyerId: seeded.buyer.id,
+      mode: "FASTEST",
+    });
+    if (!created.ok) throw new Error(created.reason);
+    await openInvoice(created.orderId, seeded.buyer.id, "DEAL", 10_300);
+
+    expect(await recordManualPayment(created.orderId, "0xclerk", "USDT")).toBe(
+      "invoice-open",
+    );
+    const order = await db.order.findUniqueOrThrow({
+      where: { id: created.orderId },
+    });
+    expect(order.status).toBe("AWAITING_PAYMENT");
+    expect(
+      await db.ledgerEntry.count({ where: { orderId: created.orderId } }),
+    ).toBe(0);
+  }),
+);
+
+test(
+  "a price recorded by hand is refused while a price invoice is open",
+  withCleanDb(async () => {
+    const seeded = await seedListing();
+    const created = await createDeal({
+      listingId: seeded.listing.id,
+      buyerId: seeded.buyer.id,
+      mode: "SAFEST",
+    });
+    if (!created.ok) throw new Error(created.reason);
+    await db.order.update({
+      where: { id: created.orderId },
+      data: { agentId: seeded.agent.id },
+    });
+    await recordOpeningPayment(created.orderId, created.reference, "USDT");
+    const actors: Record<string, string> = {
+      buyer: seeded.buyer.id,
+      seller: seeded.seller.id,
+      agent: seeded.agent.id,
+    };
+    for (const step of templateFor("SAFEST")) {
+      if (step.position < 2 || step.position >= 6) continue;
+      await runStep({
+        orderId: created.orderId,
+        position: step.position,
+        userId: actors[step.actor],
+      });
+    }
+    await openInvoice(created.orderId, seeded.buyer.id, "DEAL_PRICE", 10_000);
+
+    expect(
+      await recordManualPricePayment(created.orderId, "0xclerk", "USDT"),
+    ).toBe("invoice-open");
+    const order = await db.order.findUniqueOrThrow({
+      where: { id: created.orderId },
+    });
+    expect(order.status).toBe("AWAITING_BUYER_PAYMENT");
+    expect(order.buyerPaymentRef).toBeNull();
+  }),
+);
+
+test(
+  "a late payment under two names is credited once",
+  withCleanDb(async () => {
+    // The deal had stopped. Cryptomus's payment landed and was credited to
+    // the buyer; then a clerk recorded the same money by hand, and it was
+    // credited again under the deal's own reference.
+    const seeded = await seedListing();
+    const created = await createDeal({
+      listingId: seeded.listing.id,
+      buyerId: seeded.buyer.id,
+      mode: "FASTEST",
+    });
+    if (!created.ok) throw new Error(created.reason);
+    await db.order.update({
+      where: { id: created.orderId },
+      data: { status: "CANCELLED", cancelledAt: new Date() },
+    });
+    const reference = await openInvoice(
+      created.orderId,
+      seeded.buyer.id,
+      "DEAL",
+      10_300,
+      true,
+    );
+    await recordOpeningPayment(created.orderId, reference, "USDT");
+    await db.invoice.update({
+      where: { reference },
+      data: { appliedAt: new Date() },
+    });
+    expect(await balanceOf(seeded.buyer.id)).toBe(10_300);
+
+    expect(await recordManualPayment(created.orderId, "0xclerk", "USDT")).toBe(
+      "invoice-open",
+    );
+    expect(await balanceOf(seeded.buyer.id)).toBe(10_300);
+  }),
+);
+
+test(
+  "a deal refunded by the processor is not refunded again to the balance",
+  withCleanDb(async () => {
+    // Cryptomus sent the buyer's money back, and the deal froze for staff.
+    // Deciding it as a refund credited the buyer's balance too: paid back
+    // twice, once by the processor and once by us.
+    const seeded = await seedListing();
+    const created = await createDeal({
+      listingId: seeded.listing.id,
+      buyerId: seeded.buyer.id,
+      mode: "FASTEST",
+    });
+    if (!created.ok) throw new Error(created.reason);
+    const reference = await openInvoice(
+      created.orderId,
+      seeded.buyer.id,
+      "DEAL",
+      10_300,
+      true,
+    );
+    await recordOpeningPayment(created.orderId, reference, "USDT");
+    await db.order.update({
+      where: { id: created.orderId },
+      data: { status: "DISPUTED" },
+    });
+    await db.auditLog.create({
+      data: {
+        action: "payment.refunded_by_processor",
+        entity: "order",
+        entityId: created.orderId,
+        after: { reference, status: "refund_paid", frozen: true },
+      },
+    });
+    const finance = await seedUser("FINANCE");
+
+    expect(
+      await resolveDeal({
+        orderId: created.orderId,
+        to: "REFUNDED",
+        byUserId: finance.id,
+        note: "Cryptomus refunded it",
+      }),
+    ).toMatchObject({ ok: true });
+
+    expect(await balanceOf(seeded.buyer.id)).toBe(0);
+    expect(await platformPositionFor(created.orderId)).toBe(0);
+    expect(
+      await db.ledgerEntry.findFirstOrThrow({
+        where: { orderId: created.orderId, kind: "REFUND", userId: null },
+      }),
+    ).toMatchObject({ amountUsd: -10_300, note: "Refunded by the processor" });
   }),
 );
