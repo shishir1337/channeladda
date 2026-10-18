@@ -1,5 +1,5 @@
 import {
-  ArrowLeftIcon,
+  BanknoteIcon,
   ExternalLinkIcon,
   MessagesSquareIcon,
   ShieldCheckIcon,
@@ -9,6 +9,14 @@ import {
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import type { ComponentType, ReactNode, SVGProps } from "react";
+import {
+  Callout,
+  Card,
+  MetaItem,
+  PageHeader,
+  Reference,
+} from "@/components/app/kit";
 import { AgentInvite } from "@/components/deals/agent-invite";
 import {
   moneyNote,
@@ -16,14 +24,11 @@ import {
   STATUS_TONE,
   statusSentence,
 } from "@/components/deals/deal-status";
-import {
-  DealNextStep,
-  DealSteps,
-  RaiseDispute,
-} from "@/components/deals/deal-timeline";
+import { DealSteps, RaiseDispute } from "@/components/deals/deal-timeline";
 import { PayNow } from "@/components/deals/pay-now";
 import { PayToCard } from "@/components/deals/pay-to";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Price } from "@/components/ui/price";
 import { db } from "@/lib/db";
 import { isTerminal } from "@/lib/deal-machine";
@@ -44,8 +49,9 @@ export const metadata: Metadata = {
  * the air opens it to find out four things, and should not have to read to get
  * them — what stage this is at, what they have to do right now, what the other
  * side is waiting on, and where the money is. So the page is ordered by those
- * questions rather than by what the database knows: stage, then the single
- * action, then the money, then the record of every step.
+ * questions rather than by what the database knows: the stage in a sentence,
+ * then every step with the single action inside the one in play, and beside
+ * them where to pay, the money, and who is on it.
  */
 export default async function DealPage({
   params,
@@ -61,6 +67,8 @@ export default async function DealPage({
   const safest = deal.mode === "SAFEST";
   const viewer = deal.viewerRole;
   const terminal = isTerminal(deal.status);
+  const disputed = deal.status === "DISPUTED";
+  const sentence = statusSentence(deal.status, deal.mode, viewer);
 
   // Only the agent is ever asked to name a second approver, and only on the
   // step that hands the channel over. Nobody else needs the staff list, and
@@ -77,274 +85,229 @@ export default async function DealPage({
       })
     : undefined;
 
-  // The buyer's opening payment is the action at this point, so it replaces
-  // the next-step card rather than sitting beside it.
+  // The buyer's opening payment is the action at this point, so it takes the
+  // place of the step's own action rather than sitting beside it.
   const payingNow = deal.status === "AWAITING_PAYMENT" && viewer === "buyer";
   const wallet = payingNow ? await getWallet(user.id) : null;
-
-  const total = deal.steps.length;
-  const doneCount = deal.steps.filter((s) => s.completedAt !== null).length;
-  const position = deal.nextStep?.position ?? total;
-  const percent = total > 0 ? Math.round((doneCount / total) * 100) : 0;
 
   const ModeIcon = safest ? ShieldCheckIcon : ZapIcon;
 
   return (
     <>
-      <Link
-        href="/dashboard/deals"
-        className="inline-flex min-h-11 items-center gap-1.5 text-sm text-muted transition-colors duration-200 hover:text-fg"
-      >
-        <ArrowLeftIcon aria-hidden="true" className="size-4" />
-        All deals
-      </Link>
+      <PageHeader
+        back={{ href: "/dashboard/deals", label: "All deals" }}
+        title={deal.listingTitle}
+        meta={
+          <>
+            {/* `whitespace-normal`: a badge never wraps by default, and these
+                labels are sentences — on a phone the longest one would
+                otherwise run off the side of the screen. */}
+            <Badge
+              variant={STATUS_TONE[deal.status]}
+              size="sm"
+              className="max-w-full whitespace-normal app:h-auto app:min-h-5 app:py-0.5 app:leading-4"
+            >
+              {STATUS_LABELS[deal.status]}
+            </Badge>
+            <span className="inline-flex items-center gap-1.5 font-medium text-muted">
+              <ModeIcon aria-hidden="true" className="size-3.5 text-subtle" />
+              {safest ? "Safest deal" : "Fastest deal"}
+            </span>
+            <MetaItem label="Reference">
+              <Reference>{deal.reference}</Reference>
+            </MetaItem>
+          </>
+        }
+        actions={
+          // Where the people on this deal talk, and where it can be run from.
+          <>
+            {deal.conversationId ? (
+              <Button asChild variant="secondary" size="md">
+                <Link href={`/dashboard/messages/${deal.conversationId}`}>
+                  <MessagesSquareIcon aria-hidden="true" />
+                  Open the deal chat
+                </Link>
+              </Button>
+            ) : null}
+            <Button asChild variant="ghost" size="md">
+              <Link href={`/listing/${deal.listingSlug}`}>
+                View the listing
+                <ExternalLinkIcon aria-hidden="true" />
+              </Link>
+            </Button>
+          </>
+        }
+      />
 
-      {/* ---- what this is ------------------------------------------------- */}
-      <div className="mt-3 flex flex-wrap items-center gap-2.5">
-        <Badge variant={safest ? "verified" : "primary"} size="md">
-          <ModeIcon aria-hidden="true" />
-          {safest ? "Safest deal" : "Fastest deal"}
-        </Badge>
-        <span className="tnum text-xs text-subtle">
-          Reference {deal.reference}
-        </span>
-      </div>
-
-      <h1 className="mt-3 font-display text-2xl leading-tight font-black tracking-tight text-fg sm:text-3xl">
-        {deal.listingTitle}
-      </h1>
-
-      <div className="mt-1.5 flex flex-wrap items-center gap-x-5">
-        {/* Where the people on this deal talk, and where it can be run from. */}
-        {deal.conversationId ? (
-          <Link
-            href={`/dashboard/messages/${deal.conversationId}`}
-            className="inline-flex min-h-9 items-center gap-1.5 text-sm font-medium text-primary-text underline-offset-4 hover:underline"
-          >
-            <MessagesSquareIcon aria-hidden="true" className="size-3.5" />
-            Open the deal chat
-          </Link>
-        ) : null}
-        <Link
-          href={`/listing/${deal.listingSlug}`}
-          className="inline-flex min-h-9 items-center gap-1.5 text-sm text-primary-text underline-offset-4 hover:underline"
-        >
-          View the listing
-          <ExternalLinkIcon aria-hidden="true" className="size-3.5" />
-        </Link>
-      </div>
-
-      <div className="mt-6 lg:grid lg:grid-cols-[minmax(0,1fr)_21rem] lg:items-start lg:gap-8">
-        {/* ---- stage, action, money --------------------------------------- */}
-        <div className="flex flex-col gap-5">
-          <section
-            aria-labelledby="stage-heading"
-            className="rounded-panel border border-line bg-surface p-5 sm:p-6"
-          >
-            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+      <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start lg:gap-6">
+        {/* ---- where it is, and every step ---------------------------- */}
+        <div className="flex min-w-0 flex-col gap-4">
+          {/* A paused deal says so above everything, in the one colour that
+              means trouble; otherwise the stage is the first line of the
+              card that holds the steps. */}
+          {disputed ? (
+            <section aria-labelledby="stage-heading">
               <h2 id="stage-heading" className="sr-only">
                 Where this deal is
               </h2>
-              {/* `whitespace-normal`: a badge never wraps by default, and
-                  these labels are sentences — on a phone the longest one would
-                  otherwise run off the side of the card. */}
-              <Badge
-                variant={STATUS_TONE[deal.status]}
-                size="md"
-                className="max-w-full whitespace-normal"
+              <Callout tone="danger" title={STATUS_LABELS[deal.status]}>
+                {sentence}
+              </Callout>
+            </section>
+          ) : null}
+
+          <Card>
+            {disputed ? null : (
+              <section
+                aria-labelledby="stage-heading"
+                className="border-b border-line p-4 sm:p-5"
               >
-                {STATUS_LABELS[deal.status]}
-              </Badge>
-              {total > 0 && !terminal ? (
-                <p className="tnum text-xs text-subtle">
-                  Step {position} of {total}
+                <h2 id="stage-heading" className="sr-only">
+                  Where this deal is
+                </h2>
+                <p className="max-w-[66ch] text-sm leading-relaxed text-fg">
+                  {sentence}
                 </p>
-              ) : null}
-            </div>
-
-            {total > 0 ? (
-              <div
-                role="progressbar"
-                aria-valuenow={doneCount}
-                aria-valuemin={0}
-                aria-valuemax={total}
-                aria-label={`${doneCount} of ${total} steps complete`}
-                className="mt-4 h-1.5 w-full overflow-hidden rounded-full bg-surface-3"
-              >
-                <span
-                  aria-hidden="true"
-                  className={
-                    deal.status === "COMPLETED"
-                      ? "block h-full rounded-full bg-verified"
-                      : terminal
-                        ? "block h-full rounded-full bg-line-strong"
-                        : "block h-full rounded-full bg-primary"
-                  }
-                  style={{ width: `${percent}%` }}
-                />
-              </div>
-            ) : null}
-
-            <p className="mt-4 max-w-[62ch] text-[0.9375rem] leading-relaxed text-muted">
-              {statusSentence(deal.status, deal.mode, viewer)}
-            </p>
-          </section>
-
-          {payingNow && wallet ? (
-            <PayNow
-              orderId={deal.id}
-              totalUsd={deal.totalUsd}
-              priceUsd={deal.priceUsd}
-              mode={deal.mode}
-              availableUsd={wallet.availableUsd}
+              </section>
+            )}
+            <DealSteps
+              deal={deal}
+              staffIds={staffIds}
+              payment={
+                payingNow && wallet ? (
+                  <PayNow
+                    orderId={deal.id}
+                    totalUsd={deal.totalUsd}
+                    priceUsd={deal.priceUsd}
+                    mode={deal.mode}
+                    availableUsd={wallet.availableUsd}
+                    inline
+                  />
+                ) : undefined
+              }
             />
-          ) : (
-            <DealNextStep deal={deal} staffIds={staffIds} />
-          )}
+          </Card>
+        </div>
 
+        {/* ---- what it needs, the money, the people ------------------- */}
+        {/* Not sticky: the payment details, the money, the people and the
+            dispute form together can be taller than a laptop viewport, and
+            a stuck column that tall hides its own end. */}
+        <div className="mt-4 flex min-w-0 flex-col gap-4 lg:mt-0">
           {/* Safest only: where the buyer pays the seller directly. */}
           <PayToCard deal={deal} />
 
           {/* The account the seller invites. Never shown to the buyer. */}
           <AgentInvite deal={deal} />
 
-          {/* ---- the money ----------------------------------------------- */}
-          <section
-            aria-labelledby="money-heading"
-            className="rounded-panel border border-line bg-surface p-5 sm:p-6"
-          >
-            <h2
-              id="money-heading"
-              className="font-display text-base font-bold text-fg"
-            >
-              The money, and where it is
-            </h2>
-
-            <dl
-              className={cn(
-                "mt-4 grid gap-4 sm:gap-5",
-                terminal ? "sm:grid-cols-2" : "sm:grid-cols-3",
-              )}
-            >
-              <div className="sm:border-r sm:border-line sm:pr-5">
-                <dt className="font-mono text-[0.625rem] font-semibold tracking-[0.12em] text-subtle uppercase">
-                  Channel price
-                </dt>
-                <dd className="mt-1.5 font-display text-xl font-black text-fg">
-                  <Price usd={deal.priceUsd / 100} />
-                </dd>
-                <dd className="mt-1 text-xs leading-relaxed text-subtle">
-                  {safest
-                    ? viewer === "seller"
-                      ? "paid to you directly by the buyer"
-                      : "paid directly to the seller, not through us"
-                    : "part of what Channel Adda is holding"}
-                </dd>
-              </div>
-
-              <div
-                className={cn(
-                  !terminal && "sm:border-r sm:border-line sm:pr-5",
+          {/* ---- the money --------------------------------------------- */}
+          <Card>
+            <section aria-labelledby="money-heading">
+              <CardHead id="money-heading" icon={BanknoteIcon}>
+                The money, and where it is
+              </CardHead>
+              <dl className="px-4 sm:px-5">
+                <Line
+                  label="Channel price"
+                  value={<Price usd={deal.priceUsd / 100} />}
+                  money
+                  note={
+                    safest
+                      ? viewer === "seller"
+                        ? "paid to you directly by the buyer"
+                        : "paid directly to the seller, not through us"
+                      : "part of what Channel Adda is holding"
+                  }
+                />
+                <Line
+                  label="Our fee"
+                  value={<Price usd={deal.buyerFeeUsd / 100} />}
+                  money
+                  note={
+                    viewer === "buyer"
+                      ? "paid by you, up front"
+                      : "paid by the buyer, up front"
+                  }
+                />
+                {/* Only while the deal is live: once it has ended, nothing is
+                    being held and a present-tense claim here would be false. */}
+                {terminal ? null : (
+                  <Line
+                    label={
+                      safest ? "Channel Adda holds" : "Channel Adda is holding"
+                    }
+                    value={
+                      safest ? (
+                        "The channel"
+                      ) : (
+                        <Price usd={deal.totalUsd / 100} />
+                      )
+                    }
+                    money
+                    note={
+                      safest
+                        ? "our agent owns it until the handover completes"
+                        : "the price and our fee together"
+                    }
+                  />
                 )}
-              >
-                <dt className="font-mono text-[0.625rem] font-semibold tracking-[0.12em] text-subtle uppercase">
-                  Our fee
-                </dt>
-                <dd className="mt-1.5 font-display text-xl font-black text-fg">
-                  <Price usd={deal.buyerFeeUsd / 100} />
-                </dd>
-                <dd className="mt-1 text-xs leading-relaxed text-subtle">
-                  {viewer === "buyer"
-                    ? "paid by you, up front"
-                    : "paid by the buyer, up front"}
-                </dd>
-              </div>
-
-              {/* Only while the deal is live: once it has ended, nothing is
-                  being held and a present-tense claim here would be false. */}
+              </dl>
               {terminal ? null : (
-                <div>
-                  <dt className="font-mono text-[0.625rem] font-semibold tracking-[0.12em] text-subtle uppercase">
-                    {safest ? "Channel Adda holds" : "Channel Adda is holding"}
-                  </dt>
-                  <dd className="mt-1.5 font-display text-xl font-black text-fg">
-                    {safest ? (
-                      "The channel"
-                    ) : (
-                      <Price usd={deal.totalUsd / 100} />
-                    )}
-                  </dd>
-                  <dd className="mt-1 text-xs leading-relaxed text-subtle">
-                    {safest
-                      ? "our agent owns it until the handover completes"
-                      : "the price and our fee together"}
-                  </dd>
-                </div>
+                <p className="border-t border-line px-4 py-3 text-[0.8125rem] leading-relaxed text-muted sm:px-5">
+                  {moneyNote(deal.mode, viewer)}
+                </p>
               )}
-            </dl>
+            </section>
+          </Card>
 
-            {terminal ? null : (
-              <p className="mt-4 max-w-[62ch] border-t border-line pt-4 text-sm leading-relaxed text-muted">
-                {moneyNote(deal.mode, viewer)}
-              </p>
-            )}
-          </section>
+          {/* ---- who is on it ------------------------------------------ */}
+          <Card>
+            <section aria-labelledby="people-heading">
+              <CardHead id="people-heading" icon={UsersIcon}>
+                Who is on this deal
+              </CardHead>
+              <dl className="px-4 sm:px-5">
+                <Line
+                  label="Buyer"
+                  value={
+                    <Party name={deal.buyerName} you={viewer === "buyer"} />
+                  }
+                  note={
+                    safest
+                      ? "pays our fee up front, then the seller directly"
+                      : "pays the price and our fee to Channel Adda"
+                  }
+                />
+                <Line
+                  label="Seller"
+                  value={
+                    <Party name={deal.sellerName} you={viewer === "seller"} />
+                  }
+                  note={
+                    safest
+                      ? "hands the channel to our agent, is paid by the buyer"
+                      : "transfers the channel, is paid by Channel Adda"
+                  }
+                />
+                <Line
+                  label="Channel Adda agent"
+                  value={
+                    <Party
+                      name={deal.agentName ?? "Not assigned yet"}
+                      you={viewer === "agent"}
+                      muted={deal.agentName === null}
+                    />
+                  }
+                  note={
+                    safest
+                      ? "takes ownership of the channel, then passes it on"
+                      : "supervises the transfer as a manager"
+                  }
+                />
+              </dl>
+            </section>
+          </Card>
 
-          {/* ---- who is on it -------------------------------------------- */}
-          <section
-            aria-labelledby="people-heading"
-            className="rounded-panel border border-line bg-surface p-5 sm:p-6"
-          >
-            <h2
-              id="people-heading"
-              className="flex items-center gap-2 font-display text-base font-bold text-fg"
-            >
-              <UsersIcon aria-hidden="true" className="size-4 shrink-0" />
-              Who is on this deal
-            </h2>
-            <dl className="mt-4 flex flex-col gap-3">
-              <Party
-                label="Buyer"
-                name={deal.buyerName}
-                you={viewer === "buyer"}
-                note={
-                  safest
-                    ? "pays our fee up front, then the seller directly"
-                    : "pays the price and our fee to Channel Adda"
-                }
-              />
-              <Party
-                label="Seller"
-                name={deal.sellerName}
-                you={viewer === "seller"}
-                note={
-                  safest
-                    ? "hands the channel to our agent, is paid by the buyer"
-                    : "transfers the channel, is paid by Channel Adda"
-                }
-              />
-              <Party
-                label="Channel Adda agent"
-                name={deal.agentName ?? "Not assigned yet"}
-                you={viewer === "agent"}
-                note={
-                  safest
-                    ? "takes ownership of the channel, then passes it on"
-                    : "supervises the transfer as a manager"
-                }
-                muted={deal.agentName === null}
-              />
-            </dl>
-          </section>
-        </div>
-
-        {/* ---- the record ------------------------------------------------- */}
-        {/* Not sticky: nine steps plus the dispute panel can be taller than a
-            laptop viewport, and a stuck column that tall hides its own end. */}
-        <div className="mt-5 flex flex-col gap-5 lg:mt-0">
-          <div className="rounded-panel border border-line bg-surface p-5 sm:p-6">
-            <DealSteps deal={deal} />
-          </div>
           {deal.nextStep ? <RaiseDispute deal={deal} /> : null}
         </div>
       </div>
@@ -352,42 +315,78 @@ export default async function DealPage({
   );
 }
 
-/** One side of the deal, with the reader's own row marked. */
-function Party({
+/** A side card's heading, kept an `h2` so the page's outline stays flat. */
+function CardHead({
+  id,
+  icon: Icon,
+  children,
+}: {
+  id: string;
+  icon: ComponentType<SVGProps<SVGSVGElement>>;
+  children: ReactNode;
+}) {
+  return (
+    <div className="flex items-center gap-2 border-b border-line px-4 py-3 sm:px-5">
+      <Icon aria-hidden="true" className="size-4 shrink-0 text-subtle" />
+      <h2 id={id} className="min-w-0 text-sm leading-6 font-semibold text-fg">
+        {children}
+      </h2>
+    </div>
+  );
+}
+
+/**
+ * One fact: what it is, its value, and a line on what it means for the
+ * reader. The note is what stops a Safest buyer reading the price as
+ * something Channel Adda is holding.
+ */
+function Line({
   label,
-  name,
+  value,
   note,
+  money,
+}: {
+  label: string;
+  value: ReactNode;
+  note: string;
+  money?: boolean;
+}) {
+  return (
+    <div className="grid grid-cols-[auto_minmax(0,1fr)] items-baseline gap-x-4 border-b border-line py-3 last:border-b-0">
+      <dt className="text-[0.8125rem] text-muted">{label}</dt>
+      <dd
+        className={cn(
+          "min-w-0 text-right break-words text-fg tabular-nums",
+          money ? "text-[0.9375rem] font-semibold" : "text-sm font-medium",
+        )}
+      >
+        {value}
+      </dd>
+      <dd className="col-span-2 mt-0.5 text-xs leading-relaxed text-subtle">
+        {note}
+      </dd>
+    </div>
+  );
+}
+
+/** A name on the deal, with the reader's own marked. */
+function Party({
+  name,
   you,
   muted,
 }: {
-  label: string;
   name: string;
-  note: string;
   you: boolean;
   muted?: boolean;
 }) {
   return (
-    <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-0.5">
-      <dt className="w-full font-mono text-[0.625rem] font-semibold tracking-[0.12em] text-subtle uppercase sm:w-auto sm:min-w-[8.5rem]">
-        {label}
-      </dt>
-      <dd className="min-w-0 flex-1">
-        <span
-          className={
-            muted ? "text-sm text-subtle" : "text-sm font-semibold text-fg"
-          }
-        >
-          {name}
-        </span>
-        {you ? (
-          <span className="ml-1.5 text-xs font-medium text-primary-text">
-            (you)
-          </span>
-        ) : null}
-        <span className="mt-0.5 block text-xs leading-relaxed text-subtle">
-          {note}
-        </span>
-      </dd>
-    </div>
+    <>
+      <span className={muted ? "font-normal text-subtle" : undefined}>
+        {name}
+      </span>
+      {you ? (
+        <span className="ml-1.5 text-xs font-normal text-muted">(you)</span>
+      ) : null}
+    </>
   );
 }

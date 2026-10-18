@@ -9,9 +9,12 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { type ReactNode, useId, useState, useTransition } from "react";
+import { Callout, Card, textareaClass } from "@/components/app/kit";
 import { FormNotice } from "@/components/auth/fields";
+import { BusyLabel } from "@/components/deals/deal-timeline";
 import { Button } from "@/components/ui/button";
 import { MAX_PAY_TO } from "@/lib/pay-to";
+import { cn } from "@/lib/utils";
 import { savePayTo } from "@/server/actions/deals";
 import type { DealView } from "@/server/deals";
 
@@ -41,31 +44,47 @@ export function PayToCard({ deal }: { deal: DealView }) {
   // The agent and staff see what the seller said, to settle a disagreement.
   if (!deal.sellerPayTo) return null;
   return (
-    <section className="rounded-panel border border-line bg-surface p-5 sm:p-6">
-      <Heading>Where the buyer pays the seller</Heading>
+    <Frame title="Where the buyer pays the seller">
       <Details text={deal.sellerPayTo} />
-    </section>
+    </Frame>
   );
 }
 
-function Heading({ children }: { children: ReactNode }) {
+/** The card, its heading, and a column of whatever goes in it. */
+function Frame({ title, children }: { title: ReactNode; children: ReactNode }) {
+  const headingId = useId();
   return (
-    <h2 className="flex items-center gap-2 font-display text-base font-bold text-fg">
-      <WalletIcon aria-hidden="true" className="size-4 shrink-0" />
-      {children}
-    </h2>
+    <Card>
+      <section aria-labelledby={headingId}>
+        <div className="flex items-center gap-2 border-b border-line px-4 py-3 sm:px-5">
+          <WalletIcon
+            aria-hidden="true"
+            className="size-4 shrink-0 text-subtle"
+          />
+          <h2
+            id={headingId}
+            className="min-w-0 text-sm leading-6 font-semibold text-fg"
+          >
+            {title}
+          </h2>
+        </div>
+        <div className="flex flex-col gap-3 p-4 sm:p-5">{children}</div>
+      </section>
+    </Card>
   );
 }
 
 function Details({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
   return (
-    <div className="mt-3 flex items-start gap-2 rounded-card border border-line bg-surface-2 p-3">
-      <p className="min-w-0 flex-1 font-mono text-sm break-all whitespace-pre-wrap text-fg select-all">
+    <div className="flex items-start gap-1 rounded-lg border border-line bg-surface-2/60 py-1 pr-1 pl-3">
+      <p className="min-w-0 flex-1 py-1.5 font-mono text-[0.8125rem] leading-relaxed break-all whitespace-pre-wrap text-fg select-all">
         {text}
       </p>
-      <button
+      <Button
         type="button"
+        variant="ghost"
+        size="icon"
         onClick={async () => {
           try {
             await navigator.clipboard.writeText(text);
@@ -77,14 +96,16 @@ function Details({ text }: { text: string }) {
           }
         }}
         aria-label="Copy the payment details"
-        className="inline-flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-lg text-subtle transition-colors duration-200 hover:bg-surface hover:text-fg"
       >
         {copied ? (
-          <CheckIcon aria-hidden="true" className="size-4" />
+          <CheckIcon aria-hidden="true" className="size-4 text-verified" />
         ) : (
           <CopyIcon aria-hidden="true" className="size-4" />
         )}
-      </button>
+      </Button>
+      <span aria-live="polite" className="sr-only">
+        {copied ? "Copied" : ""}
+      </span>
     </div>
   );
 }
@@ -95,40 +116,33 @@ function BuyerView({ deal }: { deal: DealView }) {
 
   if (!deal.sellerPayTo) {
     return (
-      <section className="rounded-panel border border-line bg-surface p-5 sm:p-6">
-        <Heading>Where to pay {deal.sellerName}</Heading>
-        <p className="mt-2 max-w-[62ch] text-sm leading-relaxed text-muted">
-          {deal.sellerName} has not said yet. We have reminded them; ask in the
-          conversation too. Do not send money to details given anywhere else.
-        </p>
-      </section>
+      <Frame title={`Where to pay ${deal.sellerName}`}>
+        <Callout tone="warning" title={`${deal.sellerName} has not said yet.`}>
+          We have reminded them; ask in the conversation too. Do not send money
+          to details given anywhere else.
+        </Callout>
+      </Frame>
     );
   }
 
   return (
-    <section className="rounded-panel border border-line bg-surface p-5 sm:p-6">
-      <Heading>Pay {deal.sellerName} here</Heading>
+    <Frame title={`Pay ${deal.sellerName} here`}>
       {deal.payToChangedWhileVisible && deal.sellerPayToAt ? (
-        <p className="mt-3 flex items-start gap-2 rounded-card border border-danger/30 bg-danger-soft px-3.5 py-3 text-sm leading-relaxed text-fg">
-          <ShieldAlertIcon
-            aria-hidden="true"
-            className="mt-0.5 size-4 shrink-0 text-danger"
-          />
-          <span>
-            <strong className="font-semibold">
-              Changed {when(new Date(deal.sellerPayToAt))}.
-            </strong>{" "}
-            Check it with {deal.sellerName} here in the conversation before you
-            pay.
-          </span>
-        </p>
+        <Callout
+          tone="danger"
+          icon={ShieldAlertIcon}
+          title={`Changed ${when(new Date(deal.sellerPayToAt))}.`}
+        >
+          Check it with {deal.sellerName} here in the conversation before you
+          pay.
+        </Callout>
       ) : null}
       <Details text={deal.sellerPayTo} />
-      <p className="mt-2.5 text-xs leading-relaxed text-subtle">
-        Pay only these details. If anyone sends others — in a message, an email,
-        anywhere — stop and raise it with Channel Adda.
-      </p>
-    </section>
+      <Callout tone="warning" title="Pay only these details.">
+        If anyone sends others — in a message, an email, anywhere — stop and
+        raise it with Channel Adda.
+      </Callout>
+    </Frame>
   );
 }
 
@@ -143,20 +157,17 @@ function SellerEditor({ deal }: { deal: DealView }) {
   const over = text.length > MAX_PAY_TO;
 
   return (
-    <section className="rounded-panel border border-line bg-surface p-5 sm:p-6">
-      <Heading>Where {deal.buyerName} should pay you</Heading>
-
+    <Frame title={`Where ${deal.buyerName} should pay you`}>
       {locked ? (
         <>
           {deal.sellerPayTo ? <Details text={deal.sellerPayTo} /> : null}
-          <p className="mt-2.5 flex items-center gap-1.5 text-xs text-subtle">
-            <LockIcon aria-hidden="true" className="size-3.5" />
+          <p className="flex items-center gap-1.5 text-xs text-subtle">
+            <LockIcon aria-hidden="true" className="size-3.5 shrink-0" />
             Locked: the buyer has recorded paying you.
           </p>
         </>
       ) : editing ? (
         <form
-          className="mt-3"
           onSubmit={(e) => {
             e.preventDefault();
             setError(null);
@@ -172,7 +183,10 @@ function SellerEditor({ deal }: { deal: DealView }) {
           }}
         >
           {error ? <FormNotice>{error}</FormNotice> : null}
-          <label htmlFor={fieldId} className="block text-sm text-muted">
+          <label
+            htmlFor={fieldId}
+            className="block max-w-[62ch] text-[0.8125rem] leading-relaxed text-muted"
+          >
             A wallet address and its network, or bank details. {deal.buyerName}{" "}
             sees this only when it is their turn to pay you, and is warned if it
             changes after that.
@@ -184,15 +198,18 @@ function SellerEditor({ deal }: { deal: DealView }) {
             onChange={(e) => setText(e.target.value)}
             placeholder="USDT (TRC20): T…"
             aria-invalid={over}
-            className="mt-2 w-full rounded-xl border border-line bg-surface-2 p-3 font-mono text-sm text-fg placeholder:text-subtle focus:border-primary/60 focus:outline-none"
+            className={cn(textareaClass, "mt-2 font-mono")}
           />
-          <div className="mt-2.5 flex flex-wrap items-center gap-2.5">
+          <div className="mt-3 flex flex-wrap items-center gap-2">
             <Button
               type="submit"
+              variant="secondary"
               size="sm"
               disabled={pending || !text.trim() || over}
             >
-              {pending ? "Saving…" : "Save"}
+              <BusyLabel busy={pending} busyText="Saving…">
+                Save
+              </BusyLabel>
             </Button>
             {deal.sellerPayTo ? (
               <Button
@@ -208,7 +225,7 @@ function SellerEditor({ deal }: { deal: DealView }) {
               </Button>
             ) : null}
             {over ? (
-              <span className="text-xs font-medium text-danger">
+              <span className="text-xs font-medium text-danger tabular-nums">
                 {(text.length - MAX_PAY_TO).toLocaleString("en-US")} characters
                 too many
               </span>
@@ -218,22 +235,23 @@ function SellerEditor({ deal }: { deal: DealView }) {
       ) : (
         <>
           {deal.sellerPayTo ? <Details text={deal.sellerPayTo} /> : null}
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            className="mt-3"
-            onClick={() => setEditing(true)}
-          >
-            Change
-          </Button>
+          <div>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => setEditing(true)}
+            >
+              Change
+            </Button>
+          </div>
           {deal.buyerPayStepReached ? (
-            <p className="mt-2.5 text-xs leading-relaxed text-subtle">
+            <p className="text-xs leading-relaxed text-subtle">
               {deal.buyerName} can see these now. Changing them warns them.
             </p>
           ) : null}
         </>
       )}
-    </section>
+    </Frame>
   );
 }

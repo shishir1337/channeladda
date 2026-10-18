@@ -8,12 +8,17 @@ import {
 import type { Metadata } from "next";
 import Link from "next/link";
 import {
-  PageHead,
-  Row,
-  Rows,
+  Amount,
+  EmptyState,
+  IconTile,
+  List,
+  ListItem,
+  PageHeader,
+  Reference,
   Section,
+  Sep,
   TurnFlag,
-} from "@/components/dashboard/page-parts";
+} from "@/components/app/kit";
 import {
   ACTOR_LABELS,
   SIDE_LABELS,
@@ -22,8 +27,6 @@ import {
 } from "@/components/deals/deal-status";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { EmptyState } from "@/components/ui/empty-state";
-import { Price } from "@/components/ui/price";
 import type { DealListRow } from "@/server/deals";
 import { listDealsFor } from "@/server/deals";
 import { requireUser } from "@/server/session";
@@ -69,14 +72,14 @@ export default async function DealsPage() {
 
   return (
     <>
-      <PageHead
+      <PageHeader
         title="Deals"
         description={
           deals.length === 0
-            ? "A deal is the handover itself: the steps that move an account from its seller to its buyer, with Channel Adda in the middle."
+            ? "The steps that move an account from its seller to its buyer, with Channel Adda in the middle."
             : mine.length > 0
-              ? `${mine.length} of your ${deals.length} ${deals.length === 1 ? "deal" : "deals"} ${mine.length === 1 ? "needs" : "need"} something from you. A deal moves one step at a time.`
-              : "Everything in progress, on either side. A deal moves one step at a time, and each row says who it is waiting on."
+              ? `${mine.length} of your ${deals.length} ${deals.length === 1 ? "deal" : "deals"} ${mine.length === 1 ? "needs" : "need"} something from you.`
+              : "Everything in progress, on either side. Each row says who it is waiting on."
         }
         actions={
           deals.length > 0 ? (
@@ -88,23 +91,27 @@ export default async function DealsPage() {
       />
 
       {deals.length === 0 ? (
-        <Section>
-          <EmptyState
-            icon={HandshakeIcon}
-            title="No deals yet"
-            description="When you buy an account, or somebody buys one of yours, the handover runs here step by step — who has the account, who has been paid, and what is needed from you next."
-            action={
-              <Button asChild size="md">
-                <Link href="/browse">Browse accounts for sale</Link>
-              </Button>
-            }
-          />
-        </Section>
+        <EmptyState
+          icon={HandshakeIcon}
+          title="No deals yet"
+          body="When you buy an account, or somebody buys one of yours, the handover runs here step by step."
+          action={
+            <Button asChild size="md">
+              <Link href="/browse">Browse accounts for sale</Link>
+            </Button>
+          }
+        />
       ) : (
         <>
+          {/* The only gold on the page is this count and the "Your move"
+              flags: a deal waiting on the reader is found by its turn, not
+              by a tinted row. */}
           {mine.length > 0 ? (
             <Section
+              id="waiting-on-you"
               title="Waiting on you"
+              count={mine.length}
+              tone="primary"
               description="Nothing on these moves until you act."
             >
               <DealRows deals={mine} />
@@ -113,7 +120,9 @@ export default async function DealsPage() {
 
           {paused.length > 0 ? (
             <Section
+              id="paused"
               title="Paused with Channel Adda"
+              count={paused.length}
               description="A moderator is reading the record. Nothing moves until they decide."
             >
               <DealRows deals={paused} />
@@ -122,7 +131,9 @@ export default async function DealsPage() {
 
           {theirs.length > 0 ? (
             <Section
+              id="with-the-other-side"
               title="With the other side"
+              count={theirs.length}
               description="In progress. A deal moves up to “Waiting on you” when it is your turn."
             >
               <DealRows deals={theirs} />
@@ -130,7 +141,7 @@ export default async function DealsPage() {
           ) : null}
 
           {finished.length > 0 ? (
-            <Section title="Finished">
+            <Section id="finished" title="Finished" count={finished.length}>
               <DealRows deals={finished} />
             </Section>
           ) : null}
@@ -142,7 +153,7 @@ export default async function DealsPage() {
 
 function DealRows({ deals }: { deals: DealListRow[] }) {
   return (
-    <Rows>
+    <List>
       {deals.map((deal) => {
         const Icon = SIDE_ICONS[deal.side];
         // Frozen: the row still has a next actor, but nobody may act.
@@ -150,46 +161,31 @@ function DealRows({ deals }: { deals: DealListRow[] }) {
         const yourTurn = !frozen && deal.awaiting === deal.side;
 
         return (
-          <Row key={deal.id}>
-            <Link
-              href={`/dashboard/deals/${deal.id}`}
-              className="flex items-start gap-3.5 p-4 transition-colors duration-200 hover:bg-surface-2 sm:p-5"
-            >
-              <span
-                aria-hidden="true"
-                className={
-                  yourTurn
-                    ? "mt-0.5 grid size-9 shrink-0 place-items-center rounded-xl bg-primary-soft text-primary-text"
-                    : "mt-0.5 grid size-9 shrink-0 place-items-center rounded-xl bg-surface-2 text-subtle"
-                }
-              >
-                <Icon className="size-[1.15rem]" />
-              </span>
+          <ListItem key={deal.id} href={`/dashboard/deals/${deal.id}`}>
+            <div className="flex items-start gap-3 sm:items-center">
+              {/* The side is already in words on the meta line; the tile
+                  only helps a wide list scan, so a phone keeps the room. */}
+              <IconTile icon={Icon} className="hidden sm:inline-flex" />
 
-              <span className="min-w-0 flex-1">
-                <span className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-                  <span className="min-w-0 truncate text-[0.9375rem] font-semibold text-fg">
+              <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm leading-5 font-medium text-fg">
                     {deal.listingTitle}
-                  </span>
-                  <span className="shrink-0 text-right">
-                    <Price
-                      usd={deal.priceUsd / 100}
-                      className="text-[0.9375rem] font-semibold text-fg"
-                    />
-                    <span className="block text-[0.625rem] tracking-wide text-subtle uppercase">
-                      channel price
+                  </p>
+                  <p className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[0.8125rem] leading-5 text-muted">
+                    <span className="min-w-0 truncate">
+                      {SIDE_LABELS[deal.side]}{" "}
+                      {deal.side === "agent" ? "for" : "with"}{" "}
+                      {deal.otherSideName}
                     </span>
-                  </span>
-                </span>
+                    <Sep />
+                    <span>{deal.mode === "SAFEST" ? "Safest" : "Fastest"}</span>
+                    <Sep />
+                    <Reference>{deal.reference}</Reference>
+                  </p>
+                </div>
 
-                <span className="mt-1 block truncate text-xs text-subtle">
-                  {SIDE_LABELS[deal.side]}{" "}
-                  {deal.side === "agent" ? "for" : "with"} {deal.otherSideName}{" "}
-                  · {deal.mode === "SAFEST" ? "Safest" : "Fastest"} ·{" "}
-                  <span className="tnum">{deal.reference}</span>
-                </span>
-
-                <span className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 sm:shrink-0 sm:justify-end">
                   <Badge variant={STATUS_TONE[deal.status]} size="sm">
                     {STATUS_SHORT[deal.status]}
                   </Badge>
@@ -199,17 +195,23 @@ function DealRows({ deals }: { deals: DealListRow[] }) {
                       who={ACTOR_LABELS[deal.awaiting]}
                     />
                   ) : null}
-                </span>
-              </span>
+                </div>
+              </div>
+
+              <Amount
+                cents={deal.priceUsd}
+                caption="channel price"
+                className="shrink-0 sm:w-28"
+              />
 
               <ChevronRightIcon
                 aria-hidden="true"
-                className="mt-2 hidden size-4 shrink-0 text-subtle sm:block"
+                className="hidden size-4 shrink-0 text-subtle transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-muted sm:block"
               />
-            </Link>
-          </Row>
+            </div>
+          </ListItem>
         );
       })}
-    </Rows>
+    </List>
   );
 }

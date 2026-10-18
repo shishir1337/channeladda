@@ -1,4 +1,5 @@
 import { MailIcon } from "lucide-react";
+import { Callout, Card } from "@/components/app/kit";
 import type { DealView } from "@/server/deals";
 
 /**
@@ -15,28 +16,41 @@ export function AgentInvite({ deal }: { deal: DealView }) {
   if (!deal.agentEmail || deal.viewerRole === "buyer") return null;
 
   return (
-    <section
-      aria-labelledby="invite-heading"
-      className="rounded-panel border border-line bg-surface p-5 sm:p-6"
-    >
-      <h2
-        id="invite-heading"
-        className="flex items-center gap-2 font-display text-base font-bold text-fg"
-      >
-        <MailIcon aria-hidden="true" className="size-4 shrink-0" />
-        Invite this account as {deal.mode === "SAFEST" ? "owner" : "manager"}
-      </h2>
-      <p className="mt-3 rounded-card border border-line bg-surface-2 px-3.5 py-3 font-mono text-sm break-all text-fg select-all">
-        {deal.agentEmail}
-      </p>
-      {deal.agentBrand ? (
-        <p className="mt-2.5 max-w-[62ch] text-sm leading-relaxed text-muted">
-          It will show up as{" "}
-          <strong className="text-fg">{deal.agentBrand}</strong>. If the name
-          does not match, stop and contact support — nobody else should be
-          asking for owner access to your channel.
-        </p>
-      ) : null}
-    </section>
+    <Card>
+      <section aria-labelledby="invite-heading">
+        <div className="flex items-center gap-2 border-b border-line px-4 py-3 sm:px-5">
+          <MailIcon
+            aria-hidden="true"
+            className="size-4 shrink-0 text-subtle"
+          />
+          <h2
+            id="invite-heading"
+            className="min-w-0 text-sm leading-6 font-semibold text-fg"
+          >
+            Invite this account as{" "}
+            {deal.mode === "SAFEST" ? "owner" : "manager"}
+          </h2>
+        </div>
+        <div className="flex flex-col gap-3 p-4 sm:p-5">
+          <p className="rounded-lg border border-line bg-surface-2/60 px-3 py-2.5 font-mono text-[0.8125rem] leading-relaxed break-all text-fg select-all">
+            {deal.agentEmail}
+          </p>
+          {deal.agentBrand ? (
+            <Callout
+              tone="warning"
+              title={
+                <>
+                  It will show up as{" "}
+                  <strong className="font-semibold">{deal.agentBrand}</strong>.
+                </>
+              }
+            >
+              If the name does not match, stop and contact support — nobody else
+              should be asking for owner access to your channel.
+            </Callout>
+          ) : null}
+        </div>
+      </section>
+    </Card>
   );
 }

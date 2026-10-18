@@ -3,11 +3,27 @@
 import {
   CheckIcon,
   ClockIcon,
+  InfoIcon,
   LoaderCircleIcon,
   ShieldAlertIcon,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useId, useState, useTransition } from "react";
+import {
+  type ComponentType,
+  type ReactNode,
+  type SVGProps,
+  useId,
+  useState,
+  useTransition,
+} from "react";
+import {
+  Card,
+  Dot,
+  hintClass,
+  inputClass,
+  labelClass,
+  TurnFlag,
+} from "@/components/app/kit";
 import { TextField } from "@/components/auth/fields";
 import {
   ACTOR_LABELS,
@@ -18,6 +34,7 @@ import {
   stepHelp,
 } from "@/components/deals/deal-status";
 import { Button } from "@/components/ui/button";
+import { isTerminal } from "@/lib/deal-machine";
 import { cn } from "@/lib/utils";
 import { completeStep, endDeal } from "@/server/actions/deals";
 import type { DealStepView, DealView } from "@/server/deals";
@@ -25,11 +42,14 @@ import type { DealStepView, DealView } from "@/server/deals";
 /**
  * The deal, step by step, as both sides and the agent see it.
  *
- * Split in two deliberately. `DealNextStep` is the one card that answers
- * "what do I do now?" and is the only place an action button appears;
- * `DealSteps` is the record of the whole choreography, where everything
- * already done recedes and nothing competes with the action above it. A flat
- * list of nine equal rows made the current step as easy to miss as the first.
+ * Two ways in, one set of parts. On the deal page `DealSteps` is the whole
+ * choreography: everything already done recedes, and the step in play keeps
+ * its weight and carries its own action, so the one button on the screen
+ * sits beside the step it completes. The conversation has no room for the
+ * whole list, so there `DealNextStep` is that one step as a card. Both draw
+ * the step's detail and its button from `StepDetail`, so they cannot drift
+ * apart. A flat list of nine equal rows made the current step as easy to
+ * miss as the first.
  *
  * One timeline rather than a view per role: everybody looking at a deal needs
  * to know the same things — what has happened, what is happening now, who it
@@ -52,8 +72,121 @@ function confirmLabel(label: string) {
   return CONFIRM_LABELS[label] ?? "Mark this done";
 }
 
+type StaffList = { id: string; name: string }[];
+
 /**
- * The one card that says what happens next, and the only one with a button.
+ * What the step in play means for this reader: whether it is theirs to do,
+ * and what, if anything, stands in the way.
+ */
+function stepState(deal: DealView, step: DealStepView) {
+  // A dispute freezes every step, so the person whose turn it nominally is
+  // must not be offered a button the server will refuse.
+  const frozen = deal.status === "DISPUTED";
+  // The recovery hold: the release step exists, and is not available yet.
+  // Offering the button would only produce a refusal.
+  const heldUntil =
+    deal.holdUntil && new Date(deal.holdUntil) > new Date()
+      ? new Date(deal.holdUntil)
+      : null;
+  return {
+    frozen,
+    heldUntil,
+    mine: !frozen && !heldUntil && step.actor === deal.viewerRole,
+    help: stepHelp(step.label),
+    hold: isHoldStep(step.label),
+    // Step 1 is completed by the payment clearing and by nothing else, so the
+    // buyer gets the payment panel rather than a button the server will
+    // refuse.
+    paymentPending: deal.status === "AWAITING_PAYMENT",
+  };
+}
+
+type StepState = ReturnType<typeof stepState>;
+
+/**
+ * A button label that keeps the button's width while its action runs.
+ *
+ * The idle label and the busy one are stacked in the same grid cell and
+ * only one is visible, so the button is always as wide as the wider of the
+ * two and a row of buttons never jumps. The hidden one is `invisible`, which
+ * also takes it out of the accessible name.
+ */
+export function BusyLabel({
+  busy,
+  busyText,
+  children,
+}: {
+  busy: boolean;
+  busyText: string;
+  children: ReactNode;
+}) {
+  return (
+    <span className="inline-grid gap-[inherit] *:col-start-1 *:row-start-1">
+      <span
+        className={cn(
+          "inline-flex items-center justify-center gap-[inherit]",
+          busy && "invisible",
+        )}
+      >
+        {children}
+      </span>
+      <span
+        className={cn(
+          "inline-flex items-center justify-center gap-[inherit]",
+          !busy && "invisible",
+        )}
+      >
+        <LoaderCircleIcon
+          aria-hidden="true"
+          className={cn(busy && "animate-spin")}
+        />
+        {busyText}
+      </span>
+    </span>
+  );
+}
+
+/** Whose step it is, in words — gold only when it is the reader's. */
+function Whose({ state, who }: { state: StepState; who: string }) {
+  if (state.mine) return <TurnFlag mine />;
+  if (state.frozen) {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted">
+        <Dot tone="danger" />
+        Paused
+      </span>
+    );
+  }
+  return (
+    <span className="text-xs font-medium text-muted">Waiting on {who}</span>
+  );
+}
+
+/** A quiet aside inside a step: a waiting period, why there is no button. */
+function Note({
+  icon: Icon = InfoIcon,
+  children,
+}: {
+  icon?: ComponentType<SVGProps<SVGSVGElement>>;
+  children: ReactNode;
+}) {
+  return (
+    <div className="mt-3 flex max-w-[62ch] items-start gap-2.5 rounded-lg border border-line bg-surface-2/60 px-3 py-2.5">
+      <Icon
+        aria-hidden="true"
+        className="mt-0.5 size-3.5 shrink-0 text-subtle"
+      />
+      <p className="min-w-0 text-[0.8125rem] leading-relaxed text-muted">
+        {children}
+      </p>
+    </div>
+  );
+}
+
+/**
+ * The step in play as a card of its own, for the conversation, where the
+ * whole list does not fit. The deal page draws the same step inside
+ * `DealSteps`.
  *
  * Renders nothing once a deal has stopped — a closed deal has no next move,
  * and the status block above it has already said so.
@@ -68,116 +201,94 @@ export function DealNextStep({
    * agent has to name somebody, and offering a list beats asking them to
    * paste a user id.
    */
-  staffIds?: { id: string; name: string }[];
+  staffIds?: StaffList;
 }) {
   const step = deal.nextStep;
   if (!step) return null;
-
-  // A dispute freezes every step, so the person whose turn it nominally is
-  // must not be offered a button the server will refuse.
-  const frozen = deal.status === "DISPUTED";
-  // The recovery hold: the release step exists, and is not available yet.
-  // Offering the button would only produce a refusal.
-  const heldUntil =
-    deal.holdUntil && new Date(deal.holdUntil) > new Date()
-      ? new Date(deal.holdUntil)
-      : null;
-  const mine = !frozen && !heldUntil && step.actor === deal.viewerRole;
-  const help = stepHelp(step.label);
-  const hold = isHoldStep(step.label);
-  // Step 1 is completed by the payment clearing and by nothing else, so the
-  // buyer gets the payment panel rather than a button the server will refuse.
-  const paymentPending = deal.status === "AWAITING_PAYMENT";
+  const state = stepState(deal, step);
 
   return (
-    <section
-      aria-labelledby="next-step-heading"
-      className={cn(
-        "rounded-panel border p-5 sm:p-6",
-        mine ? "border-primary/40 bg-primary-soft" : "border-line bg-surface",
-      )}
-    >
-      <p className="flex flex-wrap items-center gap-2 font-mono text-[0.6875rem] font-semibold tracking-[0.14em] uppercase">
-        {mine ? (
-          <>
-            <span
-              aria-hidden="true"
-              className="size-1.5 animate-pulse-dot rounded-full bg-primary"
-            />
-            <span className="text-primary-text">Your move</span>
-          </>
-        ) : (
-          <span className="text-subtle">
-            {frozen ? "Paused" : `Waiting on ${ACTOR_LABELS[step.actor]}`}
+    <Card className="@container">
+      <section aria-labelledby="next-step-heading" className="p-4 sm:p-5">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <Whose state={state} who={ACTOR_LABELS[step.actor]} />
+          <span className="ml-auto text-xs text-subtle tabular-nums">
+            Step {step.position} of {deal.steps.length}
           </span>
-        )}
-        <span className="tnum ml-auto font-normal tracking-normal text-subtle">
-          Step {step.position} of {deal.steps.length}
-        </span>
-      </p>
+        </div>
+        <h2
+          id="next-step-heading"
+          className="mt-2.5 text-[0.9375rem] leading-6 font-semibold text-fg"
+        >
+          {step.label}
+        </h2>
+        <StepDetail deal={deal} step={step} state={state} staffIds={staffIds} />
+      </section>
+    </Card>
+  );
+}
 
-      <h2
-        id="next-step-heading"
-        className="mt-2.5 font-display text-lg leading-snug font-bold text-fg sm:text-xl"
-      >
-        {step.label}
-      </h2>
-
-      {help ? (
-        <p className="mt-2 max-w-[62ch] text-[0.9375rem] leading-relaxed text-muted">
-          {help}
+/**
+ * Everything under the step in play: what it involves, what is in the way,
+ * and — for the person whose step it is — the button.
+ */
+function StepDetail({
+  deal,
+  step,
+  state,
+  staffIds,
+}: {
+  deal: DealView;
+  step: DealStepView;
+  state: StepState;
+  staffIds?: StaffList;
+}) {
+  return (
+    <>
+      {state.help ? (
+        <p className="mt-1.5 max-w-[62ch] text-[0.8125rem] leading-relaxed text-muted">
+          {state.help}
         </p>
       ) : null}
 
-      {!mine ? (
-        <p className="mt-2 text-sm leading-relaxed text-subtle">
-          {frozen
+      {!state.mine ? (
+        <p className="mt-2 max-w-[62ch] text-[0.8125rem] leading-relaxed text-subtle">
+          {state.frozen
             ? "This step is where the deal stopped. It stays here until a moderator decides the dispute."
             : "Nothing is needed from you right now. Your deals list flags this one under “Waiting on you” the moment it is your turn."}
         </p>
       ) : null}
 
-      {heldUntil ? (
-        <p className="mt-3 flex items-start gap-2.5 rounded-card border border-primary/30 bg-primary-soft px-3.5 py-3 text-sm leading-relaxed text-fg">
-          <ClockIcon
-            aria-hidden="true"
-            className="mt-0.5 size-4 shrink-0 text-primary-text"
-          />
-          <span>
-            <span className="font-semibold">
-              Recovery hold until{" "}
-              {heldUntil.toLocaleDateString("en-GB", {
-                day: "numeric",
-                month: "long",
-              })}
-              .
-            </span>{" "}
-            That is the window in which an old owner could still try to reclaim
-            the account. The seller is paid when it ends; until then the money
-            stays with Channel Adda.
-          </span>
-        </p>
+      {state.heldUntil ? (
+        <Note icon={ClockIcon}>
+          <span className="font-medium text-fg tabular-nums">
+            Recovery hold until{" "}
+            {state.heldUntil.toLocaleDateString("en-GB", {
+              day: "numeric",
+              month: "long",
+            })}
+            .
+          </span>{" "}
+          That is the window in which an old owner could still try to reclaim
+          the account. The seller is paid when it ends; until then the money
+          stays with Channel Adda.
+        </Note>
       ) : null}
 
-      {hold ? (
-        <p className="mt-3 flex items-start gap-2.5 rounded-card border border-line bg-surface px-3.5 py-3 text-sm leading-relaxed text-muted">
-          <ClockIcon aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
-          <span>{HOLD_NOTE}</span>
-        </p>
-      ) : null}
+      {state.hold ? <Note icon={ClockIcon}>{HOLD_NOTE}</Note> : null}
 
-      {mine ? (
-        paymentPending ? (
-          <p className="mt-4 rounded-card border border-line bg-surface px-3.5 py-3 text-sm leading-relaxed text-muted">
+      {state.mine ? (
+        state.paymentPending ? (
+          <Note>
             This step ticks itself off the moment your payment clears. There is
             no button for it, so nobody can record a payment that has not
             arrived.
-          </p>
+          </Note>
         ) : (
           <StepAction deal={deal} step={step} staffIds={staffIds} />
         )
       ) : null}
-    </section>
+    </>
   );
 }
 
@@ -188,7 +299,7 @@ function StepAction({
 }: {
   deal: DealView;
   step: DealStepView;
-  staffIds?: { id: string; name: string }[];
+  staffIds?: StaffList;
 }) {
   const router = useRouter();
   const refId = useId();
@@ -206,10 +317,10 @@ function StepAction({
   const blocked = wantsRef && paymentRef.trim() === "";
 
   return (
-    <div className="mt-4">
+    <div className="mt-4 flex flex-col gap-4">
       {wantsRef ? (
-        <div className="rounded-card border border-line bg-surface p-3.5 sm:p-4">
-          <p className="max-w-[62ch] text-sm leading-relaxed text-muted">
+        <div>
+          <p className="max-w-[62ch] text-[0.8125rem] leading-relaxed text-muted">
             Send the agreed amount to the seller, then paste the transaction
             reference. It is what lets Channel Adda settle a disagreement about
             whether the money arrived — without it there is only one person's
@@ -229,23 +340,15 @@ function StepAction({
       ) : null}
 
       {wantsApprover ? (
-        <div
-          className={cn(
-            "max-w-sm rounded-card border border-line bg-surface p-3.5 sm:p-4",
-            wantsRef && "mt-3",
-          )}
-        >
-          <label
-            htmlFor={approverId}
-            className="block text-sm font-medium text-fg"
-          >
+        <div className="max-w-sm">
+          <label htmlFor={approverId} className={labelClass}>
             Second approval from
           </label>
           <select
             id={approverId}
             value={approvedById}
             onChange={(e) => setApprovedById(e.target.value)}
-            className="mt-2 h-12 w-full cursor-pointer rounded-xl border border-line bg-surface-2 px-3 text-base text-fg focus:border-primary/60 focus:outline-none sm:text-[0.9375rem]"
+            className={cn(inputClass, "mt-1.5 cursor-pointer")}
           >
             <option value="">No second approver</option>
             {staffIds?.map((person) => (
@@ -254,7 +357,7 @@ function StepAction({
               </option>
             ))}
           </select>
-          <p className="mt-2 text-xs leading-relaxed text-subtle">
+          <p className={hintClass}>
             Required above the platform's threshold. Recorded against your name
             and theirs in the audit trail — only name someone who has actually
             agreed to it.
@@ -262,93 +365,131 @@ function StepAction({
         </div>
       ) : null}
 
-      <Button
-        type="button"
-        size="lg"
-        className={cn(
-          "w-full sm:w-auto",
-          (wantsRef || wantsApprover) && "mt-4",
-        )}
-        disabled={pending || blocked}
-        onClick={() => {
-          setError(null);
-          startTransition(async () => {
-            const result = await completeStep(deal.id, step.position, {
-              ...(wantsRef ? { paymentRef: paymentRef.trim() } : {}),
-              ...(approvedById ? { approvedById } : {}),
+      <div>
+        <Button
+          type="button"
+          size="md"
+          className="w-full @sm:w-auto"
+          disabled={pending || blocked}
+          onClick={() => {
+            setError(null);
+            startTransition(async () => {
+              const result = await completeStep(deal.id, step.position, {
+                ...(wantsRef ? { paymentRef: paymentRef.trim() } : {}),
+                ...(approvedById ? { approvedById } : {}),
+              });
+              if (!result.ok) {
+                setError(result.error);
+                return;
+              }
+              router.refresh();
             });
-            if (!result.ok) {
-              setError(result.error);
-              return;
-            }
-            router.refresh();
-          });
-        }}
-      >
-        {pending ? (
-          <>
-            <LoaderCircleIcon
-              aria-hidden="true"
-              className="size-4 animate-spin"
-            />
-            Saving…
-          </>
-        ) : (
-          <>
-            <CheckIcon aria-hidden="true" className="size-4" />
+          }}
+        >
+          <BusyLabel busy={pending} busyText="Saving…">
+            <CheckIcon aria-hidden="true" />
             {confirmLabel(step.label)}
-          </>
-        )}
-      </Button>
+          </BusyLabel>
+        </Button>
 
-      {blocked ? (
-        <p className="mt-2 text-xs text-subtle">
-          Add the transaction reference to continue.
-        </p>
-      ) : null}
+        {blocked ? (
+          <p className="mt-2 text-xs text-subtle">
+            Add the transaction reference to continue.
+          </p>
+        ) : null}
 
-      {error ? (
-        <p role="alert" className="mt-2.5 text-sm font-medium text-danger">
-          {error}
-        </p>
-      ) : null}
+        {error ? (
+          <p
+            role="alert"
+            className="mt-2 text-[0.8125rem] font-medium text-danger"
+          >
+            {error}
+          </p>
+        ) : null}
+      </div>
     </div>
   );
 }
 
 /**
- * The whole choreography, in order.
+ * The whole choreography, in order, with the step in play doing the work.
  *
- * Done steps recede to a tick and a date; the step in play keeps its weight
- * and says so in words as well as colour; later steps are numbered and quiet.
- * The action for the current step is not here — it is in the card above, so
- * there is only ever one button on the screen.
+ * Done steps recede to a tick, who did it and when; the step in play keeps
+ * its weight, says whose it is in words as well as colour, and carries its
+ * action, so the one button on the screen sits beside the step it completes.
+ * Later steps are quiet. No frame of its own: the page puts it in a card.
  */
-export function DealSteps({ deal }: { deal: DealView }) {
+export function DealSteps({
+  deal,
+  staffIds,
+  payment,
+}: {
+  deal: DealView;
+  /** As for `DealNextStep`: who can second a high-value handover. */
+  staffIds?: StaffList;
+  /**
+   * The buyer's opening payment, drawn in place of the step's own action:
+   * the step it completes ticks itself off when the money clears.
+   */
+  payment?: ReactNode;
+}) {
+  const total = deal.steps.length;
   const doneCount = deal.steps.filter((s) => s.completedAt !== null).length;
+  const percent = total > 0 ? Math.round((doneCount / total) * 100) : 0;
+  const terminal = isTerminal(deal.status);
+  const next = deal.nextStep;
+  const state = next ? stepState(deal, next) : null;
 
   return (
-    <section aria-labelledby="steps-heading">
+    <section aria-labelledby="steps-heading" className="p-4 sm:p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <h2
           id="steps-heading"
-          className="font-display text-base font-bold text-fg"
+          className="text-sm leading-6 font-semibold text-fg"
         >
           What happens, in order
         </h2>
-        <p className="tnum text-xs text-subtle">
-          {doneCount} of {deal.steps.length} done
+        <p className="text-xs text-subtle tabular-nums">
+          {doneCount} of {total} done
         </p>
       </div>
 
-      <ol className="mt-4 flex flex-col">
+      {total > 0 ? (
+        <div
+          role="progressbar"
+          aria-valuenow={doneCount}
+          aria-valuemin={0}
+          aria-valuemax={total}
+          aria-label={`${doneCount} of ${total} steps complete`}
+          className="mt-3 h-1 w-full overflow-hidden rounded-full bg-surface-3"
+        >
+          <span
+            aria-hidden="true"
+            className={cn(
+              "block h-full rounded-full transition-[width] duration-500 ease-out",
+              deal.status === "COMPLETED"
+                ? "bg-verified"
+                : terminal
+                  ? "bg-line-strong"
+                  : "bg-muted",
+            )}
+            style={{ width: `${percent}%` }}
+          />
+        </div>
+      ) : null}
+
+      <ol className="mt-5">
         {deal.steps.map((step, index) => (
           <Step
             key={step.position}
             deal={deal}
             step={step}
-            isNext={deal.nextStep?.position === step.position}
+            current={
+              next?.position === step.position && state ? state : undefined
+            }
             isLast={index === deal.steps.length - 1}
+            staffIds={staffIds}
+            payment={payment}
           />
         ))}
       </ol>
@@ -359,94 +500,148 @@ export function DealSteps({ deal }: { deal: DealView }) {
 function Step({
   deal,
   step,
-  isNext,
+  current,
   isLast,
+  staffIds,
+  payment,
 }: {
   deal: DealView;
   step: DealStepView;
-  isNext: boolean;
+  /** Set on the step in play only. */
+  current?: StepState;
   isLast: boolean;
+  staffIds?: StaffList;
+  payment?: ReactNode;
 }) {
   const done = step.completedAt !== null;
 
   return (
-    <li className="flex gap-3.5">
+    <li aria-current={current ? "step" : undefined} className="flex gap-3">
       <div className="flex flex-col items-center">
-        <span
-          aria-hidden="true"
-          className={cn(
-            "flex size-7 shrink-0 items-center justify-center rounded-full border",
-            done && "border-verified bg-verified text-white",
-            !done && isNext && "border-primary bg-primary text-primary-fg",
-            !done && !isNext && "border-line bg-surface-2",
-          )}
-        >
-          {done ? (
-            <CheckIcon className="size-3.5" />
-          ) : (
-            <span
-              className={cn(
-                "tnum text-[0.6875rem] font-semibold",
-                !isNext && "font-normal text-subtle",
-              )}
-            >
-              {step.position}
-            </span>
-          )}
-        </span>
+        <Marker done={done} current={current} />
         {!isLast ? (
           <span
             aria-hidden="true"
             className={cn(
               "my-1 w-px flex-1",
-              done ? "bg-verified/40" : "bg-line",
+              done ? "bg-verified/30" : "bg-line",
             )}
           />
         ) : null}
       </div>
 
-      <div className={cn("min-w-0 flex-1", isLast ? "pb-0" : "pb-6")}>
-        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
-          <p
-            className={cn(
-              "text-sm",
-              done && "text-muted",
-              isNext && "font-semibold text-fg",
-              !done && !isNext && "font-medium text-muted",
+      <div
+        className={cn(
+          "@container min-w-0 flex-1",
+          isLast ? "pb-0" : current ? "pb-7" : "pb-4",
+        )}
+      >
+        {current ? (
+          <>
+            <p className="text-sm leading-5 font-semibold text-fg">
+              {step.label}
+            </p>
+            <div className="mt-1.5">
+              <Whose
+                state={current}
+                who={actorLabel(step.actor, deal.viewerRole)}
+              />
+            </div>
+            {payment ? (
+              <div className="mt-3">{payment}</div>
+            ) : (
+              <StepDetail
+                deal={deal}
+                step={step}
+                state={current}
+                staffIds={staffIds}
+              />
             )}
-          >
-            {step.label}
-          </p>
-          {isNext ? (
-            <span className="rounded-full border border-primary/30 bg-primary-soft px-2 py-0.5 font-mono text-[0.625rem] font-semibold tracking-[0.1em] text-primary-text uppercase">
-              You are here
-            </span>
-          ) : null}
-        </div>
-
-        <p className="mt-0.5 text-xs text-subtle">
-          {done ? (
-            <>
-              Done by {actorLabel(step.actor, deal.viewerRole)} on{" "}
-              {step.completedAt?.toLocaleDateString("en-GB")}
-            </>
-          ) : isNext ? (
-            <>Waiting on {actorLabel(step.actor, deal.viewerRole)}</>
-          ) : (
-            <>Then {ACTOR_LABELS[step.actor]}</>
-          )}
-        </p>
+          </>
+        ) : (
+          <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-0.5">
+            <p
+              className={cn(
+                "text-sm leading-5",
+                done ? "text-muted" : "text-subtle",
+              )}
+            >
+              {step.label}
+            </p>
+            <p className="text-xs text-subtle">
+              {done ? (
+                <>
+                  Done by {actorLabel(step.actor, deal.viewerRole)} on{" "}
+                  {step.completedAt?.toLocaleDateString("en-GB", {
+                    day: "numeric",
+                    month: "short",
+                    year: "numeric",
+                  })}
+                </>
+              ) : (
+                <>Then {ACTOR_LABELS[step.actor]}</>
+              )}
+            </p>
+          </div>
+        )}
 
         {step.proofUrl ? (
           <a
             href={step.proofUrl}
-            className="mt-1.5 inline-flex min-h-8 items-center text-xs font-medium text-primary-text underline underline-offset-4"
+            className="mt-0.5 inline-flex min-h-11 items-center text-xs font-medium text-muted underline decoration-line-strong underline-offset-4 transition-colors duration-150 hover:text-fg hover:decoration-current pointer-fine:min-h-6"
           >
             Proof attached
           </a>
         ) : null}
       </div>
     </li>
+  );
+}
+
+/**
+ * The dot on the rail. Done is a quiet tick, the step in play a ring — red
+ * while a dispute holds it, and pulsing only when it is the reader's move —
+ * and what is still to come an empty circle.
+ */
+function Marker({ done, current }: { done: boolean; current?: StepState }) {
+  if (done) {
+    return (
+      <span
+        aria-hidden="true"
+        className="flex size-5 shrink-0 items-center justify-center rounded-full bg-verified-soft text-verified ring-1 ring-verified/25 ring-inset"
+      >
+        <CheckIcon className="size-3" strokeWidth={3} />
+      </span>
+    );
+  }
+  if (current) {
+    return (
+      <span
+        aria-hidden="true"
+        className={cn(
+          "flex size-5 shrink-0 items-center justify-center rounded-full border-2 bg-surface ring-3",
+          current.frozen
+            ? "border-danger ring-danger-soft"
+            : "border-primary ring-primary-soft",
+        )}
+      >
+        <span
+          className={cn(
+            "size-2 rounded-full",
+            current.frozen ? "bg-danger" : "bg-primary",
+            current.mine && "animate-pulse-dot",
+          )}
+        />
+      </span>
+    );
+  }
+  return (
+    <span
+      aria-hidden="true"
+      className="flex size-5 shrink-0 items-center justify-center"
+    >
+      <span className="size-2.5 rounded-full border-[1.5px] border-line-strong bg-surface" />
+    </span>
   );
 }
 
@@ -471,80 +666,86 @@ export function RaiseDispute({ deal }: { deal: DealView }) {
 
   if (!open) {
     return (
-      <button
+      <Button
         type="button"
+        variant="ghost"
+        size="sm"
         onClick={() => setOpen(true)}
-        className="inline-flex min-h-11 cursor-pointer items-center gap-2 text-sm text-muted underline-offset-4 transition-colors duration-200 hover:text-fg hover:underline"
+        className="self-start"
       >
-        <ShieldAlertIcon aria-hidden="true" className="size-4 shrink-0" />
+        <ShieldAlertIcon aria-hidden="true" />
         Something is wrong with this deal
-      </button>
+      </Button>
     );
   }
 
   return (
-    <div className="rounded-panel border border-line bg-surface p-5 sm:p-6">
-      <h2 className="font-display text-base font-bold text-fg">
-        Raise this with us
-      </h2>
-      <p className="mt-2 max-w-[62ch] text-sm leading-relaxed text-muted">
-        The deal stops where it is and a moderator reads the whole record,
-        including every step and the payment references on it. Nothing moves
-        again until they decide.
-      </p>
-      <TextField
-        id={noteId}
-        name="note"
-        label="What has gone wrong"
-        value={note}
-        onChange={(e) => setNote(e.target.value)}
-        className="mt-4 max-w-md"
-        required
-      />
-      <div className="mt-4 flex flex-wrap gap-2.5">
-        <Button
-          type="button"
-          size="md"
-          disabled={pending || note.trim() === ""}
-          onClick={() => {
-            setError(null);
-            startTransition(async () => {
-              const result = await endDeal(deal.id, "DISPUTED", note.trim());
-              if (!result.ok) {
-                setError(result.error);
-                return;
-              }
-              router.refresh();
-            });
-          }}
-        >
-          {pending ? (
-            <>
-              <LoaderCircleIcon
-                aria-hidden="true"
-                className="size-4 animate-spin"
-              />
-              Sending…
-            </>
-          ) : (
-            "Raise it"
-          )}
-        </Button>
-        <Button
-          type="button"
-          size="md"
-          variant="ghost"
-          disabled={pending}
-          onClick={() => setOpen(false)}
-        >
-          Never mind
-        </Button>
+    <Card>
+      <div className="flex items-center gap-2 border-b border-line px-4 py-3 sm:px-5">
+        <ShieldAlertIcon
+          aria-hidden="true"
+          className="size-4 shrink-0 text-subtle"
+        />
+        <h2 className="text-sm leading-6 font-semibold text-fg">
+          Raise this with us
+        </h2>
       </div>
-      {error ? (
-        <p role="alert" className="mt-2.5 text-sm font-medium text-danger">
-          {error}
+      <div className="p-4 sm:p-5">
+        <p className="max-w-[62ch] text-[0.8125rem] leading-relaxed text-muted">
+          The deal stops where it is and a moderator reads the whole record,
+          including every step and the payment references on it. Nothing moves
+          again until they decide.
         </p>
-      ) : null}
-    </div>
+        <TextField
+          id={noteId}
+          name="note"
+          label="What has gone wrong"
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          className="mt-4 max-w-md"
+          required
+        />
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            disabled={pending || note.trim() === ""}
+            onClick={() => {
+              setError(null);
+              startTransition(async () => {
+                const result = await endDeal(deal.id, "DISPUTED", note.trim());
+                if (!result.ok) {
+                  setError(result.error);
+                  return;
+                }
+                router.refresh();
+              });
+            }}
+          >
+            <BusyLabel busy={pending} busyText="Sending…">
+              Raise it
+            </BusyLabel>
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            disabled={pending}
+            onClick={() => setOpen(false)}
+          >
+            Never mind
+          </Button>
+        </div>
+        {error ? (
+          <p
+            role="alert"
+            className="mt-2.5 text-[0.8125rem] font-medium text-danger"
+          >
+            {error}
+          </p>
+        ) : null}
+      </div>
+    </Card>
   );
 }

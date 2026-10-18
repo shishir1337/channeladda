@@ -1,10 +1,13 @@
 "use client";
 
-import { CreditCardIcon, LoaderCircleIcon, WalletIcon } from "lucide-react";
+import { CreditCardIcon, WalletIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { Card, TurnFlag } from "@/components/app/kit";
+import { BusyLabel } from "@/components/deals/deal-timeline";
 import { Button } from "@/components/ui/button";
 import { Price } from "@/components/ui/price";
+import { cn } from "@/lib/utils";
 import { startPayment } from "@/server/actions/payments";
 import { payDealFromWallet } from "@/server/actions/wallet";
 
@@ -16,9 +19,10 @@ import { payDealFromWallet } from "@/server/actions/wallet";
  * to the seller, and a buyer who does not know that will think the figure is
  * wrong.
  *
- * It is styled as the page's single action, the same card the next-step panel
- * uses, because at this point in a deal paying is the only thing that moves
- * anything.
+ * In the conversation it is a card of its own, the same shape as the
+ * next-step card, because at this point in a deal paying is the only thing
+ * that moves anything. On the deal page it is drawn `inline`, inside the
+ * step it completes, which already names it.
  *
  * When checkout is not configured this does not disappear — it explains that
  * Channel Adda will send details and confirm by hand, which is the fallback
@@ -30,6 +34,7 @@ export function PayNow({
   priceUsd,
   mode,
   availableUsd,
+  inline = false,
 }: {
   orderId: string;
   totalUsd: number;
@@ -37,39 +42,26 @@ export function PayNow({
   mode: "SAFEST" | "FASTEST";
   /** The buyer's spendable balance, so the cheaper route is offered first. */
   availableUsd: number;
+  /** Inside the deal page's step list: no card and no heading of its own. */
+  inline?: boolean;
 }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [manual, setManual] = useState(false);
+  // Which button started the payment, so only that one shows it working.
+  const [via, setVia] = useState<"balance" | "crypto" | null>(null);
   const [pending, startTransition] = useTransition();
 
   const canUseBalance = availableUsd >= totalUsd;
 
-  return (
-    <section
-      aria-labelledby="pay-now-heading"
-      className="rounded-panel border border-primary/40 bg-primary-soft p-5 sm:p-6"
-    >
-      <p className="flex flex-wrap items-center gap-2 font-mono text-[0.6875rem] font-semibold tracking-[0.14em] uppercase">
-        <span
-          aria-hidden="true"
-          className="size-1.5 animate-pulse-dot rounded-full bg-primary"
-        />
-        <span className="text-primary-text">Your move</span>
-      </p>
-
-      <h2
-        id="pay-now-heading"
-        className="mt-2.5 font-display text-lg leading-snug font-bold text-fg sm:text-xl"
-      >
-        {mode === "SAFEST" ? "Pay the admin fee to begin" : "Pay to begin"}
-      </h2>
-
-      <p className="mt-2 max-w-[62ch] text-[0.9375rem] leading-relaxed text-muted">
+  const body = (
+    <>
+      <p className="max-w-[62ch] text-[0.8125rem] leading-relaxed text-muted">
         {mode === "SAFEST" ? (
           <>
             This is our fee only. Once our agent owns the channel you will pay
-            the seller <Price usd={priceUsd / 100} className="text-fg" />{" "}
+            the seller{" "}
+            <Price usd={priceUsd / 100} className="font-medium text-fg" />{" "}
             directly, and we will tell you when.
           </>
         ) : (
@@ -80,25 +72,24 @@ export function PayNow({
         )}
       </p>
 
-      <div className="mt-4 flex items-baseline gap-2.5 border-y border-primary/25 py-3.5">
-        <span className="text-xs font-medium tracking-wide text-muted uppercase">
-          You pay now
-        </span>
+      <div className="mt-4 flex items-baseline justify-between gap-3 border-y border-line py-3">
+        <span className="text-[0.8125rem] text-muted">You pay now</span>
         <Price
           usd={totalUsd / 100}
-          className="ml-auto font-display text-2xl font-black text-fg sm:text-[1.75rem]"
+          className="text-xl leading-7 font-semibold tracking-[-0.015em] text-fg"
         />
       </div>
 
-      <div className="mt-4 flex flex-col gap-2.5 sm:flex-row sm:flex-wrap">
+      <div className="mt-4 flex flex-col gap-2 @sm:flex-row @sm:flex-wrap">
         {canUseBalance ? (
           <Button
             type="button"
-            size="lg"
+            size="md"
             disabled={pending}
             onClick={() => {
               setError(null);
               setManual(false);
+              setVia("balance");
               startTransition(async () => {
                 const result = await payDealFromWallet(orderId);
                 if (!result.ok) {
@@ -109,26 +100,22 @@ export function PayNow({
               });
             }}
           >
-            {pending ? (
-              <LoaderCircleIcon
-                aria-hidden="true"
-                className="size-4 animate-spin"
-              />
-            ) : (
-              <WalletIcon aria-hidden="true" className="size-4" />
-            )}
-            {pending ? "Paying…" : "Pay from your balance"}
+            <BusyLabel busy={pending && via === "balance"} busyText="Paying…">
+              <WalletIcon aria-hidden="true" />
+              Pay from your balance
+            </BusyLabel>
           </Button>
         ) : null}
 
         <Button
           type="button"
-          size="lg"
+          size="md"
           variant={canUseBalance ? "secondary" : "primary"}
           disabled={pending}
           onClick={() => {
             setError(null);
             setManual(false);
+            setVia("crypto");
             startTransition(async () => {
               const result = await startPayment(orderId);
               if (!result.ok) {
@@ -144,26 +131,41 @@ export function PayNow({
             });
           }}
         >
-          {pending ? (
-            <LoaderCircleIcon
-              aria-hidden="true"
-              className="size-4 animate-spin"
-            />
-          ) : (
-            <CreditCardIcon aria-hidden="true" className="size-4" />
-          )}
-          {pending ? "Opening…" : "Pay with crypto"}
+          <BusyLabel busy={pending && via === "crypto"} busyText="Opening…">
+            <CreditCardIcon aria-hidden="true" />
+            Pay with crypto
+          </BusyLabel>
         </Button>
       </div>
 
       {error ? (
         <p
           role={manual ? "status" : "alert"}
-          className={`mt-3.5 max-w-[62ch] text-sm leading-relaxed ${manual ? "text-muted" : "font-medium text-danger"}`}
+          className={cn(
+            "mt-3 max-w-[62ch] text-[0.8125rem] leading-relaxed",
+            manual ? "text-muted" : "font-medium text-danger",
+          )}
         >
           {error}
         </p>
       ) : null}
-    </section>
+    </>
+  );
+
+  if (inline) return <div className="@container">{body}</div>;
+
+  return (
+    <Card className="@container">
+      <section aria-labelledby="pay-now-heading" className="p-4 sm:p-5">
+        <TurnFlag mine />
+        <h2
+          id="pay-now-heading"
+          className="mt-2.5 text-[0.9375rem] leading-6 font-semibold text-fg"
+        >
+          {mode === "SAFEST" ? "Pay the admin fee to begin" : "Pay to begin"}
+        </h2>
+        <div className="mt-1.5">{body}</div>
+      </section>
+    </Card>
   );
 }
