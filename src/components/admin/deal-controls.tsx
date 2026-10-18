@@ -15,6 +15,7 @@ import { TextArea, TextField } from "@/components/auth/fields";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { DealMode, OrderStatus } from "@/generated/prisma/enums";
+import { movesHeldMoney } from "@/lib/outcomes";
 import { cn } from "@/lib/utils";
 import {
   assignDealAgent,
@@ -738,7 +739,13 @@ export function EndDeal({
           ).map((ending) => {
             const active = choice === ending.to;
             const reachable = ending.applies?.(mode) ?? true;
-            const tag = WEIGHT_TAG[ending.weight];
+            // The server's rule: handing held money back is a refund
+            // whatever it is called, in either mode.
+            const movesMoney = movesHeldMoney(ending.to, paid === true);
+            const tag =
+              movesMoney && ending.weight === "final"
+                ? WEIGHT_TAG.money
+                : WEIGHT_TAG[ending.weight];
             return (
               <label
                 key={ending.to}
@@ -777,14 +784,8 @@ export function EndDeal({
                     {!reachable ? (
                       <Badge variant="neutral">Not this mode</Badge>
                     ) : null}
-                    {/* The same rule as movesPlatformMoney on the server:
-                        handing held money back is a refund whatever it is
-                        called, in either mode. */}
                     {!canMoveMoney &&
-                    (ending.weight === "money" ||
-                      ((ending.to === "CANCELLED" ||
-                        ending.to === "RETURNED_TO_SELLER") &&
-                        paid === true)) ? (
+                    (ending.weight === "money" || movesMoney) ? (
                       <Badge variant="neutral">Finance only</Badge>
                     ) : null}
                   </span>

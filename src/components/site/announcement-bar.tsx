@@ -17,7 +17,8 @@ export function AnnouncementBar() {
         <p className="text-[0.8125rem] leading-snug text-muted">
           Every deal is supervised by a Channel Adda agent.{" "}
           <span className="text-fg">
-            We hold the money, or we hold the account — you choose which.
+            You pay Channel Adda, never the seller — and on a Safest deal we
+            hold the account too.
           </span>
         </p>
       </div>

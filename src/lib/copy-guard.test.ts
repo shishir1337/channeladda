@@ -24,6 +24,7 @@ const BANNED: readonly RegExp[] = [
   /price never (passes|passed|reaches|touches)/i,
   /buyer pays the seller/i,
   /pays you directly/i,
+  /we hold the money, or we hold the account/i,
 ];
 
 const ROOT = join(__dirname, "..");

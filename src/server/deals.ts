@@ -17,6 +17,7 @@ import {
 } from "@/lib/deal-templates";
 import { orderAmounts } from "@/lib/fees";
 import { keptFee, requiredHold } from "@/lib/holds";
+import { movesHeldMoney } from "@/lib/outcomes";
 import { isSerializationFailure } from "@/lib/serialization-failure";
 import { keyFromUrl } from "@/lib/upload-keys";
 import { recordAudit } from "@/server/audit";
@@ -1709,14 +1710,9 @@ async function expireStale(scope: { listingId?: string }): Promise<number> {
  */
 function movesPlatformMoney(
   to: string,
-  order: { mode: string; paymentRef: string | null },
+  order: { paymentRef: string | null },
 ): boolean {
-  if (to === "COMPLETED" || to === "REFUNDED") return true;
-  // Both now hand back held money, in either mode, once anything was paid.
-  if (to === "CANCELLED" || to === "RETURNED_TO_SELLER") {
-    return order.paymentRef !== null;
-  }
-  return false;
+  return movesHeldMoney(to, order.paymentRef !== null);
 }
 
 export async function resolveDeal(input: {
