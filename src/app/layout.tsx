@@ -77,7 +77,13 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       suppressHydrationWarning
       className={`${inter.variable} ${spaceGrotesk.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
-      <body className="flex min-h-full flex-col bg-bg text-fg">
+      {/* Browser extensions write attributes onto <body> before React loads
+          (ColorZilla adds cz-shortcut-listen, Grammarly its own). Only this
+          element's attributes are excused — a mismatch inside it still shows. */}
+      <body
+        suppressHydrationWarning
+        className="flex min-h-full flex-col bg-bg text-fg"
+      >
         <AppProviders>{children}</AppProviders>
       </body>
     </html>
