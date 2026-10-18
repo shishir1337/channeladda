@@ -1,6 +1,7 @@
 import { CheckCircle2Icon, MailWarningIcon } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { IconTile } from "@/components/app/kit";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { ResendVerification } from "@/components/auth/resend-verification";
 import { Button } from "@/components/ui/button";
@@ -32,19 +33,17 @@ export default async function VerifyEmailPage({
         title="Email confirmed"
         description="That is everything. Your account is ready to use."
       >
-        <div className="rounded-panel border border-verified/30 bg-verified-soft p-6">
-          <span className="flex size-12 items-center justify-center rounded-xl bg-surface text-verified">
-            <CheckCircle2Icon aria-hidden="true" className="size-6" />
-          </span>
-          <h2 className="mt-5 font-display text-lg font-bold">
+        <div className="rounded-card border border-line bg-surface p-5 shadow-xs">
+          <IconTile icon={CheckCircle2Icon} tone="verified" size="lg" />
+          <h2 className="mt-4 text-[0.9375rem] font-semibold text-fg">
             You are all set
           </h2>
-          <p className="mt-2.5 text-sm leading-relaxed text-muted">
+          <p className="mt-1 text-sm leading-relaxed text-muted">
             You can save listings, send offers and message sellers straight
             away. Identity checks only come in before a seller&apos;s first
             listing goes live.
           </p>
-          <div className="mt-6 flex flex-wrap gap-3">
+          <div className="mt-5 flex flex-wrap gap-2">
             <Button asChild size="md">
               <Link href="/browse">Browse accounts</Link>
             </Button>
@@ -70,21 +69,19 @@ export default async function VerifyEmailPage({
           Wrong address?{" "}
           <Link
             href="/signup"
-            className="font-medium text-primary-text underline-offset-4 hover:underline"
+            className="font-medium text-fg underline decoration-line-strong underline-offset-4 transition-colors hover:decoration-fg"
           >
             Sign up again
           </Link>
         </p>
       }
     >
-      <div className="rounded-panel border border-line bg-surface p-6">
-        <span className="flex size-12 items-center justify-center rounded-xl bg-primary-soft text-primary-text">
-          <MailWarningIcon aria-hidden="true" className="size-6" />
-        </span>
-        <h2 className="mt-5 font-display text-lg font-bold">
+      <div className="rounded-card border border-line bg-surface p-5 shadow-xs">
+        <IconTile icon={MailWarningIcon} tone="primary" size="lg" />
+        <h2 className="mt-4 text-[0.9375rem] font-semibold text-fg">
           {expired ? "Request a new link" : "Nothing in your inbox?"}
         </h2>
-        <p className="mt-2.5 text-sm leading-relaxed text-muted">
+        <p className="mt-1 text-sm leading-relaxed text-muted">
           Check your spam folder first — verification mail sometimes lands
           there. If it is genuinely missing, we can send another.
         </p>

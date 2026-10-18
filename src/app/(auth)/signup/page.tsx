@@ -2,7 +2,11 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { SignUpForm } from "@/components/auth/auth-forms";
 import { AuthShell } from "@/components/auth/auth-shell";
-import { AuthDivider, GoogleButton } from "@/components/auth/google-button";
+import {
+  AuthDivider,
+  GoogleButton,
+  GoogleOffNote,
+} from "@/components/auth/google-button";
 import { isGoogleEnabled } from "@/lib/auth";
 
 export const metadata: Metadata = {
@@ -16,13 +20,13 @@ export default function SignUpPage() {
   return (
     <AuthShell
       title="Create your account"
-      description="Free, and it takes about fifteen seconds. You only need an email address to browse, save listings and send offers."
+      description="Free, and about fifteen seconds. An email is all you need."
       footer={
         <p>
           Already have an account?{" "}
           <Link
             href="/signin"
-            className="font-medium text-primary-text underline-offset-4 hover:underline"
+            className="font-medium text-fg underline decoration-line-strong underline-offset-4 transition-colors hover:decoration-fg"
           >
             Sign in
           </Link>
@@ -34,7 +38,9 @@ export default function SignUpPage() {
           <GoogleButton label="Sign up with Google" />
           <AuthDivider />
         </>
-      ) : null}
+      ) : (
+        <GoogleOffNote />
+      )}
       <SignUpForm />
     </AuthShell>
   );

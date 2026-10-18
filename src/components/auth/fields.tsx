@@ -76,24 +76,32 @@ export function PasswordField({
   label,
   hint,
   error,
+  aside,
   ...props
 }: {
   id: string;
   label: string;
   hint?: string;
   error?: string;
+  /** Beside the label, on the right — "Forgot password?". */
+  aside?: React.ReactNode;
 } & InputHTMLAttributes<HTMLInputElement>) {
   const [shown, setShown] = useState(false);
 
   return (
     <div>
-      <label
-        htmlFor={id}
-        className="block text-sm font-medium text-fg app:text-[0.8125rem]"
-      >
-        {label}
-        {props.required ? <span className="ml-0.5 text-danger">*</span> : null}
-      </label>
+      <div className="flex items-baseline justify-between gap-3">
+        <label
+          htmlFor={id}
+          className="block text-sm font-medium text-fg app:text-[0.8125rem]"
+        >
+          {label}
+          {props.required ? (
+            <span className="ml-0.5 text-danger">*</span>
+          ) : null}
+        </label>
+        {aside}
+      </div>
       {hint ? (
         <p
           id={`${id}-hint`}

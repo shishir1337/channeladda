@@ -54,7 +54,7 @@ export default async function InvitePage({
             Already have an account?{" "}
             <Link
               href="/signin"
-              className="font-medium text-primary-text underline-offset-4 hover:underline"
+              className="font-medium text-fg underline decoration-line-strong underline-offset-4 transition-colors hover:decoration-fg"
             >
               Sign in
             </Link>

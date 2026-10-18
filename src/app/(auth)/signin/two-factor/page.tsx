@@ -30,7 +30,7 @@ export default async function TwoFactorPage({
           Locked out?{" "}
           <Link
             href="/support?topic=account"
-            className="font-medium text-primary-text underline-offset-4 hover:underline"
+            className="font-medium text-fg underline decoration-line-strong underline-offset-4 transition-colors hover:decoration-fg"
           >
             Contact support
           </Link>{" "}

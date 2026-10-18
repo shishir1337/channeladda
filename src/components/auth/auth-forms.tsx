@@ -4,6 +4,7 @@ import { CheckCircle2Icon, MailCheckIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
+import { IconTile } from "@/components/app/kit";
 import { FormNotice, PasswordField, TextField } from "@/components/auth/fields";
 import { Button } from "@/components/ui/button";
 import { authClient, signIn, signUp } from "@/lib/auth-client";
@@ -85,7 +86,7 @@ export function SignInForm({ next }: { next?: string }) {
     >
       {errors.form ? <FormNotice>{errors.form}</FormNotice> : null}
 
-      <div className="flex flex-col gap-5">
+      <div className="flex flex-col gap-4">
         <TextField
           id={emailId}
           name="email"
@@ -96,29 +97,29 @@ export function SignInForm({ next }: { next?: string }) {
           error={errors.email}
           required
         />
-        <div>
-          <PasswordField
-            id={pwId}
-            name="password"
-            label="Password"
-            autoComplete="current-password"
-            placeholder="••••••••"
-            error={errors.password}
-            required
-          />
-          <Link
-            href="/forgot-password"
-            className="mt-2 inline-flex min-h-9 items-center text-sm text-primary-text underline-offset-4 hover:underline"
-          >
-            Forgot your password?
-          </Link>
-        </div>
+        <PasswordField
+          id={pwId}
+          name="password"
+          label="Password"
+          autoComplete="current-password"
+          placeholder="••••••••"
+          error={errors.password}
+          required
+          aside={
+            <Link
+              href="/forgot-password"
+              className="-my-3 inline-flex min-h-11 items-center rounded-md text-[0.8125rem] text-muted transition-colors hover:text-fg pointer-fine:-my-1 pointer-fine:min-h-6"
+            >
+              Forgot password?
+            </Link>
+          }
+        />
       </div>
 
       <Button
         type="submit"
         size="lg"
-        className="mt-7 w-full"
+        className="mt-6 w-full"
         disabled={pending}
       >
         {pending ? "Signing in…" : "Sign in"}
@@ -181,7 +182,7 @@ export function SignUpForm() {
     >
       {errors.form ? <FormNotice>{errors.form}</FormNotice> : null}
 
-      <div className="flex flex-col gap-5">
+      <div className="flex flex-col gap-4">
         <TextField
           id={nameId}
           name="name"
@@ -217,7 +218,7 @@ export function SignUpForm() {
         <div>
           <label
             htmlFor={termsId}
-            className="flex cursor-pointer items-start gap-3 text-sm text-muted"
+            className="flex cursor-pointer items-start gap-2.5 text-[0.8125rem] leading-5 text-muted"
           >
             <input
               id={termsId}
@@ -225,20 +226,20 @@ export function SignUpForm() {
               type="checkbox"
               aria-invalid={Boolean(errors.terms)}
               aria-describedby={errors.terms ? `${termsId}-error` : undefined}
-              className="mt-0.5 size-4 shrink-0 cursor-pointer accent-primary"
+              className="mt-0.5 size-4 shrink-0 cursor-pointer rounded accent-fg"
             />
             <span>
               I agree to the{" "}
               <Link
                 href="/terms"
-                className="text-primary-text underline-offset-4 hover:underline"
+                className="font-medium text-fg underline decoration-line-strong underline-offset-4 transition-colors hover:decoration-fg"
               >
                 terms of service
               </Link>{" "}
               and{" "}
               <Link
                 href="/privacy"
-                className="text-primary-text underline-offset-4 hover:underline"
+                className="font-medium text-fg underline decoration-line-strong underline-offset-4 transition-colors hover:decoration-fg"
               >
                 privacy policy
               </Link>
@@ -249,7 +250,7 @@ export function SignUpForm() {
             <p
               id={`${termsId}-error`}
               role="alert"
-              className="mt-2 text-sm text-danger"
+              className="mt-1.5 text-[0.8125rem] text-danger"
             >
               {errors.terms}
             </p>
@@ -260,12 +261,12 @@ export function SignUpForm() {
       <Button
         type="submit"
         size="lg"
-        className="mt-7 w-full"
+        className="mt-6 w-full"
         disabled={pending}
       >
         {pending ? "Creating account…" : "Create account"}
       </Button>
-      <p className="mt-3 text-center text-xs text-subtle">
+      <p className="mt-3 text-center text-xs leading-relaxed text-subtle">
         No documents needed. Identity checks only apply before a seller&apos;s
         first listing goes live.
       </p>
@@ -281,14 +282,12 @@ export function ForgotPasswordForm() {
 
   if (sentTo) {
     return (
-      <div className="rounded-panel border border-verified/30 bg-verified-soft p-6">
-        <span className="flex size-12 items-center justify-center rounded-xl bg-surface text-verified">
-          <MailCheckIcon aria-hidden="true" className="size-6" />
-        </span>
-        <h2 className="mt-5 font-display text-lg font-bold">
+      <div className="rounded-card border border-line bg-surface p-5 shadow-xs">
+        <IconTile icon={MailCheckIcon} tone="verified" size="lg" />
+        <h2 className="mt-4 text-[0.9375rem] font-semibold text-fg">
           Check your inbox
         </h2>
-        <p className="mt-2.5 text-sm leading-relaxed text-muted">
+        <p className="mt-1 text-sm leading-relaxed text-muted">
           If an account exists for{" "}
           <span className="font-medium text-fg">{sentTo}</span>, a reset link is
           on its way. It expires in one hour.
@@ -296,7 +295,7 @@ export function ForgotPasswordForm() {
         <Button
           variant="secondary"
           size="md"
-          className="mt-6"
+          className="mt-5"
           onClick={() => setSentTo(null)}
         >
           Use a different email
@@ -347,7 +346,7 @@ export function ForgotPasswordForm() {
       <Button
         type="submit"
         size="lg"
-        className="mt-7 w-full"
+        className="mt-6 w-full"
         disabled={pending}
       >
         {pending ? "Sending…" : "Send reset link"}
@@ -374,17 +373,15 @@ export function ResetPasswordForm({ token }: { token?: string }) {
 
   if (done) {
     return (
-      <div className="rounded-panel border border-verified/30 bg-verified-soft p-6">
-        <span className="flex size-12 items-center justify-center rounded-xl bg-surface text-verified">
-          <CheckCircle2Icon aria-hidden="true" className="size-6" />
-        </span>
-        <h2 className="mt-5 font-display text-lg font-bold">
+      <div className="rounded-card border border-line bg-surface p-5 shadow-xs">
+        <IconTile icon={CheckCircle2Icon} tone="verified" size="lg" />
+        <h2 className="mt-4 text-[0.9375rem] font-semibold text-fg">
           Password updated
         </h2>
-        <p className="mt-2.5 text-sm leading-relaxed text-muted">
+        <p className="mt-1 text-sm leading-relaxed text-muted">
           Every other session has been signed out.
         </p>
-        <Button asChild size="md" className="mt-6">
+        <Button asChild size="md" className="mt-5">
           <Link href="/signin">Sign in</Link>
         </Button>
       </div>
@@ -428,7 +425,7 @@ export function ResetPasswordForm({ token }: { token?: string }) {
       }}
     >
       {errors.form ? <FormNotice>{errors.form}</FormNotice> : null}
-      <div className="flex flex-col gap-5">
+      <div className="flex flex-col gap-4">
         <PasswordField
           id={pwId}
           name="password"
@@ -452,7 +449,7 @@ export function ResetPasswordForm({ token }: { token?: string }) {
       <Button
         type="submit"
         size="lg"
-        className="mt-7 w-full"
+        className="mt-6 w-full"
         disabled={pending}
       >
         {pending ? "Updating…" : "Update password"}

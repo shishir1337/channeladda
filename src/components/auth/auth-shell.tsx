@@ -1,8 +1,9 @@
 import {
-  ArrowLeftIcon,
+  ArrowUpRightIcon,
   BadgeCheckIcon,
-  LockIcon,
-  UsersIcon,
+  CheckIcon,
+  ShieldCheckIcon,
+  StarIcon,
 } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -11,26 +12,30 @@ import { getPlatformCounts } from "@/server/listings";
 import { getSiteStats } from "@/server/sellers";
 
 const trustPoints = [
-  {
-    icon: LockIcon,
-    title: "Your money is never at risk",
-    body: "Every deal is held open by us: either the account sits with one of our agents, or your payment does. A transfer that fails leaves you no worse off.",
-  },
-  {
-    icon: BadgeCheckIcon,
-    title: "Ownership checked before listing",
-    body: "Sellers prove control with a live code check, not a screenshot. Every listing is reviewed by a human.",
-  },
-  {
-    icon: UsersIcon,
-    title: "Ratings that cannot be bought",
-    body: "A review can only be written by a buyer whose deal actually completed.",
-  },
+  { icon: ShieldCheckIcon, label: "Agent-held deals" },
+  { icon: BadgeCheckIcon, label: "Ownership checked" },
+  { icon: StarIcon, label: "Reviews from real buyers" },
 ];
 
 /**
- * Split layout for every auth screen: the form on the left, and the reasons to
- * trust us on the right where a first-time visitor will actually read them.
+ * How a Safest deal moves, drawn rather than described. Decorative: it is the
+ * shape of the product, not anybody's deal.
+ */
+const glimpse = [
+  { label: "Admin fee paid", state: "done" },
+  { label: "Agent holds the channel", state: "done" },
+  { label: "Buyer pays the seller", state: "now" },
+  { label: "Ownership handed over", state: "next" },
+] as const;
+
+/**
+ * Every auth screen: the form on the left, quiet and centred; on a wide
+ * screen a dark panel that says what makes the place safe in a line and a
+ * picture instead of three paragraphs.
+ *
+ * Rendered with `data-app`, so these pages share the dashboard's palette,
+ * type and control sizes — signing in should feel like the first screen of
+ * the tool, not the last page of the brochure.
  */
 export async function AuthShell({
   title,
@@ -55,92 +60,182 @@ export async function AuthShell({
     liveListings = Object.values(counts).reduce((a, b) => a + b, 0);
     transfers = stats.transfers;
   } catch {
-    // leave both at zero; the block below is skipped
+    // leave both at zero; the figures below are skipped
   }
 
   return (
-    <div className="flex min-h-dvh flex-col lg:grid lg:grid-cols-2">
-      <div className="flex flex-1 flex-col px-5 py-8 sm:px-8 sm:py-10">
-        <div className="flex items-center justify-between gap-4">
+    <div
+      data-app=""
+      className="min-h-dvh bg-bg lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]"
+    >
+      <div className="flex min-h-dvh flex-col px-5 py-4 sm:px-8 sm:py-6">
+        <header className="flex items-center justify-between gap-4">
           <Link
             href="/"
-            className="flex min-h-11 items-center gap-2.5 rounded-lg"
+            className="flex min-h-11 items-center gap-2 rounded-md"
             aria-label="Channel Adda home"
           >
-            <ChannelAddaLogo className="size-8" />
-            <span className="font-display text-lg font-bold tracking-tight">
-              Channel <span className="text-primary-text">Adda</span>
+            <ChannelAddaLogo className="size-7" />
+            <span className="text-[0.9375rem] font-semibold tracking-[-0.01em] text-fg">
+              Channel Adda
             </span>
           </Link>
           <Link
             href="/browse"
-            className="inline-flex min-h-11 items-center gap-1.5 rounded-lg px-2 text-sm text-muted transition-colors hover:text-fg"
+            className="group inline-flex min-h-11 items-center gap-1 rounded-md px-1 text-[0.8125rem] text-muted transition-colors hover:text-fg"
           >
-            <ArrowLeftIcon aria-hidden="true" className="size-4" />
             Back to marketplace
+            <ArrowUpRightIcon
+              aria-hidden="true"
+              className="size-3.5 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
+            />
           </Link>
-        </div>
+        </header>
 
         <main
           id="main"
-          className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center py-10"
+          className="mx-auto flex w-full max-w-[23rem] flex-1 animate-app-in flex-col justify-center py-12"
         >
-          <h1 className="font-display text-[1.75rem] leading-tight font-bold sm:text-[2rem]">
+          <h1 className="text-2xl leading-8 font-semibold tracking-[-0.022em] text-fg">
             {title}
           </h1>
-          <div className="mt-3 text-[0.9375rem] leading-relaxed text-muted">
+          <div className="mt-1.5 text-sm leading-relaxed text-muted">
             {description}
           </div>
 
           <div className="mt-8">{children}</div>
 
           {footer ? (
-            <div className="mt-8 border-t border-line pt-6 text-sm text-muted">
+            <div className="mt-8 text-center text-[0.8125rem] leading-relaxed text-muted">
               {footer}
             </div>
           ) : null}
         </main>
+
+        <footer className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs text-subtle lg:justify-start">
+          <span>© Channel Adda</span>
+          <Link href="/terms" className="transition-colors hover:text-fg">
+            Terms
+          </Link>
+          <Link href="/privacy" className="transition-colors hover:text-fg">
+            Privacy
+          </Link>
+        </footer>
       </div>
 
-      {/* Reassurance panel. Hidden on small screens where the form matters more. */}
-      <aside className="hidden border-l border-line bg-bg-subtle lg:flex lg:flex-col lg:justify-center lg:px-12 xl:px-16">
-        <p className="text-xs font-semibold tracking-[0.14em] text-primary-text uppercase">
-          Why people trade here
-        </p>
-        <ul className="mt-8 flex flex-col gap-8">
-          {trustPoints.map((point) => (
-            <li key={point.title} className="flex gap-4">
-              <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary-soft text-primary-text">
-                <point.icon aria-hidden="true" className="size-5" />
-              </span>
-              <div>
-                <h2 className="font-display text-base font-semibold">
-                  {point.title}
-                </h2>
-                <p className="mt-1.5 max-w-sm text-sm leading-relaxed text-muted">
-                  {point.body}
-                </p>
-              </div>
-            </li>
-          ))}
-        </ul>
+      {/* The panel. Dark in both themes — it is the brand, not the page. */}
+      <aside
+        aria-label="Why people trade on Channel Adda"
+        className="relative m-3 hidden flex-col justify-between overflow-hidden rounded-2xl bg-[#0d0d10] p-10 text-white ring-1 ring-black/5 lg:flex xl:p-14 dark:bg-[#111114] dark:ring-white/[0.07]"
+      >
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute -top-40 -right-32 size-[34rem] rounded-full bg-[radial-gradient(closest-side,rgb(255_176_32/0.22),transparent)]"
+        />
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute -bottom-48 -left-40 size-[30rem] rounded-full bg-[radial-gradient(closest-side,rgb(255_255_255/0.06),transparent)]"
+        />
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 [background-image:linear-gradient(to_right,rgb(255_255_255/0.035)_1px,transparent_1px),linear-gradient(to_bottom,rgb(255_255_255/0.035)_1px,transparent_1px)] [background-size:48px_48px] [mask-image:radial-gradient(ellipse_at_center,black_30%,transparent_75%)]"
+        />
 
-        {liveListings > 0 ? (
-          <dl className="mt-12 flex gap-10 border-t border-line pt-8">
-            <div>
-              <dt className="text-xs text-subtle">Live listings</dt>
-              <dd className="tnum mt-1 font-display text-xl font-bold">
-                {liveListings.toLocaleString("en-US")}
-              </dd>
+        <p className="relative inline-flex w-fit items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-xs font-medium text-white/70">
+          <ShieldCheckIcon
+            aria-hidden="true"
+            className="size-3.5 text-primary"
+          />
+          The supervised marketplace
+        </p>
+
+        <div className="relative">
+          <h2 className="max-w-[18ch] text-[2rem] leading-[1.15] font-semibold tracking-[-0.025em] text-white">
+            We hold the money, or we hold the account.
+          </h2>
+          <p className="mt-3 max-w-[38ch] text-sm leading-relaxed text-white/55">
+            Until the handover is confirmed, neither side has to trust a
+            stranger.
+          </p>
+
+          <div className="mt-10 max-w-sm rounded-xl border border-white/10 bg-white/[0.04] p-5 shadow-[0_24px_60px_-24px_rgb(0_0_0/0.8)] backdrop-blur-sm">
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-medium text-white/80">Safest deal</span>
+              <span className="text-white/45 tabular-nums">Step 3 of 4</span>
             </div>
-            <div>
-              <dt className="text-xs text-subtle">Transfers completed</dt>
-              <dd className="tnum mt-1 font-display text-xl font-bold">
-                {transfers.toLocaleString("en-US")}
-              </dd>
+            <div
+              aria-hidden="true"
+              className="mt-3 h-1 overflow-hidden rounded-full bg-white/10"
+            >
+              <div className="h-full w-[62%] rounded-full bg-primary" />
             </div>
-          </dl>
-        ) : null}
+            <ol className="mt-4 flex flex-col gap-3">
+              {glimpse.map((step) => (
+                <li key={step.label} className="flex items-center gap-3">
+                  {step.state === "done" ? (
+                    <span className="inline-flex size-5 items-center justify-center rounded-full bg-white/10 text-white/80">
+                      <CheckIcon
+                        aria-hidden="true"
+                        className="size-3"
+                        strokeWidth={3}
+                      />
+                    </span>
+                  ) : step.state === "now" ? (
+                    <span className="inline-flex size-5 items-center justify-center rounded-full ring-2 ring-primary">
+                      <span className="size-1.5 animate-pulse-dot rounded-full bg-primary" />
+                    </span>
+                  ) : (
+                    <span className="size-5 rounded-full ring-1 ring-white/20" />
+                  )}
+                  <span
+                    className={
+                      step.state === "next"
+                        ? "text-sm text-white/40"
+                        : step.state === "now"
+                          ? "text-sm font-medium text-white"
+                          : "text-sm text-white/60"
+                    }
+                  >
+                    {step.label}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          </div>
+        </div>
+
+        <div className="relative flex flex-col gap-6">
+          <ul className="flex flex-wrap gap-2">
+            {trustPoints.map((point) => (
+              <li
+                key={point.label}
+                className="inline-flex items-center gap-1.5 rounded-full border border-white/10 px-3 py-1.5 text-xs text-white/70"
+              >
+                <point.icon
+                  aria-hidden="true"
+                  className="size-3.5 text-white/50"
+                />
+                {point.label}
+              </li>
+            ))}
+          </ul>
+          {liveListings > 0 ? (
+            <dl className="flex gap-10 border-t border-white/10 pt-6">
+              <div>
+                <dt className="text-xs text-white/45">Live listings</dt>
+                <dd className="mt-1 text-xl font-semibold text-white tabular-nums">
+                  {liveListings.toLocaleString("en-US")}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-white/45">Transfers completed</dt>
+                <dd className="mt-1 text-xl font-semibold text-white tabular-nums">
+                  {transfers.toLocaleString("en-US")}
+                </dd>
+              </div>
+            </dl>
+          ) : null}
+        </div>
       </aside>
     </div>
   );

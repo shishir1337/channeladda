@@ -16,13 +16,13 @@ export default async function ResetPasswordPage({
   return (
     <AuthShell
       title="Choose a new password"
-      description="Pick something you have not used elsewhere. This account can hold money, so it is worth a strong one."
+      description="One you have not used anywhere else — this account can hold money."
       footer={
         <p>
           Link expired?{" "}
           <Link
             href="/forgot-password"
-            className="font-medium text-primary-text underline-offset-4 hover:underline"
+            className="font-medium text-fg underline decoration-line-strong underline-offset-4 transition-colors hover:decoration-fg"
           >
             Request a new one
           </Link>

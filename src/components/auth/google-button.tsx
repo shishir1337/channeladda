@@ -88,10 +88,26 @@ export function GoogleButton({
 /** The "or" rule between Google and the email form. */
 export function AuthDivider() {
   return (
-    <div className="my-5 flex items-center gap-3">
+    <div className="my-6 flex items-center gap-3">
       <span aria-hidden="true" className="h-px flex-1 bg-line" />
-      <span className="text-xs text-subtle">or</span>
+      <span className="text-xs text-subtle">or with email</span>
       <span aria-hidden="true" className="h-px flex-1 bg-line" />
     </div>
+  );
+}
+
+/**
+ * Said only on a development server, where the missing button is otherwise a
+ * mystery: production keeps the rule above — no button that cannot finish.
+ */
+export function GoogleOffNote() {
+  if (process.env.NODE_ENV === "production") return null;
+  return (
+    <p className="mb-6 rounded-lg border border-dashed border-line-strong px-3 py-2.5 text-xs leading-relaxed text-subtle">
+      Google sign-in is off on this server. Set{" "}
+      <code className="font-mono text-muted">GOOGLE_CLIENT_ID</code> and{" "}
+      <code className="font-mono text-muted">GOOGLE_CLIENT_SECRET</code> to show
+      it.
+    </p>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { inputClass, labelClass } from "@/components/app/kit";
 import { Button } from "@/components/ui/button";
 import { authClient } from "@/lib/auth-client";
 
@@ -19,20 +20,17 @@ export function ResendVerification({ email }: { email?: string }) {
 
   if (state === "sent") {
     return (
-      <output className="mt-6 block text-sm text-verified">
+      <output className="mt-5 block text-sm text-verified">
         Sent. If that address has an unverified account, the link is on its way.
       </output>
     );
   }
 
   return (
-    <div className="mt-6 flex flex-col gap-3">
+    <div className="mt-5 flex flex-col gap-3">
       {!email ? (
         <div>
-          <label
-            htmlFor={inputId}
-            className="block text-sm font-medium text-fg"
-          >
+          <label htmlFor={inputId} className={labelClass}>
             Your email
           </label>
           <input
@@ -41,7 +39,7 @@ export function ResendVerification({ email }: { email?: string }) {
             value={address}
             onChange={(e) => setAddress(e.target.value)}
             placeholder="you@example.com"
-            className="mt-2 h-12 w-full rounded-xl border border-line bg-surface-2 px-3.5 text-base text-fg placeholder:text-subtle focus:border-primary/60 focus:outline-none sm:text-[0.9375rem]"
+            className={`mt-1.5 ${inputClass}`}
           />
         </div>
       ) : null}
@@ -63,7 +61,7 @@ export function ResendVerification({ email }: { email?: string }) {
       </Button>
 
       {state === "failed" ? (
-        <p role="alert" className="text-sm text-danger">
+        <p role="alert" className="text-[0.8125rem] text-danger">
           Could not send it just now. Wait a moment and try again.
         </p>
       ) : null}

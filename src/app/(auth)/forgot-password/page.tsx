@@ -13,13 +13,13 @@ export default function ForgotPasswordPage() {
   return (
     <AuthShell
       title="Reset your password"
-      description="Enter the email you signed up with and we will send you a link. It expires in one hour."
+      description="We will email you a link. It expires in one hour."
       footer={
         <p>
           Remembered it?{" "}
           <Link
             href="/signin"
-            className="font-medium text-primary-text underline-offset-4 hover:underline"
+            className="font-medium text-fg underline decoration-line-strong underline-offset-4 transition-colors hover:decoration-fg"
           >
             Back to sign in
           </Link>

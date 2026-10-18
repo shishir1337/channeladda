@@ -1,8 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Callout } from "@/components/app/kit";
 import { SignInForm } from "@/components/auth/auth-forms";
 import { AuthShell } from "@/components/auth/auth-shell";
-import { AuthDivider, GoogleButton } from "@/components/auth/google-button";
+import {
+  AuthDivider,
+  GoogleButton,
+  GoogleOffNote,
+} from "@/components/auth/google-button";
 import { isGoogleEnabled } from "@/lib/auth";
 
 export const metadata: Metadata = {
@@ -26,7 +31,7 @@ export default async function SignInPage({
           New to Channel Adda?{" "}
           <Link
             href="/signup"
-            className="font-medium text-primary-text underline-offset-4 hover:underline"
+            className="font-medium text-fg underline decoration-line-strong underline-offset-4 transition-colors hover:decoration-fg"
           >
             Create a free account
           </Link>
@@ -34,13 +39,15 @@ export default async function SignInPage({
       }
     >
       {error === "google" ? (
-        <p
+        <Callout
+          tone="danger"
           role="alert"
-          className="mb-4 rounded-xl border border-danger/30 bg-danger-soft px-4 py-3 text-sm text-fg"
+          title="Google did not complete that sign-in."
+          className="mb-6"
         >
-          Google did not complete that sign-in. Nothing has changed on your
-          account — try again, or use your email and password below.
-        </p>
+          Nothing has changed on your account — try again, or use your email and
+          password below.
+        </Callout>
       ) : null}
 
       {isGoogleEnabled() ? (
@@ -48,7 +55,9 @@ export default async function SignInPage({
           <GoogleButton next={target} />
           <AuthDivider />
         </>
-      ) : null}
+      ) : (
+        <GoogleOffNote />
+      )}
 
       <SignInForm next={target} />
     </AuthShell>
