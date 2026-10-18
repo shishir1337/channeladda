@@ -715,7 +715,16 @@ export function Stat({
             className="size-3.5 shrink-0 text-subtle"
           />
         ) : null}
-        <span className="min-w-0">{label}</span>
+        <span
+          className={cn(
+            "min-w-0",
+            // Room for the tip that floats over a linked card, between the
+            // label and the arrow, so a long label wraps before it.
+            info && href && "mr-6",
+          )}
+        >
+          {label}
+        </span>
         {info && !href ? (
           <InfoTip
             label={`About ${typeof label === "string" ? label : "this figure"}`}
