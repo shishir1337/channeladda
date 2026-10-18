@@ -48,7 +48,7 @@ export default async function VerifyEmailPage({
               <Link href="/browse">Browse accounts</Link>
             </Button>
             <Button asChild variant="secondary" size="md">
-              <Link href="/sell">Create a listing</Link>
+              <Link href="/dashboard/listings/new">Create a listing</Link>
             </Button>
           </div>
         </div>

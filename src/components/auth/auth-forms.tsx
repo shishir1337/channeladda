@@ -8,6 +8,7 @@ import { IconTile } from "@/components/app/kit";
 import { FormNotice, PasswordField, TextField } from "@/components/auth/fields";
 import { Button } from "@/components/ui/button";
 import { authClient, signIn, signUp } from "@/lib/auth-client";
+import { safeNext } from "@/lib/safe-next";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -80,7 +81,9 @@ export function SignInForm({ next }: { next?: string }) {
         }
 
         // `refresh` so server components pick up the new session cookie.
-        router.push(next?.startsWith("/") ? next : "/");
+        // safeNext, not startsWith("/"): "//host" starts with a slash too,
+        // and is somebody else's site.
+        router.push(safeNext(next, "/"));
         router.refresh();
       }}
     >

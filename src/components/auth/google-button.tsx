@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { authClient } from "@/lib/auth-client";
+import { safeNext } from "@/lib/safe-next";
 
 /**
  * "Continue with Google".
@@ -59,7 +60,7 @@ export function GoogleButton({
           startTransition(async () => {
             const result = await authClient.signIn.social({
               provider: "google",
-              callbackURL: next ?? "/dashboard",
+              callbackURL: safeNext(next),
               // Somewhere to land that can say what went wrong, rather than
               // Google's own error page.
               errorCallbackURL: "/signin?error=google",

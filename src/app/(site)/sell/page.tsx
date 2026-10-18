@@ -57,7 +57,7 @@ export default async function SellPage() {
         description="List for free, put your account in front of active buyers, and let a supervised handover prove you are dealing with someone serious. We only earn when your deal completes."
         actions={
           <Button asChild size="lg">
-            <Link href="/signup">
+            <Link href="/signup?next=%2Fdashboard%2Flistings%2Fnew">
               Create a free listing
               <ArrowRightIcon aria-hidden="true" className="size-4" />
             </Link>
@@ -244,7 +244,7 @@ export default async function SellPage() {
               </p>
             </div>
             <Button asChild size="lg" className="shrink-0">
-              <Link href="/signup">
+              <Link href="/signup?next=%2Fdashboard%2Flistings%2Fnew">
                 Create a free listing
                 <ArrowRightIcon aria-hidden="true" className="size-4" />
               </Link>

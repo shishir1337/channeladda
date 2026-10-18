@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { SignUpForm } from "@/components/auth/auth-forms";
 import { AuthShell } from "@/components/auth/auth-shell";
 import {
@@ -8,6 +9,8 @@ import {
   GoogleOffNote,
 } from "@/components/auth/google-button";
 import { isGoogleEnabled } from "@/lib/auth";
+import { safeNext } from "@/lib/safe-next";
+import { getCurrentUser } from "@/server/session";
 
 export const metadata: Metadata = {
   title: "Create an account",
@@ -16,7 +19,17 @@ export const metadata: Metadata = {
   alternates: { canonical: "/signup" },
 };
 
-export default function SignUpPage() {
+export default async function SignUpPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  // Already signed in: there is nothing to sign up for. The marketing pages'
+  // "Create a free listing" buttons come here with ?next=, and a signed-in
+  // seller who pressed one was shown this form — a dead end.
+  const { next } = await searchParams;
+  if (await getCurrentUser()) redirect(safeNext(next));
+
   return (
     <AuthShell
       title="Create your account"

@@ -5,32 +5,7 @@ import { useId, useState, useTransition } from "react";
 import { TextField } from "@/components/auth/fields";
 import { Button } from "@/components/ui/button";
 import { authClient } from "@/lib/auth-client";
-
-/**
- * The second step of signing in.
- *
- * Reached only when the password was already right, so the only secret being
- * guessed here is the six-digit code — which is why the server locks the
- * account after ten wrong ones rather than relying on a rate limit.
- *
- * Backup codes are offered on the same screen rather than behind a "trouble
- * signing in?" link. Someone whose phone is lost or wiped is in exactly the
- * situation the codes exist for, and making them hunt for the option is how
- * people end up emailing support instead.
- */
-/**
- * Where it is safe to send somebody after they verify.
- *
- * Taken from the query string, so it is an open redirect unless it is
- * checked: "?next=https://evil.example" would hand a freshly authenticated
- * user to an attacker's page. "//evil.example" has to be refused too — a
- * browser reads it as protocol-relative to another host, which is exactly
- * what the looser check elsewhere in this codebase misses.
- */
-function safeNext(next: string): string {
-  if (!next.startsWith("/") || next.startsWith("//")) return "/dashboard";
-  return next;
-}
+import { safeNext } from "@/lib/safe-next";
 
 export function TwoFactorChallenge({ next }: { next: string }) {
   const router = useRouter();
