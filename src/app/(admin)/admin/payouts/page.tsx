@@ -2,17 +2,23 @@ import { CoinsIcon, LockIcon, TriangleAlertIcon } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import {
-  AllClear,
-  ConsoleHeader,
-  ConsoleSection,
-  MetaItem,
-  Metric,
-  MetricGrid,
-  RowItem,
-  Rows,
-} from "@/components/admin/console";
+  exactUsd,
+  linkClass,
+  MoneyMetric,
+} from "@/components/admin/money-parts";
 import { PayoutDecision } from "@/components/admin/payout-decision";
 import { Waited } from "@/components/admin/vocab";
+import {
+  AllClear,
+  List,
+  ListItem,
+  MetaItem,
+  PageHeader,
+  Section,
+  Sep,
+  Stat,
+  StatGrid,
+} from "@/components/app/kit";
 import { Badge } from "@/components/ui/badge";
 import { Price } from "@/components/ui/price";
 import { requireRole } from "@/server/session";
@@ -31,6 +37,11 @@ export const metadata: Metadata = {
  * product, so the address is shown in full and in a monospaced face rather
  * than truncated to fit a column, the amount is the largest thing on the row,
  * and settling asks twice.
+ *
+ * Each request is one row in two parts, always stacked: what is being sent
+ * and where, then the decision on a quieter band beneath it. Never side by
+ * side — the confirmation tells finance to check "the address above", and
+ * the eye should pass the address on its way to the button.
  */
 export default async function AdminPayoutsPage() {
   const staff = await requireRole("FINANCE");
@@ -45,8 +56,7 @@ export default async function AdminPayoutsPage() {
 
   return (
     <>
-      <ConsoleHeader
-        eyebrow="Money"
+      <PageHeader
         title="Payouts"
         description="Each amount is already held against the seller's balance, so nothing here can be spent twice while you decide. Sending is irreversible — read the address against what the seller saved before you do."
         meta={
@@ -62,8 +72,8 @@ export default async function AdminPayoutsPage() {
         }
       />
 
-      <MetricGrid className="mt-6 lg:grid-cols-3">
-        <Metric
+      <StatGrid columns={3} className="grid-cols-1 sm:grid-cols-3">
+        <Stat
           label="Requests to settle"
           value={pending.length}
           icon={CoinsIcon}
@@ -75,22 +85,21 @@ export default async function AdminPayoutsPage() {
           }
           note="Oldest first, same as every other queue."
         />
-        <Metric
+        <MoneyMetric
           label="Held in total"
-          value={<Price usd={total / 100} className="text-[1.4rem]" />}
+          cents={total}
           icon={LockIcon}
           note="Held against the sellers’ available balances, so it cannot be spent twice. Debited only when you send it."
         />
-        <Metric
+        <MoneyMetric
           label="Largest single"
-          value={<Price usd={largest / 100} className="text-[1.4rem]" />}
+          cents={largest}
           icon={TriangleAlertIcon}
-          tone={largest > 0 ? "danger" : "neutral"}
           note="Check this one against the seller's history."
         />
-      </MetricGrid>
+      </StatGrid>
 
-      <ConsoleSection
+      <Section
         id="queue"
         title="Waiting to be sent"
         count={pending.length}
@@ -103,23 +112,26 @@ export default async function AdminPayoutsPage() {
             body="Every requested payout has been settled or refused. Requests land here as sellers make them."
           />
         ) : (
-          <Rows>
+          <List>
             {pending.map((payout) => (
-              <RowItem key={payout.id} flag="primary">
-                <div className="p-4 pl-5 sm:p-5 sm:pl-6">
-                  <div className="flex flex-wrap items-start justify-between gap-x-5 gap-y-2">
+              <ListItem key={payout.id} padded={false}>
+                <div className="px-4 py-4 sm:px-5 sm:py-5">
+                  <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
                     <div className="min-w-0">
-                      <p className="font-display text-2xl font-black text-fg">
+                      <p className="text-2xl leading-8 font-semibold tracking-[-0.02em] text-fg tabular-nums">
                         <Price usd={payout.amountUsd / 100} />
                       </p>
-                      <p className="mt-1 text-sm text-muted">
+                      <p className="mt-0.5 text-[0.8125rem] text-muted tabular-nums">
+                        {exactUsd(payout.amountUsd)}
+                      </p>
+                      <p className="mt-2.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[0.8125rem] text-muted">
                         <Link
                           href={`/admin/users/${payout.user.id}`}
-                          className="font-medium text-primary-text underline-offset-4 hover:underline"
+                          className={linkClass}
                         >
                           {payout.user.name}
                         </Link>
-                        <span className="text-subtle"> · </span>
+                        <Sep />
                         <span className="break-all">{payout.user.email}</span>
                       </p>
                     </div>
@@ -133,14 +145,14 @@ export default async function AdminPayoutsPage() {
                     </div>
                   </div>
 
-                  <div className="mt-3.5">
-                    <p className="font-mono text-[0.625rem] font-semibold tracking-[0.12em] text-subtle uppercase">
+                  <div className="mt-4">
+                    <p className="text-xs font-medium text-muted">
                       Destination address
                     </p>
-                    <p className="mt-1.5 rounded-card border border-line-strong bg-surface-2 p-3 font-mono text-xs leading-relaxed break-all text-fg select-all">
+                    <p className="mt-1.5 rounded-lg border border-line-strong bg-surface-2 px-3 py-2.5 font-mono text-[0.8125rem] leading-relaxed break-all text-fg select-all">
                       {payout.address}
                     </p>
-                    <p className="mt-1.5 text-xs text-subtle">
+                    <p className="mt-1.5 text-xs leading-relaxed text-subtle">
                       Read it in full. A single wrong character sends{" "}
                       <Price
                         usd={payout.amountUsd / 100}
@@ -149,19 +161,21 @@ export default async function AdminPayoutsPage() {
                       somewhere nobody can recover it from.
                     </p>
                   </div>
+                </div>
 
+                <div className="border-t border-line bg-surface-2/40 px-4 py-4 sm:px-5">
                   <PayoutDecision
                     withdrawalId={payout.id}
                     amountCents={payout.amountUsd}
                   />
                 </div>
-              </RowItem>
+              </ListItem>
             ))}
-          </Rows>
+          </List>
         )}
-      </ConsoleSection>
+      </Section>
 
-      <p className="mt-7 flex items-start gap-2 text-xs leading-relaxed text-subtle">
+      <p className="mt-10 flex max-w-[96ch] items-start gap-2 text-xs leading-relaxed text-subtle">
         <LockIcon aria-hidden="true" className="mt-px size-3.5 shrink-0" />
         <span>
           Every decision here is written to the audit trail under your name,

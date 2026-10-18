@@ -3,6 +3,7 @@
 import { CheckCircle2Icon, TriangleAlertIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useId, useState, useTransition } from "react";
+import { BusyLabel } from "@/components/admin/money-parts";
 import { TextArea, TextField } from "@/components/auth/fields";
 import { Button } from "@/components/ui/button";
 import { Price } from "@/components/ui/price";
@@ -21,6 +22,9 @@ import { decidePayout } from "@/server/actions/wallet";
  * in full — the amount is already on the row above — and the second does it.
  * Refusing needs no second press: it hands the money back to the seller's
  * balance, and they can ask again.
+ *
+ * Drawn with no frame of its own: the queue row puts it on a band under the
+ * address and draws the line between them.
  */
 export function PayoutDecision({
   withdrawalId,
@@ -53,11 +57,11 @@ export function PayoutDecision({
   };
 
   return (
-    <div className="mt-4 border-t border-line pt-4">
-      <p className="font-mono text-[0.625rem] font-semibold tracking-[0.12em] text-subtle uppercase">
+    <div>
+      <p className="text-sm leading-5 font-semibold text-fg">
         Settle this payout
       </p>
-      <div className="mt-3 grid gap-3.5 sm:grid-cols-2">
+      <div className="mt-3 grid gap-4 sm:grid-cols-2">
         <TextField
           id={ids.tx}
           name="txHash"
@@ -65,6 +69,11 @@ export function PayoutDecision({
           hint="Send the funds on-chain first, then paste the hash. Required to mark it sent."
           value={txHash}
           onChange={(e) => setTxHash(e.target.value)}
+          // A hash is read character by character, so it gets the face
+          // every other reference on the desk is set in.
+          className="[&_input]:font-mono"
+          autoComplete="off"
+          spellCheck={false}
         />
         <TextArea
           id={ids.note}
@@ -78,8 +87,8 @@ export function PayoutDecision({
       </div>
 
       {armed ? (
-        <div className="mt-3.5 rounded-card border border-danger/40 bg-danger-soft p-3.5">
-          <p className="flex items-start gap-2 text-sm leading-relaxed font-medium text-fg">
+        <div className="mt-4 rounded-lg border border-danger/25 bg-danger-soft/70 p-3.5">
+          <p className="flex items-start gap-2 text-[0.8125rem] leading-relaxed font-medium text-fg">
             <TriangleAlertIcon
               aria-hidden="true"
               className="mt-0.5 size-4 shrink-0 text-danger"
@@ -100,7 +109,7 @@ export function PayoutDecision({
               seller saved. There is no undo.
             </span>
           </p>
-          <div className="mt-3 flex flex-wrap gap-2.5">
+          <div className="mt-3 flex flex-wrap gap-2 pl-6">
             <Button
               type="button"
               size="sm"
@@ -108,7 +117,11 @@ export function PayoutDecision({
               disabled={pending || txHash.trim() === ""}
               onClick={() => decide("SENT")}
             >
-              {pending ? "Settling…" : "Yes — it has been sent"}
+              <BusyLabel
+                busy={pending}
+                label="Yes — it has been sent"
+                busyLabel="Settling…"
+              />
             </Button>
             <Button
               type="button"
@@ -122,7 +135,7 @@ export function PayoutDecision({
           </div>
         </div>
       ) : (
-        <div className="mt-3.5 flex flex-wrap items-center gap-2.5">
+        <div className="mt-4 flex flex-wrap items-center gap-2">
           <Button
             type="button"
             size="sm"
@@ -137,11 +150,15 @@ export function PayoutDecision({
           <Button
             type="button"
             size="sm"
-            variant="secondary"
+            variant="outline"
             disabled={pending || note.trim() === ""}
             onClick={() => decide("REJECTED")}
           >
-            {pending ? "Returning…" : "Refuse and return it"}
+            <BusyLabel
+              busy={pending}
+              label="Refuse and return it"
+              busyLabel="Returning…"
+            />
           </Button>
           {txHash.trim() === "" && note.trim() === "" ? (
             <span className="text-xs text-subtle">
@@ -155,19 +172,19 @@ export function PayoutDecision({
         <p
           role={bad ? "alert" : "status"}
           className={cn(
-            "mt-2.5 flex items-start gap-1.5 text-xs leading-relaxed",
+            "mt-3 flex items-start gap-1.5 text-[0.8125rem] leading-relaxed",
             bad ? "text-danger" : "text-verified",
           )}
         >
           {bad ? (
             <TriangleAlertIcon
               aria-hidden="true"
-              className="mt-px size-3.5 shrink-0"
+              className="mt-0.5 size-3.5 shrink-0"
             />
           ) : (
             <CheckCircle2Icon
               aria-hidden="true"
-              className="mt-px size-3.5 shrink-0"
+              className="mt-0.5 size-3.5 shrink-0"
             />
           )}
           <span>{message}</span>

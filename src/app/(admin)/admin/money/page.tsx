@@ -3,6 +3,7 @@ import {
   ArrowUpRightIcon,
   BanknoteIcon,
   CoinsIcon,
+  FileSpreadsheetIcon,
   LandmarkIcon,
   LockIcon,
   PiggyBankIcon,
@@ -15,35 +16,39 @@ import {
 import type { Metadata } from "next";
 import Link from "next/link";
 import {
-  AllClear,
-  Amount,
-  ConsoleHeader,
-  ConsoleSection,
-  MetaItem,
-  MetricGrid,
-  Panel,
-  RowHead,
-  RowItem,
-  Rows,
-  TableScroller,
-  Td,
-  Th,
-} from "@/components/admin/console";
-import {
   DownloadLink,
   exactUsd,
+  linkClass,
+  MoneyLine,
   MoneyMetric,
   MonthPicker,
   plural,
+  RefLink,
 } from "@/components/admin/money-parts";
 import {
   DealModeBadge,
   OrderStatusBadge,
   Waited,
 } from "@/components/admin/vocab";
+import {
+  AllClear,
+  Amount,
+  Callout,
+  IconTile,
+  List,
+  ListItem,
+  MetaItem,
+  PageHeader,
+  Section,
+  Sep,
+  StatGrid,
+  TableCard,
+  Td,
+  Th,
+  Tr,
+} from "@/components/app/kit";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Price } from "@/components/ui/price";
 import {
   fastestHoldMismatches,
   type InvoiceAttention,
@@ -113,6 +118,10 @@ function invoiceAdvice(row: InvoiceAttention): string {
  * one line what it counts, revenue is only ever fees, and the order is the
  * order somebody should act in — what needs a person, then where the money
  * is right now, then the month's report and its exports.
+ *
+ * The exports stay at the foot of the month's report rather than in the
+ * page header: each file is for the month picked there, and a download
+ * button at the top of the page would not say which month it fetches.
  */
 export default async function AdminMoneyPage({
   searchParams,
@@ -159,14 +168,13 @@ export default async function AdminMoneyPage({
 
   return (
     <>
-      <ConsoleHeader
-        eyebrow="Money"
+      <PageHeader
         title="Money desk"
-        description="What Channel Adda earned, what it is holding for other people, and what it paid out — month by month, straight from the ledger. Revenue here is fees and nothing else: on a Safest deal the price goes buyer to seller and never touches our books, and on a Fastest deal the price is the seller's money, which we only hold."
+        description="What Channel Adda earned, what it is holding for other people, and what it paid out — month by month, straight from the ledger."
         actions={
-          <Button asChild size="sm" variant="secondary">
+          <Button asChild variant="secondary">
             <Link href="/admin/money/adjust">
-              <SlidersHorizontalIcon aria-hidden="true" className="size-4" />
+              <SlidersHorizontalIcon aria-hidden="true" />
               Correct a balance
             </Link>
           </Button>
@@ -183,12 +191,12 @@ export default async function AdminMoneyPage({
       />
 
       {/* --------------------------------------------- needs a person */}
-      <ConsoleSection
+      <Section
         id="invoices"
         title="Paid at the processor, not applied"
         count={invoices.total}
         tone={unapplied.length > 0 ? "danger" : "neutral"}
-        description="The processor told us these were paid, but the money never reached a deal or a balance — or it arrived in a state a person has to judge. The sweep retries every ten minutes, so anything here for longer than that needs you. Check each one in the processor's dashboard by its reference before acting: recording a payment by hand cannot be undone."
+        description="The sweep retries every ten minutes, so anything here for longer than that needs you. Check each one in the processor's dashboard by its reference before acting: recording a payment by hand cannot be undone."
       >
         {invoices.rows.length === 0 ? (
           <AllClear
@@ -196,28 +204,29 @@ export default async function AdminMoneyPage({
             body="When a buyer pays and the deal still says unpaid, the invoice shows up here first."
           />
         ) : (
-          <Rows>
+          <List>
             {invoices.rows.map((row) => {
               const problem = PROBLEM[row.problem];
               return (
-                <RowItem
+                <ListItem
                   key={row.id}
+                  padded={false}
                   flag={row.landed === null ? "danger" : undefined}
                 >
-                  <div className="p-4 pl-5">
-                    <RowHead
-                      title={
-                        <span className="font-mono text-[0.8125rem] break-all">
-                          {row.reference}
-                        </span>
-                      }
-                      reference={
-                        row.purpose === "DEAL"
-                          ? "Deal payment"
-                          : "Wallet top-up"
-                      }
-                      tags={
-                        <>
+                  <div className="px-4 py-4 sm:px-5">
+                    <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                          <span className="font-mono text-[0.8125rem] font-medium break-all text-fg">
+                            {row.reference}
+                          </span>
+                          <span className="text-xs text-subtle">
+                            {row.purpose === "DEAL"
+                              ? "Deal payment"
+                              : "Wallet top-up"}
+                          </span>
+                        </p>
+                        <div className="mt-2 flex flex-wrap items-center gap-1.5">
                           <Badge variant={problem.variant}>
                             {problem.label}
                           </Badge>
@@ -236,58 +245,69 @@ export default async function AdminMoneyPage({
                               prefix="paid"
                               warnAfter={0.25}
                               lateAfter={1}
+                              className="ml-1"
                             />
                           ) : (
-                            <Waited since={row.createdAt} prefix="raised" />
+                            <Waited
+                              since={row.createdAt}
+                              prefix="raised"
+                              className="ml-1"
+                            />
                           )}
-                        </>
-                      }
-                      right={
-                        <Amount cents={row.amountUsd} caption="invoiced" />
-                      }
-                    />
-                    <p className="mt-2 text-xs text-muted">
+                        </div>
+                      </div>
+                      <Amount
+                        cents={row.amountUsd}
+                        caption={`${exactUsd(row.amountUsd)} invoiced`}
+                      />
+                    </div>
+
+                    <p className="mt-3 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[0.8125rem] text-muted">
                       <Link
                         href={`/admin/users/${row.user.id}`}
-                        className="font-medium text-primary-text underline-offset-4 hover:underline"
+                        className={linkClass}
                       >
                         {row.user.name}
                       </Link>
-                      <span className="text-subtle"> · </span>
+                      <Sep />
                       <span className="break-all">{row.user.email}</span>
                       {row.order ? (
                         <>
-                          <span className="text-subtle"> · deal </span>
-                          <Link
-                            href={`/dashboard/deals/${row.order.id}`}
-                            className="tnum font-medium text-primary-text underline-offset-4 hover:underline"
-                          >
+                          <Sep />
+                          <span>deal</span>
+                          <RefLink href={`/dashboard/deals/${row.order.id}`}>
                             {row.order.reference}
-                          </Link>
-                          <span className="text-subtle">
-                            {" "}
+                          </RefLink>
+                          <span>
                             owes{" "}
-                            <span className="tnum">
+                            <span className="text-fg tabular-nums">
                               {exactUsd(row.order.totalUsd)}
                             </span>
                           </span>
                         </>
                       ) : null}
                     </p>
-                    <p className="mt-2 max-w-[78ch] text-sm leading-relaxed text-fg">
+
+                    <p className="mt-3 max-w-[78ch] border-l-2 border-line-strong pl-3 text-sm leading-relaxed text-fg">
                       {invoiceAdvice(row)}
                     </p>
-                    <p className="mt-1.5 text-[0.6875rem] break-all text-subtle">
+
+                    <p className="mt-3 text-xs break-all text-subtle">
                       Processor status: {row.lastStatus ?? "none yet"}
-                      {row.externalId
-                        ? ` · processor id ${row.externalId}`
-                        : ""}
+                      {row.externalId ? (
+                        <>
+                          {" · processor id "}
+                          <span className="font-mono text-muted">
+                            {row.externalId}
+                          </span>
+                        </>
+                      ) : null}
                     </p>
                   </div>
-                </RowItem>
+                </ListItem>
               );
             })}
-          </Rows>
+          </List>
         )}
         {invoices.total > invoices.rows.length ? (
           <p className="mt-2.5 text-xs text-subtle">
@@ -296,21 +316,20 @@ export default async function AdminMoneyPage({
             move up.
           </p>
         ) : null}
-      </ConsoleSection>
+      </Section>
 
       {/* ------------------------------------------------ right now */}
-      <ConsoleSection
+      <Section
         id="now"
         title="Right now"
         description="Where the money is at this moment, whatever month is selected below. Everything here is worked out from the ledger rows, not from what the deals say should have happened."
       >
-        <MetricGrid className="grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+        <StatGrid columns={3} className="grid-cols-1 sm:grid-cols-2">
           <MoneyMetric
             label="Held for Fastest buyers"
             cents={position.heldForBuyers.cents}
             count={plural(position.heldForBuyers.count, "deal")}
             icon={LockIcon}
-            tone={position.heldForBuyers.cents > 0 ? "info" : "neutral"}
             note="Price plus fee on Fastest deals still running, including those waiting out their recovery hold. Not ours: it becomes the seller's when the deal completes, or goes back to the buyer on a refund."
           />
           <MoneyMetric
@@ -333,39 +352,42 @@ export default async function AdminMoneyPage({
             label="Ours"
             cents={position.platformOwn}
             icon={PiggyBankIcon}
-            tone="verified"
             note="Every fee earned since the start, less fees given back and balance corrections we paid for. The only part of the money here that belongs to Channel Adda."
           />
           <MoneyMetric
             label="Should be on hand"
             cents={position.onHand}
             icon={LandmarkIcon}
+            className="sm:col-span-2"
             note="The three above added up: what our crypto accounts should hold, before processor and network fees. If they hold much less, stop and find out why."
           />
-        </MetricGrid>
+        </StatGrid>
 
         <div className="mt-3">
           {mismatches.length === 0 ? (
             <AllClear
-              icon={ScaleIcon}
               title="The books agree with every Fastest deal"
               body="Each running Fastest deal has exactly its price plus fee on our books, and each finished one has nothing left. Checked every time this page loads."
             />
           ) : (
-            <Panel tone="danger">
-              <p className="flex items-center gap-2 font-display text-sm font-bold text-fg">
-                <ScaleIcon aria-hidden="true" className="size-4 text-danger" />
-                {plural(mismatches.length, "Fastest deal")} where the books and
-                the deal disagree
-              </p>
-              <p className="mt-1.5 text-sm leading-relaxed text-muted">
+            <>
+              <Callout
+                tone="danger"
+                icon={ScaleIcon}
+                title={
+                  <>
+                    {plural(mismatches.length, "Fastest deal")} where the books
+                    and the deal disagree
+                  </>
+                }
+              >
                 The money on our books for these deals is not what the deal says
                 we should be holding. This should never happen. Do not refund,
                 release or correct anything on them until a developer has
                 looked.
-              </p>
-              <TableScroller className="mt-3">
-                <table className="w-full min-w-[30rem] text-sm">
+              </Callout>
+              <TableCard className="mt-3">
+                <table className="w-full min-w-[30rem]">
                   <caption className="sr-only">
                     Fastest deals whose ledger does not match their status
                   </caption>
@@ -379,53 +401,51 @@ export default async function AdminMoneyPage({
                   </thead>
                   <tbody>
                     {mismatches.map((row) => (
-                      <tr key={row.id} className="border-t border-line">
+                      <Tr key={row.id}>
                         <Td>
-                          <Link
-                            href={`/dashboard/deals/${row.id}`}
-                            className="tnum text-xs text-primary-text underline-offset-4 hover:underline"
-                          >
+                          <RefLink href={`/dashboard/deals/${row.id}`}>
                             {row.reference}
-                          </Link>
+                          </RefLink>
                         </Td>
                         <Td>
                           <OrderStatusBadge status={row.status} />
                         </Td>
-                        <Td numeric>{exactUsd(row.heldUsd)}</Td>
-                        <Td numeric>{exactUsd(row.expectedUsd)}</Td>
-                      </tr>
+                        <Td numeric className="font-medium text-fg">
+                          {exactUsd(row.heldUsd)}
+                        </Td>
+                        <Td numeric className="text-muted">
+                          {exactUsd(row.expectedUsd)}
+                        </Td>
+                      </Tr>
                     ))}
                   </tbody>
                 </table>
-              </TableScroller>
-            </Panel>
+              </TableCard>
+            </>
           )}
         </div>
-      </ConsoleSection>
+      </Section>
 
       {/* ------------------------------------------------- the month */}
       <section
         id="month"
         aria-labelledby="month-heading"
-        className="mt-10 border-t border-line pt-6"
+        className="mt-12 border-t border-line pt-8"
       >
         <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
           <div className="min-w-0">
-            <p className="font-mono text-[0.625rem] font-semibold tracking-[0.14em] text-subtle uppercase">
-              Monthly report
-            </p>
             <h2
               id="month-heading"
-              className="mt-1.5 font-display text-[1.35rem] leading-tight font-black tracking-tight text-fg"
+              className="flex flex-wrap items-baseline gap-x-2 text-lg leading-7 font-semibold tracking-[-0.012em] text-fg"
             >
-              {month.label}
+              <span className="font-medium text-muted">Monthly report</span>
+              <Sep />
+              <span>{month.label}</span>
               {isCurrent ? (
-                <span className="ml-2 align-middle text-xs font-semibold text-subtle">
-                  so far
-                </span>
+                <span className="text-sm font-normal text-subtle">so far</span>
               ) : null}
             </h2>
-            <p className="mt-1.5 max-w-[68ch] text-sm leading-relaxed text-muted">
+            <p className="mt-1 max-w-[68ch] text-[0.8125rem] leading-relaxed text-muted">
               Months run from midnight to midnight UTC.
               {later
                 ? " This month has not started yet, so everything below is empty."
@@ -443,31 +463,26 @@ export default async function AdminMoneyPage({
           />
         </div>
 
-        <ConsoleSection
+        <Section
           id="fees"
           title="Fees earned"
-          description="Our revenue for the month. A Safest fee is earned when the buyer's opening payment clears; a Fastest fee only when the deal completes, because until then it is part of the money we hold."
+          description="Revenue here is fees and nothing else: on a Safest deal the price goes buyer to seller and never touches our books, and on a Fastest deal the price is the seller's money, which we only hold."
         >
-          <div className="grid gap-3 lg:grid-cols-[minmax(0,18rem)_1fr]">
-            <Panel tone={fees.net > 0 ? "verified" : "neutral"}>
-              <p className="flex items-center gap-1.5 font-mono text-[0.625rem] font-semibold tracking-[0.12em] text-subtle uppercase">
-                <ReceiptIcon aria-hidden="true" className="size-3.5" />
-                Net fees earned
-              </p>
-              <p className="mt-2.5 font-display text-[2rem] leading-none font-black text-fg">
-                <Price usd={fees.net / 100} />
-              </p>
-              <p className="tnum mt-2 text-xs text-muted">
-                {exactUsd(fees.net)}
-              </p>
-              <p className="mt-2 text-[0.6875rem] leading-snug text-subtle">
-                Every fee in the table, less Safest fees given back. This is the
-                month&rsquo;s revenue. Channel prices are never revenue.
-              </p>
-            </Panel>
+          <div className="grid gap-3 lg:grid-cols-[17rem_minmax(0,1fr)]">
+            <MoneyMetric
+              label="Net fees earned"
+              cents={fees.net}
+              icon={ReceiptIcon}
+              note={
+                <>
+                  Every fee in the table, less Safest fees given back. This is
+                  the month&rsquo;s revenue. Channel prices are never revenue.
+                </>
+              }
+            />
 
-            <TableScroller>
-              <table className="w-full min-w-[32rem] text-sm">
+            <TableCard>
+              <table className="w-full min-w-[32rem]">
                 <caption className="sr-only">
                   Fees earned in {month.label}, by deal mode
                 </caption>
@@ -481,10 +496,10 @@ export default async function AdminMoneyPage({
                 </thead>
                 <tbody>
                   {feeRows.map((row) => (
-                    <tr key={row.mode} className="border-t border-line">
+                    <Tr key={row.mode}>
                       <Td>
                         <DealModeBadge mode={row.mode} />
-                        <span className="mt-1 block text-[0.6875rem] text-subtle">
+                        <span className="mt-1 block text-xs text-subtle tabular-nums">
                           {plural(row.buyer.count, "deal")}
                         </span>
                       </Td>
@@ -512,17 +527,19 @@ export default async function AdminMoneyPage({
                           caption={exactUsd(row.buyer.cents + row.seller.cents)}
                         />
                       </Td>
-                    </tr>
+                    </Tr>
                   ))}
-                  <tr className="border-t border-line">
-                    <Td className="text-xs text-muted">
-                      Given back
-                      <span className="mt-0.5 block text-[0.6875rem] text-subtle">
+                  <Tr>
+                    <Td>
+                      <span className="text-[0.8125rem] text-muted">
+                        Given back
+                      </span>
+                      <span className="mt-0.5 block text-xs text-subtle tabular-nums">
                         {plural(fees.returned.count, "Safest refund")}
                       </span>
                     </Td>
-                    <Td numeric>{null}</Td>
-                    <Td numeric>{null}</Td>
+                    <Td numeric />
+                    <Td numeric />
                     <Td numeric>
                       <Amount
                         cents={0 - fees.returned.cents}
@@ -530,12 +547,12 @@ export default async function AdminMoneyPage({
                         tone={fees.returned.cents > 0 ? "danger" : "neutral"}
                       />
                     </Td>
-                  </tr>
-                  <tr className="border-t border-line-strong bg-surface-2">
+                  </Tr>
+                  <tr className="border-t border-line-strong bg-surface-2/50">
                     <Td className="font-semibold text-fg">Net</Td>
-                    <Td numeric>{null}</Td>
+                    <Td numeric />
                     <Td numeric>
-                      <span className="text-[0.6875rem] text-subtle">
+                      <span className="text-xs text-subtle">
                         gross {exactUsd(grossFees)}
                       </span>
                     </Td>
@@ -545,81 +562,89 @@ export default async function AdminMoneyPage({
                   </tr>
                 </tbody>
               </table>
-            </TableScroller>
+            </TableCard>
           </div>
 
-          <dl className="mt-3 grid gap-x-6 gap-y-2 text-xs leading-relaxed text-muted sm:grid-cols-2">
-            <div>
-              <dt className="inline font-semibold text-fg">Safest buyer fee</dt>
-              <dd className="inline">
-                {" "}
-                — the admin fee Safest buyers paid us, counted when their
-                opening payment cleared.
-              </dd>
-            </div>
-            <div>
-              <dt className="inline font-semibold text-fg">
-                Safest seller fee
-              </dt>
-              <dd className="inline">
-                {" "}
-                — there is none: the price goes buyer to seller, so there is
-                nothing for us to deduct it from.
-              </dd>
-            </div>
-            <div>
-              <dt className="inline font-semibold text-fg">
-                Fastest buyer fee
-              </dt>
-              <dd className="inline">
-                {" "}
-                — the fee on top of the price, from Fastest deals that completed
-                this month.
-              </dd>
-            </div>
-            <div>
-              <dt className="inline font-semibold text-fg">
-                Fastest seller fee
-              </dt>
-              <dd className="inline">
-                {" "}
-                — taken from the seller&rsquo;s price on Fastest deals that
-                completed this month, at the seller-fee rate.
-              </dd>
-            </div>
-            <div className="sm:col-span-2">
-              <dt className="inline font-semibold text-fg">Given back</dt>
-              <dd className="inline">
-                {" "}
-                — Safest admin fees refunded because the deal was cancelled
-                before an agent took the channel. Fastest refunds are not here:
-                they return money we were holding, not money we had earned.
-              </dd>
-            </div>
-          </dl>
-        </ConsoleSection>
+          <div className="mt-4 max-w-[96ch] text-xs leading-relaxed text-muted">
+            <p>
+              A Safest fee is earned when the buyer&rsquo;s opening payment
+              clears; a Fastest fee only when the deal completes, because until
+              then it is part of the money we hold.
+            </p>
+            <dl className="mt-2 grid gap-x-8 gap-y-1.5 sm:grid-cols-2">
+              <div>
+                <dt className="inline font-medium text-fg">Safest buyer fee</dt>
+                <dd className="inline">
+                  {" "}
+                  — the admin fee Safest buyers paid us, counted when their
+                  opening payment cleared.
+                </dd>
+              </div>
+              <div>
+                <dt className="inline font-medium text-fg">
+                  Safest seller fee
+                </dt>
+                <dd className="inline">
+                  {" "}
+                  — there is none: the price goes buyer to seller, so there is
+                  nothing for us to deduct it from.
+                </dd>
+              </div>
+              <div>
+                <dt className="inline font-medium text-fg">
+                  Fastest buyer fee
+                </dt>
+                <dd className="inline">
+                  {" "}
+                  — the fee on top of the price, from Fastest deals that
+                  completed this month.
+                </dd>
+              </div>
+              <div>
+                <dt className="inline font-medium text-fg">
+                  Fastest seller fee
+                </dt>
+                <dd className="inline">
+                  {" "}
+                  — taken from the seller&rsquo;s price on Fastest deals that
+                  completed this month, at the seller-fee rate.
+                </dd>
+              </div>
+              <div className="sm:col-span-2">
+                <dt className="inline font-medium text-fg">Given back</dt>
+                <dd className="inline">
+                  {" "}
+                  — Safest admin fees refunded because the deal was cancelled
+                  before an agent took the channel. Fastest refunds are not
+                  here: they return money we were holding, not money we had
+                  earned.
+                </dd>
+              </div>
+            </dl>
+          </div>
+        </Section>
 
-        <ConsoleSection
+        <Section
           id="flows"
           title="Money that moved"
           description="Everything else that went in or out during the month. None of it is revenue; most of it is other people's money passing through."
         >
-          <MetricGrid className="grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-            <MoneyMetric
+          <List>
+            <MoneyLine
               label="Paid into Fastest deals"
               cents={figures.fastest.paidIn.cents}
               count={plural(figures.fastest.paidIn.count, "deal")}
               icon={ArrowDownLeftIcon}
               note="Price plus fee from Fastest buyers, by crypto or from their balance. We hold it until the deal ends."
             />
-            <MoneyMetric
+            <MoneyLine
               label="Credited to sellers"
               cents={figures.fastest.toSellers.cents}
               count={plural(figures.fastest.toSellers.count, "sale")}
               icon={BanknoteIcon}
               note="Sale prices released into sellers' wallets when Fastest deals completed, less the seller fee. Still with us until they withdraw it."
             />
-            <MoneyMetric
+            <MoneyLine
               label="Refunded to buyers"
               cents={figures.refunds.total}
               count={plural(
@@ -627,41 +652,42 @@ export default async function AdminMoneyPage({
                 "refund",
               )}
               icon={RotateCcwIcon}
-              tone={figures.refunds.total > 0 ? "info" : "neutral"}
               note={
                 <>
                   Returned to buyers&rsquo; Channel Adda balances:{" "}
-                  {exactUsd(figures.refunds.fastest.cents)} of held Fastest
-                  money, {exactUsd(figures.refunds.safest.cents)} of Safest
-                  admin fees.
+                  <span className="tabular-nums">
+                    {exactUsd(figures.refunds.fastest.cents)}
+                  </span>{" "}
+                  of held Fastest money,{" "}
+                  <span className="tabular-nums">
+                    {exactUsd(figures.refunds.safest.cents)}
+                  </span>{" "}
+                  of Safest admin fees.
                 </>
               }
             />
-            <MoneyMetric
+            <MoneyLine
               label="Deposits"
               cents={figures.deposits.topUps.cents}
               count={plural(figures.deposits.topUps.count, "top-up")}
               icon={ArrowDownLeftIcon}
               note="Money members paid in to their own balance."
             />
-            <MoneyMetric
+            <MoneyLine
               label="Deal payments to balances"
               cents={figures.deposits.dealPayments.cents}
               count={plural(figures.deposits.dealPayments.count, "payment")}
               icon={WalletIcon}
-              tone={
-                figures.deposits.dealPayments.count > 0 ? "primary" : "neutral"
-              }
               note="Deal payments that arrived after the deal had stopped, or paid a deal twice. Credited to the payer's balance rather than lost."
             />
-            <MoneyMetric
+            <MoneyLine
               label="Paid from balances"
               cents={figures.spentFromBalances.cents}
               count={plural(figures.spentFromBalances.count, "deal")}
               icon={WalletIcon}
               note="Members paying a deal's opening payment out of their balance instead of by crypto. Moves their money into our hold or our fees."
             />
-            <MoneyMetric
+            <MoneyLine
               label="Payouts sent"
               cents={figures.payouts.cents}
               count={plural(figures.payouts.count, "payout")}
@@ -669,7 +695,7 @@ export default async function AdminMoneyPage({
               href="/admin/payouts"
               note="Withdrawals finance marked as sent. This is money that left us for members' own crypto wallets."
             />
-            <MoneyMetric
+            <MoneyLine
               label="Corrections added"
               cents={figures.adjustments.credits.cents}
               count={plural(figures.adjustments.credits.count, "correction")}
@@ -677,7 +703,7 @@ export default async function AdminMoneyPage({
               href="/admin/money/adjust"
               note="Added to members' balances by hand. Each one came out of our own money, so the books still balance."
             />
-            <MoneyMetric
+            <MoneyLine
               label="Corrections taken"
               cents={figures.adjustments.debits.cents}
               count={plural(figures.adjustments.debits.count, "correction")}
@@ -685,10 +711,10 @@ export default async function AdminMoneyPage({
               href="/admin/money/adjust"
               note="Taken from members' balances by hand, usually a credit made by mistake. Each one went back into our own money."
             />
-          </MetricGrid>
-        </ConsoleSection>
+          </List>
+        </Section>
 
-        <ConsoleSection
+        <Section
           id="closing"
           title={
             isCurrent || later ? "Position so far" : "At the close of the month"
@@ -699,7 +725,7 @@ export default async function AdminMoneyPage({
               : `What we were holding for other people at midnight UTC on ${figures.closing.asOf.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" })} — the figures an accountant carries into the next month.`
           }
         >
-          <MetricGrid className="grid-cols-1 sm:grid-cols-2">
+          <StatGrid columns={2} className="grid-cols-1 sm:grid-cols-2">
             <MoneyMetric
               label="Held for Fastest buyers"
               cents={figures.closing.heldForBuyers}
@@ -712,58 +738,68 @@ export default async function AdminMoneyPage({
               icon={WalletIcon}
               note="Every member balance added together when the month closed: what we owed members."
             />
-          </MetricGrid>
-        </ConsoleSection>
+          </StatGrid>
+        </Section>
 
-        <ConsoleSection
+        <Section
           id="exports"
           title="For the accountant"
           description={`Spreadsheet files for ${month.label}, in exact US dollars and cents. Each download is written to the audit trail under your name.`}
         >
-          <div className="grid gap-2.5 sm:grid-cols-2">
-            <Panel className="flex flex-col gap-3">
-              <div>
-                <p className="font-display text-sm font-bold text-fg">
-                  Ledger entries
-                </p>
-                <p className="mt-1 text-xs leading-relaxed text-muted">
-                  Every row written this month: when, what kind, whose side (a
-                  member&rsquo;s or ours), the amount, the deal and the note.
-                  The platform&rsquo;s rows have no member.
-                </p>
+          <List>
+            <ListItem>
+              <div className="flex items-start gap-3">
+                <IconTile icon={FileSpreadsheetIcon} />
+                <div className="flex min-w-0 flex-1 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
+                  <div className="min-w-0">
+                    <p className="text-sm leading-5 font-medium text-fg">
+                      Ledger entries
+                    </p>
+                    <p className="mt-0.5 max-w-[72ch] text-[0.8125rem] leading-relaxed text-muted">
+                      Every row written this month: when, what kind, whose side
+                      (a member&rsquo;s or ours), the amount, the deal and the
+                      note. The platform&rsquo;s rows have no member.
+                    </p>
+                  </div>
+                  <div className="shrink-0">
+                    <DownloadLink
+                      href={`/api/admin/export/ledger?month=${month.key}`}
+                    >
+                      Ledger CSV
+                    </DownloadLink>
+                  </div>
+                </div>
               </div>
-              <div>
-                <DownloadLink
-                  href={`/api/admin/export/ledger?month=${month.key}`}
-                >
-                  Ledger CSV
-                </DownloadLink>
+            </ListItem>
+            <ListItem>
+              <div className="flex items-start gap-3">
+                <IconTile icon={FileSpreadsheetIcon} />
+                <div className="flex min-w-0 flex-1 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
+                  <div className="min-w-0">
+                    <p className="text-sm leading-5 font-medium text-fg">
+                      Payouts sent
+                    </p>
+                    <p className="mt-0.5 max-w-[72ch] text-[0.8125rem] leading-relaxed text-muted">
+                      Every withdrawal marked as sent this month, with the
+                      member, the address, the network, the transaction hash and
+                      who sent it.
+                    </p>
+                  </div>
+                  <div className="shrink-0">
+                    <DownloadLink
+                      href={`/api/admin/export/payouts?month=${month.key}`}
+                    >
+                      Payouts CSV
+                    </DownloadLink>
+                  </div>
+                </div>
               </div>
-            </Panel>
-            <Panel className="flex flex-col gap-3">
-              <div>
-                <p className="font-display text-sm font-bold text-fg">
-                  Payouts sent
-                </p>
-                <p className="mt-1 text-xs leading-relaxed text-muted">
-                  Every withdrawal marked as sent this month, with the member,
-                  the address, the network, the transaction hash and who sent
-                  it.
-                </p>
-              </div>
-              <div>
-                <DownloadLink
-                  href={`/api/admin/export/payouts?month=${month.key}`}
-                >
-                  Payouts CSV
-                </DownloadLink>
-              </div>
-            </Panel>
-          </div>
-        </ConsoleSection>
+            </ListItem>
+          </List>
+        </Section>
       </section>
 
-      <p className="mt-7 flex items-start gap-2 text-xs leading-relaxed text-subtle">
+      <p className="mt-10 flex max-w-[96ch] items-start gap-2 text-xs leading-relaxed text-subtle">
         <LockIcon aria-hidden="true" className="mt-px size-3.5 shrink-0" />
         <span>
           Large figures are shown in whichever currency the header is set to,

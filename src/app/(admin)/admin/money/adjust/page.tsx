@@ -1,29 +1,32 @@
 import {
-  ArrowLeftIcon,
   SearchIcon,
   ShieldAlertIcon,
   SlidersHorizontalIcon,
 } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { MoneyAdjustForm } from "@/components/admin/money-adjust-form";
+import { exactUsd, linkClass } from "@/components/admin/money-parts";
+import { elapsed } from "@/components/admin/vocab";
 import {
-  AllClear,
   Amount,
-  ConsoleHeader,
-  ConsoleSection,
+  Callout,
+  Card,
+  EmptyState,
   Fact,
   Facts,
+  inputClass,
   MetaItem,
-  Nothing,
-  Panel,
-  TableScroller,
+  PageHeader,
+  Section,
+  TableCard,
   Td,
   Th,
-} from "@/components/admin/console";
-import { MoneyAdjustForm } from "@/components/admin/money-adjust-form";
-import { exactUsd } from "@/components/admin/money-parts";
-import { elapsed } from "@/components/admin/vocab";
+  Tr,
+} from "@/components/app/kit";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import {
   CREDIT_WINDOW_HOURS,
   FINANCE_CREDIT_CAP_USD,
@@ -80,19 +83,10 @@ export default async function AdminAdjustPage({
 
   return (
     <>
-      <ConsoleHeader
-        eyebrow="Money"
+      <PageHeader
+        back={{ href: "/admin/money", label: "Money desk" }}
         title="Correct a balance"
-        description="For when we owe somebody money, or credited them by mistake. Every correction is two ledger rows — one on the member, the opposite one on Channel Adda — so the books still balance, and both go on the audit trail under your name."
-        actions={
-          <Link
-            href="/admin/money"
-            className="inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-primary-text underline-offset-4 hover:underline"
-          >
-            <ArrowLeftIcon aria-hidden="true" className="size-4" />
-            Money desk
-          </Link>
-        }
+        description="For when we owe somebody money, or credited them by mistake."
         meta={
           <>
             <MetaItem label="Signed in as">{staff.name}</MetaItem>
@@ -103,13 +97,13 @@ export default async function AdminAdjustPage({
         }
       />
 
-      <ConsoleSection
+      <Section
         id="rules"
         title="The rules"
         description="The server enforces every one of these, whatever the form says."
       >
-        <Panel padded={false} className="px-4 sm:px-5">
-          <Facts>
+        <Card className="px-4 sm:px-5">
+          <Facts className="lg:grid-cols-2">
             <Fact label="Finance can add, per member">
               {exactUsd(FINANCE_CREDIT_CAP_USD)} in {CREDIT_WINDOW_HOURS}h
             </Fact>
@@ -120,24 +114,28 @@ export default async function AdminAdjustPage({
             <Fact label="Largest single correction">
               {exactUsd(MAX_ADJUSTMENT_USD)}
             </Fact>
-            <Fact label="Reason">
+            {/* The bottom-left cell when the rules sit in two columns. */}
+            <Fact label="Reason" className="lg:border-b-0">
               {MIN_REASON_LENGTH}+ characters, shown to the member
             </Fact>
             <Fact label="Staff accounts, or your own">
               Superadmin only · never your own
             </Fact>
           </Facts>
-        </Panel>
-        <p className="mt-2.5 max-w-[78ch] text-xs leading-relaxed text-subtle">
-          A correction is for money we already owe or already over-credited. A
-          top-up the processor took but never credited is not one — it would
+        </Card>
+        <Callout
+          tone="warning"
+          className="mt-3"
+          title="A correction is for money we already owe or already over-credited."
+        >
+          A top-up the processor took but never credited is not one — it would
           book the money as ours rather than as the member&rsquo;s deposit. That
           belongs on the money desk&rsquo;s &ldquo;paid, not applied&rdquo;
           list.
-        </p>
-      </ConsoleSection>
+        </Callout>
+      </Section>
 
-      <ConsoleSection
+      <Section
         id="member"
         title="Whose balance"
         description="The member's email address, exactly, or their account id from the People page."
@@ -146,7 +144,7 @@ export default async function AdminAdjustPage({
           <form
             method="get"
             action="/admin/money/adjust"
-            className="flex flex-wrap items-stretch gap-2"
+            className="flex flex-wrap items-center gap-2 sm:max-w-xl"
           >
             <div className="relative min-w-56 flex-1">
               <SearchIcon
@@ -163,64 +161,64 @@ export default async function AdminAdjustPage({
                 defaultValue={query}
                 autoComplete="off"
                 placeholder="name@example.com"
-                className="h-12 w-full rounded-xl border border-line bg-surface pr-3 pl-9 text-base text-fg placeholder:text-subtle focus:border-primary/60 focus:outline-none sm:text-sm"
+                className={cn(inputClass, "pr-3 pl-9")}
               />
             </div>
-            <button
-              type="submit"
-              className="h-12 shrink-0 cursor-pointer rounded-xl bg-primary px-5 text-sm font-medium text-primary-fg shadow-soft transition-opacity hover:opacity-90"
-            >
+            {/* The next step on an empty page; once somebody is found, the
+                correction form below is, so this steps back. */}
+            <Button type="submit" variant={member ? "secondary" : "primary"}>
               Find
-            </button>
+            </Button>
           </form>
         </search>
 
         {query && !member ? (
-          <div className="mt-3">
-            <Nothing
-              title="Nobody with that email or id"
-              body="This is an exact match, so check the spelling. Partial searches are on the People page."
-              action={
-                <Link
-                  href={`/admin/users?q=${encodeURIComponent(query)}`}
-                  className="inline-flex min-h-11 items-center rounded-xl border border-line px-4 text-sm font-medium text-muted transition-colors hover:border-line-strong hover:text-fg"
-                >
+          <EmptyState
+            className="mt-3"
+            title="Nobody with that email or id"
+            body="This is an exact match, so check the spelling. Partial searches are on the People page."
+            action={
+              <Button asChild variant="secondary" size="sm">
+                <Link href={`/admin/users?q=${encodeURIComponent(query)}`}>
                   Search People instead
                 </Link>
-              }
-            />
-          </div>
+              </Button>
+            }
+          />
         ) : null}
 
         {member ? (
-          <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(0,20rem)_1fr]">
-            <Panel>
-              <p className="text-sm font-semibold text-fg">
-                <Link
-                  href={`/admin/users/${member.id}`}
-                  className="text-primary-text underline-offset-4 hover:underline"
-                >
-                  {member.name}
-                </Link>
-              </p>
-              <p className="mt-0.5 text-xs break-all text-subtle">
-                {member.email}
-              </p>
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {member.role !== "USER" ? (
-                  <Badge variant="info">
-                    Staff · {member.role.toLowerCase()}
-                  </Badge>
-                ) : null}
-                {member.banned ? (
-                  <Badge variant="danger">Suspended</Badge>
+          <div className="mt-3 grid items-start gap-3 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
+            <Card>
+              <div className="px-4 pt-4 sm:px-5">
+                <p className="text-sm leading-5 font-semibold text-fg">
+                  <Link
+                    href={`/admin/users/${member.id}`}
+                    className={linkClass}
+                  >
+                    {member.name}
+                  </Link>
+                </p>
+                <p className="mt-0.5 text-[0.8125rem] break-all text-muted">
+                  {member.email}
+                </p>
+                {member.role !== "USER" || member.banned ? (
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {member.role !== "USER" ? (
+                      <Badge variant="info">
+                        Staff · {member.role.toLowerCase()}
+                      </Badge>
+                    ) : null}
+                    {member.banned ? (
+                      <Badge variant="danger">Suspended</Badge>
+                    ) : null}
+                  </div>
                 ) : null}
               </div>
-              <Facts columns={1} className="mt-3">
+
+              <Facts className="mt-2 px-4 sm:px-5">
                 <Fact label="Balance">
-                  <span className="tnum">
-                    {exactUsd(member.wallet.balanceUsd)}
-                  </span>
+                  {exactUsd(member.wallet.balanceUsd)}
                 </Fact>
                 <Fact
                   label="Promised to payouts"
@@ -230,73 +228,67 @@ export default async function AdminAdjustPage({
                       : "neutral"
                   }
                 >
-                  <span className="tnum">
-                    {exactUsd(member.wallet.pendingWithdrawalUsd)}
-                  </span>
+                  {exactUsd(member.wallet.pendingWithdrawalUsd)}
                 </Fact>
                 <Fact label="Available">
-                  <span className="tnum">
-                    {exactUsd(member.wallet.availableUsd)}
-                  </span>
+                  {exactUsd(member.wallet.availableUsd)}
                 </Fact>
               </Facts>
 
-              {member.wallet.entries.length > 0 ? (
-                <div className="mt-4">
-                  <p className="font-mono text-[0.625rem] font-semibold tracking-[0.12em] text-subtle uppercase">
-                    Last movements
-                  </p>
-                  <ul className="mt-2 grid gap-1.5">
-                    {member.wallet.entries.slice(0, 6).map((entry) => (
-                      <li
-                        key={entry.id}
-                        className="flex items-baseline justify-between gap-3 text-xs"
-                      >
-                        <span className="min-w-0 truncate text-muted">
-                          {KIND_LABEL[entry.kind] ?? entry.kind}
-                          <span className="text-subtle">
-                            {" "}
-                            · {elapsed(entry.createdAt).label}
-                          </span>
-                        </span>
-                        <span
-                          className={
-                            entry.amountUsd < 0
-                              ? "tnum shrink-0 text-danger"
-                              : "tnum shrink-0 text-fg"
-                          }
+              <div className="border-t border-line px-4 py-3.5 sm:px-5">
+                {member.wallet.entries.length > 0 ? (
+                  <>
+                    <p className="text-xs font-medium text-muted">
+                      Last movements
+                    </p>
+                    <ul className="mt-2 grid gap-1.5">
+                      {member.wallet.entries.slice(0, 6).map((entry) => (
+                        <li
+                          key={entry.id}
+                          className="flex items-baseline justify-between gap-3 text-[0.8125rem]"
                         >
-                          {entry.amountUsd > 0 ? "+" : ""}
-                          {exactUsd(entry.amountUsd)}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ) : (
-                <p className="mt-3 text-xs text-subtle">
-                  No money has moved on this account yet.
-                </p>
-              )}
-            </Panel>
+                          <span className="min-w-0 truncate text-muted">
+                            {KIND_LABEL[entry.kind] ?? entry.kind}
+                            <span className="text-subtle">
+                              {" "}
+                              · {elapsed(entry.createdAt).label}
+                            </span>
+                          </span>
+                          <span
+                            className={cn(
+                              "shrink-0 tabular-nums",
+                              entry.amountUsd < 0 ? "text-danger" : "text-fg",
+                            )}
+                          >
+                            {entry.amountUsd > 0 ? "+" : ""}
+                            {exactUsd(entry.amountUsd)}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                ) : (
+                  <p className="text-xs text-subtle">
+                    No money has moved on this account yet.
+                  </p>
+                )}
+              </div>
+            </Card>
 
             {blocked ? (
-              <Panel tone="danger">
-                <p className="flex items-center gap-2 font-display text-sm font-bold text-fg">
-                  <ShieldAlertIcon
-                    aria-hidden="true"
-                    className="size-4 text-danger"
-                  />
-                  {isSelf
+              <Callout
+                tone="danger"
+                icon={ShieldAlertIcon}
+                title={
+                  isSelf
                     ? "This is your own account"
-                    : "This is a staff account"}
-                </p>
-                <p className="mt-1.5 text-sm leading-relaxed text-muted">
-                  {isSelf
-                    ? "Nobody corrects their own balance. Ask a colleague on the finance desk, or a superadmin."
-                    : "Only a superadmin can correct a staff member's balance, so two people on the same desk cannot top each other up."}
-                </p>
-              </Panel>
+                    : "This is a staff account"
+                }
+              >
+                {isSelf
+                  ? "Nobody corrects their own balance. Ask a colleague on the finance desk, or a superadmin."
+                  : "Only a superadmin can correct a staff member's balance, so two people on the same desk cannot top each other up."}
+              </Callout>
             ) : (
               <MoneyAdjustForm
                 // Remounted per member, so a half-typed correction never
@@ -316,23 +308,23 @@ export default async function AdminAdjustPage({
             )}
           </div>
         ) : null}
-      </ConsoleSection>
+      </Section>
 
-      <ConsoleSection
+      <Section
         id="recent"
         title="Recent corrections"
         count={recent.length}
         description="The last 25, newest first, across every member. The reason is exactly what the member sees."
       >
         {recent.length === 0 ? (
-          <AllClear
+          <EmptyState
             icon={SlidersHorizontalIcon}
             title="No balance has been corrected"
             body="Every correction shows here with who made it and why."
           />
         ) : (
-          <TableScroller>
-            <table className="w-full min-w-[40rem] text-sm">
+          <TableCard>
+            <table className="w-full min-w-[44rem]">
               <caption className="sr-only">
                 Recent balance corrections, newest first
               </caption>
@@ -347,47 +339,47 @@ export default async function AdminAdjustPage({
               </thead>
               <tbody>
                 {recent.map((row) => (
-                  <tr key={row.id} className="border-t border-line align-top">
-                    <Td className="whitespace-nowrap">
+                  <Tr key={row.id}>
+                    <Td className="align-top whitespace-nowrap">
                       <time
                         dateTime={row.createdAt.toISOString()}
                         title={row.createdAt.toLocaleString("en-GB")}
-                        className="tnum text-xs text-subtle"
+                        className="text-[0.8125rem] text-subtle tabular-nums"
                       >
                         {elapsed(row.createdAt).label}
                       </time>
                     </Td>
-                    <Td>
+                    <Td className="align-top">
                       <Link
                         href={`/admin/money/adjust?member=${encodeURIComponent(row.member.email)}`}
-                        className="text-xs font-medium text-primary-text underline-offset-4 hover:underline"
+                        className={cn(linkClass, "text-[0.8125rem]")}
                       >
                         {row.member.name}
                       </Link>
-                      <span className="block text-[0.6875rem] break-all text-subtle">
+                      <span className="block text-xs break-all text-subtle">
                         {row.member.email}
                       </span>
                     </Td>
-                    <Td numeric>
+                    <Td numeric className="align-top">
                       <Amount
                         cents={row.amountUsd}
                         caption={exactUsd(row.amountUsd)}
                         tone={row.amountUsd < 0 ? "danger" : "verified"}
                       />
                     </Td>
-                    <Td className="max-w-[22rem] text-xs leading-relaxed text-muted">
+                    <Td className="max-w-[22rem] align-top text-[0.8125rem] leading-relaxed text-muted">
                       {row.reason}
                     </Td>
-                    <Td className="text-xs whitespace-nowrap text-subtle">
+                    <Td className="align-top text-[0.8125rem] whitespace-nowrap text-muted">
                       {row.byName ?? "Unknown"}
                     </Td>
-                  </tr>
+                  </Tr>
                 ))}
               </tbody>
             </table>
-          </TableScroller>
+          </TableCard>
         )}
-      </ConsoleSection>
+      </Section>
     </>
   );
 }
