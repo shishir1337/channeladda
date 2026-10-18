@@ -73,6 +73,7 @@ import {
   searchDeals,
 } from "@/server/admin-money";
 import { agentIdentity, listAssignableAgents } from "@/server/admin-users";
+import { isConfigured as isCryptomusConfigured } from "@/server/cryptomus";
 import {
   listDealActivity,
   listDealsForAgent,
@@ -189,6 +190,9 @@ export default async function AdminDealsPage({
   const isAgent = viewer.role === "AGENT" || viewer.role === "SUPERADMIN";
   const isFinance = viewer.role === "FINANCE" || viewer.role === "SUPERADMIN";
   const isStaff = viewer.role !== "AGENT";
+  // Whether an invoice could exist at all, so a missing one is not blamed
+  // on the buyer when checkout is simply switched off.
+  const checkoutOn = isCryptomusConfigured();
   // An agent sees their own queue by default rather than only when the
   // query says so: the nav link cannot carry a query without the item
   // failing to highlight, and a bookmark to the bare path is the same page.
@@ -446,7 +450,7 @@ export default async function AdminDealsPage({
             <List>
               {awaitingPayment.map((order) => {
                 const invoice = invoices.get(order.id) ?? null;
-                const line = describeInvoice(invoice);
+                const line = describeInvoice(invoice, { checkoutOn });
                 return (
                   <ListItem
                     key={order.id}

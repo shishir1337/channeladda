@@ -465,6 +465,18 @@ describe("invoices", () => {
     }),
   );
 
+  test("with checkout switched off, the desk does not blame the buyer", () => {
+    // Walked in the browser: the buyer had pressed "Pay with crypto" and
+    // been told checkout was off, and the desk said "The buyer has not
+    // opened the payment page".
+    const off = describeInvoice(null, { checkoutOn: false });
+    expect(off.label).toBe("Checkout is switched off");
+    expect(off.note).not.toMatch(/has not opened/);
+    expect(describeInvoice(null, { checkoutOn: true }).label).toBe(
+      "No invoice raised",
+    );
+  });
+
   test("each processor state reads as something to do", () => {
     expect(describeInvoice(null).label).toBe("No invoice raised");
     const base = { settledAt: null, appliedAt: null };

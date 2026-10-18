@@ -627,7 +627,17 @@ export function describeInvoice(
     InvoiceSummary,
     "lastStatus" | "settledAt" | "appliedAt"
   > | null,
+  { checkoutOn = true }: { checkoutOn?: boolean } = {},
 ): InvoiceLine {
+  if (!invoice && !checkoutOn) {
+    // Not the buyer's doing: with no processor there is no invoice to raise,
+    // and saying they "had not opened the payment page" blamed them for it.
+    return {
+      label: "Checkout is switched off",
+      note: "Card and crypto checkout is not switched on, so no invoice can exist. A payment that reached us some other way is recorded here by hand.",
+      tone: "neutral",
+    };
+  }
   if (!invoice) {
     return {
       label: "No invoice raised",
