@@ -31,7 +31,10 @@ export function TextField({
         {props.required ? <span className="ml-0.5 text-danger">*</span> : null}
       </label>
       {hint ? (
-        <p id={`${id}-hint`} className="mt-1 text-xs text-subtle">
+        <p
+          id={`${id}-hint`}
+          className="mt-1 text-xs text-subtle app:leading-relaxed"
+        >
           {hint}
         </p>
       ) : null}
@@ -56,7 +59,11 @@ export function TextField({
         {...props}
       />
       {error ? (
-        <p id={`${id}-error`} role="alert" className="mt-2 text-sm text-danger">
+        <p
+          id={`${id}-error`}
+          role="alert"
+          className="mt-2 text-sm text-danger app:mt-1.5 app:text-[0.8125rem]"
+        >
           {error}
         </p>
       ) : null}
@@ -88,7 +95,10 @@ export function PasswordField({
         {props.required ? <span className="ml-0.5 text-danger">*</span> : null}
       </label>
       {hint ? (
-        <p id={`${id}-hint`} className="mt-1 text-xs text-subtle">
+        <p
+          id={`${id}-hint`}
+          className="mt-1 text-xs text-subtle app:leading-relaxed"
+        >
           {hint}
         </p>
       ) : null}
@@ -127,7 +137,11 @@ export function PasswordField({
         </button>
       </div>
       {error ? (
-        <p id={`${id}-error`} role="alert" className="mt-2 text-sm text-danger">
+        <p
+          id={`${id}-error`}
+          role="alert"
+          className="mt-2 text-sm text-danger app:mt-1.5 app:text-[0.8125rem]"
+        >
           {error}
         </p>
       ) : null}
@@ -166,7 +180,10 @@ export function TextArea({
         {props.required ? <span className="ml-0.5 text-danger">*</span> : null}
       </label>
       {hint ? (
-        <p id={`${id}-hint`} className="mt-1 text-xs text-subtle">
+        <p
+          id={`${id}-hint`}
+          className="mt-1 text-xs text-subtle app:leading-relaxed"
+        >
           {hint}
         </p>
       ) : null}
@@ -190,7 +207,11 @@ export function TextArea({
         {...props}
       />
       {error ? (
-        <p id={`${id}-error`} role="alert" className="mt-2 text-sm text-danger">
+        <p
+          id={`${id}-error`}
+          role="alert"
+          className="mt-2 text-sm text-danger app:mt-1.5 app:text-[0.8125rem]"
+        >
           {error}
         </p>
       ) : null}
@@ -202,7 +223,7 @@ export function FormNotice({ children }: { children: React.ReactNode }) {
   return (
     <p
       role="alert"
-      className="mb-5 rounded-xl border border-danger/30 bg-danger-soft px-4 py-3 text-sm text-fg app:mb-4 app:rounded-lg app:py-2.5 app:text-[0.8125rem]"
+      className="mb-5 rounded-xl border border-danger/30 bg-danger-soft px-4 py-3 text-sm text-fg app:mb-0 app:rounded-lg app:py-2.5 app:text-[0.8125rem]"
     >
       {children}
     </p>

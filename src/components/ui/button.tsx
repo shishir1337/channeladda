@@ -14,7 +14,7 @@ const buttonVariants = cva(
     variants: {
       variant: {
         primary:
-          "bg-primary text-primary-fg hover:bg-primary-hover shadow-soft hover:shadow-lift app:shadow-[inset_0_1px_0_rgb(255_255_255/0.25),0_1px_2px_rgb(0_0_0/0.08)] app:ring-1 app:ring-inset app:ring-black/10 app:hover:shadow-[inset_0_1px_0_rgb(255_255_255/0.25),0_1px_2px_rgb(0_0_0/0.08)]",
+          "bg-primary text-primary-fg hover:bg-primary-hover shadow-soft hover:shadow-lift app:shadow-[inset_0_1px_0_rgb(255_255_255/0.25),0_1px_2px_rgb(0_0_0/0.08)] app:ring-1 app:ring-inset app:ring-black/10 app:hover:shadow-[inset_0_1px_0_rgb(255_255_255/0.25),0_1px_2px_rgb(0_0_0/0.08)] app:disabled:bg-surface-3 app:disabled:text-subtle app:disabled:opacity-100 app:disabled:shadow-none app:disabled:ring-line",
         secondary:
           "bg-surface-2 text-fg border border-line hover:border-line-strong hover:bg-surface-3 app:bg-surface app:shadow-xs app:hover:bg-surface-2 app:dark:bg-surface-2 app:dark:hover:bg-surface-3",
         outline:
