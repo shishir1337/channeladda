@@ -218,7 +218,10 @@ export function InviteTeammate({
       <CardHeader
         icon={UserPlusIcon}
         title="Add a teammate"
-        description="Creates nothing yet. You get a one-time link to hand over; the account exists once they have used it and set their own password. No password is ever shared or emailed."
+        // The security promise stays in view; how the link works is one
+        // tap away.
+        description="No password is ever shared or emailed."
+        info="Creates nothing yet. You get a one-time link to hand over; the account exists once they have used it and set their own password."
       />
       <CardBody>
         <div className="grid gap-5 lg:grid-cols-[minmax(0,20rem)_1fr] lg:items-start">

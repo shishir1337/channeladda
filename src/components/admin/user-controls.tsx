@@ -9,6 +9,7 @@ import {
   TriangleAlertIcon,
 } from "lucide-react";
 import { type ReactNode, useId, useState, useTransition } from "react";
+import { InfoTip } from "@/components/app/info-tip";
 import { Callout, Card, CardBody, CardHeader } from "@/components/app/kit";
 import { TextArea, TextField } from "@/components/auth/fields";
 import { Badge } from "@/components/ui/badge";
@@ -150,6 +151,7 @@ function Choice({
   title,
   tag,
   detail,
+  more,
 }: {
   name: string;
   value: string;
@@ -159,13 +161,18 @@ function Choice({
   onSelect: () => void;
   title: ReactNode;
   tag?: ReactNode;
+  /** One short line under the option's name. */
   detail?: ReactNode;
+  /** The rest of what the option means, behind an (i) at the row's end. */
+  more?: ReactNode;
 }) {
   return (
-    <label
+    // The (i) sits beside the label rather than in it: a button inside a
+    // label would become part of the radio's name, and a click on it would
+    // be a click on the label.
+    <div
       className={cn(
-        "flex items-start gap-3 px-3 py-2.5 transition-[background-color,opacity] duration-150",
-        locked ? "cursor-default" : "cursor-pointer",
+        "flex items-start transition-[background-color,opacity] duration-150",
         checked
           ? "bg-surface-2/70"
           : locked
@@ -173,34 +180,61 @@ function Choice({
             : "hover:bg-surface-2/40",
       )}
     >
-      <input
-        type="radio"
-        name={name}
-        value={value}
-        checked={checked}
-        onChange={onSelect}
-        className="mt-0.5 size-4 shrink-0 cursor-[inherit] accent-fg"
-      />
-      <span className="min-w-0">
-        <span className="flex flex-wrap items-center gap-1.5 text-sm leading-5 font-medium text-fg">
-          {title}
-          {tag}
-        </span>
-        {detail ? (
-          <span className="mt-0.5 block text-xs leading-relaxed text-muted">
-            {detail}
+      <label
+        className={cn(
+          "flex min-w-0 flex-1 items-start gap-3 px-3 py-2.5",
+          locked ? "cursor-default" : "cursor-pointer",
+        )}
+      >
+        <input
+          type="radio"
+          name={name}
+          value={value}
+          checked={checked}
+          onChange={onSelect}
+          className="mt-0.5 size-4 shrink-0 cursor-[inherit] accent-fg"
+        />
+        <span className="min-w-0">
+          <span className="flex flex-wrap items-center gap-1.5 text-sm leading-5 font-medium text-fg">
+            {title}
+            {tag}
           </span>
-        ) : null}
-      </span>
-    </label>
+          {detail ? (
+            <span className="mt-0.5 block text-xs leading-relaxed text-muted">
+              {detail}
+            </span>
+          ) : null}
+        </span>
+      </label>
+      {more ? (
+        <InfoTip
+          label={`About ${typeof title === "string" ? title : "this option"}`}
+          className="mt-2.5 mr-3"
+        >
+          {more}
+        </InfoTip>
+      ) : null}
+    </div>
   );
 }
 
-/** One remedy's name and what is true of it now. */
-function StepHead({ title, status }: { title: string; status?: ReactNode }) {
+/** One remedy's name, what it is for, and what is true of it now. */
+function StepHead({
+  title,
+  status,
+  info,
+}: {
+  title: string;
+  status?: ReactNode;
+  /** Why somebody would reach for this, behind an (i) beside the name. */
+  info?: ReactNode;
+}) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-      <h3 className="text-sm leading-5 font-medium text-fg">{title}</h3>
+      <div className="flex items-center gap-1.5">
+        <h3 className="text-sm leading-5 font-medium text-fg">{title}</h3>
+        {info ? <InfoTip label={`About ${title}`}>{info}</InfoTip> : null}
+      </div>
       {status}
     </div>
   );
@@ -324,11 +358,18 @@ export function UserControls({
         <Callout
           tone="neutral"
           icon={ShieldAlertIcon}
-          title="This is your own account"
+          title={
+            <span className="inline-flex items-center gap-1.5">
+              This is your own account
+              <InfoTip label="Why nobody can change their own account">
+                It is how a mistake in this panel stays something another
+                superadmin can undo rather than something that needs a developer
+                and a database.
+              </InfoTip>
+            </span>
+          }
         >
           Nobody can change their own role or suspend themselves, including you.
-          It is how a mistake in this panel stays something another superadmin
-          can undo rather than something that needs a developer and a database.
           Ask a colleague with the superadmin role.
         </Callout>
       ) : null}
@@ -338,7 +379,9 @@ export function UserControls({
           <CardHeader
             as="h2"
             title="Access"
-            description="What they can reach in the staff area. Takes effect at once and is written to the audit trail under your name."
+            // The confirmation below says the same at the moment it matters:
+            // "applies immediately and is recorded against your name".
+            info="What they can reach in the staff area. Takes effect at once and is written to the audit trail under your name."
           />
           <CardBody>
             <fieldset className="min-w-0" disabled={pending || roleArmed}>
@@ -529,7 +572,7 @@ function AgentIdentity({
       <CardHeader
         as="h2"
         title="Transfer identity"
-        description="Copied onto every deal they take, so one agent reaches every seller as the same person."
+        info="Copied onto every deal they take, so one agent reaches every seller as the same person."
       />
       <CardBody>
         {stored === null ? (
@@ -617,28 +660,33 @@ function AgentIdentity({
 
 // ---------------------------------------------------------- identity (KYC)
 
+/**
+ * Each status in one line, and what follows from it behind the (i). The two
+ * halves are one explanation split at a sentence, so neither is reworded.
+ */
 const KYC_CHOICES: {
   status: KycStatus;
   label: string;
   meaning: string;
+  more: string;
 }[] = [
   {
     status: "APPROVED",
     label: "Approved",
-    meaning:
-      "You checked their identity and it holds up. Their seller page can appear in the public sellers directory and among the top sellers on the homepage.",
+    meaning: "You checked their identity and it holds up.",
+    more: "Their seller page can appear in the public sellers directory and among the top sellers on the homepage.",
   },
   {
     status: "REJECTED",
     label: "Rejected",
-    meaning:
-      "The check failed. They stay out of the directory. Their listings are not touched — suspend the account if that is what this calls for.",
+    meaning: "The check failed.",
+    more: "They stay out of the directory. Their listings are not touched — suspend the account if that is what this calls for.",
   },
   {
     status: "NOT_STARTED",
     label: "Not started",
-    meaning:
-      "Clears an earlier decision, as if no check had been done. Use it to undo a mistake.",
+    meaning: "Clears an earlier decision, as if no check had been done.",
+    more: "Use it to undo a mistake.",
   },
 ];
 
@@ -697,7 +745,7 @@ export function KycControl({
       <CardHeader
         as="h2"
         title="Identity check"
-        description="Records the outcome of a check you did yourself — a video call, a document sent to support. Nothing here inspects a document."
+        info="Records the outcome of a check you did yourself — a video call, a document sent to support. Nothing here inspects a document."
         actions={
           <Badge variant={KYC_VARIANT[current]}>
             <span className="sr-only">Currently </span>
@@ -734,6 +782,7 @@ export function KycControl({
                       }}
                       title={choice.label}
                       detail={choice.meaning}
+                      more={choice.more}
                     />
                   ),
                 )}
@@ -861,17 +910,26 @@ export function AccountRecovery({
       <CardHeader
         as="h2"
         title="Help them back in"
-        description="For somebody who is locked out or worried. Each of these is recorded against your name."
+        // Who it is for is one tap away; that it is on the record stays.
+        description="Each of these is recorded against your name."
+        info="For somebody who is locked out or worried."
       />
       <div className="divide-y divide-line">
         <RecoveryStep
           title="Email address"
           status={emailVerified ? "Verified" : "Not verified"}
           statusTone={emailVerified ? "verified" : "danger"}
+          // The check to make before pressing stays in view; why the
+          // button exists sits behind the (i).
           body={
             emailVerified
               ? "Nothing to do."
-              : "They cannot make an offer until this is verified, and the email that would do it may never arrive. Confirm the address another way first — they wrote in from it, or you called them."
+              : "Confirm the address another way first — they wrote in from it, or you called them."
+          }
+          more={
+            emailVerified
+              ? undefined
+              : "They cannot make an offer until this is verified, and the email that would do it may never arrive."
           }
           action={
             !emailVerified && canVerifyEmail
@@ -893,7 +951,10 @@ export function AccountRecovery({
               ? "Signed out"
               : `${sessions} ${sessions === 1 ? "device" : "devices"}`
           }
-          body="Ends every session they have, on every device; their password still works. For somebody worried that someone else is in their account, or who signed in on a shared computer — where suspending would be far too much."
+          // What the button does stays in view; when to use it is behind
+          // the (i).
+          body="Ends every session they have, on every device; their password still works."
+          more="For somebody worried that someone else is in their account, or who signed in on a shared computer — where suspending would be far too much."
           blocked={
             sessions > 0 && !canEndSessions
               ? endSessionsBlockedBecause
@@ -921,13 +982,17 @@ function RecoveryStep({
   status,
   statusTone = "neutral",
   body,
+  more,
   action,
   blocked,
 }: {
   title: string;
   status: string;
   statusTone?: "neutral" | "verified" | "danger";
+  /** What is true now or what the button does, in one line. */
   body: string;
+  /** Why somebody would reach for it, behind an (i) beside the name. */
+  more?: string;
   action: {
     idle: string;
     prompt: string;
@@ -945,6 +1010,7 @@ function RecoveryStep({
     <div className="px-4 py-4 sm:px-5">
       <StepHead
         title={title}
+        info={more}
         status={<Badge variant={statusTone}>{status}</Badge>}
       />
       <p className={BODY}>{body}</p>

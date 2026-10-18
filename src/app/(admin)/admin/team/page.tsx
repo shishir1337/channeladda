@@ -19,6 +19,7 @@ import {
   ListItem,
   ListRow,
   MetaItem,
+  Meter,
   PageHeader,
   Section,
   Sep,
@@ -118,13 +119,22 @@ function Load({
 
   return (
     <span className="inline-flex flex-col items-end gap-1">
-      <span
-        className={cn(
-          "text-sm font-medium tabular-nums",
-          atCap ? "text-danger" : nearCap ? "text-primary-text" : "text-fg",
-        )}
-      >
-        {holds} of {cap}
+      <span className="inline-flex items-center gap-2.5">
+        <Meter
+          value={holds}
+          max={cap}
+          label="Channels held against the cap"
+          tone={atCap ? "danger" : nearCap ? "primary" : "neutral"}
+          className="w-12"
+        />
+        <span
+          className={cn(
+            "text-sm font-medium tabular-nums",
+            atCap ? "text-danger" : nearCap ? "text-primary-text" : "text-fg",
+          )}
+        >
+          {holds} of {cap}
+        </span>
       </span>
       {atCap ? (
         <Badge variant="danger">
@@ -160,7 +170,7 @@ export default async function AdminTeamPage() {
     <>
       <PageHeader
         title="Team"
-        description="Everyone who can reach the staff area, what they can do, and how many channels each agent holds against the cap."
+        info="Everyone who can reach the staff area, what they can do, and how many channels each agent holds against the cap."
         meta={
           <MetaItem label="Per-agent cap">
             {maxHoldsPerAgent.toLocaleString("en-US")} channels
@@ -194,7 +204,7 @@ export default async function AdminTeamPage() {
         <Stat
           label="With access"
           value={members.length}
-          note="Everyone who is not a plain member."
+          info="Everyone who is not a plain member."
           icon={UsersIcon}
         />
         <Stat
@@ -203,28 +213,32 @@ export default async function AdminTeamPage() {
           tone={
             available.length === 0 && agents.length > 0 ? "danger" : "neutral"
           }
+          info="Can take another Safest channel."
+          // Only the warnings stay on the card: a desk that cannot take a
+          // Safest deal is a finding, not a definition.
           note={
             agents.length === 0
               ? "No agents. Safest deals cannot be taken at all."
               : available.length === 0
                 ? "Every agent is at the cap. No Safest deal can be picked up."
-                : "Can take another Safest channel."
+                : undefined
           }
         />
         <Stat
           label="At the cap"
           value={atCap.length}
           tone={atCap.length > 0 ? "danger" : "neutral"}
-          note="Holding the most channels one agent may own."
+          info="Holding the most channels one agent may own."
         />
         <Stat
           label="Invitations out"
           value={live.length}
           tone={live.length > 0 ? "primary" : "neutral"}
+          info="Links handed out and not yet used."
           note={
             invites.length > live.length
               ? `${invites.length - live.length} expired and still listed.`
-              : "Links handed out and not yet used."
+              : undefined
           }
         />
       </StatGrid>
@@ -235,7 +249,29 @@ export default async function AdminTeamPage() {
           title="Worth fixing"
           tone="primary"
           count={noIdentity.length + noTwoFactor.length}
-          description="Neither of these stops anything today. Both are how a transfer goes wrong quietly."
+          // Each row says what is missing; why it matters is said once,
+          // here, rather than on every row.
+          info={
+            <>
+              <span className="block">
+                Neither of these stops anything today. Both are how a transfer
+                goes wrong quietly.
+              </span>
+              {noIdentity.length > 0 ? (
+                <span className="mt-2 block">
+                  Has no transfer identity, so whoever assigns them a deal types
+                  the address a seller is told to invite. One typo is a channel
+                  invited to nobody.
+                </span>
+              ) : null}
+              {noTwoFactor.length > 0 ? (
+                <span className="mt-2 block">
+                  <span className="font-medium text-fg">Two-factor:</span> Only
+                  they can turn it on, under Security on their own dashboard.
+                </span>
+              ) : null}
+            </>
+          }
         >
           <List>
             {noIdentity.map((agent) => (
@@ -249,13 +285,7 @@ export default async function AdminTeamPage() {
                     <Avatar name={agent.name} className="size-8 text-xs" />
                   }
                   title={agent.name}
-                  meta={
-                    <span className="whitespace-normal">
-                      Has no transfer identity, so whoever assigns them a deal
-                      types the address a seller is told to invite. One typo is
-                      a channel invited to nobody.
-                    </span>
-                  }
+                  meta="Has no transfer identity"
                   trailing={
                     <span className="hidden text-[0.8125rem] font-medium text-muted transition-colors group-hover:text-fg sm:inline">
                       Set it
@@ -276,13 +306,7 @@ export default async function AdminTeamPage() {
                     <Avatar name={member.name} className="size-8 text-xs" />
                   }
                   title={member.name}
-                  meta={
-                    <span className="whitespace-normal">
-                      {ROLE_LABELS[member.role]} with no second factor. Only
-                      they can turn it on, under Security on their own
-                      dashboard.
-                    </span>
-                  }
+                  meta={`${ROLE_LABELS[member.role]} with no second factor.`}
                   trailing={
                     <span className="hidden text-[0.8125rem] font-medium text-muted transition-colors group-hover:text-fg sm:inline">
                       Their account
@@ -300,7 +324,7 @@ export default async function AdminTeamPage() {
         id="people"
         title="With access"
         count={members.length}
-        description="Open an account to change what somebody can reach, set an agent's transfer identity, or suspend them."
+        info="Open an account to change what somebody can reach, set an agent's transfer identity, or suspend them."
       >
         {members.length === 0 ? (
           <EmptyState
@@ -407,7 +431,9 @@ export default async function AdminTeamPage() {
           title="Invitations out"
           count={invites.length}
           tone={live.length > 0 ? "primary" : "neutral"}
-          description="Links handed out and not yet used. Anyone holding one can create that account, so withdraw any you are no longer sure about."
+          // What the links are is on the figure above; what holding one
+          // allows is a security fact, so it stays in view.
+          description="Anyone holding one can create that account, so withdraw any you are no longer sure about."
         >
           <List>
             {invites.map((invite) => {
@@ -469,12 +495,7 @@ export default async function AdminTeamPage() {
         </Section>
       ) : null}
 
-      <Section
-        id="invite"
-        title="Hire somebody"
-        description="An agent, a moderator, someone on finance, or a second superadmin."
-        className="scroll-mt-20"
-      >
+      <Section id="invite" title="Hire somebody" className="scroll-mt-20">
         <InviteTeammate
           roles={INVITABLE_ROLES}
           labels={ROLE_LABELS}

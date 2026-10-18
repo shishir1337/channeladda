@@ -29,6 +29,7 @@ import {
   EmptyState,
   Fact,
   Facts,
+  Meter,
   PageHeader,
   Reference,
   Section,
@@ -278,7 +279,7 @@ export default async function AdminUserPage({
               <Section
                 id="money"
                 title="Money"
-                description="Their balance as the ledger has it, what is held for payouts not yet settled, and recent movements. Read-only: the ledger is never edited from here."
+                info="Their balance as the ledger has it, what is held for payouts not yet settled, and recent movements. Read-only: the ledger is never edited from here."
                 actions={
                   // The correction form refuses your own account, and a
                   // staff account unless you are superadmin; the link is
@@ -300,7 +301,7 @@ export default async function AdminUserPage({
                   <Stat
                     label="Balance"
                     value={<Price usd={wallet.balanceUsd / 100} />}
-                    note="Every ledger row, summed."
+                    info="Every ledger row, summed."
                   />
                   <Stat
                     label="Held for payouts"
@@ -308,16 +309,36 @@ export default async function AdminUserPage({
                     tone={
                       wallet.pendingWithdrawalUsd > 0 ? "primary" : "neutral"
                     }
-                    note="Requested or approved, not yet sent."
+                    info="Requested or approved, not yet sent."
+                    // How much of the balance is spoken for, seen before it
+                    // is read. Full when more is held than they have.
+                    chip={
+                      wallet.balanceUsd > 0 ? (
+                        <Meter
+                          value={wallet.pendingWithdrawalUsd}
+                          max={wallet.balanceUsd}
+                          label="Share of the balance held for payouts"
+                          tone={
+                            wallet.availableUsd < 0
+                              ? "danger"
+                              : wallet.pendingWithdrawalUsd > 0
+                                ? "primary"
+                                : "neutral"
+                          }
+                        />
+                      ) : null
+                    }
                   />
                   <Stat
                     label="Available"
                     value={<Price usd={wallet.availableUsd / 100} />}
                     tone={wallet.availableUsd < 0 ? "danger" : "neutral"}
+                    info="What they could withdraw now."
+                    // Money at risk: said on the card, never behind the (i).
                     note={
                       wallet.availableUsd < 0
                         ? "Below zero. More is held than they have — reconcile before sending anything."
-                        : "What they could withdraw now."
+                        : undefined
                     }
                   />
                 </StatGrid>
@@ -343,11 +364,7 @@ export default async function AdminUserPage({
 
                 <div className="mt-3">
                   {ledgerShown.length === 0 ? (
-                    <EmptyState
-                      icon={WalletIcon}
-                      title="No money has moved"
-                      body="Nothing has been credited to or taken from this account."
-                    />
+                    <EmptyState icon={WalletIcon} title="No money has moved" />
                   ) : (
                     <TableCard>
                       <table className="w-full min-w-[32rem] border-collapse">
@@ -393,7 +410,7 @@ export default async function AdminUserPage({
                   {wallet.entries.length > ledgerShown.length ? (
                     <p className="mt-2 text-xs text-subtle">
                       The latest {ledgerShown.length} of {wallet.entries.length}{" "}
-                      loaded. The balance above counts every row.
+                      loaded.
                     </p>
                   ) : null}
                 </div>
@@ -403,13 +420,13 @@ export default async function AdminUserPage({
                 id="withdrawals"
                 title="Payouts"
                 count={withdrawals.length}
-                description="Every withdrawal they have asked for, and what became of it. Check a new request's address against those paid before."
+                description="Check a new request's address against those paid before."
+                info="Every withdrawal they have asked for, and what became of it."
               >
                 {withdrawals.length === 0 ? (
                   <EmptyState
                     icon={ReceiptTextIcon}
                     title="No payouts requested"
-                    body="They have never asked to withdraw."
                   />
                 ) : (
                   <TableCard>
@@ -483,7 +500,7 @@ export default async function AdminUserPage({
             id="deals"
             title="Deals"
             count={deals.total}
-            description={
+            info={
               deals.total > deals.deals.length
                 ? `The latest ${deals.deals.length} of ${deals.total}, as buyer, seller or agent.`
                 : "Every deal they are part of, as buyer, seller or agent."
@@ -594,7 +611,22 @@ export default async function AdminUserPage({
                         : "neutral"
                   }
                 >
-                  {person.holds} of {person.maxHolds}
+                  <span className="inline-flex items-center gap-2.5">
+                    <Meter
+                      value={person.holds}
+                      max={person.maxHolds}
+                      label="Channels held against the cap"
+                      tone={
+                        person.holds >= person.maxHolds
+                          ? "danger"
+                          : person.holds > 0
+                            ? "verified"
+                            : "neutral"
+                      }
+                      className="w-14"
+                    />
+                    {person.holds} of {person.maxHolds}
+                  </span>
                 </Fact>
               ) : null}
               <Fact label="Joined">
