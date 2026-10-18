@@ -49,6 +49,7 @@ const choices: PlatformChoice[] = platforms.map((p) => ({
   name: p.name,
   metricLabel: p.metricLabel,
   transferNote: p.transferNote,
+  tint: p.tint,
 }));
 
 type Listing = NonNullable<Awaited<ReturnType<typeof getMyListing>>>;

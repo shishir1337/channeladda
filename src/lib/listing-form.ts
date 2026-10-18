@@ -164,12 +164,26 @@ export type ListingDraft = z.output<typeof listingDraftSchema>;
  * Submitting for review asks for more than saving a draft does. A draft is
  * allowed to be half-finished; a listing about to be shown to buyers is not.
  */
+const LINK_NEEDED =
+  "Paste the link to the account — the ownership check reads it, and a moderator opens it.";
+
 export const listingSubmitSchema = listingFields.extend({
   coverUrl: z.string().min(1, "Add a cover image."),
   avatarUrl: z.string().min(1, "Add a profile picture."),
   proofs: listingFields.shape.proofs.unwrap().min(1, {
     message: "Add at least one screenshot proving the account is yours.",
   }),
+  // Optional on a draft, required here: without it there is nothing for the
+  // ownership code to be read from, and nothing for a moderator to open.
+  sourceUrl: z
+    .string({ message: LINK_NEEDED })
+    .trim()
+    .min(1, LINK_NEEDED)
+    .max(300)
+    .refine(
+      (value) => /^https?:\/\//i.test(value) || value.startsWith("@"),
+      "Paste the full link, starting with https://",
+    ),
 });
 
 /**

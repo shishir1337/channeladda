@@ -43,14 +43,23 @@ test("a draft saves without the pictures", () => {
   expect(fields(listingDraftSchema.safeParse(TYPED))).toEqual([]);
 });
 
-test("submitting for review asks for the pictures and the proof", () => {
+test("submitting for review asks for the pictures, the proof and the link", () => {
   // The other half of the same rule. A listing about to be shown to buyers
-  // needs a cover, an avatar and at least one screenshot.
+  // needs a cover, an avatar and at least one screenshot — and the link to
+  // the account, which is where the ownership check reads its code from and
+  // what a moderator opens to compare the figures.
   expect(fields(listingSubmitSchema.safeParse(TYPED)).sort()).toEqual([
     "avatarUrl",
     "coverUrl",
     "proofs",
+    "sourceUrl",
   ]);
+});
+
+test("a draft saves without the link", () => {
+  expect(
+    fields(listingDraftSchema.safeParse({ ...TYPED, sourceUrl: "" })),
+  ).toEqual([]);
 });
 
 test("a draft still checks what the seller did type", () => {
@@ -126,6 +135,7 @@ test("submitting one for review still asks for all of it", () => {
     "niche",
     "price",
     "proofs",
+    "sourceUrl",
     "title",
     "yearlyRevenue",
   ]);

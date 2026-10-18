@@ -139,6 +139,15 @@ test("the code alphabet excludes characters people mistype", () => {
   }
 });
 
+test("every symbol of the alphabet can come up", () => {
+  // The code picks a symbol with the low five bits of a random byte, which
+  // is only fair while the alphabet has exactly 32 of them.
+  const seen = new Set(
+    Array.from({ length: 400 }, () => newOwnershipCode().slice(3)).join(""),
+  );
+  expect(seen.size).toBe(32);
+});
+
 test("codes do not repeat in any practical sense", () => {
   const codes = new Set(Array.from({ length: 500 }, () => newOwnershipCode()));
   expect(codes.size).toBe(500);

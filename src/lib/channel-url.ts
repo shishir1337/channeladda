@@ -1,4 +1,3 @@
-import { randomInt } from "node:crypto";
 import type { Platform } from "@/generated/prisma/enums";
 
 /**
@@ -186,9 +185,15 @@ const CODE_ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
  * never guessed at.
  */
 export function newOwnershipCode(): string {
+  // Web Crypto rather than node:crypto, so the listing form can use the link
+  // parsing above in the browser. With exactly 32 symbols, the low five bits
+  // of a random byte pick one uniformly — 256 is a multiple of 32 — so there
+  // is no bias to correct for. Change the alphabet's length and this has to
+  // change with it.
+  const bytes = crypto.getRandomValues(new Uint8Array(8));
   let code = "";
-  for (let i = 0; i < 8; i++) {
-    code += CODE_ALPHABET[randomInt(CODE_ALPHABET.length)];
+  for (const byte of bytes) {
+    code += CODE_ALPHABET[byte & 31];
   }
   return `CA-${code}`;
 }

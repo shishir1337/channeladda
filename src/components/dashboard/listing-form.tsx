@@ -8,9 +8,9 @@ import {
   CheckIcon,
   CircleAlertIcon,
   ImagePlusIcon,
-  LinkIcon,
   Loader2Icon,
   LockIcon,
+  PencilIcon,
   TagIcon,
   TrashIcon,
 } from "lucide-react";
@@ -21,12 +21,17 @@ import { InfoTip } from "@/components/app/info-tip";
 import { IconTile, inputClass, labelClass, Meter } from "@/components/app/kit";
 import { FormNotice, TextArea, TextField } from "@/components/auth/fields";
 import {
-  ChannelImport,
+  ChannelLinkField,
   type ImportedChannel,
+  linkLabel,
+  PLATFORM_MARK,
+  type PlatformId,
+  tintStyle,
 } from "@/components/dashboard/channel-import";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ImageUpload } from "@/components/upload/image-upload";
+import { handleFromUrl, parseChannelUrl } from "@/lib/channel-url";
 import { type FeeSettings, formatRate, quote } from "@/lib/fees";
 import type { ListingDraftInput, PLATFORM_IDS } from "@/lib/listing-form";
 import { cn } from "@/lib/utils";
@@ -39,7 +44,25 @@ export type PlatformChoice = {
   name: string;
   metricLabel: string;
   transferNote: string;
+  /** The platform's brand colour token, e.g. `var(--brand-youtube)`. */
+  tint: string;
 };
+
+/**
+ * The handle a link gives, for the form: the @name on a social link, the
+ * domain for a website, nothing otherwise. Only ever a suggestion — the
+ * seller can change it, and the ownership check overwrites it with the
+ * verified channel's own.
+ */
+function handleFor(link: string, platform: string): string {
+  const fromLink = handleFromUrl(link);
+  if (fromLink) return fromLink;
+  if (platform === "website") {
+    const parsed = parseChannelUrl(link);
+    if (parsed?.kind === "domain") return parsed.value;
+  }
+  return "";
+}
 
 type Draft = {
   platform: string;
@@ -138,7 +161,7 @@ const FIELD_LABELS: Record<string, string> = {
   transferProfile: "About this account's setup",
   description: "About this account",
   whatsapp: "WhatsApp number",
-  sourceUrl: "Channel link",
+  sourceUrl: "Account link",
 };
 
 function proofIndex(key: string): number | null {
@@ -146,7 +169,10 @@ function proofIndex(key: string): number | null {
   return match ? Number(match[1]) : null;
 }
 
-function labelForError(key: string) {
+function labelForError(key: string, platform: PlatformId) {
+  // The link is called what the platform calls it — "Channel URL" on
+  // YouTube, "Profile URL" on Instagram — so the summary matches the field.
+  if (key === "sourceUrl") return linkLabel(platform);
   const direct = FIELD_LABELS[key];
   if (direct) return direct;
   const index = proofIndex(key);
@@ -356,6 +382,7 @@ export function ListingForm({
 }) {
   const router = useRouter();
   const ids = {
+    link: useId(),
     handle: useId(),
     title: useId(),
     niche: useId(),
@@ -399,9 +426,32 @@ export function ListingForm({
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) =>
     edit((d) => ({ ...d, [key]: value }));
 
+  /** Opens the handle for typing, instead of following the link. */
+  const [editingHandle, setEditingHandle] = useState(false);
+
+  /**
+   * The link, with the handle following it.
+   *
+   * The handle is what the slug and the public page are built from, and the
+   * link already carries it, so typing both was asking for the same thing
+   * twice. It follows only while it is still the one the link gave — a handle
+   * the seller typed themselves is never overwritten.
+   */
+  const setLink = (link: string) =>
+    edit((d) => {
+      const before = handleFor(d.sourceUrl, d.platform);
+      const follows = d.handle === "" || d.handle === before;
+      return {
+        ...d,
+        sourceUrl: link,
+        handle: follows ? handleFor(link, d.platform) : d.handle,
+      };
+    });
+
   const applyImport = (channel: ImportedChannel) => {
     const previous = lastImport.current;
     lastImport.current = channel;
+    setEditingHandle(false);
 
     /**
      * What one field becomes after a lookup.
@@ -417,26 +467,46 @@ export function ListingForm({
       c && c.subscribers > 0 ? String(c.subscribers) : "";
     const years = (c: ImportedChannel | null) =>
       c && c.ageYears > 0 ? String(c.ageYears) : "";
+    const rate = (c: ImportedChannel | null) =>
+      c && c.engagement !== null ? String(c.engagement) : "";
+    // The title needs ten characters and a channel name often has fewer.
+    const titleOf = (c: ImportedChannel | null) => {
+      if (!c?.title) return "";
+      const name = platforms.find((p) => p.id === c.platform.toLowerCase());
+      return c.title.trim().length >= 10
+        ? c.title
+        : `${c.title} — ${name?.name ?? "the"} channel`;
+    };
+    /** A picture the lookup stored, unless the seller has their own. */
+    const picture = (
+      current: string | null,
+      wasImported: string | null | undefined,
+      next: string | null,
+    ) =>
+      current === null || current === wasImported ? (next ?? current) : current;
 
     edit((current) => ({
       ...current,
       platform: (channel.platform.toLowerCase() ||
         current.platform) as Draft["platform"],
       sourceUrl: channel.canonicalUrl || current.sourceUrl,
-      title: take(current.title, previous?.title ?? "", channel.title),
+      title: take(current.title, titleOf(previous), titleOf(channel)),
       // The handle, not the display title: "Daily Tech Brief" is not
       // @dailytechbrief, and the slug and the public URL are built from this.
-      handle: take(
-        current.handle,
-        previous?.handle ?? "",
-        channel.handle ?? "",
+      // One the link suggested gives way to the channel's own.
+      handle:
+        current.handle === handleFor(current.sourceUrl, current.platform)
+          ? channel.handle || current.handle
+          : take(current.handle, previous?.handle ?? "", channel.handle ?? ""),
+      // The description is deliberately not taken. A channel's about text is
+      // written for viewers and routinely carries a business email — on a
+      // listing that is an invitation to deal off the platform.
+      avatarUrl: picture(
+        current.avatarUrl,
+        previous?.avatarUrl,
+        channel.avatarUrl,
       ),
-      description: take(
-        current.description,
-        previous?.description ?? "",
-        channel.description,
-      ),
-      avatarUrl: current.avatarUrl ?? channel.avatarUrl,
+      coverUrl: picture(current.coverUrl, previous?.coverUrl, channel.coverUrl),
       audience: take(current.audience, subs(previous), subs(channel)),
       ageYears: take(current.ageYears, years(previous), years(channel)),
       country: take(
@@ -444,11 +514,29 @@ export function ListingForm({
         previous?.country ?? "",
         channel.country ?? "",
       ),
+      niche: take(current.niche, previous?.niche ?? "", channel.niche ?? ""),
+      engagement: take(current.engagement, rate(previous), rate(channel)),
     }));
   };
 
   const platform =
     platforms.find((p) => p.id === draft.platform) ?? platforms[0];
+
+  // Shown as a quiet line rather than a field while it is simply what the
+  // link says; a field again the moment there is something to decide.
+  const suggestedHandle = handleFor(draft.sourceUrl, draft.platform);
+  const handleFollowsLink =
+    draft.handle !== "" &&
+    !editingHandle &&
+    !errors.handle &&
+    (draft.handle === suggestedHandle ||
+      draft.handle === lastImport.current?.handle);
+  const showHandleField =
+    !handleFollowsLink &&
+    (editingHandle ||
+      Boolean(errors.handle) ||
+      draft.handle !== "" ||
+      draft.sourceUrl.trim() !== "");
 
   const priceNumber = num(draft.price);
   const showPayout = Number.isFinite(priceNumber) && priceNumber > 0;
@@ -476,7 +564,8 @@ export function ListingForm({
       label: "The basics",
       icon: TagIcon,
       done: [
-        filled(draft.handle),
+        // The link and the handle it gives are one thing to the seller.
+        filled(draft.sourceUrl) && filled(draft.handle),
         filled(draft.title),
         filled(draft.niche),
         filled(draft.country),
@@ -577,7 +666,8 @@ export function ListingForm({
     if (key === "description") return ids.description;
     if (key === "whatsapp") return ids.whatsapp;
     if (key === "monetized") return ids.monetized;
-    if (key === "platform" || key === "sourceUrl") return STEP.basics;
+    if (key === "sourceUrl") return ids.link;
+    if (key === "platform") return STEP.basics;
     if (key === "coverUrl" || key === "avatarUrl") return STEP.images;
     const index = proofIndex(key);
     if (index !== null) return `proof-${index}-label`;
@@ -658,13 +748,6 @@ export function ListingForm({
 
   return (
     <div className="flex flex-col gap-4 sm:gap-5">
-      {/* Outside the form: pasting a link fills the fields in, it does not
-          submit anything. */}
-      <ChannelImport
-        onImported={applyImport}
-        currentUrl={draft.sourceUrl || undefined}
-      />
-
       <form
         className="flex flex-col gap-4 sm:gap-5"
         onSubmit={(e) => {
@@ -773,7 +856,7 @@ export function ListingForm({
                         className="group block min-h-11 cursor-pointer py-2 text-left text-[0.8125rem] leading-relaxed pointer-fine:min-h-0 pointer-fine:py-1"
                       >
                         <span className="font-medium text-fg underline decoration-danger/40 underline-offset-4 transition-colors duration-150 group-hover:decoration-danger">
-                          {labelForError(item.key)}
+                          {labelForError(item.key, platform.id)}
                         </span>
                         <span className="text-muted"> — {item.message}</span>
                       </button>
@@ -797,37 +880,53 @@ export function ListingForm({
         >
           <fieldset>
             <legend className={labelClass}>Platform</legend>
+            {/* Each in its own colour, quietly: the mark in a tinted tile,
+                and the chosen one edged and washed in it. Enough to find
+                YouTube at a glance without five brands shouting at once. */}
             <div className="mt-1.5 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
               {platforms.map((p) => {
                 const chosen = draft.platform === p.id;
+                const Mark = PLATFORM_MARK[p.id];
                 return (
                   <button
                     key={p.id}
                     type="button"
                     onClick={() => set("platform", p.id)}
                     aria-pressed={chosen}
+                    style={tintStyle(p.tint)}
                     className={cn(
-                      "inline-flex h-11 cursor-pointer items-center justify-between gap-2 rounded-lg border bg-surface px-3 text-sm font-medium shadow-xs transition-[border-color,background-color,color,box-shadow] duration-150 pointer-fine:h-10 dark:bg-surface-2",
+                      "group/platform relative inline-flex h-12 cursor-pointer items-center gap-2.5 rounded-lg border pr-3 pl-2 text-sm font-medium shadow-xs transition-[border-color,background-color,color,box-shadow] duration-200 pointer-fine:h-11",
                       chosen
-                        ? "border-fg text-fg ring-1 ring-fg"
+                        ? "border-[color-mix(in_oklab,var(--tint)_55%,transparent)] bg-[color-mix(in_oklab,var(--tint)_6%,var(--color-surface))] text-fg ring-1 ring-[color-mix(in_oklab,var(--tint)_30%,transparent)] dark:bg-[color-mix(in_oklab,var(--tint)_10%,var(--color-surface-2))]"
                         : errors.platform
-                          ? "border-danger text-muted hover:text-fg"
-                          : "border-line text-muted hover:border-line-strong hover:bg-surface-2/60 hover:text-fg",
+                          ? "border-danger bg-surface text-muted hover:text-fg dark:bg-surface-2"
+                          : "border-line bg-surface text-muted hover:border-[color-mix(in_oklab,var(--tint)_35%,var(--color-line))] hover:text-fg dark:bg-surface-2",
                     )}
                   >
-                    <span className="truncate">{p.name}</span>
                     <span
                       aria-hidden="true"
                       className={cn(
-                        "inline-flex size-4 shrink-0 items-center justify-center rounded-full transition-[background-color,opacity] duration-150",
+                        "inline-flex size-8 shrink-0 items-center justify-center rounded-md text-[var(--tint)] transition-[background-color,transform] duration-200 group-hover/platform:scale-[1.04] pointer-fine:size-7",
                         chosen
-                          ? "bg-fg text-bg opacity-100"
-                          : "border border-line-strong opacity-70",
+                          ? "bg-[color-mix(in_oklab,var(--tint)_14%,transparent)]"
+                          : "bg-[color-mix(in_oklab,var(--tint)_9%,transparent)]",
                       )}
                     >
-                      {chosen ? (
-                        <CheckIcon className="size-2.5" strokeWidth={3.5} />
-                      ) : null}
+                      <Mark className="size-4" />
+                    </span>
+                    <span className="min-w-0 flex-1 truncate text-left">
+                      {p.name}
+                    </span>
+                    <span
+                      aria-hidden="true"
+                      className={cn(
+                        "inline-flex size-4 shrink-0 items-center justify-center rounded-full text-white transition-[background-color,opacity,scale] duration-200",
+                        chosen
+                          ? "scale-100 bg-[var(--tint)] opacity-100"
+                          : "scale-75 opacity-0",
+                      )}
+                    >
+                      <CheckIcon className="size-2.5" strokeWidth={3.5} />
                     </span>
                   </button>
                 );
@@ -840,54 +939,57 @@ export function ListingForm({
             ) : null}
           </fieldset>
 
-          {draft.sourceUrl || errors.sourceUrl ? (
-            <div>
-              <div
-                className={cn(
-                  "flex items-start gap-2.5 rounded-lg border bg-surface-2/60 px-3 py-2.5",
-                  errors.sourceUrl ? "border-danger" : "border-line",
-                )}
+          <ChannelLinkField
+            id={ids.link}
+            platform={platform}
+            names={
+              Object.fromEntries(
+                platforms.map((p) => [p.id, p.name]),
+              ) as Record<PlatformId, string>
+            }
+            value={draft.sourceUrl}
+            onChange={setLink}
+            onPlatform={(id) => set("platform", id)}
+            onConfirm={applyImport}
+            error={errors.sourceUrl}
+            savedUrl={initial?.sourceUrl || undefined}
+          />
+
+          {handleFollowsLink ? (
+            <p className="-mt-2 flex min-w-0 items-center gap-1.5 text-[0.8125rem] text-muted">
+              <span className="shrink-0">Listed as</span>
+              <span className="truncate font-medium text-fg">
+                {draft.platform === "website" ? "" : "@"}
+                {draft.handle.replace(/^@/, "")}
+              </span>
+              <InfoTip label="About the handle">
+                Taken from the link. Your listing's address is built from it,
+                and once ownership is verified it becomes the channel's own.
+              </InfoTip>
+              <button
+                type="button"
+                onClick={() => setEditingHandle(true)}
+                className="ml-1 inline-flex h-11 shrink-0 cursor-pointer items-center gap-1 rounded-md px-1.5 text-[0.8125rem] font-medium text-muted transition-colors duration-150 hover:bg-surface-2 hover:text-fg pointer-fine:h-7"
               >
-                <LinkIcon
-                  aria-hidden="true"
-                  className="mt-0.5 size-3.5 shrink-0 text-subtle"
-                />
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs text-subtle">
-                    The link this listing points at
-                  </p>
-                  <p className="mt-0.5 text-[0.8125rem] font-medium break-all text-fg">
-                    {draft.sourceUrl || "Nothing yet"}
-                  </p>
-                </div>
-                <InfoTip label="About the link this listing points at">
-                  Set by the box at the top of this page. It is the account your
-                  ownership code is read from, so it has to be the one you are
-                  selling.
-                </InfoTip>
-              </div>
-              {/* The schema can reject this and there is no input for it, so
-                  without this line a bad link stops every save with nothing
-                  on screen to explain why. */}
-              {errors.sourceUrl ? (
-                <p role="alert" className="mt-1.5 text-[0.8125rem] text-danger">
-                  {errors.sourceUrl} Paste it again at the top of this page.
-                </p>
-              ) : null}
-            </div>
+                <PencilIcon aria-hidden="true" className="size-3" />
+                Edit
+              </button>
+            </p>
           ) : null}
 
-          <TextField
-            id={ids.handle}
-            name="handle"
-            label="Handle"
-            hint="Without the URL — just the name, for example @dailytechbrief."
-            value={draft.handle}
-            onChange={(e) => set("handle", e.target.value)}
-            error={errors.handle}
-            placeholder="@dailytechbrief"
-            required
-          />
+          {showHandleField ? (
+            <TextField
+              id={ids.handle}
+              name="handle"
+              label="Handle"
+              hint="The account's name as buyers would search for it, for example @dailytechbrief."
+              value={draft.handle}
+              onChange={(e) => set("handle", e.target.value)}
+              error={errors.handle}
+              placeholder="@dailytechbrief"
+              required
+            />
+          ) : null}
           <FieldInfo
             label="Listing title"
             info="What a buyer sees first. Say what it is and why it is worth having."
