@@ -97,6 +97,7 @@ export default async function SecurityPage() {
         {/* ---- where this account stands --------------------------------- */}
         <Card>
           <CardHeader
+            as="h2"
             icon={ShieldCheckIcon}
             title="Where this account stands"
           />
@@ -151,6 +152,7 @@ export default async function SecurityPage() {
         {/* ---- money safety ---------------------------------------------- */}
         <Card>
           <CardHeader
+            as="h2"
             icon={WalletIcon}
             title="Your payout address lives in the wallet"
             actions={
@@ -175,6 +177,7 @@ export default async function SecurityPage() {
         {/* ---- what we will never do ------------------------------------- */}
         <Card>
           <CardHeader
+            as="h2"
             icon={BanIcon}
             title="What Channel Adda will never ask you for"
           />
@@ -238,7 +241,7 @@ function StatusRow({
         <IconTile icon={icon} />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h4 className="text-sm leading-6 font-medium text-fg">{label}</h4>
+            <h3 className="text-sm leading-6 font-medium text-fg">{label}</h3>
             <Badge size="sm" variant={good ? "verified" : "primary"}>
               {state}
             </Badge>

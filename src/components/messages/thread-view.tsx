@@ -253,6 +253,13 @@ function Bubble({
                 !last && (message.mine ? "rounded-br-md" : "rounded-bl-md"),
               )}
             >
+              {/* Only the first bubble of a turn shows the name, so the rest
+                  say it to a screen reader instead. */}
+              {first ? null : (
+                <span className="sr-only">
+                  {message.mine ? "You" : displayName(message)}:{" "}
+                </span>
+              )}
               {message.body ? (
                 <p className="text-sm leading-relaxed wrap-break-word whitespace-pre-wrap">
                   {message.body}

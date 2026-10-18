@@ -157,7 +157,7 @@ export default async function ThreadPage({
               <Badge
                 variant={STATUS_TONE[deal.status]}
                 size="sm"
-                className="max-w-full whitespace-normal"
+                className="max-w-full whitespace-normal app:h-auto app:min-h-5 app:py-0.5 app:leading-4"
               >
                 {STATUS_LABELS[deal.status]}
               </Badge>

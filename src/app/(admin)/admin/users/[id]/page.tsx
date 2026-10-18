@@ -556,7 +556,7 @@ export default async function AdminUserPage({
 
         <div className="grid min-w-0 gap-3">
           <Card>
-            <CardHeader title="Account" />
+            <CardHeader as="h2" title="Account" />
             <Facts className="px-4 sm:px-5">
               <Fact label="Email">
                 <Badge variant={person.emailVerified ? "verified" : "danger"}>

@@ -58,6 +58,7 @@ function Group({
   return (
     <Card>
       <CardHeader
+        as="h2"
         title={title}
         description={<span className="block max-w-[80ch]">{description}</span>}
       />
@@ -414,6 +415,7 @@ export function SettingsForm({
       {previewable ? (
         <Card className="overflow-hidden">
           <CardHeader
+            as="h2"
             title="What that means"
             description={
               <span className="block max-w-[80ch]">
@@ -467,6 +469,7 @@ export function SettingsForm({
           this page that is the reader's move. */}
       <Card className={cn(changed && "border-primary/40")}>
         <CardHeader
+          as="h2"
           title={
             <span className="inline-flex items-center gap-2">
               {changed ? <Dot tone="primary" pulse /> : null}

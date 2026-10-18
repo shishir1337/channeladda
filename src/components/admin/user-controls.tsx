@@ -200,7 +200,7 @@ function Choice({
 function StepHead({ title, status }: { title: string; status?: ReactNode }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-      <p className="text-sm leading-5 font-medium text-fg">{title}</p>
+      <h3 className="text-sm leading-5 font-medium text-fg">{title}</h3>
       {status}
     </div>
   );
@@ -336,6 +336,7 @@ export function UserControls({
       {canSetRole && !isSelf ? (
         <Card>
           <CardHeader
+            as="h2"
             title="Access"
             description="What they can reach in the staff area. Takes effect at once and is written to the audit trail under your name."
           />
@@ -526,6 +527,7 @@ function AgentIdentity({
   return (
     <Card>
       <CardHeader
+        as="h2"
         title="Transfer identity"
         description="Copied onto every deal they take, so one agent reaches every seller as the same person."
       />
@@ -693,6 +695,7 @@ export function KycControl({
   return (
     <Card>
       <CardHeader
+        as="h2"
         title="Identity check"
         description="Records the outcome of a check you did yourself — a video call, a document sent to support. Nothing here inspects a document."
         actions={
@@ -856,6 +859,7 @@ export function AccountRecovery({
   return (
     <Card>
       <CardHeader
+        as="h2"
         title="Help them back in"
         description="For somebody who is locked out or worried. Each of these is recorded against your name."
       />
@@ -1038,7 +1042,7 @@ export function DangerZone({
 }) {
   return (
     <Card tone="danger" className="bg-surface">
-      <CardHeader title="Danger zone" />
+      <CardHeader as="h2" title="Danger zone" />
       <div className="divide-y divide-line">
         {isSelf ? null : (
           <Suspension userId={userId} banned={banned} holds={holds} />

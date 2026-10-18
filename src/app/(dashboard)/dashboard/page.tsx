@@ -427,6 +427,7 @@ export default async function DashboardPage() {
         <div className="grid gap-4 lg:grid-cols-2">
           <Card>
             <CardHeader
+              as="h2"
               icon={StoreIcon}
               title="Selling"
               actions={<SeeAll href="/dashboard/listings">All listings</SeeAll>}
@@ -474,6 +475,7 @@ export default async function DashboardPage() {
 
           <Card>
             <CardHeader
+              as="h2"
               icon={HandshakeIcon}
               title="Buying"
               actions={<SeeAll href="/dashboard/offers">All offers</SeeAll>}

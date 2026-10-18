@@ -128,6 +128,7 @@ export default async function OffersPage() {
         viewingAs="seller"
         empty={
           <EmptyState
+            as="h3"
             icon={InboxIcon}
             title="Nobody has made you an offer yet"
             body="Buyers can offer below your asking price on any live listing of yours, and you can counter without losing the buyer."
@@ -149,6 +150,7 @@ export default async function OffersPage() {
         viewingAs="buyer"
         empty={
           <EmptyState
+            as="h3"
             icon={TagIcon}
             title="You have not made any offers"
             body="Make an offer on any listing for less than its asking price — the seller can accept it, counter it, or let it lapse."

@@ -191,6 +191,7 @@ export default async function ReviewListingPage({
         <div className="flex min-w-0 flex-col gap-6 lg:col-start-1 lg:row-start-1">
           <Card>
             <CardHeader
+              as="h2"
               icon={FingerprintIcon}
               title="Ownership check"
               description="Open the account and look for this code. If it is not there, send the listing back — a seller who cannot post to the profile does not control it."
@@ -212,6 +213,7 @@ export default async function ReviewListingPage({
 
           <Card>
             <CardHeader
+              as="h2"
               title="What the seller claims"
               description="Unverified until the proof below backs it up. Money is shown in whichever currency the header is set to."
             />
@@ -236,6 +238,7 @@ export default async function ReviewListingPage({
 
           <Card>
             <CardHeader
+              as="h2"
               icon={ImageIcon}
               title={
                 <span className="inline-flex items-center gap-2">
@@ -308,14 +311,14 @@ export default async function ReviewListingPage({
 
         {/* ---- where it stands, and the decision ---- */}
         <div className="min-w-0 lg:col-start-2 lg:row-span-2 lg:row-start-1">
-          <div className="flex flex-col gap-4 lg:sticky lg:top-20">
+          <div className="no-scrollbar flex flex-col gap-4 lg:sticky lg:top-20 lg:max-h-[calc(100dvh-6rem)] lg:overflow-y-auto">
             {inReview && canModerate ? (
               <ReviewDecision listingId={listing.id} />
             ) : null}
 
             {sentBack ? (
               <Card>
-                <CardHeader title="Sent back with" />
+                <CardHeader as="h2" title="Sent back with" />
                 <CardBody>
                   <p className="text-sm leading-[1.6] break-words text-fg">
                     {listing.rejectionReason}
@@ -326,7 +329,11 @@ export default async function ReviewListingPage({
 
             {removed ? (
               <Card tone="danger">
-                <CardHeader title="Taken down" className="border-danger/15" />
+                <CardHeader
+                  as="h2"
+                  title="Taken down"
+                  className="border-danger/15"
+                />
                 <CardBody>
                   <p className="text-sm leading-[1.6] break-words text-fg">
                     {listing.rejectionReason ?? (
@@ -381,6 +388,7 @@ export default async function ReviewListingPage({
         <div className="flex min-w-0 flex-col gap-6 lg:col-start-1 lg:row-start-2">
           <Card>
             <CardHeader
+              as="h2"
               icon={UserRoundIcon}
               title="The seller"
               actions={
@@ -450,7 +458,7 @@ export default async function ReviewListingPage({
           </Card>
 
           <Card>
-            <CardHeader icon={HistoryIcon} title="History" />
+            <CardHeader as="h2" icon={HistoryIcon} title="History" />
             <CardBody>
               {trail.length === 0 ? (
                 <p className="text-[0.8125rem] text-muted">

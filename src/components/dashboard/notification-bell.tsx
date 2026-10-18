@@ -154,7 +154,7 @@ export function NotificationBell({
                     router.refresh();
                   })
                 }
-                className="-mr-1.5 inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-md px-1.5 text-xs font-medium text-muted transition-colors hover:bg-surface-2 hover:text-fg disabled:opacity-60"
+                className="-mr-1.5 inline-flex h-11 cursor-pointer items-center gap-1.5 rounded-md px-1.5 text-xs font-medium text-muted transition-colors hover:bg-surface-2 hover:text-fg disabled:opacity-60 pointer-fine:h-7"
               >
                 <CheckCheckIcon aria-hidden="true" className="size-3.5" />
                 Mark all read
@@ -249,7 +249,7 @@ export function NotificationBell({
             <Link
               href="/dashboard/notifications"
               onClick={() => setOpen(false)}
-              className="flex h-8 items-center justify-center rounded-md text-xs font-medium text-muted transition-colors hover:bg-surface-2 hover:text-fg"
+              className="flex h-11 items-center justify-center rounded-md text-xs font-medium text-muted transition-colors hover:bg-surface-2 hover:text-fg pointer-fine:h-8"
             >
               See everything
             </Link>

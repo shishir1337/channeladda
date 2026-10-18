@@ -36,6 +36,7 @@ export default async function MessagesPage() {
   if (threads.length === 0) {
     return (
       <EmptyState
+        as="h2"
         className={PANE}
         icon={MessagesSquareIcon}
         title="No conversations yet"
@@ -52,6 +53,7 @@ export default async function MessagesPage() {
   if (oldestUnread) {
     return (
       <EmptyState
+        as="h2"
         className={PANE}
         icon={MailOpenIcon}
         title={`${unread.length} ${unread.length === 1 ? "conversation needs" : "conversations need"} a reply`}
@@ -69,6 +71,7 @@ export default async function MessagesPage() {
 
   return (
     <EmptyState
+      as="h2"
       // The list is right above it on a phone; this would only repeat it.
       className={`${PANE} max-lg:hidden`}
       icon={MessagesSquareIcon}

@@ -101,6 +101,7 @@ export function ReviewDecision({ listingId }: { listingId: string }) {
     // edge; everything else on the review page stays neutral.
     <Card className="border-primary/40">
       <CardHeader
+        as="h2"
         title="Your decision"
         description="Recorded against your name in the audit trail either way."
         actions={<Badge size="sm">Logged</Badge>}
@@ -217,6 +218,7 @@ export function RemoveListing({ listingId }: { listingId: string }) {
   return (
     <Card tone="danger">
       <CardHeader
+        as="h2"
         title="Take this listing down"
         description="It disappears from the marketplace and from search. Open offers and deals on it are not undone by this — end those on the deal desk."
         className="border-danger/15"
@@ -311,7 +313,7 @@ export function ReopenListing({ listingId }: { listingId: string }) {
   return (
     <div id={panelId}>
       <Card>
-        <CardHeader title="Send it back to review" />
+        <CardHeader as="h2" title="Send it back to review" />
         <CardBody>
           <p className="text-[0.8125rem] leading-relaxed text-muted">
             For a listing that came down in error. It goes into the review
@@ -404,6 +406,7 @@ export function FeatureListing({
   return (
     <Card>
       <CardHeader
+        as="h2"
         title={
           <span className="inline-flex items-center gap-2">
             <StarIcon

@@ -167,7 +167,10 @@ export function OwnershipPanel({
               </Button>
             </div>
 
-            <ol id={stepsId} className="mt-5 flex flex-col gap-3">
+            {/* role="list": without list-style Safari drops an ol from the
+                accessibility tree, and the numbers here are drawn, not read. */}
+            {/* biome-ignore lint/a11y/noRedundantRoles: see above */}
+            <ol id={stepsId} role="list" className="mt-5 flex flex-col gap-3">
               {how.steps.map((step, i) => (
                 <Step key={step} n={i + 1}>
                   {step}

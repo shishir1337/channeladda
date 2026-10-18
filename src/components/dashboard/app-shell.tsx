@@ -30,6 +30,7 @@ import {
   SheetContent,
   SheetDescription,
   SheetTitle,
+  SheetTrigger,
 } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 
@@ -258,7 +259,7 @@ function Wordmark({
     <Link
       href={href}
       className={cn(
-        "flex h-9 min-w-0 items-center gap-2 rounded-md px-1",
+        "flex h-11 min-w-0 items-center gap-2 rounded-md px-1 pointer-fine:h-9",
         collapsed && "justify-center px-0",
       )}
       aria-label={staff ? "Channel Adda staff area" : "Channel Adda dashboard"}
@@ -390,151 +391,158 @@ export function AppShell({
 
   return (
     <Tooltip.Provider delayDuration={250} skipDelayDuration={150}>
-      <div data-app="" className="min-h-dvh bg-bg">
-        <a
-          href="#main"
-          className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:inline-flex focus:h-9 focus:items-center focus:rounded-md focus:border focus:border-line focus:bg-surface focus:px-3 focus:text-sm focus:font-medium focus:text-fg focus:shadow-lift"
-        >
-          Skip to main content
-        </a>
+      {/* The sheet wraps the whole frame so its trigger can live in the top
+          bar: Radix hands focus back to that trigger when the drawer closes,
+          and gives it aria-expanded and aria-controls. */}
+      <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
+        <div data-app="" className="min-h-dvh bg-bg">
+          <a
+            href="#main"
+            className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:inline-flex focus:h-9 focus:items-center focus:rounded-md focus:border focus:border-line focus:bg-surface focus:px-3 focus:text-sm focus:font-medium focus:text-fg focus:shadow-lift"
+          >
+            Skip to main content
+          </a>
 
-        {/* ---- rail, desktop only ---------------------------------------- */}
-        <aside
-          className={cn(
-            "fixed inset-y-0 left-0 z-30 hidden flex-col border-r border-line bg-bg lg:flex",
-            collapsed ? "w-15" : "w-60",
-            mounted &&
-              "transition-[width] duration-200 ease-[var(--ease-out-soft)]",
-          )}
-        >
-          <div
+          {/* ---- rail, desktop only ---------------------------------------- */}
+          <aside
             className={cn(
-              "flex h-14 shrink-0 items-center px-3",
-              collapsed && "justify-center px-0",
+              "fixed inset-y-0 left-0 z-30 hidden flex-col border-r border-line bg-bg lg:flex",
+              collapsed ? "w-15" : "w-60",
+              mounted &&
+                "transition-[width] duration-200 ease-[var(--ease-out-soft)]",
             )}
           >
-            <Wordmark collapsed={collapsed} href={home} staff={staff} />
-          </div>
-
-          <div
-            className={cn(
-              "no-scrollbar flex-1 overflow-y-auto px-3 pt-2 pb-4",
-              collapsed && "px-2.5",
-            )}
-          >
-            <NavList
-              groups={groups}
-              currentHref={current?.item.href}
-              collapsed={collapsed}
-            />
-          </div>
-
-          <div
-            className={cn(
-              "shrink-0 border-t border-line p-2",
-              collapsed && "px-2.5",
-            )}
-          >
-            <UserMenu user={user} area={area} collapsed={collapsed} />
-          </div>
-        </aside>
-
-        {/* ---- everything to the right of the rail ------------------------ */}
-        <div
-          className={cn(
-            collapsed ? "lg:pl-15" : "lg:pl-60",
-            mounted &&
-              "transition-[padding] duration-200 ease-[var(--ease-out-soft)]",
-          )}
-        >
-          <header className="sticky top-0 z-20 flex h-14 items-center gap-2 border-b border-line bg-bg/80 px-3 backdrop-blur-md backdrop-saturate-150 sm:px-5 lg:px-6">
-            <button
-              type="button"
-              onClick={() => setDrawerOpen(true)}
-              aria-label={
-                waiting > 0
-                  ? `Open the menu — ${waiting} waiting on you`
-                  : "Open the menu"
-              }
-              className={cn(iconButton, "relative lg:hidden")}
+            <div
+              className={cn(
+                "flex h-14 shrink-0 items-center px-3",
+                collapsed && "justify-center px-0",
+              )}
             >
-              <PanelLeftIcon aria-hidden="true" className="size-[1.125rem]" />
-              {waiting > 0 ? (
-                <span
-                  aria-hidden="true"
-                  className="absolute top-2 right-2 size-1.5 rounded-full bg-primary ring-2 ring-bg pointer-fine:top-1 pointer-fine:right-1"
-                />
-              ) : null}
-            </button>
-            <button
-              type="button"
-              onClick={toggle}
-              aria-label={
-                collapsed ? "Expand the sidebar" : "Collapse the sidebar"
-              }
-              aria-expanded={!collapsed}
-              title={
-                collapsed
-                  ? "Expand the sidebar (Ctrl+B)"
-                  : "Collapse the sidebar (Ctrl+B)"
-              }
-              className={cn(iconButton, "-ml-1 hidden lg:inline-flex")}
-            >
-              <PanelLeftIcon aria-hidden="true" className="size-4" />
-            </button>
-
-            <span
-              aria-hidden="true"
-              className="mx-1 hidden h-4 w-px bg-line-strong/70 sm:block"
-            />
-
-            <nav
-              aria-label="You are here"
-              className="flex min-w-0 flex-1 items-center gap-1.5 text-sm"
-            >
-              {current?.group.label ? (
-                <>
-                  <span className="hidden shrink-0 text-muted sm:inline">
-                    {current.group.label}
-                  </span>
-                  <ChevronRightIcon
-                    aria-hidden="true"
-                    className="hidden size-3.5 shrink-0 text-subtle/70 sm:block"
-                  />
-                </>
-              ) : null}
-              <span
-                aria-current="page"
-                className="truncate font-medium text-fg"
-              >
-                {page}
-              </span>
-            </nav>
-
-            <div className="flex shrink-0 items-center gap-0.5">
-              {bell}
-              <ThemeToggle
-                className={cn(
-                  iconButton,
-                  "border-0 hover:border-0 [&_svg]:size-4",
-                )}
-              />
-              <div className="lg:hidden">
-                <UserMenu user={user} area={area} variant="compact" />
-              </div>
+              <Wordmark collapsed={collapsed} href={home} staff={staff} />
             </div>
-          </header>
 
-          <main
-            id="main"
-            className="px-4 pt-6 pb-16 sm:px-6 lg:px-10 lg:pt-8 lg:pb-20"
+            <div
+              className={cn(
+                "no-scrollbar flex-1 overflow-y-auto px-3 pt-2 pb-4",
+                collapsed && "px-2.5",
+              )}
+            >
+              <NavList
+                groups={groups}
+                currentHref={current?.item.href}
+                collapsed={collapsed}
+              />
+            </div>
+
+            <div
+              className={cn(
+                "shrink-0 border-t border-line p-2",
+                collapsed && "px-2.5",
+              )}
+            >
+              <UserMenu user={user} area={area} collapsed={collapsed} />
+            </div>
+          </aside>
+
+          {/* ---- everything to the right of the rail ------------------------ */}
+          <div
+            className={cn(
+              collapsed ? "lg:pl-15" : "lg:pl-60",
+              mounted &&
+                "transition-[padding] duration-200 ease-[var(--ease-out-soft)]",
+            )}
           >
-            <div className="mx-auto w-full max-w-6xl">{children}</div>
-          </main>
-        </div>
+            <header className="sticky top-0 z-20 flex h-14 items-center gap-2 border-b border-line bg-bg/80 px-3 backdrop-blur-md backdrop-saturate-150 sm:px-5 lg:px-6">
+              <SheetTrigger asChild>
+                <button
+                  type="button"
+                  aria-label={
+                    waiting > 0
+                      ? `Open the menu — ${waiting} waiting on you`
+                      : "Open the menu"
+                  }
+                  className={cn(iconButton, "relative lg:hidden")}
+                >
+                  <PanelLeftIcon
+                    aria-hidden="true"
+                    className="size-[1.125rem]"
+                  />
+                  {waiting > 0 ? (
+                    <span
+                      aria-hidden="true"
+                      className="absolute top-2 right-2 size-1.5 rounded-full bg-primary ring-2 ring-bg pointer-fine:top-1 pointer-fine:right-1"
+                    />
+                  ) : null}
+                </button>
+              </SheetTrigger>
+              <button
+                type="button"
+                onClick={toggle}
+                aria-label={
+                  collapsed ? "Expand the sidebar" : "Collapse the sidebar"
+                }
+                aria-expanded={!collapsed}
+                title={
+                  collapsed
+                    ? "Expand the sidebar (Ctrl+B)"
+                    : "Collapse the sidebar (Ctrl+B)"
+                }
+                className={cn(iconButton, "-ml-1 hidden lg:inline-flex")}
+              >
+                <PanelLeftIcon aria-hidden="true" className="size-4" />
+              </button>
 
-        {/* ---- the same rail, on a phone ----------------------------------- */}
-        <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
+              <span
+                aria-hidden="true"
+                className="mx-1 hidden h-4 w-px bg-line-strong/70 sm:block"
+              />
+
+              <nav
+                aria-label="You are here"
+                className="flex min-w-0 flex-1 items-center gap-1.5 text-sm"
+              >
+                {current?.group.label ? (
+                  <>
+                    <span className="hidden shrink-0 text-muted sm:inline">
+                      {current.group.label}
+                    </span>
+                    <ChevronRightIcon
+                      aria-hidden="true"
+                      className="hidden size-3.5 shrink-0 text-subtle/70 sm:block"
+                    />
+                  </>
+                ) : null}
+                <span
+                  aria-current="page"
+                  className="truncate font-medium text-fg"
+                >
+                  {page}
+                </span>
+              </nav>
+
+              <div className="flex shrink-0 items-center gap-0.5">
+                {bell}
+                <ThemeToggle
+                  className={cn(
+                    iconButton,
+                    "border-0 hover:border-0 [&_svg]:size-4",
+                  )}
+                />
+                <div className="lg:hidden">
+                  <UserMenu user={user} area={area} variant="compact" />
+                </div>
+              </div>
+            </header>
+
+            <main
+              id="main"
+              className="px-4 pt-6 pb-16 sm:px-6 lg:px-10 lg:pt-8 lg:pb-20"
+            >
+              <div className="mx-auto w-full max-w-6xl">{children}</div>
+            </main>
+          </div>
+
+          {/* ---- the same rail, on a phone ----------------------------------- */}
           <SheetContent side="left" className="w-[17rem] max-w-[85vw] p-0">
             <SheetTitle className="sr-only">Menu</SheetTitle>
             <SheetDescription className="sr-only">
@@ -555,8 +563,8 @@ export function AppShell({
               <UserMenu user={user} area={area} />
             </div>
           </SheetContent>
-        </Sheet>
-      </div>
+        </div>
+      </Sheet>
     </Tooltip.Provider>
   );
 }

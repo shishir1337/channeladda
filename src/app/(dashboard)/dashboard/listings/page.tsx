@@ -344,14 +344,16 @@ function ListingRow({
               <p className="truncate text-sm leading-5 font-medium text-fg">
                 {listing.title || listing.handle}
               </p>
-              <p className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[0.8125rem] leading-5 text-muted">
-                <span className="shrink-0 capitalize">
+              <p className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-1.5 text-[0.8125rem] leading-5 text-muted">
+                <span className="capitalize">
                   {platform?.name ?? listing.platform}
                 </span>
                 <Sep />
-                <span className="truncate">{listing.handle}</span>
+                <span className="min-w-0 max-w-full truncate">
+                  {listing.handle}
+                </span>
                 <Sep />
-                <span className="shrink-0 whitespace-nowrap">
+                <span className="whitespace-nowrap">
                   <span className="tabular-nums">
                     {listing.audience.toLocaleString("en-US")}
                   </span>{" "}

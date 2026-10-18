@@ -117,7 +117,7 @@ export function PageHeader({
         {back ? (
           <Link
             href={back.href}
-            className="group -ml-1 mb-2 inline-flex items-center gap-0.5 rounded-md px-1 py-0.5 text-[0.8125rem] text-muted transition-colors hover:text-fg"
+            className="group -ml-1 mb-1 inline-flex min-h-11 items-center gap-0.5 rounded-md px-1 text-[0.8125rem] text-muted transition-colors hover:text-fg pointer-fine:mb-2 pointer-fine:min-h-6"
           >
             <ChevronLeftIcon
               aria-hidden="true"
@@ -264,7 +264,7 @@ export function SeeAll({
   return (
     <Link
       href={href}
-      className="group inline-flex items-center gap-0.5 rounded-md text-[0.8125rem] font-medium text-muted transition-colors hover:text-fg"
+      className="group inline-flex min-h-11 items-center gap-0.5 rounded-md text-[0.8125rem] font-medium text-muted transition-colors hover:text-fg pointer-fine:min-h-6"
     >
       {children}
       <ChevronRightIcon
@@ -526,6 +526,7 @@ export function EmptyState({
   action,
   tone = "neutral",
   bare,
+  as: Title = "p",
   className,
 }: {
   icon?: Icon;
@@ -535,6 +536,8 @@ export function EmptyState({
   tone?: "neutral" | "success";
   /** Inside a card that already has a border. */
   bare?: boolean;
+  /** A heading when the empty state stands in for a section of the page. */
+  as?: "p" | "h2" | "h3";
   className?: string;
 }) {
   return (
@@ -550,7 +553,9 @@ export function EmptyState({
         size="lg"
         tone={tone === "success" ? "verified" : "neutral"}
       />
-      <p className="mt-4 text-sm font-semibold text-fg">{title}</p>
+      <Title className="mt-4 text-sm font-semibold tracking-normal text-fg">
+        {title}
+      </Title>
       {body ? (
         <p className="mt-1 max-w-[46ch] text-[0.8125rem] leading-relaxed text-muted">
           {body}
@@ -682,7 +687,9 @@ export function Stat({
       </div>
       <p
         className={cn(
-          "mt-2 text-[1.625rem] leading-8 font-semibold tracking-[-0.02em] tabular-nums",
+          // A figure in a wide currency on a phone breaks rather than
+          // running into the card beside it.
+          "mt-2 text-[1.375rem] leading-7 font-semibold tracking-[-0.02em] [overflow-wrap:anywhere] tabular-nums sm:text-[1.625rem] sm:leading-8",
           tone === "danger" ? "text-danger" : "text-fg",
         )}
       >
@@ -947,7 +954,9 @@ export function FilterBar({
         className,
       )}
     >
-      <div className="flex min-w-max items-center gap-5">{children}</div>
+      <div className="flex min-w-max items-center gap-x-5 sm:min-w-0 sm:flex-wrap">
+        {children}
+      </div>
     </nav>
   );
 }

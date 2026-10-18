@@ -49,7 +49,7 @@ function Panel({
 }) {
   return (
     <Card className="flex flex-col">
-      <CardHeader icon={icon} title={title} description={blurb} />
+      <CardHeader as="h2" icon={icon} title={title} description={blurb} />
       {/* A column, so the action can sit at the foot of the card and two
           panels side by side line their buttons up. */}
       <CardBody className="flex flex-1 flex-col">{children}</CardBody>

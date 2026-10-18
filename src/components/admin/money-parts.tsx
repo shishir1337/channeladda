@@ -50,7 +50,7 @@ export function plural(count: number, one: string, many = `${one}s`): string {
  * reader, and a desk full of gold names would bury it.
  */
 export const linkClass =
-  "font-medium text-fg underline-offset-4 transition-colors duration-150 hover:underline";
+  "font-medium text-fg underline decoration-line-strong underline-offset-4 transition-colors duration-150 hover:decoration-fg";
 
 /**
  * A deal reference that opens the deal. Monospaced like every reference,

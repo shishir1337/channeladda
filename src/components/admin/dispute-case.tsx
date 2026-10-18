@@ -178,7 +178,7 @@ function Person({
       {href ? (
         <Link
           href={href}
-          className="font-medium text-fg underline-offset-4 transition-colors hover:underline"
+          className="font-medium text-fg underline decoration-line-strong underline-offset-4 transition-colors duration-150 hover:decoration-fg"
         >
           {name}
         </Link>
@@ -309,25 +309,39 @@ export function DisputeCase({
 
           <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-line pt-4">
             {dispute.conversation ? (
-              <Button asChild size="sm" variant="secondary">
-                <Link href={`/admin/messages/${dispute.conversation.id}`}>
-                  <MessagesSquareIcon aria-hidden="true" />
-                  Read their conversation
-                  <span className="tnum font-normal text-subtle">
-                    ({dispute.conversation.messages.toLocaleString("en-US")}{" "}
-                    {dispute.conversation.messages === 1
-                      ? "message"
-                      : "messages"}
-                    )
-                  </span>
-                  {dispute.conversation.flagged ? (
-                    <Badge variant="danger">
-                      <FlagIcon aria-hidden="true" />
-                      flagged
-                    </Badge>
-                  ) : null}
-                </Link>
-              </Button>
+              // The count and the flag sit beside the button rather than in
+              // it: a button does not wrap, and on a phone the card clipped
+              // the flag — the one part of this line staff triage on. The
+              // link still says both, for anyone hearing it.
+              <>
+                <Button asChild size="sm" variant="secondary">
+                  <Link href={`/admin/messages/${dispute.conversation.id}`}>
+                    <MessagesSquareIcon aria-hidden="true" />
+                    Read their conversation
+                    <span className="sr-only">
+                      {" "}
+                      ({dispute.conversation.messages.toLocaleString("en-US")}{" "}
+                      {dispute.conversation.messages === 1
+                        ? "message"
+                        : "messages"}
+                      {dispute.conversation.flagged ? ", flagged" : ""})
+                    </span>
+                  </Link>
+                </Button>
+                <span
+                  aria-hidden="true"
+                  className="text-xs text-subtle tabular-nums"
+                >
+                  {dispute.conversation.messages.toLocaleString("en-US")}{" "}
+                  {dispute.conversation.messages === 1 ? "message" : "messages"}
+                </span>
+                {dispute.conversation.flagged ? (
+                  <Badge variant="danger" aria-hidden="true">
+                    <FlagIcon />
+                    flagged
+                  </Badge>
+                ) : null}
+              </>
             ) : (
               <p className="mr-2 text-[0.8125rem] text-subtle">
                 No conversation is linked to this deal.

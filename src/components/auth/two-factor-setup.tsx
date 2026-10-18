@@ -105,6 +105,7 @@ export function TwoFactorSetup({
     return (
       <Card>
         <CardHeader
+          as="h2"
           icon={ShieldCheckIcon}
           title="Two-step is on"
           description="Signing in asks for a code from your authenticator app. If you lose the app, one of your backup codes gets you in."
@@ -155,7 +156,11 @@ export function TwoFactorSetup({
   if (codes) {
     return (
       <Card>
-        <CardHeader icon={KeyRoundIcon} title="Save these backup codes now" />
+        <CardHeader
+          as="h2"
+          icon={KeyRoundIcon}
+          title="Save these backup codes now"
+        />
         <CardBody>
           <p className="max-w-[72ch] text-sm leading-relaxed text-fg">
             They are stored hashed on our side, which means we genuinely cannot
@@ -192,6 +197,7 @@ export function TwoFactorSetup({
   return (
     <Card>
       <CardHeader
+        as="h2"
         icon={SmartphoneIcon}
         title="Two-step sign-in"
         description="A code from your phone on top of your password, so a stolen password is not enough on its own."
