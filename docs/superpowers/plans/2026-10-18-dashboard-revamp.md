@@ -125,3 +125,54 @@ scroll inside `TableCard`; action rows wrap; two-column layouts stack.
    lead reviews screenshots and commits.
 5. Report: files changed, anything you could not do, any copy you shortened
    (old → new, one line each), and kit additions you would want.
+
+---
+
+## Phase E — the calm pass (owner's feedback, 2026-10-18)
+
+> "isn't it looks too much text based, nothing feels calm, texts everywhere?
+> it's far better than the older version but still it can be best."
+
+The structure is right; the pages still *read* like documents. Reference
+designs (Dribbble/Behance SaaS dashboards) carry meaning with a title, a big
+figure, a small visual and space — almost no sentences.
+
+### New kit parts (commit d0d32ac)
+
+- `info` prop on `PageHeader`, `Section`, `CardHeader`, `Stat`: an (i) beside
+  the title that opens the explanation on hover, focus or tap
+  (`InfoTip` in `src/components/app/info-tip.tsx` for anywhere else).
+- `Disclosure({ title, bare? })`: a folded "How this works" block.
+- `Meter({ value, max, label, tone })`, `SplitBar({ parts, label })`,
+  `Ring({ value, max, label, tone, size, children })`: visuals built only from
+  figures the page already has.
+- Sections are now 40px apart and the page header 32px above content.
+
+### Rules for every page
+
+1. **Page description:** at most one short line (~60 characters) or none.
+   Anything longer moves into `info` on the `PageHeader`, word for word.
+2. **Section description:** none by default. Move it into `info` word for
+   word — unless it is safety, money-at-risk, fee, legal or irreversible-
+   action copy, which stays visible (a compact `Callout` is fine).
+3. **Stat note:** at most ~5 words, or none. Meaning goes in `info`.
+4. **Card header description:** one short line or none; the rest in `info`.
+5. **Explainer blocks** (mode explainers, fee definitions, "how it works"
+   lists, long notes under tables): fold into a `Disclosure`, or into `info`.
+6. **Form hints:** keep the ones that prevent a mistake (format, limits,
+   what will be shown to whom); move rationale into an `InfoTip` beside the
+   label or drop it if it repeats the card's `info`.
+7. **Empty states:** title plus at most one short line.
+8. **Show, don't say:** where a page already has the numbers, add a visual —
+   a `SplitBar` for a total and its parts, a `Meter` for progress or usage, a
+   `Ring` for steps done. Never add a server call or query to feed one.
+9. **Repeated sentences:** if the same explanation appears in two places on a
+   page, keep one.
+10. **Meta rows:** drop "Signed in as …" / "Desk …" / "Read …" chatter from
+    staff headers unless it decides something (keep "Read" time only where a
+    figure is time-sensitive, e.g. the money desk).
+
+Everything moved into `info` or a `Disclosure` keeps its exact words. Copy
+that is cut must be redundant (said elsewhere on the same page). Safety, fee,
+legal and irreversible-action copy is never hidden and never reworded.
+Behaviour rules from the page brief above all still apply.
