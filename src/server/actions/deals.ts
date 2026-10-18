@@ -45,6 +45,8 @@ const MESSAGES: Record<repo.DealFailure, string> = {
   "bad-proof": "Attach an uploaded file or an https link.",
   "pay-in-checkout":
     "The price is paid to Channel Adda from this page, by crypto or from your balance. The step completes on its own when the money arrives.",
+  "price-not-paid":
+    "The buyer has not paid the price yet, so this deal cannot be decided for the seller — it would hand over the channel for the fee alone. Return the channel to the seller instead.",
   "books-mismatch":
     "What Channel Adda is holding for this deal does not match what the deal says was paid, so nothing has been moved. It is listed on the money desk for a developer to look at.",
 };

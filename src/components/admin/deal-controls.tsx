@@ -583,10 +583,17 @@ export function EndDeal({
   canMoveMoney = false,
   paid,
   inCustody,
+  pricePaid,
 }: {
   orderId: string;
   /** Whether the opening payment cleared. Needed to describe a dispute. */
   paid?: boolean;
+  /**
+   * Safest: whether the price has reached us. Until it has, deciding for the
+   * seller would hand over the channel for the fee alone, so the server
+   * refuses it and this says so first.
+   */
+  pricePaid?: boolean;
   /** Whether a Safest agent took the channel. Needed to describe a dispute. */
   inCustody?: boolean;
   /** Known for every row except reassignment, where the query is SAFEST-only. */
@@ -738,7 +745,11 @@ export function EndDeal({
             (ending) => !(ending.to === "DISPUTED" && status === "DISPUTED"),
           ).map((ending) => {
             const active = choice === ending.to;
-            const reachable = ending.applies?.(mode) ?? true;
+            const priceMissing =
+              ending.to === "COMPLETED" &&
+              mode === "SAFEST" &&
+              pricePaid === false;
+            const reachable = (ending.applies?.(mode) ?? true) && !priceMissing;
             // The server's rule: handing held money back is a refund
             // whatever it is called, in either mode.
             const movesMoney = movesHeldMoney(ending.to, paid === true);
@@ -782,7 +793,9 @@ export function EndDeal({
                     </span>
                     <Badge variant={tag.variant}>{tag.label}</Badge>
                     {!reachable ? (
-                      <Badge variant="neutral">Not this mode</Badge>
+                      <Badge variant="neutral">
+                        {priceMissing ? "Price not paid yet" : "Not this mode"}
+                      </Badge>
                     ) : null}
                     {!canMoveMoney &&
                     (ending.weight === "money" || movesMoney) ? (

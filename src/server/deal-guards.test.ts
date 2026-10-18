@@ -271,6 +271,37 @@ test(
 );
 
 test(
+  "a safest deal cannot be decided for the seller before the price is paid",
+  withCleanDb(async () => {
+    // Completing would sell the channel with only the fee on our books:
+    // the seller paid nothing for giving it away, and a price arriving
+    // during the dispute would go back to the buyer as well.
+    const { orderId, staff, actors, listing } = await runTo("SAFEST", 6);
+    await resolveDeal({
+      orderId,
+      to: "DISPUTED",
+      byUserId: actors.buyer,
+      note: "stuck at the price",
+    });
+    expect(
+      await resolveDeal({
+        orderId,
+        to: "COMPLETED",
+        byUserId: staff.id,
+        note: "decided for the seller",
+      }),
+    ).toMatchObject({ ok: false, reason: "price-not-paid" });
+    expect(
+      (await db.listing.findUniqueOrThrow({ where: { id: listing.id } }))
+        .status,
+    ).toBe("RESERVED");
+    expect(
+      await db.ledgerEntry.count({ where: { orderId, kind: "BUYER_FEE" } }),
+    ).toBe(0);
+  }),
+);
+
+test(
   "a failed second transfer can still be returned from a dispute",
   withCleanDb(async () => {
     const { orderId, staff, buyer, actors } = await runTo("SAFEST", 8);

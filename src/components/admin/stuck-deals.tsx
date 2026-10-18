@@ -64,6 +64,7 @@ export async function StuckDeals({
       // What a dispute cannot say on its own: how far the deal had got.
       paymentRef: true,
       custodyAt: true,
+      buyerPaidAt: true,
       agent: { select: { name: true } },
       listing: { select: { title: true } },
       steps: {
@@ -187,6 +188,7 @@ export async function StuckDeals({
                   canMoveMoney={canMoveMoney}
                   paid={order.paymentRef !== null}
                   inCustody={order.custodyAt !== null}
+                  pricePaid={order.buyerPaidAt !== null}
                 />
               </ListItem>
             );

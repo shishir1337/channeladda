@@ -607,6 +607,7 @@ export function DisputeCase({
           canMoveMoney={canMoveMoney}
           paid={dispute.paid}
           inCustody={dispute.inCustody}
+          pricePaid={dispute.buyerPaidAt !== null}
         />
       </section>
     </article>

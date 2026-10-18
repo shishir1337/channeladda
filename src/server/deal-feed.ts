@@ -179,6 +179,10 @@ export async function listDealsNeedingAgent(limit = 50) {
       status: true,
       priceUsd: true,
       createdAt: true,
+      // How far the deal got, for the outcomes offered beside it.
+      paymentRef: true,
+      custodyAt: true,
+      buyerPaidAt: true,
       listing: { select: { title: true, slug: true } },
     },
   });
@@ -217,6 +221,9 @@ export async function listDealsNeedingReassignment(limit = 50) {
       // thing on the staff desk, and without this it was the only queue
       // that could not say how long it had been like that.
       createdAt: true,
+      paymentRef: true,
+      custodyAt: true,
+      buyerPaidAt: true,
       agent: { select: { id: true, name: true, email: true } },
       listing: { select: { title: true } },
     },

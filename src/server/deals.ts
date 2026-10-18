@@ -71,6 +71,8 @@ export type DealFailure =
   | "in-custody"
   /** A payment completes this step when it reaches us; nobody presses it. */
   | "pay-in-checkout"
+  /** A Safest deal is not finished before its price has reached us. */
+  | "price-not-paid"
   /** The recovery hold on this platform has not ended yet. */
   | "on-hold"
   /**
@@ -1780,6 +1782,18 @@ export async function resolveDeal(input: {
   // Deciding a dispute is what this path is for, and that is left intact.
   if (input.to === "COMPLETED" && order.status !== "DISPUTED") {
     return { ok: false, reason: "not-disputed" };
+  }
+
+  // Deciding a Safest dispute for the seller sells the channel, and the
+  // seller is paid from the price we hold. Before the buyer has paid it there
+  // is only the fee: the channel would go for nothing, and a price arriving
+  // later would go back to the buyer as well.
+  if (
+    input.to === "COMPLETED" &&
+    order.mode === "SAFEST" &&
+    order.buyerPaidAt === null
+  ) {
+    return { ok: false, reason: "price-not-paid" };
   }
 
   // Cancelling a Safest deal whose channel we are holding closed the order,

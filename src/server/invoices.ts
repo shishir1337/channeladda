@@ -3,10 +3,127 @@ import "server-only";
 import { randomBytes } from "node:crypto";
 import type { InvoicePurpose } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
+import { TERMINAL_STATUSES } from "@/lib/deal-machine";
 import { recordAudit } from "@/server/audit";
 import { classifyStatus, lookupInvoice } from "@/server/cryptomus";
 import { recordOpeningPayment, recordPricePayment } from "@/server/deals";
+import { notifyStaff } from "@/server/notifications";
 import { creditDeposit } from "@/server/wallet";
+
+/**
+ * The processor sent a deal payment back to the payer. What that means
+ * depends on which payment it was.
+ *
+ * - **The one the deal was paid with** (the opening payment, or a Safest
+ *   price): the hold on our books is now a claim about money that has gone,
+ *   and left alone the deal would complete and pay the seller out of it. The
+ *   deal is frozen in a dispute for a person to decide.
+ * - **One we credited to the buyer's balance instead** — a second payment,
+ *   or one that arrived after the deal had stopped: the buyer now has both
+ *   the refund and the credit, so the credit is taken back. The deal, paid
+ *   for properly, carries on.
+ *
+ * Either way the audit row is what `resolveDeal` later reads, so a refund
+ * decided by staff never pays the buyer a second time. Shared by the webhook
+ * and the sweep, which used to disagree: only the webhook froze anything.
+ */
+export async function applyProcessorRefund(input: {
+  orderId: string;
+  reference: string;
+  status: string;
+  via?: "webhook" | "reconcile";
+}): Promise<"frozen" | "reversed" | "noted"> {
+  const order = await db.order.findUnique({
+    where: { id: input.orderId },
+    select: {
+      id: true,
+      buyerId: true,
+      paymentRef: true,
+      buyerPaymentRef: true,
+    },
+  });
+  if (!order) return "noted";
+
+  const applied =
+    input.reference === order.paymentRef ||
+    input.reference === order.buyerPaymentRef;
+
+  let outcome: "frozen" | "reversed" | "noted" = "noted";
+  let frozen = false;
+  if (applied) {
+    const moved = await db.order.updateMany({
+      where: { id: order.id, status: { notIn: [...TERMINAL_STATUSES] } },
+      data: { status: "DISPUTED" },
+    });
+    frozen = moved.count === 1;
+    outcome = "frozen";
+  } else {
+    const credit = await db.ledgerEntry.findFirst({
+      where: {
+        orderId: order.id,
+        userId: order.buyerId,
+        kind: "DEPOSIT",
+        externalRef: {
+          in: [`overpay:${input.reference}`, `late:${input.reference}`],
+        },
+      },
+      select: { amountUsd: true },
+    });
+    if (credit) {
+      try {
+        await db.ledgerEntry.create({
+          data: {
+            userId: order.buyerId,
+            orderId: order.id,
+            kind: "DEPOSIT",
+            amountUsd: -credit.amountUsd,
+            note: "Refunded to you by the processor, so taken back from your balance",
+            externalRef: `reversed:${input.reference}`,
+          },
+        });
+        outcome = "reversed";
+      } catch (error) {
+        // Told twice: the reversal already exists.
+        if (!isUniqueViolation(error)) throw error;
+      }
+    }
+  }
+
+  await recordAudit({
+    actorId: null,
+    action: "payment.refunded_by_processor",
+    entity: "order",
+    entityId: order.id,
+    after: {
+      reference: input.reference,
+      status: input.status,
+      applied,
+      frozen,
+      reversed: outcome === "reversed",
+      via: input.via ?? "webhook",
+    },
+  });
+
+  if (outcome === "reversed") {
+    await notifyStaff(["FINANCE"], (userId) => ({
+      userId,
+      kind: "PAYOUT",
+      title: "A payment refunded by the processor was taken back",
+      body: `Cryptomus refunded ${input.reference}, which we had credited to the buyer's balance. The credit has been reversed.`,
+      href: "/admin/money",
+    }));
+  }
+  return outcome;
+}
+
+function isUniqueViolation(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code?: unknown }).code === "P2002"
+  );
+}
 
 /**
  * Invoices we have raised, and making sure each one lands.
@@ -207,17 +324,26 @@ async function reconcileOne(invoice: {
     // A refund is neither. The money reached us and went back, so if we
     // applied it there is a hold on the books that is no longer real.
     if (outcome === "refunded") {
-      await recordAudit({
-        actorId: null,
-        action: "payment.refunded_by_processor",
-        entity: invoice.orderId ? "order" : "user",
-        entityId: invoice.orderId ?? invoice.userId,
-        after: {
+      if (invoice.orderId) {
+        await applyProcessorRefund({
+          orderId: invoice.orderId,
           reference: invoice.reference,
           status: confirmed.status,
           via: "reconcile",
-        },
-      });
+        });
+      } else {
+        await recordAudit({
+          actorId: null,
+          action: "payment.refunded_by_processor",
+          entity: "user",
+          entityId: invoice.userId,
+          after: {
+            reference: invoice.reference,
+            status: confirmed.status,
+            via: "reconcile",
+          },
+        });
+      }
       await markApplied(invoice.reference);
     }
     return false;

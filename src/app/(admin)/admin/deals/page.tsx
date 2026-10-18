@@ -437,6 +437,9 @@ export default async function AdminDealsPage({
                   mode="SAFEST"
                   status={order.status}
                   canMoveMoney={isFinance}
+                  paid={order.paymentRef !== null}
+                  inCustody={order.custodyAt !== null}
+                  pricePaid={order.buyerPaidAt !== null}
                 />
               </ListItem>
             ))}
@@ -695,6 +698,9 @@ export default async function AdminDealsPage({
                     mode={order.mode}
                     status={order.status}
                     canMoveMoney={isFinance}
+                    paid={order.paymentRef !== null}
+                    inCustody={order.custodyAt !== null}
+                    pricePaid={order.buyerPaidAt !== null}
                   />
                 </ListItem>
               );

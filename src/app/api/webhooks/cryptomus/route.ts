@@ -1,7 +1,6 @@
 import { after } from "next/server";
 import { verifyWebhookSign } from "@/lib/cryptomus-sign";
 import { db } from "@/lib/db";
-import { TERMINAL_STATUSES } from "@/lib/deal-machine";
 import { recordAudit } from "@/server/audit";
 import {
   classifyStatus,
@@ -9,7 +8,11 @@ import {
   getInvoice,
 } from "@/server/cryptomus";
 import { recordOpeningPayment, recordPricePayment } from "@/server/deals";
-import { markApplied, noteCallback } from "@/server/invoices";
+import {
+  applyProcessorRefund,
+  markApplied,
+  noteCallback,
+} from "@/server/invoices";
 import { creditDeposit } from "@/server/wallet";
 
 /**
@@ -174,36 +177,6 @@ async function handleTopUp(
   return "applied";
 }
 
-/**
- * A deal whose payment the processor has sent back.
- *
- * Moved to DISPUTED, which is the one status that stops a deal without
- * deciding it: every later step refuses while a deal is disputed, so the
- * seller cannot be credited out of a hold whose money has gone. Staff then
- * decide it like any other dispute, with the audit row in front of them.
- */
-async function freezeRefundedDeal(
-  orderId: string,
-  reference: string,
-  status: string,
-) {
-  const frozen = await db.order.updateMany({
-    where: { id: orderId, status: { notIn: [...TERMINAL_STATUSES] } },
-    data: { status: "DISPUTED" },
-  });
-
-  await recordAudit({
-    actorId: null,
-    action: "payment.refunded_by_processor",
-    entity: "order",
-    entityId: orderId,
-    after: { reference, status, frozen: frozen.count === 1 },
-  });
-
-  console.warn(
-    `[cryptomus] ${reference} was refunded by the processor; deal frozen`,
-  );
-}
 async function handle(
   orderId: string,
   status: string,
@@ -258,11 +231,13 @@ async function handle(
   // A Safest deal takes two payments; the price is the second.
   const isPrice = invoice?.purpose === "DEAL_PRICE";
 
-  if (
-    outcome === "refunded" &&
-    (isPrice ? order.buyerPaymentRef : order.paymentRef)
-  ) {
-    await freezeRefundedDeal(order.id, orderId, status);
+  if (outcome === "refunded") {
+    await applyProcessorRefund({
+      orderId: order.id,
+      reference: orderId,
+      status,
+      via: "webhook",
+    });
     return "ignored";
   }
 

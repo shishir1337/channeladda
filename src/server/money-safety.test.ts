@@ -11,7 +11,8 @@ import {
   recordOpeningPayment,
   resolveDeal,
 } from "@/server/deals";
-import { reconcileInvoices } from "@/server/invoices";
+import { applyProcessorRefund, reconcileInvoices } from "@/server/invoices";
+import { creditDeposit, payFromWallet } from "@/server/wallet";
 import { seedListing, seedUser, withCleanDb } from "@/test/db";
 import { runStep } from "@/test/deal-steps";
 
@@ -606,5 +607,91 @@ test(
         where: { orderId: created.orderId, kind: "REFUND", userId: null },
       }),
     ).toMatchObject({ amountUsd: -10_300, note: "Refunded by the processor" });
+  }),
+);
+
+// ------------------------------- a processor refund, by what was refunded
+
+async function safestPricePaidFromBalance() {
+  const seeded = await seedListing();
+  const created = await createDeal({
+    listingId: seeded.listing.id,
+    buyerId: seeded.buyer.id,
+    mode: "SAFEST",
+  });
+  if (!created.ok) throw new Error(created.reason);
+  await db.order.update({
+    where: { id: created.orderId },
+    data: { agentId: seeded.agent.id },
+  });
+  await recordOpeningPayment(created.orderId, created.reference, "USDT");
+  const actors: Record<string, string> = {
+    buyer: seeded.buyer.id,
+    seller: seeded.seller.id,
+    agent: seeded.agent.id,
+  };
+  for (const step of templateFor("SAFEST")) {
+    if (step.position < 2 || step.position >= 6) continue;
+    await runStep({
+      orderId: created.orderId,
+      position: step.position,
+      userId: actors[step.actor],
+    });
+  }
+  await creditDeposit(seeded.buyer.id, 10_000, "top-price", "USDT");
+  const paid = await payFromWallet(created.orderId, seeded.buyer.id);
+  if (!paid.ok) throw new Error(paid.reason);
+  return { ...seeded, orderId: created.orderId };
+}
+
+test(
+  "a refunded duplicate price payment takes the credit back and leaves the deal running",
+  withCleanDb(async () => {
+    // The buyer paid the price from their balance and then paid the invoice
+    // too. The invoice became a balance credit; when Cryptomus then refunds
+    // it, the buyer must not keep both — and the deal, paid for properly,
+    // must not freeze.
+    const { orderId, buyer } = await safestPricePaidFromBalance();
+    const reference = await openInvoice(
+      orderId,
+      buyer.id,
+      "DEAL_PRICE",
+      10_000,
+      true,
+    );
+    const { recordPricePayment } = await import("@/server/deals");
+    expect(await recordPricePayment(orderId, reference, "USDT")).toBe(
+      "second-payment-credited",
+    );
+    expect(await balanceOf(buyer.id)).toBe(10_000);
+
+    expect(
+      await applyProcessorRefund({ orderId, reference, status: "refund_paid" }),
+    ).toBe("reversed");
+    expect(await balanceOf(buyer.id)).toBe(0);
+    const order = await db.order.findUniqueOrThrow({ where: { id: orderId } });
+    expect(order.status).toBe("AWAITING_HANDOVER");
+
+    // Told twice, taken back once.
+    await applyProcessorRefund({ orderId, reference, status: "refund_paid" });
+    expect(await balanceOf(buyer.id)).toBe(0);
+  }),
+);
+
+test(
+  "a refunded payment the deal was paid with freezes the deal",
+  withCleanDb(async () => {
+    const { orderId } = await paidFastestDeal();
+    const order = await db.order.findUniqueOrThrow({ where: { id: orderId } });
+    expect(
+      await applyProcessorRefund({
+        orderId,
+        reference: order.paymentRef ?? "",
+        status: "refund_paid",
+      }),
+    ).toBe("frozen");
+    expect(
+      (await db.order.findUniqueOrThrow({ where: { id: orderId } })).status,
+    ).toBe("DISPUTED");
   }),
 );
