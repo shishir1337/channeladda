@@ -2,6 +2,7 @@
 
 import { LoaderCircleIcon, ShieldCheckIcon } from "lucide-react";
 import { useState, useTransition } from "react";
+import { Card, CardBody, CardFooter, CardHeader } from "@/components/app/kit";
 import { Button } from "@/components/ui/button";
 import {
   claimThread,
@@ -15,6 +16,9 @@ import {
  * Claiming is first and separate: two moderators answering the same dispute in
  * different words is worse than a slow reply, so the thread gets an owner
  * before it gets an answer.
+ *
+ * Closing is the one action here that stops people talking, so it is the one
+ * drawn in the danger colour, last and apart from the rest.
  */
 export function StaffControls({
   conversationId,
@@ -51,23 +55,24 @@ export function StaffControls({
   }
 
   return (
-    <div className="rounded-panel border border-line bg-surface-2 p-4 sm:p-5">
-      <p className="flex items-center gap-2 font-mono text-[0.625rem] font-semibold tracking-[0.14em] text-subtle uppercase">
-        <ShieldCheckIcon aria-hidden="true" className="size-3.5" />
-        Staff controls
-      </p>
+    <Card>
+      <CardHeader
+        as="h2"
+        icon={ShieldCheckIcon}
+        title="Staff controls"
+        description={
+          claimedBy
+            ? `${claimedBy} is handling this conversation.`
+            : "Nobody has picked this up yet."
+        }
+      />
 
-      <p className="mt-2.5 text-sm leading-relaxed text-muted">
-        {claimedBy
-          ? `${claimedBy} is handling this conversation.`
-          : "Nobody has picked this up yet."}
-      </p>
-
-      <div className="mt-3.5 flex flex-wrap gap-2">
+      <CardBody className="flex flex-col gap-2">
         {claimedBy ? null : (
           <Button
             type="button"
             size="sm"
+            className="w-full"
             disabled={pending}
             onClick={() => run(() => claimThread(conversationId))}
           >
@@ -86,6 +91,7 @@ export function StaffControls({
             type="button"
             size="sm"
             variant="secondary"
+            className="w-full"
             disabled={pending}
             onClick={() => run(() => clearThreadFlag(conversationId))}
           >
@@ -96,27 +102,33 @@ export function StaffControls({
         <Button
           type="button"
           size="sm"
-          variant={closed ? "secondary" : "ghost"}
+          variant={closed ? "secondary" : "danger"}
+          className={claimedBy && !flagged ? "w-full" : "mt-2 w-full"}
           disabled={pending}
           onClick={() => run(() => setThreadClosed(conversationId, !closed))}
         >
           {closed ? "Reopen conversation" : "Close conversation"}
         </Button>
-      </div>
 
-      {error ? (
-        <p role="alert" className="mt-3 text-sm font-medium text-danger">
-          {error}
-        </p>
-      ) : null}
-      {note ? (
-        <output className="mt-3 block text-sm text-verified">{note}</output>
-      ) : null}
+        {error ? (
+          <p
+            role="alert"
+            className="mt-1 text-[0.8125rem] font-medium text-danger"
+          >
+            {error}
+          </p>
+        ) : null}
+        {note ? (
+          <output className="mt-1 block text-[0.8125rem] text-verified">
+            {note}
+          </output>
+        ) : null}
+      </CardBody>
 
-      <p className="mt-4 border-t border-line pt-3.5 text-xs leading-relaxed text-subtle">
+      <CardFooter className="text-xs leading-relaxed text-subtle">
         Anything you send here is signed &ldquo;Channel Adda&rdquo; and both
         sides can read it. Your name is never shown to them.
-      </p>
-    </div>
+      </CardFooter>
+    </Card>
   );
 }

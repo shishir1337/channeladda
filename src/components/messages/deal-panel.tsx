@@ -1,8 +1,9 @@
 "use client";
 
-import { ChevronDownIcon, ExternalLinkIcon } from "lucide-react";
+import { ArrowUpRightIcon, ChevronDownIcon } from "lucide-react";
 import Link from "next/link";
 import { type ReactNode, useState } from "react";
+import { Dot, Reference, TurnFlag } from "@/components/app/kit";
 import { OfferActions } from "@/components/offers/offer-actions";
 import { Price } from "@/components/ui/price";
 import type {
@@ -87,54 +88,49 @@ export function DealPanel({
   // card, not a frame around it.
   const childOwns =
     Boolean(children) && (state.kind === "pay" || state.kind === "step");
+  // While the buyer pays, a Safest seller's "where to pay you" card is a
+  // card of its own too. It goes under the panel's card, not inside it, so
+  // the column never draws a box in a box.
+  const childBelow = Boolean(children) && state.kind === "waiting-for-payment";
 
-  return (
-    <section
-      aria-label="What happens next"
+  const toggle = (
+    <button
+      type="button"
+      onClick={() => setOpen((was) => !was)}
+      aria-expanded={open}
       className={cn(
-        !childOwns && "rounded-panel border",
-        !childOwns &&
-          (view.yourMove
-            ? "border-primary/40 bg-primary-soft"
-            : "border-line bg-surface"),
+        "flex min-h-11 w-full cursor-pointer items-center gap-2.5 px-4 py-2.5 text-left transition-colors duration-150 focus-visible:-outline-offset-2 lg:hidden",
+        childOwns
+          ? cn(
+              "rounded-card border bg-surface shadow-xs",
+              view.yourMove ? "border-primary/45" : "border-line",
+            )
+          : "rounded-card",
       )}
     >
-      <button
-        type="button"
-        onClick={() => setOpen((was) => !was)}
-        aria-expanded={open}
+      {view.yourMove ? <Dot tone="primary" pulse /> : null}
+      <span
         className={cn(
-          "flex w-full cursor-pointer items-center gap-2 px-4 py-3 text-left lg:hidden",
-          childOwns &&
-            (view.yourMove
-              ? "rounded-panel border border-primary/40 bg-primary-soft"
-              : "rounded-panel border border-line bg-surface"),
+          "min-w-0 flex-1 truncate text-sm",
+          view.yourMove ? "font-medium text-fg" : "text-muted",
         )}
       >
-        {view.yourMove ? (
-          <span
-            aria-hidden="true"
-            className="size-1.5 shrink-0 animate-pulse-dot rounded-full bg-primary"
-          />
-        ) : null}
-        <span
-          className={cn(
-            "min-w-0 flex-1 truncate text-sm",
-            view.yourMove ? "font-semibold text-primary-text" : "text-muted",
-          )}
-        >
-          {view.summary}
-        </span>
-        <ChevronDownIcon
-          aria-hidden="true"
-          className={cn(
-            "size-4 shrink-0 text-subtle transition-transform duration-200",
-            open && "rotate-180",
-          )}
-        />
-      </button>
+        {view.summary}
+      </span>
+      <ChevronDownIcon
+        aria-hidden="true"
+        className={cn(
+          "size-4 shrink-0 text-subtle transition-transform duration-200",
+          open && "rotate-180",
+        )}
+      />
+    </button>
+  );
 
-      {childOwns ? (
+  if (childOwns) {
+    return (
+      <section aria-label="What happens next">
+        {toggle}
         <div className={cn("mt-2 lg:mt-0 lg:block", open ? "block" : "hidden")}>
           {children}
           <Body
@@ -143,27 +139,42 @@ export function DealPanel({
             listingSlug={listingSlug}
             dealReference={dealReference}
             hasChildren
+            framed={false}
           />
         </div>
-      ) : (
+      </section>
+    );
+  }
+
+  return (
+    <section aria-label="What happens next">
+      <div
+        className={cn(
+          "rounded-card border bg-surface shadow-xs transition-colors duration-150",
+          view.yourMove ? "border-primary/45" : "border-line",
+        )}
+      >
+        {toggle}
         <div
           className={cn(
-            "px-4 pb-4 sm:px-5 lg:block lg:py-5",
+            "px-4 pb-4 lg:block lg:pt-4",
             open ? "block" : "hidden",
           )}
         >
-          <p className="hidden font-mono text-[0.6875rem] font-semibold tracking-[0.14em] uppercase lg:block">
-            <span
-              className={view.yourMove ? "text-primary-text" : "text-subtle"}
-            >
-              {view.yourMove ? "Your move" : "What happens next"}
-            </span>
-          </p>
-          <h2 className="font-display text-base leading-snug font-bold text-fg lg:mt-2">
+          <div className="mb-2 hidden min-h-5 items-center lg:flex">
+            {view.yourMove ? (
+              <TurnFlag mine />
+            ) : (
+              <span className="text-xs font-medium text-subtle">
+                What happens next
+              </span>
+            )}
+          </div>
+          <h2 className="text-[0.9375rem] leading-6 font-semibold text-fg">
             {view.title}
           </h2>
           {view.detail ? (
-            <p className="mt-1.5 max-w-[62ch] text-sm leading-relaxed text-muted">
+            <p className="mt-1 max-w-[62ch] text-[0.8125rem] leading-relaxed text-muted">
               {view.detail}
             </p>
           ) : null}
@@ -174,10 +185,23 @@ export function DealPanel({
             listingSlug={listingSlug}
             dealReference={dealReference}
             hasChildren={Boolean(children)}
+            framed
           />
-          {children ? <div className="mt-4">{children}</div> : null}
+          {children && !childBelow ? (
+            <div className="mt-4 border-t border-line">{children}</div>
+          ) : null}
         </div>
-      )}
+      </div>
+
+      {childBelow ? (
+        // Takes no room when the card has nothing to say (a Fastest deal,
+        // or no details yet for the agent to see).
+        <div
+          className={cn("mt-3 empty:mt-0 lg:block", open ? "block" : "hidden")}
+        >
+          {children}
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -199,7 +223,12 @@ function describe(
         summary: "Buy this channel, or make an offer",
         title: (
           <>
-            Asking <Price usd={dollars(state.askingCents)} exact />
+            Asking{" "}
+            <Price
+              usd={dollars(state.askingCents)}
+              exact
+              className="tabular-nums"
+            />
           </>
         ),
         detail:
@@ -226,7 +255,11 @@ function describe(
             {state.offer.bySeller
               ? `${otherName} offered to sell for `
               : `${otherName} offered `}
-            <Price usd={dollars(state.offer.amountCents)} exact />
+            <Price
+              usd={dollars(state.offer.amountCents)}
+              exact
+              className="tabular-nums"
+            />
           </>
         ),
         detail: `Accept it, counter, or turn it down · ${timeLeft(state.offer.expiresAt)}`,
@@ -238,8 +271,12 @@ function describe(
         title: (
           <>
             {viewerRole === "seller" ? "Your price of " : "Your offer of "}
-            <Price usd={dollars(state.offer.amountCents)} exact /> is with{" "}
-            {otherName}
+            <Price
+              usd={dollars(state.offer.amountCents)}
+              exact
+              className="tabular-nums"
+            />{" "}
+            is with {otherName}
           </>
         ),
         detail: `${timeLeft(state.offer.expiresAt)}. You can withdraw it until they answer.`,
@@ -250,7 +287,12 @@ function describe(
         summary: "Start the deal at your agreed price",
         title: (
           <>
-            <Price usd={dollars(state.priceCents)} exact /> is held for you
+            <Price
+              usd={dollars(state.priceCents)}
+              exact
+              className="tabular-nums"
+            />{" "}
+            is held for you
           </>
         ),
         detail: `Choose Safest or Fastest and start the deal · ${timeLeft(state.heldUntil)}`,
@@ -321,6 +363,7 @@ function Body({
   listingSlug,
   dealReference,
   hasChildren = false,
+  framed,
 }: {
   state: PanelStateView;
   viewerRole: "buyer" | "seller" | "agent" | "staff";
@@ -328,6 +371,11 @@ function Body({
   dealReference: string | null;
   /** The page supplied the card for this state, so no fallback link. */
   hasChildren?: boolean;
+  /**
+   * Inside the panel's own card, where the deal link is its footer; beside
+   * the deal's cards, where it is a quiet line under them.
+   */
+  framed: boolean;
 }) {
   const side = viewerRole === "buyer" || viewerRole === "seller";
 
@@ -337,7 +385,7 @@ function Body({
     side
   ) {
     return (
-      <div className="mt-3">
+      <div className="mt-3.5 empty:hidden">
         <OfferActions
           offer={{
             id: state.offer.id,
@@ -362,10 +410,25 @@ function Body({
     return (
       <Link
         href={`/dashboard/deals/${dealId}`}
-        className="mt-3 inline-flex min-h-9 items-center gap-1.5 text-sm font-medium text-primary-text underline-offset-4 hover:underline"
+        className={cn(
+          "group flex min-h-11 items-center gap-2 text-[0.8125rem] font-medium text-muted transition-colors duration-150 hover:text-fg pointer-fine:min-h-8",
+          framed ? "-mb-1 mt-4 border-t border-line pt-3" : "mt-2 px-1",
+        )}
       >
-        {dealReference ? `Deal ${dealReference}` : "The deal page"}
-        <ExternalLinkIcon aria-hidden="true" className="size-3.5" />
+        {dealReference ? (
+          <>
+            Deal <Reference>{dealReference}</Reference>
+          </>
+        ) : (
+          "The deal page"
+        )}
+        <ArrowUpRightIcon
+          aria-hidden="true"
+          className={cn(
+            "size-3.5 shrink-0 text-subtle transition duration-150 group-hover:translate-x-px group-hover:-translate-y-px group-hover:text-fg",
+            framed && "ml-auto",
+          )}
+        />
       </Link>
     );
   }
@@ -374,10 +437,13 @@ function Body({
     return (
       <Link
         href={`/listing/${listingSlug}`}
-        className="mt-3 inline-flex min-h-9 items-center gap-1.5 text-sm font-medium text-primary-text underline-offset-4 hover:underline"
+        className="group mt-3 inline-flex min-h-11 items-center gap-1.5 text-[0.8125rem] font-medium text-muted transition-colors duration-150 hover:text-fg pointer-fine:min-h-8"
       >
         Choose how to buy
-        <ExternalLinkIcon aria-hidden="true" className="size-3.5" />
+        <ArrowUpRightIcon
+          aria-hidden="true"
+          className="size-3.5 shrink-0 text-subtle transition duration-150 group-hover:translate-x-px group-hover:-translate-y-px group-hover:text-fg"
+        />
       </Link>
     );
   }

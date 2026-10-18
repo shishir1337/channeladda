@@ -1,8 +1,8 @@
 import { MailOpenIcon, MessagesSquareIcon } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { EmptyState } from "@/components/app/kit";
 import { Button } from "@/components/ui/button";
-import { EmptyState } from "@/components/ui/empty-state";
 import { listThreads } from "@/server/messages";
 import { requireUser } from "@/server/session";
 
@@ -10,6 +10,14 @@ export const metadata: Metadata = {
   title: "Messages",
   robots: { index: false, follow: false },
 };
+
+/**
+ * On a computer the pane is the height of the rail beside it and drawn
+ * without a frame, so it reads as the space a conversation will open into.
+ * On a phone it is an ordinary card under (or instead of) the list.
+ */
+const PANE =
+  "justify-center lg:min-h-[calc(100dvh-6.5rem)] lg:border-transparent lg:bg-transparent lg:shadow-none";
 
 /**
  * The empty right-hand pane.
@@ -28,10 +36,10 @@ export default async function MessagesPage() {
   if (threads.length === 0) {
     return (
       <EmptyState
-        className="min-h-[22rem] justify-center"
+        className={PANE}
         icon={MessagesSquareIcon}
         title="No conversations yet"
-        description="Ask a question on any listing and the thread starts here. Every conversation is readable by Channel Adda, which is what lets us settle a dispute on the record."
+        body="Ask a question on any listing and the thread starts here."
         action={
           <Button asChild size="md">
             <Link href="/browse">Browse accounts</Link>
@@ -44,10 +52,10 @@ export default async function MessagesPage() {
   if (oldestUnread) {
     return (
       <EmptyState
-        className="min-h-[22rem] justify-center"
+        className={PANE}
         icon={MailOpenIcon}
         title={`${unread.length} ${unread.length === 1 ? "conversation needs" : "conversations need"} a reply`}
-        description="A buyer who waits a day usually buys somewhere else. Start with the one that has been waiting longest."
+        body="Start with the one that has been waiting longest."
         action={
           <Button asChild size="md">
             <Link href={`/dashboard/messages/${oldestUnread.id}`}>
@@ -61,10 +69,11 @@ export default async function MessagesPage() {
 
   return (
     <EmptyState
-      className="min-h-[22rem] justify-center"
+      // The list is right above it on a phone; this would only repeat it.
+      className={`${PANE} max-lg:hidden`}
       icon={MessagesSquareIcon}
       title="Pick a conversation"
-      description="Choose one from your conversations to read it and reply. Photos and clips are deleted after 48 hours, and a thread with no deal attached clears after 10 days."
+      body="Choose one to read it and reply."
     />
   );
 }

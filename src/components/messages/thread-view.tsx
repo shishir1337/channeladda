@@ -1,10 +1,12 @@
 "use client";
 
 import {
+  CircleAlertIcon,
   ClockIcon,
   EyeIcon,
   ImageIcon,
   LoaderCircleIcon,
+  LockIcon,
   MessageSquareIcon,
   ScissorsIcon,
   SendIcon,
@@ -13,10 +15,12 @@ import {
   XIcon,
 } from "lucide-react";
 import { useEffect, useRef, useState, useTransition } from "react";
+import { EmptyState } from "@/components/app/kit";
 import {
   ChatOfferCard,
   type ThreadOfferView,
 } from "@/components/messages/chat-offer-card";
+import { BusyLabel, Initials } from "@/components/messages/chat-parts";
 import { EventLine } from "@/components/messages/event-line";
 import {
   type OfferComposerConfig,
@@ -77,7 +81,12 @@ function expiresIn(iso: string): string | null {
 function Attachment({ message }: { message: ThreadMessageView }) {
   if (message.attachmentRemoved) {
     return (
-      <p className="mt-2.5 flex items-start gap-1.5 border-t border-line pt-2.5 text-xs leading-relaxed text-subtle">
+      <p
+        className={cn(
+          "flex items-start gap-1.5 text-xs leading-relaxed text-subtle",
+          message.body && "mt-2 border-t border-fg/10 pt-2",
+        )}
+      >
         <ClockIcon aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" />
         <span>
           An attachment here was removed automatically after 48 hours. Chat is
@@ -94,31 +103,32 @@ function Attachment({ message }: { message: ThreadMessageView }) {
     : null;
 
   return (
-    <figure className="mt-2.5">
+    <figure className={message.body ? "mt-2" : undefined}>
       {message.attachmentKind === "VIDEO" ? (
         // biome-ignore lint/a11y/useMediaCaption: a user-sent clip has none
         <video
           src={message.attachmentUrl}
           controls
           preload="metadata"
-          className="max-h-80 w-full rounded-card border border-line bg-black"
+          className="max-h-80 w-full rounded-lg border border-fg/10 bg-black"
         />
       ) : (
         <a
           href={message.attachmentUrl}
           target="_blank"
           rel="noopener noreferrer"
+          className="block w-fit rounded-lg transition-opacity duration-150 hover:opacity-90"
         >
           {/* biome-ignore lint/performance/noImgElement: private attachment served per viewer; the image optimiser would cache it outside that check */}
           <img
             src={message.attachmentUrl}
             alt="Attachment"
-            className="max-h-80 w-auto rounded-card border border-line"
+            className="max-h-80 w-auto rounded-lg border border-fg/10"
           />
         </a>
       )}
       {left ? (
-        <figcaption className="mt-1.5 flex items-center gap-1.5 text-[0.6875rem] text-subtle">
+        <figcaption className="mt-1.5 flex items-center gap-1.5 text-xs text-subtle">
           <ClockIcon aria-hidden="true" className="size-3" />
           Removed in {left}
         </figcaption>
@@ -136,19 +146,54 @@ function displayName(message: ThreadMessageView) {
     : message.senderName;
 }
 
-function Bubble({ message }: { message: ThreadMessageView }) {
+/**
+ * Messages a few minutes apart from the same person read as one turn: one
+ * name and time over the lot, close together, so a run of short replies does
+ * not repeat the same header four times.
+ */
+const GROUP_MS = 5 * 60_000;
+
+function sameTurn(a: ThreadMessageView, b: ThreadMessageView) {
+  return (
+    a.kind === "TEXT" &&
+    b.kind === "TEXT" &&
+    !a.fromStaff &&
+    !b.fromStaff &&
+    a.mine === b.mine &&
+    a.senderName === b.senderName &&
+    a.senderRole === b.senderRole &&
+    Math.abs(
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    ) < GROUP_MS
+  );
+}
+
+function Bubble({
+  message,
+  first,
+  last,
+}: {
+  message: ThreadMessageView;
+  /** Opens a turn: carries the name, the time and the avatar. */
+  first: boolean;
+  /** Closes a turn: keeps its full corner on the sender's side. */
+  last: boolean;
+}) {
   if (message.fromStaff) {
     return (
-      <li className="flex flex-col items-center">
-        <div className="w-full max-w-2xl rounded-panel border border-primary/30 bg-primary-soft p-4">
-          <p className="flex flex-wrap items-center gap-1.5 text-xs font-semibold text-primary-text">
-            <ShieldCheckIcon aria-hidden="true" className="size-3.5" />
+      <li className="flex justify-center">
+        <div className="w-full max-w-xl rounded-card border border-line bg-surface px-4 py-3 shadow-xs">
+          <p className="flex flex-wrap items-center gap-1.5 text-[0.8125rem] font-medium text-fg">
+            <ShieldCheckIcon
+              aria-hidden="true"
+              className="size-3.5 text-muted"
+            />
             Channel Adda
-            <span className="ml-auto font-normal text-subtle">
+            <span className="ml-auto text-xs font-normal text-subtle tabular-nums">
               {when(message.createdAt)}
             </span>
           </p>
-          <p className="mt-2 text-sm leading-relaxed whitespace-pre-wrap text-fg">
+          <p className="mt-1.5 text-sm leading-relaxed wrap-break-word whitespace-pre-wrap text-fg">
             {message.body}
           </p>
         </div>
@@ -157,60 +202,83 @@ function Bubble({ message }: { message: ThreadMessageView }) {
   }
 
   return (
-    <li className={message.mine ? "flex justify-end" : "flex justify-start"}>
+    <li
+      className={cn(
+        "group/msg flex",
+        message.mine ? "justify-end" : "justify-start",
+        // The list spaces turns apart; messages inside one sit close.
+        !first && "-mt-4",
+      )}
+    >
       <div
         className={cn(
-          "flex max-w-[min(34rem,92%)] gap-2.5",
+          "flex max-w-[min(34rem,88%)] min-w-0 gap-2",
           message.mine && "flex-row-reverse",
         )}
       >
         {!message.mine ? (
-          <span
-            aria-hidden="true"
-            className="mt-6 grid size-8 shrink-0 place-items-center rounded-full bg-surface-2 text-xs font-semibold text-muted"
-          >
-            {message.senderName.trim().charAt(0).toUpperCase()}
-          </span>
+          first ? (
+            <Initials name={message.senderName} className="mt-0.5 size-7" />
+          ) : (
+            <span aria-hidden="true" className="w-7 shrink-0" />
+          )
         ) : null}
 
         <div className="min-w-0">
-          <p
-            className={cn(
-              "flex items-baseline gap-2 text-xs text-subtle",
-              message.mine && "justify-end",
-            )}
-          >
-            <span className="font-medium text-muted">
-              {message.mine ? "You" : displayName(message)}
-            </span>
-            <span>{when(message.createdAt)}</span>
-          </p>
+          {first ? (
+            <p
+              className={cn(
+                "mb-1 flex items-baseline gap-1.5 text-xs text-subtle",
+                message.mine && "justify-end",
+              )}
+            >
+              <span className="font-medium text-muted">
+                {message.mine ? "You" : displayName(message)}
+              </span>
+              <span className="tabular-nums">{when(message.createdAt)}</span>
+            </p>
+          ) : null}
           <div
             className={cn(
-              "mt-1 border p-3.5",
-              message.mine
-                ? "rounded-panel rounded-tr-md border-primary/25 bg-primary-soft"
-                : "rounded-panel rounded-tl-md border-line bg-surface",
+              "flex items-end gap-2",
+              message.mine && "flex-row-reverse",
             )}
           >
-            {message.body ? (
-              <p className="text-sm leading-relaxed whitespace-pre-wrap text-fg">
-                {message.body}
-              </p>
-            ) : null}
-            <Attachment message={message} />
-            {message.redactedKinds ? (
-              <p className="mt-2.5 flex items-start gap-1.5 border-t border-line pt-2.5 text-xs leading-relaxed text-subtle">
-                <ScissorsIcon
-                  aria-hidden="true"
-                  className="mt-0.5 size-3.5 shrink-0"
-                />
-                <span>
-                  {message.redactedKinds} removed. Deals stay on Channel Adda so
-                  we can stand behind them.
-                </span>
-              </p>
-            ) : null}
+            <div
+              className={cn(
+                "min-w-0 rounded-card px-3.5 py-2",
+                message.mine
+                  ? "rounded-tr-md bg-surface-3 text-fg"
+                  : "rounded-tl-md border border-line bg-surface text-fg",
+                !last && (message.mine ? "rounded-br-md" : "rounded-bl-md"),
+              )}
+            >
+              {message.body ? (
+                <p className="text-sm leading-relaxed wrap-break-word whitespace-pre-wrap">
+                  {message.body}
+                </p>
+              ) : null}
+              <Attachment message={message} />
+              {message.redactedKinds ? (
+                <p className="mt-2 flex items-start gap-1.5 border-t border-fg/10 pt-2 text-xs leading-relaxed text-subtle">
+                  <ScissorsIcon
+                    aria-hidden="true"
+                    className="mt-0.5 size-3.5 shrink-0"
+                  />
+                  <span>
+                    {message.redactedKinds} removed. Deals stay on Channel Adda
+                    so we can stand behind them.
+                  </span>
+                </p>
+              ) : null}
+            </div>
+            {/* Inside a turn the time is on hover, beside the message it
+                belongs to; screen readers hear it either way. */}
+            {first ? null : (
+              <span className="mb-1.5 shrink-0 text-xs whitespace-nowrap text-subtle tabular-nums opacity-0 transition-opacity duration-150 group-hover/msg:opacity-100">
+                {when(message.createdAt)}
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -265,6 +333,7 @@ export function ThreadView({
 
   const over = draft.length > MAX_MESSAGE;
   const left = MAX_MESSAGE - draft.length;
+  const hasSomething = draft.trim().length > 0 || attachment !== null;
 
   function send() {
     const body = draft.trim();
@@ -329,10 +398,13 @@ export function ThreadView({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <p className="flex items-start gap-2.5 rounded-card border border-line bg-surface-2 px-3.5 py-3 text-xs leading-relaxed text-muted">
-        <EyeIcon aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+      <p className="mx-auto flex max-w-[66ch] items-start gap-2 rounded-card border border-line bg-surface-2/60 px-3.5 py-2.5 text-xs leading-relaxed text-muted">
+        <EyeIcon
+          aria-hidden="true"
+          className="mt-0.5 size-3.5 shrink-0 text-subtle"
+        />
         <span>
-          <strong className="font-semibold text-fg">
+          <strong className="font-medium text-fg">
             Channel Adda can read this conversation
           </strong>{" "}
           and will step in if something goes wrong. Phone numbers, emails and
@@ -342,24 +414,25 @@ export function ThreadView({
       </p>
 
       {messages.length === 0 ? (
-        <div className="mt-4 flex flex-col items-center rounded-panel border border-dashed border-line-strong bg-surface px-6 py-12 text-center">
-          <span className="flex size-11 items-center justify-center rounded-2xl bg-surface-2 text-subtle">
-            <MessageSquareIcon aria-hidden="true" className="size-5" />
-          </span>
-          <p className="mt-3.5 font-display text-[0.9375rem] font-bold text-fg">
-            No messages yet
-          </p>
-          <p className="mx-auto mt-1.5 max-w-[46ch] text-sm leading-relaxed text-muted">
-            Ask {otherSide} whatever you need to know before you commit —
-            revenue, where the traffic comes from, strikes, why they are
-            selling.
-          </p>
-        </div>
+        <EmptyState
+          bare
+          className="py-14"
+          icon={MessageSquareIcon}
+          title="No messages yet"
+          body={`Ask ${otherSide} whatever you need to know before you commit — revenue, where the traffic comes from, strikes, why they are selling.`}
+        />
       ) : (
-        <ul className="mt-4 flex flex-col gap-4">
-          {messages.map((message) =>
-            message.kind === "EVENT" ? (
-              <EventLine key={message.id} message={message} />
+        <ul className="mt-6 flex flex-col gap-5">
+          {messages.map((message, index) => {
+            const prev = messages[index - 1];
+            const next = messages[index + 1];
+            return message.kind === "EVENT" ? (
+              <EventLine
+                key={message.id}
+                message={message}
+                // A run of history lines reads as one block of record.
+                className={prev?.kind === "EVENT" ? "-mt-3" : undefined}
+              />
             ) : message.kind === "OFFER" && message.offer ? (
               <ChatOfferCard
                 key={message.id}
@@ -385,91 +458,100 @@ export function ThreadView({
                 }
               />
             ) : (
-              <Bubble key={message.id} message={message} />
-            ),
-          )}
+              <Bubble
+                key={message.id}
+                message={message}
+                first={!prev || !sameTurn(prev, message)}
+                last={!next || !sameTurn(message, next)}
+              />
+            );
+          })}
         </ul>
       )}
-      <div ref={endRef} />
+      {/* The margin lands the message box on screen with the newest
+          message, rather than leaving it just under the fold. */}
+      <div ref={endRef} className="scroll-mb-48" />
 
       {closed ? (
-        <p className="mt-6 flex items-start gap-2.5 rounded-panel border border-line bg-surface-2 p-4 text-sm leading-relaxed text-muted">
-          <ShieldCheckIcon
+        <p className="mt-6 flex items-start justify-center gap-2 rounded-card border border-line bg-surface-2/60 px-4 py-3 text-[0.8125rem] leading-relaxed text-muted">
+          <LockIcon
             aria-hidden="true"
-            className="mt-0.5 size-4 shrink-0"
+            className="mt-0.5 size-3.5 shrink-0 text-subtle"
           />
           <span>
             Channel Adda closed this conversation. Nothing further can be sent.
           </span>
         </p>
       ) : (
-        <div className="mt-6 rounded-panel border border-line bg-surface p-3.5 focus-within:border-primary/50 sm:p-4">
+        // On a computer the box stays at the bottom of the window while the
+        // conversation scrolls under it. Not on a phone: there, with an offer
+        // open, it could be taller than the screen and its top unreachable.
+        <div className="relative mt-6 lg:sticky lg:bottom-0 lg:z-10 lg:bg-bg lg:pb-5 lg:before:pointer-events-none lg:before:absolute lg:before:inset-x-0 lg:before:bottom-full lg:before:h-6 lg:before:bg-linear-to-t lg:before:from-bg lg:before:to-transparent">
           {offering && offerComposer ? (
-            <div className="mb-3.5">
-              <OfferComposerForm
-                config={offerComposer}
-                onDone={() => setOffering(false)}
-              />
-            </div>
-          ) : null}
-          <label htmlFor="composer" className="sr-only">
-            Write a message
-          </label>
-          <textarea
-            id="composer"
-            rows={3}
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
-                event.preventDefault();
-                send();
-              }
-            }}
-            placeholder="Ask about revenue, traffic sources, strikes…"
-            aria-invalid={over}
-            className="w-full resize-y bg-transparent text-base leading-relaxed text-fg placeholder:text-subtle focus:outline-none sm:text-[0.9375rem]"
-          />
-
-          {attachment ? (
-            <div className="mt-2.5 flex items-center gap-3 rounded-card border border-line bg-surface-2 p-2.5">
-              {attachment.kind === "IMAGE" ? (
-                // biome-ignore lint/performance/noImgElement: a local preview of the file being sent, not a served image
-                <img
-                  src={attachment.url}
-                  alt=""
-                  className="size-12 rounded-lg object-cover"
-                />
-              ) : (
-                <span className="flex size-12 items-center justify-center rounded-lg bg-surface text-xs text-muted">
-                  clip
-                </span>
-              )}
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-xs font-medium text-fg">
-                  {attachment.name}
-                </span>
-                <span className="block text-[0.6875rem] text-subtle">
-                  {(attachment.bytes / 1024 / 1024).toFixed(1)}MB · deleted
-                  after 48 hours
-                </span>
-              </span>
-              <button
-                type="button"
-                onClick={() => {
-                  URL.revokeObjectURL(attachment.url);
-                  setAttachment(null);
-                }}
-                aria-label="Remove attachment"
-                className="inline-flex size-9 cursor-pointer items-center justify-center rounded-lg text-subtle transition-colors duration-200 hover:bg-surface hover:text-fg"
-              >
-                <XIcon aria-hidden="true" className="size-4" />
-              </button>
-            </div>
+            <OfferComposerForm
+              config={offerComposer}
+              onDone={() => setOffering(false)}
+            />
           ) : null}
 
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-3">
-            <div className="flex min-w-0 items-center gap-3">
+          <div className="rounded-card border border-line bg-surface shadow-xs transition-[border-color,box-shadow] duration-150 not-focus-within:hover:border-line-strong focus-within:border-primary focus-within:ring-[3px] focus-within:ring-primary/20 has-[[aria-invalid=true]]:border-danger has-[[aria-invalid=true]]:ring-danger/15 dark:bg-surface-2">
+            <label htmlFor="composer" className="sr-only">
+              Write a message
+            </label>
+            <textarea
+              id="composer"
+              rows={3}
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+                  event.preventDefault();
+                  send();
+                }
+              }}
+              placeholder="Ask about revenue, traffic sources, strikes…"
+              aria-invalid={over}
+              className="block max-h-72 min-h-20 w-full resize-none bg-transparent px-3.5 pt-3 pb-1 text-base leading-6 field-sizing-content text-fg placeholder:text-subtle focus:outline-none sm:text-sm"
+            />
+
+            {attachment ? (
+              <div className="mx-2 mb-1 flex items-center gap-3 rounded-lg border border-line bg-surface-2 p-2">
+                {attachment.kind === "IMAGE" ? (
+                  // biome-ignore lint/performance/noImgElement: a local preview of the file being sent, not a served image
+                  <img
+                    src={attachment.url}
+                    alt=""
+                    className="size-10 rounded-md object-cover"
+                  />
+                ) : (
+                  <span className="flex size-10 items-center justify-center rounded-md border border-line bg-surface text-xs text-muted">
+                    clip
+                  </span>
+                )}
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[0.8125rem] font-medium text-fg">
+                    {attachment.name}
+                  </span>
+                  <span className="block text-xs text-subtle tabular-nums">
+                    {(attachment.bytes / 1024 / 1024).toFixed(1)}MB · deleted
+                    after 48 hours
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    URL.revokeObjectURL(attachment.url);
+                    setAttachment(null);
+                  }}
+                  aria-label="Remove attachment"
+                  className="inline-flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-md text-subtle transition-colors duration-150 hover:bg-surface-3 hover:text-fg pointer-fine:size-8"
+                >
+                  <XIcon aria-hidden="true" className="size-4" />
+                </button>
+              </div>
+            ) : null}
+
+            <div className="flex flex-wrap items-center gap-1 px-2 pt-1 pb-2">
               <input
                 ref={fileRef}
                 type="file"
@@ -483,8 +565,9 @@ export function ThreadView({
               />
               <Button
                 type="button"
-                size="sm"
-                variant="secondary"
+                size="icon"
+                variant="ghost"
+                title="Photo or clip"
                 disabled={uploading || pending || attachment !== null}
                 onClick={() => fileRef.current?.click()}
               >
@@ -496,15 +579,17 @@ export function ThreadView({
                 ) : (
                   <ImageIcon aria-hidden="true" className="size-4" />
                 )}
-                {uploading ? "Attaching…" : "Photo or clip"}
+                <span className="sr-only">
+                  {uploading ? "Attaching…" : "Photo or clip"}
+                </span>
               </Button>
               {offerComposer ? (
                 <Button
                   type="button"
-                  size="sm"
-                  variant="secondary"
+                  variant="ghost"
                   aria-expanded={offering}
                   onClick={() => setOffering((was) => !was)}
+                  className="aria-expanded:bg-surface-2 aria-expanded:text-fg"
                 >
                   <TagIcon aria-hidden="true" className="size-4" />
                   {offerComposer.mode === "price"
@@ -514,8 +599,9 @@ export function ThreadView({
               ) : null}
               <p
                 className={cn(
-                  "min-w-0 text-xs",
+                  "min-w-0 px-1.5 text-xs tabular-nums",
                   over ? "font-medium text-danger" : "text-subtle",
+                  !over && left >= 400 && "max-sm:hidden",
                 )}
               >
                 {over
@@ -524,38 +610,47 @@ export function ThreadView({
                     ? `${left.toLocaleString("en-US")} characters left`
                     : "Up to 25MB"}
               </p>
+              <Button
+                type="button"
+                variant={hasSomething || pending ? "primary" : "secondary"}
+                title="Send (Ctrl+Enter)"
+                className="ml-auto"
+                disabled={
+                  pending ||
+                  uploading ||
+                  over ||
+                  (draft.trim().length === 0 && attachment === null)
+                }
+                onClick={send}
+              >
+                {pending ? (
+                  <LoaderCircleIcon
+                    aria-hidden="true"
+                    className="size-4 animate-spin"
+                  />
+                ) : (
+                  <SendIcon aria-hidden="true" className="size-4" />
+                )}
+                <BusyLabel busy={pending} idle="Send" working="Sending…" />
+              </Button>
             </div>
-            <Button
-              type="button"
-              size="md"
-              disabled={
-                pending ||
-                uploading ||
-                over ||
-                (draft.trim().length === 0 && attachment === null)
-              }
-              onClick={send}
-            >
-              {pending ? (
-                <LoaderCircleIcon
-                  aria-hidden="true"
-                  className="size-4 animate-spin"
-                />
-              ) : (
-                <SendIcon aria-hidden="true" className="size-4" />
-              )}
-              {pending ? "Sending…" : "Send"}
-            </Button>
           </div>
 
           {error ? (
-            <p role="alert" className="mt-2.5 text-sm font-medium text-danger">
+            <p
+              role="alert"
+              className="mt-2 px-1 text-[0.8125rem] font-medium text-danger"
+            >
               {error}
             </p>
           ) : null}
           {note ? (
-            <output className="mt-2.5 block text-xs leading-relaxed text-primary-text">
-              {note}
+            <output className="mt-2 flex items-start gap-1.5 px-1 text-xs leading-relaxed text-muted">
+              <CircleAlertIcon
+                aria-hidden="true"
+                className="mt-0.5 size-3.5 shrink-0 text-primary-text"
+              />
+              <span>{note}</span>
             </output>
           ) : null}
         </div>

@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
 import {
-  ConsoleHeader,
-  ConsoleSection,
+  AllClear,
+  Dot,
   FilterBar,
   FilterLink,
   MetaItem,
-} from "@/components/admin/console";
+  PageHeader,
+  Section,
+} from "@/components/app/kit";
 import { ThreadList, type ThreadRow } from "@/components/messages/thread-list";
 import { listStaffThreads } from "@/server/messages";
 import { requireStaff } from "@/server/session";
@@ -53,45 +55,50 @@ export default async function AdminMessagesPage({
 
   return (
     <>
-      <ConsoleHeader
-        eyebrow="Moderation"
+      <PageHeader
         title="Conversations"
-        description="Every thread between a buyer and a seller. You can read all of them and write into any of them as Channel Adda."
+        description="Every buyer–seller thread. Read any of them, and write into any as Channel Adda."
         meta={
           <>
             <MetaItem label="Signed in as">{staff.name}</MetaItem>
             <MetaItem label="Showing">
-              {rows.length.toLocaleString("en-US")}{" "}
+              <span className="tabular-nums">
+                {rows.length.toLocaleString("en-US")}
+              </span>{" "}
               {rows.length === 1 ? "thread" : "threads"}
             </MetaItem>
             {flaggedCount > 0 ? (
-              <span className="font-semibold text-danger">
+              <span className="inline-flex items-center gap-1.5 font-medium text-danger tabular-nums">
+                <Dot tone="danger" />
                 {flaggedCount} flagged
               </span>
             ) : (
-              <span className="text-verified">nothing flagged</span>
+              <span className="inline-flex items-center gap-1.5 text-muted">
+                <Dot tone="verified" />
+                Nothing flagged
+              </span>
             )}
           </>
         }
       />
 
-      <div className="mt-5">
-        <FilterBar label="Filter conversations">
-          <FilterLink href="/admin/messages" active={!flaggedOnly}>
-            All
-          </FilterLink>
-          <FilterLink
-            href="/admin/messages?filter=flagged"
-            active={flaggedOnly}
-            count={flaggedCount}
-          >
-            Flagged
-          </FilterLink>
-        </FilterBar>
-      </div>
+      <FilterBar label="Filter conversations">
+        <FilterLink href="/admin/messages" active={!flaggedOnly}>
+          All
+        </FilterLink>
+        <FilterLink
+          href="/admin/messages?filter=flagged"
+          active={flaggedOnly}
+          count={flaggedCount}
+          tone="danger"
+        >
+          Flagged
+        </FilterLink>
+      </FilterBar>
 
-      <ConsoleSection
+      <Section
         id="threads"
+        className="mt-6"
         title={flaggedOnly ? "Flagged threads" : "All conversations"}
         count={rows.length}
         tone={flaggedOnly && rows.length > 0 ? "danger" : "neutral"}
@@ -101,16 +108,20 @@ export default async function AdminMessagesPage({
             : "Newest activity first, with flagged threads above the rest."
         }
       >
-        <ThreadList
-          threads={rows}
-          basePath="/admin/messages"
-          empty={
-            flaggedOnly
-              ? "Nothing flagged. Nobody has tried to swap contact details."
-              : "No conversations yet."
-          }
-        />
-      </ConsoleSection>
+        {flaggedOnly && rows.length === 0 ? (
+          // A cleared queue is good news, said quietly.
+          <AllClear
+            title="Nothing flagged"
+            body="Nobody has tried to swap contact details."
+          />
+        ) : (
+          <ThreadList
+            threads={rows}
+            basePath="/admin/messages"
+            empty="No conversations yet."
+          />
+        )}
+      </Section>
     </>
   );
 }

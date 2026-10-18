@@ -1,8 +1,8 @@
-import { ArrowLeftIcon, ExternalLinkIcon, FlagIcon } from "lucide-react";
+import { FlagIcon } from "lucide-react";
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Panel } from "@/components/admin/console";
+import { Callout } from "@/components/app/kit";
+import { ThreadHeader } from "@/components/messages/chat-parts";
 import { LiveRefresh } from "@/components/messages/live-refresh";
 import { toMessageViews } from "@/components/messages/serialize";
 import { StaffControls } from "@/components/messages/staff-controls";
@@ -27,67 +27,51 @@ export default async function AdminThreadPage({
   const thread = await getThread(id, staff);
   if (!thread || !fingerprint) notFound();
 
+  const flagged = thread.flaggedAt !== null;
+  const closed = thread.closedAt !== null;
+
   return (
     <>
       <LiveRefresh conversationId={thread.id} fingerprint={fingerprint} />
-      <Link
-        href="/admin/messages"
-        className="inline-flex min-h-11 items-center gap-1.5 text-sm text-muted transition-colors hover:text-fg"
-      >
-        <ArrowLeftIcon aria-hidden="true" className="size-4" />
-        All conversations
-      </Link>
 
-      <header className="mt-2 border-b border-line pb-5">
-        <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              {thread.flaggedAt ? (
-                <Badge variant="danger" size="md">
+      <ThreadHeader
+        back={{ href: "/admin/messages", label: "All conversations" }}
+        people={[thread.buyerName, thread.sellerName]}
+        title={`${thread.buyerName} and ${thread.sellerName}`}
+        listing={{
+          href: `/listing/${thread.listingSlug}`,
+          handle: thread.listingHandle,
+          title: thread.listingTitle,
+        }}
+        meta={
+          flagged || closed || thread.staffName ? (
+            <>
+              {flagged ? (
+                <Badge variant="danger" size="sm">
                   <FlagIcon aria-hidden="true" />
                   Flagged
                 </Badge>
               ) : null}
-              {thread.closedAt ? <Badge size="md">Closed</Badge> : null}
+              {closed ? <Badge size="sm">Closed</Badge> : null}
               {thread.staffName ? (
-                <Badge variant="info" size="md">
+                <Badge variant="info" size="sm">
                   Claimed by {thread.staffName}
                 </Badge>
               ) : null}
-            </div>
-            <h1 className="mt-2.5 font-display text-[1.4rem] leading-[1.15] font-black tracking-tight text-fg sm:text-[1.7rem]">
-              {thread.buyerName} and {thread.sellerName}
-            </h1>
-            <Link
-              href={`/listing/${thread.listingSlug}`}
-              className="mt-1.5 inline-flex items-center gap-1.5 text-sm text-primary-text underline-offset-4 hover:underline"
-            >
-              {thread.listingHandle} · {thread.listingTitle}
-              <ExternalLinkIcon aria-hidden="true" className="size-3.5" />
-            </Link>
-          </div>
-        </div>
-      </header>
+            </>
+          ) : null
+        }
+      />
 
-      {thread.flaggedAt ? (
-        <Panel tone="danger" className="mt-5">
-          <p className="flex items-start gap-2 text-sm leading-relaxed text-fg">
-            <FlagIcon
-              aria-hidden="true"
-              className="mt-0.5 size-4 shrink-0 text-danger"
-            />
-            <span>
-              <strong className="font-semibold">Flagged.</strong>{" "}
-              {thread.flagReason ??
-                "Someone tried to move this off the platform."}{" "}
-              Taking a deal off Channel Adda is how both sides lose their
-              protection, so read the whole thread before deciding.
-            </span>
-          </p>
-        </Panel>
+      {flagged ? (
+        <Callout tone="danger" icon={FlagIcon} title="Flagged" className="mt-5">
+          {thread.flagReason ?? "Someone tried to move this off the platform."}{" "}
+          Taking a deal off Channel Adda is how both sides lose their
+          protection, so read the whole thread before deciding.
+        </Callout>
       ) : null}
 
-      <div className="mt-5 grid gap-5 lg:grid-cols-[1fr_18rem] lg:items-start">
+      <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start lg:gap-6">
         <div className="min-w-0">
           <ThreadView
             conversationId={thread.id}
@@ -96,18 +80,18 @@ export default async function AdminThreadPage({
             viewerRole="staff"
             messages={toMessageViews(thread.messages)}
           />
-          <p className="mt-3 text-xs leading-relaxed text-subtle">
+          <p className="mt-2 px-1 text-xs leading-relaxed text-subtle">
             Anything you write here is sent as Channel Adda, not as {staff.name}
             . Both sides see it.
           </p>
         </div>
 
-        <div className="min-w-0 lg:sticky lg:top-24">
+        <div className="min-w-0 lg:sticky lg:top-[5.5rem]">
           <StaffControls
             conversationId={thread.id}
             claimedBy={thread.staffName}
-            flagged={thread.flaggedAt !== null}
-            closed={thread.closedAt !== null}
+            flagged={flagged}
+            closed={closed}
           />
         </div>
       </div>

@@ -1,5 +1,6 @@
-import { AlertTriangleIcon, MessageSquareIcon } from "lucide-react";
-import Link from "next/link";
+import { ChevronRightIcon, FlagIcon, MessageSquareIcon } from "lucide-react";
+import { EmptyState, List, ListItem } from "@/components/app/kit";
+import { Initials } from "@/components/messages/chat-parts";
 import { Badge } from "@/components/ui/badge";
 
 /**
@@ -45,70 +46,66 @@ export function ThreadList({
 }) {
   if (threads.length === 0) {
     return (
-      <div className="mt-6 flex flex-col items-center rounded-panel border border-dashed border-line-strong bg-surface px-6 py-14 text-center">
-        <span className="flex size-12 items-center justify-center rounded-2xl bg-surface-2 text-subtle">
-          <MessageSquareIcon aria-hidden="true" className="size-5" />
-        </span>
-        <p className="mt-4 font-display text-base font-bold text-fg">{empty}</p>
-        <p className="mx-auto mt-1.5 max-w-[48ch] text-sm leading-relaxed text-muted">
-          A thread appears the moment a buyer asks a seller a question, and
-          stays readable here for as long as the deal behind it lasts.
-        </p>
-      </div>
+      <EmptyState
+        icon={MessageSquareIcon}
+        title={empty}
+        body="A thread appears the moment a buyer asks a seller a question, and stays readable here for as long as the deal behind it lasts."
+      />
     );
   }
 
   return (
-    <ul className="mt-6 grid gap-px overflow-hidden rounded-panel border border-line bg-line">
+    <List>
       {threads.map((thread) => (
-        <li key={thread.id} className="bg-surface">
-          <Link
-            href={`${basePath}/${thread.id}`}
-            className="flex items-start gap-3.5 p-4 transition-colors duration-200 hover:bg-surface-2 sm:p-5"
-          >
-            <span
-              aria-hidden="true"
-              className={`mt-0.5 grid size-9 shrink-0 place-items-center rounded-xl ${
-                thread.flagged
-                  ? "bg-danger-soft text-danger"
-                  : "bg-surface-2 text-subtle"
-              }`}
-            >
-              {thread.flagged ? (
-                <AlertTriangleIcon className="size-[1.15rem]" />
-              ) : (
-                <MessageSquareIcon className="size-[1.15rem]" />
-              )}
-            </span>
+        <ListItem
+          key={thread.id}
+          href={`${basePath}/${thread.id}`}
+          // A flag is the reason this queue exists, so it marks the row's
+          // edge as well as its badge.
+          flag={thread.flagged ? "danger" : undefined}
+        >
+          <div className="flex items-start gap-3">
+            <Initials
+              name={thread.withName}
+              className="mt-0.5 size-9 text-xs"
+            />
 
-            <span className="min-w-0 flex-1">
-              <span className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                <span className="text-[0.9375rem] font-semibold text-fg">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-baseline gap-3">
+                <p className="min-w-0 flex-1 truncate text-sm leading-5 font-medium text-fg">
                   {thread.withName}
-                </span>
-                <span className="min-w-0 truncate text-xs text-subtle">
-                  {thread.listingHandle} · {thread.listingTitle}
-                </span>
-                <span className="ml-auto shrink-0 text-xs text-subtle">
+                </p>
+                <time
+                  dateTime={thread.lastMessageAt}
+                  className="shrink-0 text-xs text-subtle tabular-nums"
+                >
                   {when(thread.lastMessageAt)}
-                </span>
-              </span>
-
-              <span className="mt-1.5 block truncate text-sm text-muted">
+                </time>
+              </div>
+              <p className="truncate text-xs leading-5 text-subtle">
+                {thread.listingHandle} · {thread.listingTitle}
+              </p>
+              <p className="mt-0.5 truncate text-[0.8125rem] leading-5 text-muted">
                 {thread.preview}
-              </span>
+              </p>
 
               {thread.flagged || thread.closed || thread.unread > 0 ? (
-                <span className="mt-2.5 flex flex-wrap items-center gap-2">
+                <div className="mt-2 flex min-w-0 flex-wrap items-center gap-1.5">
                   {thread.unread > 0 ? (
-                    <Badge variant="solid" size="sm">
+                    <Badge variant="primary" size="sm" className="tabular-nums">
                       {thread.unread} new
                     </Badge>
                   ) : null}
                   {thread.flagged ? (
-                    <Badge variant="danger" size="sm">
-                      <AlertTriangleIcon aria-hidden="true" />
-                      {thread.flagReason ?? "Flagged for review"}
+                    <Badge
+                      variant="danger"
+                      size="sm"
+                      className="max-w-full min-w-0"
+                    >
+                      <FlagIcon aria-hidden="true" />
+                      <span className="truncate">
+                        {thread.flagReason ?? "Flagged for review"}
+                      </span>
                     </Badge>
                   ) : null}
                   {thread.closed ? (
@@ -116,12 +113,17 @@ export function ThreadList({
                       Closed
                     </Badge>
                   ) : null}
-                </span>
+                </div>
               ) : null}
-            </span>
-          </Link>
-        </li>
+            </div>
+
+            <ChevronRightIcon
+              aria-hidden="true"
+              className="mt-2.5 size-4 shrink-0 text-subtle transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-muted"
+            />
+          </div>
+        </ListItem>
       ))}
-    </ul>
+    </List>
   );
 }

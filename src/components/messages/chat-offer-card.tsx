@@ -2,6 +2,7 @@
 
 import { TagIcon } from "lucide-react";
 import type { ReactNode } from "react";
+import { TurnFlag } from "@/components/app/kit";
 import { Badge } from "@/components/ui/badge";
 import { Price } from "@/components/ui/price";
 import type { OfferStatus } from "@/generated/prisma/enums";
@@ -62,58 +63,67 @@ export function ChatOfferCard({
   const heading = offer.bySeller ? "Price from the seller" : "Offer";
 
   return (
-    <li className={mine ? "flex justify-end" : "flex justify-start"}>
+    // Someone else's card lines up with their messages, past the avatar.
+    <li className={mine ? "flex justify-end" : "flex justify-start pl-9"}>
       <article
         aria-label={`${heading}: ${status.label}`}
         className={cn(
-          "w-full max-w-sm rounded-panel border p-4",
-          yourMove
-            ? "border-primary/40 bg-primary-soft"
-            : "border-line bg-surface",
+          "w-full max-w-sm rounded-card border bg-surface shadow-xs transition-colors duration-150",
+          yourMove ? "border-primary/45" : "border-line",
         )}
       >
-        <header className="flex flex-wrap items-center gap-2">
-          <TagIcon aria-hidden="true" className="size-3.5 text-muted" />
-          <span className="text-xs font-semibold text-fg">{heading}</span>
-          <Badge variant={status.variant} size="sm">
-            {status.label}
-          </Badge>
-          {open ? (
-            <span className="ml-auto text-xs text-subtle tabular-nums">
-              {timeLeft(offer.expiresAt)}
+        <div className="px-4 pt-3.5 pb-4">
+          <header className="flex flex-wrap items-center gap-2">
+            <TagIcon aria-hidden="true" className="size-3.5 text-subtle" />
+            <span className="text-[0.8125rem] font-medium text-fg">
+              {heading}
             </span>
-          ) : null}
-        </header>
+            <Badge variant={status.variant} size="sm">
+              {status.label}
+            </Badge>
+            {open ? (
+              <span className="ml-auto text-xs text-subtle tabular-nums">
+                {timeLeft(offer.expiresAt)}
+              </span>
+            ) : null}
+          </header>
 
-        <p className="mt-2.5 font-display text-2xl font-black text-fg">
-          <Price usd={offer.amountCents / 100} exact />
-        </p>
-        <p className="mt-0.5 text-xs text-subtle">
-          {senderName} · {chatTime(createdAt)}
-        </p>
-
-        {offer.note ? (
-          <p className="mt-3 rounded-card border border-line bg-surface-2 p-3 text-sm leading-relaxed whitespace-pre-wrap text-muted">
-            {offer.note}
+          <p className="mt-2.5 text-[1.375rem] leading-7 font-semibold tracking-[-0.015em] text-fg tabular-nums">
+            <Price usd={offer.amountCents / 100} exact />
           </p>
-        ) : null}
+          <p className="mt-0.5 text-xs text-subtle">
+            {senderName}
+            <span aria-hidden="true" className="mx-1.5 text-line-strong">
+              ·
+            </span>
+            <span className="tabular-nums">{chatTime(createdAt)}</span>
+          </p>
+
+          {offer.note ? (
+            <p className="mt-3 border-l-2 border-line-strong pl-3 text-[0.8125rem] leading-relaxed wrap-break-word whitespace-pre-wrap text-muted">
+              {offer.note}
+            </p>
+          ) : null}
+        </div>
 
         {open ? (
-          <p
-            className={cn(
-              "mt-3 text-xs",
-              yourMove ? "font-medium text-primary-text" : "text-subtle",
+          <footer className="flex flex-col gap-3 rounded-b-[inherit] border-t border-line bg-surface-2/50 px-4 py-3">
+            {yourMove ? (
+              <span>
+                <TurnFlag mine />
+              </span>
+            ) : (
+              <p className="text-xs text-subtle">
+                {offer.awaiting === "seller"
+                  ? "Waiting on the seller"
+                  : "Waiting on the buyer"}
+              </p>
             )}
-          >
-            {yourMove
-              ? "Your move"
-              : offer.awaiting === "seller"
-                ? "Waiting on the seller"
-                : "Waiting on the buyer"}
-          </p>
+            {actions ? <div className="empty:hidden">{actions}</div> : null}
+          </footer>
+        ) : actions ? (
+          <div className="px-4 pb-4 empty:hidden">{actions}</div>
         ) : null}
-
-        {actions ? <div className="mt-3">{actions}</div> : null}
       </article>
     </li>
   );

@@ -2,8 +2,16 @@
 
 import { useRouter } from "next/navigation";
 import { useId, useState, useTransition } from "react";
+import {
+  hintClass,
+  inputClass,
+  labelClass,
+  textareaClass,
+} from "@/components/app/kit";
 import { FormNotice } from "@/components/auth/fields";
+import { BusyLabel } from "@/components/messages/chat-parts";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { makeOffer, proposePrice } from "@/server/actions/offers";
 
 export type OfferComposerConfig = {
@@ -55,7 +63,7 @@ export function OfferComposerForm({
 
   return (
     <form
-      className="rounded-card border border-line bg-surface-2 p-3.5 sm:p-4"
+      className="mb-2 rounded-card border border-line bg-surface p-4 shadow-xs"
       onSubmit={(e) => {
         e.preventDefault();
         setError(null);
@@ -76,40 +84,47 @@ export function OfferComposerForm({
     >
       {error ? <FormNotice>{error}</FormNotice> : null}
 
-      <label htmlFor={amountId} className="block text-sm font-medium text-fg">
+      <label htmlFor={amountId} className={labelClass}>
         {seller ? "Your price (USD)" : "Your offer (USD)"}
       </label>
-      <p className="mt-1 text-xs text-subtle">
-        Asking price is {usd(config.askingPrice)}.{" "}
+      <p className={hintClass}>
+        Asking price is{" "}
+        <span className="tabular-nums">{usd(config.askingPrice)}</span>.{" "}
         {seller
           ? "The buyer can accept it, counter, or turn it down."
           : "The seller can accept it, counter, or turn it down."}{" "}
         It lapses after {config.expiryHours} hours.
       </p>
-      <input
-        id={amountId}
-        inputMode="decimal"
-        value={amount}
-        onChange={(e) => setAmount(e.target.value)}
-        placeholder={String(Math.round(config.askingPrice * 0.9))}
-        className="mt-2 h-11 w-full max-w-xs rounded-xl border border-line bg-surface px-3.5 text-base text-fg placeholder:text-subtle focus:border-primary/60 focus:outline-none sm:text-[0.9375rem]"
-        required
-      />
+      <div className="relative mt-2 max-w-48">
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-subtle"
+        >
+          $
+        </span>
+        <input
+          id={amountId}
+          inputMode="decimal"
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          placeholder={String(Math.round(config.askingPrice * 0.9))}
+          aria-invalid={tooLow || tooHigh}
+          className={cn(inputClass, "pl-7 tabular-nums")}
+          required
+        />
+      </div>
       {tooLow ? (
-        <p className="mt-2 text-sm text-danger">
+        <p className="mt-1.5 text-[0.8125rem] text-danger">
           That is less than half the asking price and will be refused.
         </p>
       ) : null}
       {tooHigh ? (
-        <p className="mt-2 text-sm text-danger">
+        <p className="mt-1.5 text-[0.8125rem] text-danger">
           At the asking price the buyer can simply buy. Offer less.
         </p>
       ) : null}
 
-      <label
-        htmlFor={noteId}
-        className="mt-3 block text-sm font-medium text-fg"
-      >
+      <label htmlFor={noteId} className={cn(labelClass, "mt-3.5")}>
         Note (optional)
       </label>
       <textarea
@@ -117,16 +132,20 @@ export function OfferComposerForm({
         rows={2}
         value={note}
         onChange={(e) => setNote(e.target.value)}
-        className="mt-2 w-full rounded-xl border border-line bg-surface p-3 text-base text-fg focus:border-primary/60 focus:outline-none sm:text-[0.9375rem]"
+        className={cn(textareaClass, "mt-1.5 min-h-16")}
       />
 
-      <div className="mt-3 flex flex-wrap gap-2.5">
+      <div className="mt-3.5 flex flex-wrap gap-2">
         <Button
           type="submit"
           size="sm"
           disabled={pending || !entered || tooLow || tooHigh}
         >
-          {pending ? "Sending…" : seller ? "Send price" : "Send offer"}
+          <BusyLabel
+            busy={pending}
+            idle={seller ? "Send price" : "Send offer"}
+            working="Sending…"
+          />
         </Button>
         <Button type="button" variant="ghost" size="sm" onClick={onDone}>
           Cancel

@@ -2,9 +2,12 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { inputClass, labelClass, textareaClass } from "@/components/app/kit";
 import { FormNotice } from "@/components/auth/fields";
+import { BusyLabel } from "@/components/messages/chat-parts";
 import { Button } from "@/components/ui/button";
 import type { OfferStatus } from "@/generated/prisma/enums";
+import { cn } from "@/lib/utils";
 import {
   acceptOffer,
   counterOffer,
@@ -28,6 +31,9 @@ function usd(value: number) {
  * for the person whose move it is; Withdraw for the person who made it while
  * it waits on the other side. The server checks every one of them again, so
  * a card that is a few seconds stale gets a plain refusal, not a mistake.
+ *
+ * It draws no box of its own: it always sits inside a card that already has
+ * one, and a box in a box is just another edge to read past.
  */
 export function OfferActions({
   offer,
@@ -78,14 +84,18 @@ export function OfferActions({
       {error ? <FormNotice>{error}</FormNotice> : null}
 
       {yourTurn && !countering ? (
-        <div className="flex flex-wrap gap-2.5">
+        <div className="flex flex-wrap gap-2">
           <Button
             type="button"
             size="sm"
             disabled={pending}
             onClick={() => run(() => acceptOffer(offer.id))}
           >
-            {pending ? "Working…" : `Accept ${usd(offer.amount)}`}
+            <BusyLabel
+              busy={pending}
+              idle={`Accept ${usd(offer.amount)}`}
+              working="Working…"
+            />
           </Button>
           <Button
             type="button"
@@ -112,26 +122,34 @@ export function OfferActions({
       ) : null}
 
       {countering ? (
-        <div className="rounded-xl border border-line bg-surface-2 p-4">
-          <label className="block text-sm font-medium text-fg">
+        <div className="flex flex-col gap-3">
+          <label className={labelClass}>
             Counter with (USD)
-            <input
-              inputMode="decimal"
-              value={counterAmount}
-              onChange={(e) => setCounterAmount(e.target.value)}
-              className="mt-2 h-11 w-full max-w-xs rounded-xl border border-line bg-surface px-3.5 text-base text-fg focus:border-primary/60 focus:outline-none sm:text-[0.9375rem]"
-            />
+            <span className="relative mt-1.5 block max-w-48">
+              <span
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-subtle"
+              >
+                $
+              </span>
+              <input
+                inputMode="decimal"
+                value={counterAmount}
+                onChange={(e) => setCounterAmount(e.target.value)}
+                className={cn(inputClass, "pl-7 font-normal tabular-nums")}
+              />
+            </span>
           </label>
-          <label className="mt-3 block text-sm font-medium text-fg">
+          <label className={labelClass}>
             Message (optional)
             <textarea
               rows={2}
               value={counterMessage}
               onChange={(e) => setCounterMessage(e.target.value)}
-              className="mt-2 w-full rounded-xl border border-line bg-surface p-3 text-base text-fg focus:border-primary/60 focus:outline-none sm:text-[0.9375rem]"
+              className={cn(textareaClass, "mt-1.5 min-h-16 font-normal")}
             />
           </label>
-          <div className="mt-3 flex flex-wrap gap-2.5">
+          <div className="flex flex-wrap gap-2">
             <Button
               type="button"
               size="sm"
@@ -142,7 +160,11 @@ export function OfferActions({
                 )
               }
             >
-              {pending ? "Sending…" : "Send counter"}
+              <BusyLabel
+                busy={pending}
+                idle="Send counter"
+                working="Sending…"
+              />
             </Button>
             <Button
               type="button"
