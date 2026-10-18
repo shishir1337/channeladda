@@ -1,10 +1,26 @@
 import { describe, expect, test } from "vitest";
 import {
   dealHeadline,
+  moneyNote,
   STATUS_LABELS,
   STATUS_SHORT,
   statusSentence,
 } from "@/components/deals/deal-status";
+
+test("on a safest deal the money note says Channel Adda holds the price", () => {
+  for (const viewer of ["buyer", "seller", "agent"] as const) {
+    const note = moneyNote("SAFEST", viewer);
+    expect(note).toMatch(/Channel Adda/);
+    expect(note).not.toMatch(/directly|never holds|off the platform/);
+  }
+  expect(moneyNote("SAFEST", "seller")).toMatch(/your Channel Adda wallet/);
+});
+
+test("a finished safest sale tells the seller where the money went", () => {
+  const seller = statusSentence("COMPLETED", "SAFEST", "seller");
+  expect(seller).toMatch(/your Channel Adda wallet/);
+  expect(seller).not.toMatch(/directly/);
+});
 
 /**
  * Found walking a whole Safest deal in the browser: once the seller had

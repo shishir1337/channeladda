@@ -234,9 +234,9 @@ export default async function DealPage({
                   money
                   note={
                     safest
-                      ? viewer === "seller"
-                        ? "paid to you directly by the buyer"
-                        : "paid directly to the seller, not through us"
+                      ? deal.buyerPaidAt
+                        ? "paid to Channel Adda and held until the transfer completes"
+                        : "paid to Channel Adda after the inspection, never to the seller"
                       : "part of what Channel Adda is holding"
                   }
                 />
@@ -258,16 +258,24 @@ export default async function DealPage({
                       safest ? "Channel Adda holds" : "Channel Adda is holding"
                     }
                     value={
-                      safest ? (
+                      safest && !deal.buyerPaidAt ? (
                         "The channel"
                       ) : (
-                        <Price usd={deal.totalUsd / 100} />
+                        <Price
+                          usd={
+                            (safest
+                              ? deal.priceUsd + deal.buyerFeeUsd
+                              : deal.totalUsd) / 100
+                          }
+                        />
                       )
                     }
                     money
                     note={
                       safest
-                        ? "our agent owns it until the handover completes"
+                        ? deal.buyerPaidAt
+                          ? "the channel, and your payment: the price and our fee"
+                          : "our agent owns it until the handover completes"
                         : "the price and our fee together"
                     }
                   />
@@ -298,7 +306,7 @@ export default async function DealPage({
                   }
                   note={
                     safest
-                      ? "pays our fee up front, then the seller directly"
+                      ? "pays our fee up front, then the price to Channel Adda"
                       : "pays the price and our fee to Channel Adda"
                   }
                 />
@@ -309,7 +317,7 @@ export default async function DealPage({
                   }
                   note={
                     safest
-                      ? "hands the channel to our agent, is paid by the buyer"
+                      ? "hands the channel to our agent, is paid by Channel Adda"
                       : "transfers the channel, is paid by Channel Adda"
                   }
                 />

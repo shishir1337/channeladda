@@ -45,8 +45,8 @@ export function turnEmail(input: {
   const greeting = input.name ? `Hi ${input.name},` : "Hi there,";
   const mode =
     input.mode === "SAFEST"
-      ? "This is a Safest deal: we are holding the channel, and the buyer pays the seller directly."
-      : "This is a Fastest deal: we are holding the money until the buyer confirms they have the account.";
+      ? "This is a Safest deal: our agent holds the channel, and the buyer pays the price to Channel Adda — never to the seller — once it is in our hands. We hold it until the channel is the buyer's."
+      : "This is a Fastest deal: Channel Adda holds the buyer's payment until they confirm they have the account, then pays the seller.";
 
   return {
     subject: `Your move: ${input.stepLabel} (${input.reference})`,

@@ -26,16 +26,18 @@ test("the subject says what is wanted, not that something happened", () => {
   expect(mail.link).toBe("https://channeladda.com/dashboard/deals/abc");
 });
 
-test("it says which kind of deal, because the two work in opposite ways", () => {
+test("it says which kind of deal", () => {
   const safest = turnEmail({
     name: "Hannah",
     reference: "CA-1",
     listingTitle: "A channel",
-    stepLabel: "Pay the seller directly",
+    stepLabel: "Pay the price to Channel Adda",
     mode: "SAFEST",
     href: "https://x/y",
   });
   expect(safest.body).toContain("Safest");
+  expect(safest.body).toContain("the buyer pays the price to Channel Adda");
+  expect(safest.body).not.toMatch(/pays the seller directly/);
 
   const fastest = turnEmail({
     name: "Hannah",
@@ -46,6 +48,8 @@ test("it says which kind of deal, because the two work in opposite ways", () => 
     href: "https://x/y",
   });
   expect(fastest.body).toContain("Fastest");
+  expect(fastest.body).toContain("Channel Adda holds the buyer's payment");
+  expect(fastest.body).not.toMatch(/pays the seller directly/);
 });
 
 test("a missing name does not produce 'Hi ,'", () => {

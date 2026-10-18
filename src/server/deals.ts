@@ -2163,10 +2163,10 @@ export type DealView = {
   buyerFeeUsd: number;
   /** Deducted before a Fastest seller is credited. Always 0 on Safest. */
   sellerFeeUsd: number;
-  /** What the seller ends up with. On Safest the buyer pays it directly. */
+  /** What the seller is credited on completion: the price less the fee. */
   payoutUsd: number;
-  /** What the buyer recorded when they paid the seller. On Safest this is
-   *  the only evidence the payment happened, so both sides can see it. */
+  /** Safest: the price payment's own name, and when it reached Channel Adda.
+   *  Set by the system when the money arrives. */
   buyerPaymentRef: string | null;
   buyerPaidAt: Date | null;
   /** Fastest only: the seller is not released before this. */

@@ -11,9 +11,10 @@ import type { DealActor } from "@/lib/deal-machine";
  * seller and agent are told different things because different things are
  * true for each of them.
  *
- * The rule this copy must never break: on a Safest deal Channel Adda holds
- * the *channel*, never the buyer's money. The price goes from buyer to seller
- * directly.
+ * The rule this copy must never break: no money moves directly between a
+ * buyer and a seller. On both kinds of deal the buyer pays Channel Adda, we
+ * hold it, and the seller is paid into their Channel Adda wallet when the
+ * deal completes. Safest also has our agent hold the channel.
  */
 
 export type StatusTone = "neutral" | "info" | "verified" | "danger";
@@ -119,7 +120,7 @@ export function statusSentence(
     case "AWAITING_PAYMENT":
       if (viewer === "buyer") {
         return safest
-          ? "Nothing starts until our fee is paid. The channel's price is not paid now and never paid to us — it goes to the seller later, directly from you."
+          ? "Nothing starts until our fee is paid. The channel's price is not paid now: you pay it to Channel Adda later, once our agent owns the channel and you have inspected it."
           : "Nothing starts until your payment reaches Channel Adda. We hold it until you confirm the channel is yours.";
       }
       if (viewer === "seller") {
@@ -138,7 +139,7 @@ export function statusSentence(
 
     case "AWAITING_CUSTODY":
       if (viewer === "buyer") {
-        return "The seller is handing the channel to our agent. You have paid our fee and nothing else — you pay the seller only once the channel is verifiably out of their hands.";
+        return "The seller is handing the channel to our agent. You have paid our fee and nothing else — you pay the price only once the channel is verifiably out of their hands, and you pay it to Channel Adda.";
       }
       if (viewer === "seller") {
         return "Invite our agent as the channel's owner. Google then runs its own waiting period before the transfer completes.";
@@ -194,8 +195,8 @@ export function statusSentence(
       if (viewer === "buyer") return "Finished. The channel is yours.";
       if (viewer === "seller") {
         return safest
-          ? "Finished. The buyer paid you directly and the channel has moved on."
-          : "Finished. Channel Adda has released your money.";
+          ? "Finished. The channel is the buyer's, and the price is in your Channel Adda wallet."
+          : "Finished. Channel Adda has released your money to your Channel Adda wallet.";
       }
       return "Finished. Nothing is outstanding on this deal.";
 
@@ -247,7 +248,7 @@ const BY_OPEN_STEP: Partial<Record<string, Override>> = {
     short: "Agent taking over",
     sentence: {
       buyer:
-        "The seller has invited our agent, who is taking the channel over while Google runs its own waiting period. You pay the seller only once it is verifiably ours.",
+        "The seller has invited our agent, who is taking the channel over while Google runs its own waiting period. You pay the price, to Channel Adda, only once it is verifiably ours.",
       seller:
         "You have invited our agent, so your part is done for now. Google runs its own waiting period while our agent takes the channel over.",
       agent:
@@ -318,19 +319,20 @@ export function dealHeadline(
 /**
  * Where the money is, in one line, for this reader.
  *
- * The distinction this carries is the product's whole shape: Safest escrows
- * the channel and Fastest escrows the money. Nothing here may suggest the
- * platform is holding a Safest buyer's price.
+ * Both modes hold the buyer's money with Channel Adda until the deal
+ * completes; Safest also has our agent hold the channel, and takes the price
+ * in a second payment once it does. Nothing here may suggest a buyer pays a
+ * seller directly.
  */
 export function moneyNote(mode: DealMode, viewer: DealActor): string {
   if (mode === "SAFEST") {
     if (viewer === "buyer") {
-      return "Channel Adda never holds the channel's price. You pay our fee up front, and you pay the seller directly once our agent owns the channel.";
+      return "You pay our fee up front, and the price to Channel Adda once our agent owns the channel and you have inspected it. Channel Adda holds the price until the channel is yours, then pays the seller.";
     }
     if (viewer === "seller") {
-      return "The buyer pays you directly, off the platform. What Channel Adda holds in the meantime is your channel, not your money.";
+      return "The buyer pays the price to Channel Adda, never to you. We hold it until the transfer completes, then it is paid into your Channel Adda wallet.";
     }
-    return "The buyer pays our fee up front and pays the seller directly. Channel Adda holds the channel, not the price.";
+    return "The buyer pays our fee up front and the price to Channel Adda after inspecting the channel. Channel Adda holds the price until the transfer completes.";
   }
   if (viewer === "buyer") {
     return "Channel Adda holds the price and the fee together, and releases the price to the seller only after you confirm you have access.";
