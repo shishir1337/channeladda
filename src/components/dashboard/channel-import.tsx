@@ -192,9 +192,20 @@ export function ChannelLinkField({
 }) {
   const hintId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
-  const [lookup, setLookup] = useState<Lookup>({ kind: "idle" });
-  const [note, setNote] = useState<string | null>(null);
+  const [found, setLookup] = useState<Lookup>({ kind: "idle" });
+  // Each says which platform it was about, so picking another platform by
+  // hand retires it instead of leaving a Telegram channel on screen under
+  // Instagram's labels — where confirming it would quietly switch back.
+  const [notice, setNote] = useState<{ text: string; for: PlatformId } | null>(
+    null,
+  );
   const [pending, startTransition] = useTransition();
+  const lookup: Lookup =
+    (found.kind === "found" || found.kind === "confirmed") &&
+    ID_OF[found.channel.platform] !== platform.id
+      ? { kind: "idle" }
+      : found;
+  const note = notice?.for === platform.id ? notice.text : null;
   // A link replaced while the last one was still being looked up must not
   // have the old answer land on it.
   const ticket = useRef(0);
@@ -237,9 +248,10 @@ export function ChannelLinkField({
     if (detected && detected !== "website" && detected !== platform.id) {
       onPlatform(detected);
       target = detected;
-      setNote(
-        `That is a ${names[detected]} link, so the platform is now ${names[detected]}.`,
-      );
+      setNote({
+        text: `That is a ${names[detected]} link, so the platform is now ${names[detected]}.`,
+        for: detected,
+      });
     } else {
       setNote(null);
     }
