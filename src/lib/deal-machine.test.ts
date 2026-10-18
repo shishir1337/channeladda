@@ -11,7 +11,7 @@ const LEGAL: [DealMode, OrderStatus, OrderStatus, DealActor][] = [
   ["SAFEST", "AWAITING_PAYMENT", "AWAITING_CUSTODY", "system"],
   ["SAFEST", "AWAITING_CUSTODY", "IN_CUSTODY", "agent"],
   ["SAFEST", "IN_CUSTODY", "AWAITING_BUYER_PAYMENT", "buyer"],
-  ["SAFEST", "AWAITING_BUYER_PAYMENT", "AWAITING_HANDOVER", "seller"],
+  ["SAFEST", "AWAITING_BUYER_PAYMENT", "AWAITING_HANDOVER", "system"],
   ["SAFEST", "AWAITING_HANDOVER", "COMPLETED", "agent"],
   ["SAFEST", "AWAITING_BUYER_PAYMENT", "RETURNED_TO_SELLER", "staff"],
   ["FASTEST", "AWAITING_PAYMENT", "AGENT_VERIFYING", "system"],
@@ -23,6 +23,20 @@ const LEGAL: [DealMode, OrderStatus, OrderStatus, DealActor][] = [
 
 test.each(LEGAL)("%s allows %s to %s by %s", (mode, from, to, actor) => {
   expect(canTransition(mode, from, to, actor)).toBe(true);
+});
+
+test("the price payment moves a safest deal on, not the seller", () => {
+  // Nobody presses "the money arrived" any more: we saw it arrive.
+  for (const actor of ["seller", "buyer", "agent", "staff"] as const) {
+    expect(
+      canTransition(
+        "SAFEST",
+        "AWAITING_BUYER_PAYMENT",
+        "AWAITING_HANDOVER",
+        actor,
+      ),
+    ).toBe(false);
+  }
 });
 
 test("the wrong actor cannot advance a step", () => {

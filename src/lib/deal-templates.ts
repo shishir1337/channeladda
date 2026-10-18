@@ -7,7 +7,7 @@ import type { DealActor } from "@/lib/deal-machine";
  * The status on an order is deliberately coarse — it answers "whose move is
  * it?" and little else. These templates carry the choreography: the real-world
  * actions, who performs each one, and which of them move the status along.
- * Seeded as `TransferStep` rows when a deal's opening payment clears.
+ * Seeded as `TransferStep` rows when a deal is created.
  *
  * Keeping them here, in data, rather than as branches in the server layer is
  * what makes a third mode a new array instead of a migration.
@@ -40,6 +40,13 @@ export type StepTemplate = {
    * confirm could be refunded in full with one click.
    */
   handsOver?: boolean;
+  /**
+   * Completed by a payment reaching Channel Adda, never by anybody pressing
+   * it: the system records the payment, completes the step and moves the
+   * status as itself. A step a person could mark paid is a step a person
+   * could mark paid without paying.
+   */
+  byPayment?: boolean;
 };
 
 /**
@@ -56,13 +63,15 @@ export const OPENING_STATUS: Readonly<Record<DealMode, OrderStatus>> =
   });
 
 /**
- * Safest: the channel is escrowed, not the money.
+ * Safest: the channel is escrowed, and so is the money.
  *
  * Two ownership transfers, each waiting on Google's own clock, with the
- * buyer's payment to the seller sitting between them. That ordering is the
- * whole protection — the buyer does not pay until the channel is verifiably
- * out of the seller's hands, and the seller does not lose it to the buyer
- * until the money has arrived.
+ * buyer paying the price to Channel Adda between them. That ordering is the
+ * whole protection — the buyer does not pay the price until the channel is
+ * verifiably out of the seller's hands, and the seller does not lose it to
+ * the buyer until the money is with us. The price is released to the
+ * seller's Channel Adda wallet when Hold 2 completes; it never goes from
+ * buyer to seller directly.
  */
 const SAFEST_STEPS: readonly StepTemplate[] = Object.freeze([
   { position: 1, label: "Pay the admin fee", actor: "buyer" },
@@ -82,24 +91,27 @@ const SAFEST_STEPS: readonly StepTemplate[] = Object.freeze([
     actor: "buyer",
     entersStatus: "AWAITING_BUYER_PAYMENT",
   },
-  { position: 6, label: "Pay the seller directly", actor: "buyer" },
   {
-    position: 7,
-    label: "Confirm the payment arrived",
-    actor: "seller",
+    position: 6,
+    label: "Pay the price to Channel Adda",
+    actor: "buyer",
     entersStatus: "AWAITING_HANDOVER",
+    byPayment: true,
   },
   {
-    position: 8,
+    position: 7,
     label: "Transfer ownership to the buyer",
     actor: "agent",
     needsApprovalAbove: true,
+    handsOver: true,
   },
   {
-    position: 9,
+    position: 8,
     label: "Hold 2 complete, ownership verified",
     actor: "agent",
     entersStatus: "COMPLETED",
+    // Completing releases the price to the seller's wallet.
+    needsApprovalAbove: true,
   },
 ]);
 
@@ -142,4 +154,12 @@ const FASTEST_STEPS: readonly StepTemplate[] = Object.freeze([
 
 export function templateFor(mode: DealMode): readonly StepTemplate[] {
   return mode === "FASTEST" ? FASTEST_STEPS : SAFEST_STEPS;
+}
+
+/**
+ * The step a payment completes after the opening one — Safest's price — or
+ * null for a mode that takes everything up front.
+ */
+export function priceStepFor(mode: DealMode): number | null {
+  return templateFor(mode).find((s) => s.byPayment)?.position ?? null;
 }

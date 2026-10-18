@@ -33,24 +33,26 @@ describe("the headline follows whose step is open, not just the status", () => {
     );
   });
 
-  test("after the buyer records paying, the seller is asked to confirm", () => {
+  test("a safest seller is told the buyer is paying Channel Adda", () => {
+    // The price goes to us, never to the seller, and nobody confirms it by
+    // hand: we see it arrive.
     const seller = dealHeadline(
       "AWAITING_BUYER_PAYMENT",
       "SAFEST",
       "seller",
-      "seller",
+      "buyer",
     );
-    expect(seller.label).toMatch(/seller to confirm/i);
-    expect(seller.sentence).toMatch(/Confirm/);
+    expect(seller.sentence).toMatch(/to Channel Adda/);
+    expect(seller.sentence).not.toMatch(/directly|Confirm/);
 
     const buyer = dealHeadline(
       "AWAITING_BUYER_PAYMENT",
       "SAFEST",
       "buyer",
-      "seller",
+      "buyer",
     );
-    expect(buyer.label).not.toMatch(/buyer to pay/i);
-    expect(buyer.sentence).not.toMatch(/^Send the channel's price/);
+    expect(buyer.label).toMatch(/buyer to pay the price/i);
+    expect(buyer.sentence).toMatch(/^Pay the price to Channel Adda/);
   });
 
   test("on Fastest, the seller's invite comes before the agent's check", () => {

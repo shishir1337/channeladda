@@ -6,6 +6,7 @@ import { setUserRole } from "@/server/admin-users";
 import { listDealsNeedingReassignment } from "@/server/deal-feed";
 import { advanceStep, createDeal, recordOpeningPayment } from "@/server/deals";
 import { seedListing, seedUser, withCleanDb } from "@/test/db";
+import { runStep } from "@/test/deal-steps";
 
 /** A Safest deal with its agent at the handover step, then the agent moved. */
 async function heldByAgentMovedTo(role: UserRole) {
@@ -29,12 +30,11 @@ async function heldByAgentMovedTo(role: UserRole) {
     agent: seeded.agent.id,
   };
   for (const step of templateFor("SAFEST")) {
-    if (step.position < 2 || step.position >= 8) continue;
-    const r = await advanceStep({
+    if (step.position < 2 || step.position >= 7) continue;
+    const r = await runStep({
       orderId,
       position: step.position,
       userId: actors[step.actor],
-      ...(step.position === 6 ? { paymentRef: "0xabc" } : {}),
     });
     if (!r.ok) throw new Error(`step ${step.position}: ${r.reason}`);
   }
@@ -59,10 +59,10 @@ test(
       const { orderId, agent } = await heldByAgentMovedTo(role);
 
       expect(
-        await advanceStep({ orderId, position: 8, userId: agent.id }),
+        await advanceStep({ orderId, position: 7, userId: agent.id }),
       ).toMatchObject({ ok: false });
       const handover = await db.transferStep.findFirstOrThrow({
-        where: { orderId, position: 8 },
+        where: { orderId, position: 7 },
       });
       expect(handover.completedAt).toBeNull();
     }

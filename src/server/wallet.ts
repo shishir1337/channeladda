@@ -3,7 +3,7 @@ import "server-only";
 import type { WithdrawalStatus } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
 import { canTransition } from "@/lib/deal-machine";
-import { OPENING_STATUS } from "@/lib/deal-templates";
+import { OPENING_STATUS, priceStepFor } from "@/lib/deal-templates";
 import { isSerializationFailure } from "@/lib/serialization-failure";
 import { recordAudit } from "@/server/audit";
 import { postEvent } from "@/server/chat-events";
@@ -178,6 +178,11 @@ function depositNote(reference: string): string {
 /**
  * Paying a deal out of the balance rather than raising a new invoice.
  *
+ * Whichever payment the deal is waiting on: the opening payment, or — on a
+ * Safest deal that the buyer has inspected — the channel price. Either way
+ * the money moves from the buyer's balance into the platform's hold, never
+ * to the seller.
+ *
  * The debit and the order's state change are one transaction, and the debit
  * re-checks the available balance inside it: two deals paid at the same
  * instant must not both spend one balance.
@@ -194,23 +199,38 @@ export async function payFromWallet(
       status: true,
       buyerId: true,
       totalUsd: true,
-      buyerFeeUsd: true,
+      priceUsd: true,
       reference: true,
       paymentRef: true,
+      buyerPaymentRef: true,
       conversationId: true,
     },
   });
 
   if (!order) return { ok: false, reason: "not-found" };
   if (order.buyerId !== userId) return { ok: false, reason: "wrong-actor" };
-  if (order.status !== "AWAITING_PAYMENT" || order.paymentRef) {
-    return { ok: false, reason: "not-payable" };
-  }
 
-  const target = OPENING_STATUS[order.mode];
+  const stage =
+    order.status === "AWAITING_PAYMENT" && !order.paymentRef
+      ? ("opening" as const)
+      : order.mode === "SAFEST" &&
+          order.status === "AWAITING_BUYER_PAYMENT" &&
+          !order.buyerPaymentRef
+        ? ("price" as const)
+        : null;
+  if (!stage) return { ok: false, reason: "not-payable" };
+
+  const opening = stage === "opening";
+  const target = opening ? OPENING_STATUS[order.mode] : "AWAITING_HANDOVER";
   if (!canTransition(order.mode, order.status, target, "system")) {
     return { ok: false, reason: "not-payable" };
   }
+  const amountUsd = opening ? order.totalUsd : order.priceUsd;
+  const ref = opening
+    ? `wallet:${order.reference}`
+    : `wallet:${order.reference}:price`;
+  const step = opening ? 1 : priceStepFor(order.mode);
+  if (step === null) return { ok: false, reason: "not-payable" };
 
   const now = new Date();
   try {
@@ -230,30 +250,31 @@ export async function payFromWallet(
         ]);
         const available =
           (sum._sum.amountUsd ?? 0) - (pending._sum.amountUsd ?? 0);
-        if (available < order.totalUsd) throw new WalletAbort("insufficient");
+        if (available < amountUsd) throw new WalletAbort("insufficient");
 
+        // As recordOpeningPayment and recordPricePayment do. Without the
+        // status, an order the sweep expired mid-payment was written back to
+        // life with its listing already reserved for somebody else: two live
+        // deals, one channel, and a second seller payout for an account
+        // already gone.
         const took = await tx.order.updateMany({
-          where: {
-            id: order.id,
-            paymentRef: null,
-            // As recordOpeningPayment does. Without the status, an order the
-            // sweep expired mid-payment was written back to life with its
-            // listing already reserved for somebody else: two live deals, one
-            // channel, and a second seller payout for an account already gone.
-            status: order.status,
-          },
-          data: {
-            status: target,
-            paymentRef: `wallet:${order.reference}`,
-            paymentAsset: "WALLET",
-            paidAt: now,
-            feePaidAt: now,
-          },
+          where: opening
+            ? { id: order.id, paymentRef: null, status: order.status }
+            : { id: order.id, buyerPaymentRef: null, status: order.status },
+          data: opening
+            ? {
+                status: target,
+                paymentRef: ref,
+                paymentAsset: "WALLET",
+                paidAt: now,
+                feePaidAt: now,
+              }
+            : { status: target, buyerPaymentRef: ref, buyerPaidAt: now },
         });
         if (took.count !== 1) throw new WalletAbort("not-payable");
 
         await tx.transferStep.updateMany({
-          where: { orderId: order.id, position: 1, completedAt: null },
+          where: { orderId: order.id, position: step, completedAt: null },
           data: { completedAt: now },
         });
 
@@ -263,8 +284,10 @@ export async function payFromWallet(
             userId,
             orderId: order.id,
             kind: "ESCROW_HOLD",
-            amountUsd: -order.totalUsd,
-            note: `Paid deal ${order.reference} from balance`,
+            amountUsd: -amountUsd,
+            note: opening
+              ? `Paid deal ${order.reference} from balance`
+              : `Paid the price of deal ${order.reference} from balance`,
           },
         });
 
@@ -274,8 +297,10 @@ export async function payFromWallet(
             orderId: order.id,
             userId: null,
             kind: "ESCROW_HOLD",
-            amountUsd: order.totalUsd,
-            note: `${order.mode} opening payment from wallet`,
+            amountUsd,
+            note: opening
+              ? `${order.mode} opening payment from wallet`
+              : `${order.mode} price payment from wallet`,
           },
         });
       },
@@ -305,7 +330,13 @@ export async function payFromWallet(
     await postEvent(db, {
       conversationId: order.conversationId,
       kind: "EVENT",
-      event: { type: "payment-received", reference: order.reference },
+      event: opening
+        ? { type: "payment-received", reference: order.reference }
+        : {
+            type: "price-paid",
+            reference: order.reference,
+            amountCents: order.priceUsd,
+          },
       senderId: null,
       orderId: order.id,
       at: now,
@@ -318,10 +349,10 @@ export async function payFromWallet(
 
   await recordAudit({
     actorId: userId,
-    action: "deal.fee_paid",
+    action: opening ? "deal.fee_paid" : "deal.price_paid",
     entity: "order",
     entityId: order.id,
-    after: { status: target, paymentRef: `wallet:${order.reference}` },
+    after: { status: target, paymentRef: ref, amountUsd },
   });
 
   return { ok: true };

@@ -21,6 +21,7 @@ import {
   settleWithdrawal,
 } from "@/server/wallet";
 import { passHold, seedListing, seedUser, withCleanDb } from "@/test/db";
+import { runStep } from "@/test/deal-steps";
 
 /**
  * The whole thing, end to end.
@@ -67,13 +68,10 @@ async function drive(mode: "SAFEST" | "FASTEST", priceUsd = 10_000) {
   for (const step of templateFor(mode)) {
     if (step.position < 2) continue;
     await passHold(orderId);
-    const result = await advanceStep({
+    const result = await runStep({
       orderId,
       position: step.position,
       userId: actors[step.actor],
-      ...(mode === "SAFEST" && step.position === 6
-        ? { paymentRef: "0xbuyerpaidseller" }
-        : {}),
     });
     if (!result.ok) {
       throw new Error(
@@ -97,20 +95,24 @@ test(
 
     expect(order.status).toBe("COMPLETED");
     expect(order.steps.every((s) => s.completedAt !== null)).toBe(true);
-    expect(order.steps).toHaveLength(9);
-    expect(order.buyerPaymentRef).toBe("0xbuyerpaidseller");
+    expect(order.steps).toHaveLength(8);
+    // The price was paid to us, under a name the system gave it.
+    expect(order.buyerPaymentRef).toBe(`price-${orderId}`);
     expect(
       (await db.listing.findUniqueOrThrow({ where: { id: listing.id } }))
         .status,
     ).toBe("SOLD");
 
-    // The books: we charged a 3% fee and nothing else ever reached us.
+    // The books: both payments came to us, the seller was paid the price
+    // into their Channel Adda wallet, and we kept the 3% fee.
     expect(await platformPositionFor(orderId)).toBe(300);
-    expect(await balanceOf(seller.id)).toBe(0);
+    expect(await balanceOf(seller.id)).toBe(10_000);
     expect(await balanceOf(buyer.id)).toBe(0);
     expect(
-      await db.ledgerEntry.count({ where: { orderId, amountUsd: 10_000 } }),
-    ).toBe(0);
+      await db.ledgerEntry.findFirstOrThrow({
+        where: { orderId, userId: seller.id, kind: "ESCROW_RELEASE" },
+      }),
+    ).toMatchObject({ amountUsd: 10_000 });
 
     // Both sides were told whose move it was, all the way through.
     expect(
@@ -262,12 +264,11 @@ test(
       agent: seeded.agent.id,
     };
     for (const step of templateFor("SAFEST")) {
-      if (step.position < 2 || step.position >= 8) continue;
-      const r = await advanceStep({
+      if (step.position < 2 || step.position >= 7) continue;
+      const r = await runStep({
         orderId: created.orderId,
         position: step.position,
         userId: actors[step.actor],
-        ...(step.position === 6 ? { paymentRef: "0xabc" } : {}),
       });
       if (!r.ok) throw new Error(`step ${step.position}: ${r.reason}`);
     }
@@ -275,7 +276,7 @@ test(
     expect(
       await advanceStep({
         orderId: created.orderId,
-        position: 8,
+        position: 7,
         userId: actors.agent,
       }),
     ).toMatchObject({ ok: false, reason: "needs-approval" });
@@ -283,7 +284,7 @@ test(
     expect(
       await advanceStep({
         orderId: created.orderId,
-        position: 8,
+        position: 7,
         userId: actors.agent,
         approvedById: staff.id,
       }),

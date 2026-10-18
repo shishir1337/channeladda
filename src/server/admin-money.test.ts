@@ -22,7 +22,6 @@ import {
   shiftMonth,
 } from "@/server/admin-money";
 import {
-  advanceStep,
   assignAgent,
   createDeal,
   recordOpeningPayment,
@@ -34,6 +33,7 @@ import {
   settleWithdrawal,
 } from "@/server/wallet";
 import { seedListing, seedUser, withCleanDb } from "@/test/db";
+import { runStep } from "@/test/deal-steps";
 
 /**
  * The money desk reads the ledger and nothing else, so these tests drive
@@ -85,13 +85,10 @@ async function completedDeal(mode: Mode) {
       where: { id: orderId, holdUntil: { not: null } },
       data: { holdUntil: new Date(Date.now() - 1000) },
     });
-    const result = await advanceStep({
+    const result = await runStep({
       orderId,
       position: step.position,
       userId: actors[step.actor],
-      ...(mode === "SAFEST" && step.position === 6
-        ? { paymentRef: "0xbuyerpaidseller" }
-        : {}),
     });
     if (!result.ok) {
       throw new Error(`step ${step.position}: ${result.reason}`);
@@ -193,13 +190,14 @@ describe("month figures", () => {
       const month = monthOf(new Date());
       const figures = await monthFigures(month);
 
-      // Fees: the Safest admin fee, and the Fastest buyer and seller fee.
-      // The refunded deal earned nothing — its fee was never booked.
+      // Fees: the buyer and seller fee on each completed deal — the price
+      // passes through us on both kinds now. The refunded deal earned
+      // nothing — its fee was never booked.
       expect(figures.fees.safest.buyer).toEqual({ cents: 300, count: 1 });
-      expect(figures.fees.safest.seller).toEqual({ cents: 0, count: 0 });
+      expect(figures.fees.safest.seller).toEqual({ cents: 500, count: 1 });
       expect(figures.fees.fastest.buyer).toEqual({ cents: 300, count: 1 });
       expect(figures.fees.fastest.seller).toEqual({ cents: 500, count: 1 });
-      expect(figures.fees.net).toBe(1_100);
+      expect(figures.fees.net).toBe(1_600);
 
       // And the ledger agrees: the platform's own rows for the month sum to
       // exactly the fees, because every hold has netted to zero.
@@ -209,13 +207,13 @@ describe("month figures", () => {
           userId: null,
           kind: { in: ["BUYER_FEE", "SELLER_FEE"] },
         }),
-      ).toBe(1_100);
+      ).toBe(1_600);
 
-      // Two Fastest buyers paid price + fee in, and the Safest buyer the fee;
-      // one seller was credited the price less the 5% seller fee; one buyer
-      // got the whole hold back.
-      expect(figures.deals.paidIn).toEqual({ cents: 20_900, count: 3 });
-      expect(figures.deals.toSellers).toEqual({ cents: 9_500, count: 1 });
+      // Two Fastest buyers paid price + fee in, and the Safest buyer the fee
+      // and then the price; both sellers were credited the price less the 5%
+      // seller fee; one buyer got the whole hold back.
+      expect(figures.deals.paidIn).toEqual({ cents: 30_900, count: 4 });
+      expect(figures.deals.toSellers).toEqual({ cents: 19_000, count: 2 });
       expect(figures.refunds.fastest).toEqual({ cents: 10_300, count: 1 });
       expect(figures.refunds.safest.cents).toBe(0);
       expect(figures.refunds.total).toBe(10_300);
@@ -229,9 +227,9 @@ describe("month figures", () => {
       expect(figures.adjustments.credits.cents).toBe(0);
 
       // At the close (now, for this month), nothing is held for buyers and
-      // members hold the seller's 9_500 and the refunded buyer's 10_300.
+      // members hold the two sellers' 9_500 and the refunded buyer's 10_300.
       expect(figures.closing.heldForBuyers).toBe(0);
-      expect(figures.closing.memberBalances).toBe(19_800);
+      expect(figures.closing.memberBalances).toBe(29_300);
     }),
   );
 

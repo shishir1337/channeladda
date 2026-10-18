@@ -34,6 +34,7 @@ export type ChatEvent =
       priceCents: number;
     }
   | { type: "payment-received" | "payment-lapsed"; reference: string }
+  | { type: "price-paid"; reference: string; amountCents: number }
   | { type: "agent-joined" | "agent-changed"; agentName: string }
   | { type: "step-done"; name: string; label: string }
   | { type: "hold-started"; until: Date }
@@ -81,6 +82,8 @@ export function eventText(event: ChatEvent): string {
       return `${who(event.name)} opened a ${event.mode === "SAFEST" ? "Safest" : "Fastest"} deal at ${money(event.priceCents)} (${event.reference})`;
     case "payment-received":
       return `Payment received for ${event.reference}. The deal is under way`;
+    case "price-paid":
+      return `${money(event.amountCents)} paid to Channel Adda for ${event.reference}. We hold it until the channel is the buyer's, then pay the seller`;
     case "payment-lapsed":
       return `${event.reference} closed: the payment window ran out before it was paid`;
     case "agent-joined":

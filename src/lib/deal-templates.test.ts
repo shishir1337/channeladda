@@ -3,21 +3,24 @@ import type { DealMode, OrderStatus } from "@/generated/prisma/enums";
 import { canTransition } from "@/lib/deal-machine";
 import { OPENING_STATUS, templateFor } from "@/lib/deal-templates";
 
-test("safest has nine steps in the spec's order", () => {
+test("safest has eight steps in the spec's order", () => {
   const steps = templateFor("SAFEST");
-  expect(steps).toHaveLength(9);
-  expect(steps.map((s) => s.actor)).toEqual([
-    "buyer",
-    "seller",
-    "agent",
-    "agent",
-    "buyer",
-    "buyer",
-    "seller",
-    "agent",
-    "agent",
+  expect(steps.map((s) => [s.label, s.actor])).toEqual([
+    ["Pay the admin fee", "buyer"],
+    ["Invite the agent as channel owner", "seller"],
+    ["Accept and confirm custody", "agent"],
+    ["Hold 1 complete, ownership verified", "agent"],
+    ["Inspect the channel", "buyer"],
+    ["Pay the price to Channel Adda", "buyer"],
+    ["Transfer ownership to the buyer", "agent"],
+    ["Hold 2 complete, ownership verified", "agent"],
   ]);
-  expect(steps[5].label).toBe("Pay the seller directly");
+});
+
+test("the safest price is paid at checkout, never marked done by hand", () => {
+  const steps = templateFor("SAFEST");
+  expect(steps.filter((s) => s.byPayment).map((s) => s.position)).toEqual([6]);
+  expect(templateFor("FASTEST").some((s) => s.byPayment)).toBe(false);
 });
 
 test("fastest has six steps in the spec's order", () => {
@@ -40,12 +43,14 @@ test("positions are 1..n with no gaps", () => {
   }
 });
 
-test("the value-handing step is the one needing second approval", () => {
+test("both safest transfer steps need a second approval above the threshold", () => {
+  // The transfer hands the channel over, and Hold 2 completing releases the
+  // price to the seller: both hand value to the other side.
   expect(
     templateFor("SAFEST")
       .filter((s) => s.needsApprovalAbove)
       .map((s) => s.position),
-  ).toEqual([8]);
+  ).toEqual([7, 8]);
   expect(
     templateFor("FASTEST")
       .filter((s) => s.needsApprovalAbove)
@@ -67,9 +72,11 @@ test.each(["SAFEST", "FASTEST"] as const)(
     let current: OrderStatus = OPENING_STATUS[mode];
     for (const step of templateFor(mode)) {
       if (!step.entersStatus) continue;
+      // A step completed by a payment arriving moves the deal as the system.
+      const by = step.byPayment ? "system" : step.actor;
       expect(
-        canTransition(mode, current, step.entersStatus, step.actor),
-        `step ${step.position} (${step.label}): ${current} -> ${step.entersStatus} as ${step.actor}`,
+        canTransition(mode, current, step.entersStatus, by),
+        `step ${step.position} (${step.label}): ${current} -> ${step.entersStatus} as ${by}`,
       ).toBe(true);
       current = step.entersStatus;
     }

@@ -10,7 +10,11 @@ import {
   isTerminal,
   TERMINAL_STATUSES,
 } from "@/lib/deal-machine";
-import { OPENING_STATUS, templateFor } from "@/lib/deal-templates";
+import {
+  OPENING_STATUS,
+  priceStepFor,
+  templateFor,
+} from "@/lib/deal-templates";
 import { orderAmounts } from "@/lib/fees";
 import { keptFee, requiredHold } from "@/lib/holds";
 import { BUYER_PAYS_AFTER_STEP, payToVisibleTo } from "@/lib/pay-to";
@@ -69,6 +73,8 @@ export type DealFailure =
   | "in-custody"
   /** Paying a seller directly is recorded with how, or not at all. */
   | "needs-reference"
+  /** A payment completes this step when it reaches us; nobody presses it. */
+  | "pay-in-checkout"
   /** The recovery hold on this platform has not ended yet. */
   | "on-hold"
   /**
@@ -577,9 +583,10 @@ async function creditSecondPayment(
  * Idempotent on the reference, so a retry does not credit twice.
  */
 async function creditUnusablePayment(
-  order: { id: string; buyerId: string; totalUsd: number; status: string },
+  order: { id: string; buyerId: string; status: string },
   ref: string,
   asset: string,
+  amountUsd: number,
 ): Promise<void> {
   try {
     await db.ledgerEntry.create({
@@ -587,8 +594,8 @@ async function creditUnusablePayment(
         userId: order.buyerId,
         orderId: order.id,
         kind: "DEPOSIT",
-        amountUsd: order.totalUsd,
-        note: `Paid after this deal stopped; credited to your balance (${asset})`,
+        amountUsd,
+        note: `Paid when this deal could no longer take it; credited to your balance (${asset})`,
         externalRef: `late:${ref}`,
       },
     });
@@ -602,7 +609,7 @@ async function creditUnusablePayment(
     action: "payment.arrived_too_late",
     entity: "order",
     entityId: order.id,
-    after: { reference: ref, status: order.status, amountUsd: order.totalUsd },
+    after: { reference: ref, status: order.status, amountUsd },
   });
 }
 
@@ -647,7 +654,7 @@ export async function recordOpeningPayment(
   if (!canTransition(order.mode, order.status, target, "system")) {
     // Real money that the deal can no longer accept. It becomes balance
     // rather than an exception nobody can clear.
-    await creditUnusablePayment(order, ref, asset);
+    await creditUnusablePayment(order, ref, asset, order.totalUsd);
     return "credited-to-balance";
   }
 
@@ -759,6 +766,199 @@ export async function recordOpeningPayment(
   return "applied";
 }
 
+/** Safest's price step: the step the price payment completes. */
+function safestPriceStep(): number {
+  const position = priceStepFor("SAFEST");
+  if (position === null)
+    throw new Error("The Safest template has no price step.");
+  return position;
+}
+
+/**
+ * The Safest price reaching Channel Adda.
+ *
+ * The second payment on a Safest deal, made after our agent holds the channel
+ * and the buyer has inspected it — by invoice, or recorded by finance when it
+ * arrived some other way (a payment from the balance is `payFromWallet`). It
+ * goes to us, never to the seller: it is held, and released to the seller's
+ * Channel Adda wallet when Hold 2 completes.
+ *
+ * It mirrors `recordOpeningPayment` case for case — the same reference twice
+ * is a retry, a second reference is a second payment and becomes the buyer's
+ * balance, a deal that can no longer take it credits it back — but keyed on
+ * its own reference, so the two payments on one deal can never be mistaken
+ * for each other.
+ */
+export async function recordPricePayment(
+  orderId: string,
+  ref: string,
+  asset: string,
+  /** Guards the one re-entry after a lost compare-and-set. */
+  attempt = 0,
+): Promise<PaymentOutcome> {
+  const order = await db.order.findUnique({
+    where: { id: orderId },
+    select: {
+      id: true,
+      mode: true,
+      status: true,
+      buyerPaymentRef: true,
+      priceUsd: true,
+      totalUsd: true,
+      buyerId: true,
+      reference: true,
+      conversationId: true,
+    },
+  });
+  if (!order) throw new Error(`No such order: ${orderId}`);
+
+  if (order.buyerPaymentRef === ref) return "already-applied";
+
+  if (order.buyerPaymentRef) {
+    return creditSecondPayment(
+      { ...order, paymentRef: order.buyerPaymentRef },
+      ref,
+      asset,
+    );
+  }
+
+  // Only a Safest deal waiting on its price can take one. Anything else —
+  // a deal returned, cancelled or paused in a dispute meanwhile — means real
+  // money the deal cannot use, which becomes the buyer's balance.
+  if (
+    order.mode !== "SAFEST" ||
+    order.status !== "AWAITING_BUYER_PAYMENT" ||
+    !canTransition(order.mode, order.status, "AWAITING_HANDOVER", "system")
+  ) {
+    await creditUnusablePayment(order, ref, asset, order.priceUsd);
+    return "credited-to-balance";
+  }
+
+  const now = new Date();
+  let claimed = true;
+  await db.$transaction(async (tx) => {
+    // Compare-and-set on the reference and the status, as the opening
+    // payment does: two deliveries in flight, or the balance and an invoice
+    // landing together, must not both write a hold.
+    const took = await tx.order.updateMany({
+      where: {
+        id: order.id,
+        buyerPaymentRef: null,
+        status: "AWAITING_BUYER_PAYMENT",
+      },
+      data: {
+        status: "AWAITING_HANDOVER",
+        buyerPaymentRef: ref,
+        buyerPaidAt: now,
+      },
+    });
+    if (took.count !== 1) {
+      claimed = false;
+      return;
+    }
+
+    await tx.transferStep.updateMany({
+      where: {
+        orderId: order.id,
+        position: safestPriceStep(),
+        completedAt: null,
+      },
+      data: { completedAt: now },
+    });
+
+    await tx.ledgerEntry.create({
+      data: {
+        orderId: order.id,
+        userId: null,
+        kind: "ESCROW_HOLD",
+        amountUsd: order.priceUsd,
+        note: "SAFEST price payment",
+      },
+    });
+
+    if (order.conversationId) {
+      await postEvent(tx, {
+        conversationId: order.conversationId,
+        kind: "EVENT",
+        event: {
+          type: "price-paid",
+          reference: order.reference,
+          amountCents: order.priceUsd,
+        },
+        senderId: null,
+        orderId: order.id,
+        at: now,
+      });
+    }
+  });
+
+  // Lost the race: read the order again and decide from what is there now,
+  // once, exactly as the opening payment does.
+  if (!claimed) {
+    if (attempt > 0) {
+      await recordAudit({
+        actorId: null,
+        action: "payment.unsettled",
+        entity: "order",
+        entityId: order.id,
+        after: { reference: ref, status: order.status, stage: "price" },
+      });
+      throw new Error(
+        `Could not settle price payment ${ref} on ${order.id}: the order kept moving.`,
+      );
+    }
+    return recordPricePayment(orderId, ref, asset, attempt + 1);
+  }
+
+  await notifyNextActor(order.id);
+
+  await recordAudit({
+    actorId: null,
+    action: "deal.price_paid",
+    entity: "order",
+    entityId: order.id,
+    before: { status: order.status },
+    after: {
+      status: "AWAITING_HANDOVER",
+      reference: ref,
+      asset,
+      amountUsd: order.priceUsd,
+    },
+  });
+
+  return "applied";
+}
+
+/**
+ * Finance recording a Safest price that reached us outside Cryptomus.
+ *
+ * Named by the deal's own reference with a `:price` suffix, for the reason
+ * `recordManualPayment` gives: a typed txid as the payment's name made a
+ * second name for the same money. The suffix keeps it apart from the
+ * opening payment, which is named by the bare reference.
+ */
+export async function recordManualPricePayment(
+  orderId: string,
+  txid: string,
+  asset: string,
+): Promise<PaymentOutcome> {
+  const order = await db.order.findUnique({
+    where: { id: orderId },
+    select: { reference: true },
+  });
+  if (!order) throw new Error(`No such order: ${orderId}`);
+
+  await recordAudit({
+    actorId: null,
+    action: "payment.recorded_by_hand",
+    entity: "order",
+    entityId: orderId,
+    after: { txid, asset, reference: order.reference, stage: "price" },
+  });
+
+  return recordPricePayment(orderId, `${order.reference}:price`, asset);
+}
+
 /** The staff desks. `AGENT` is deliberately absent — see `roleOnDeal`. */
 const STAFF_ROLES: readonly UserRole[] = ["MODERATOR", "FINANCE", "SUPERADMIN"];
 
@@ -815,11 +1015,10 @@ const STEP_TIMESTAMP: Partial<
     >
   >
 > = {
+  // buyerPaidAt is the price arriving, which recordPricePayment stamps.
   SAFEST: {
     4: "custodyAt",
-    6: "buyerPaidAt",
-    7: "sellerConfirmedAt",
-    9: "handoverAt",
+    8: "handoverAt",
   },
   FASTEST: { 5: "handoverAt" },
 };
@@ -1058,6 +1257,9 @@ export async function advanceStep(input: {
     (s) => s.position === input.position,
   );
   if (!template) return { ok: false, reason: "wrong-step" };
+  // The Safest price is the buyer paying us, recorded when the money
+  // arrives. Letting anyone mark it done would let a deal move on unpaid.
+  if (template.byPayment) return { ok: false, reason: "pay-in-checkout" };
   if (template.actor !== actor) return { ok: false, reason: "wrong-actor" };
 
   if (
@@ -1544,15 +1746,6 @@ export async function resolveDeal(input: {
     return { ok: false, reason: "not-disputed" };
   }
 
-  // Handing the channel back once the **seller** has confirmed the buyer's
-  // payment arrived would leave the seller holding the money and the asset
-  // both. That one is an outright refusal, because it is the one signal
-  // here that cannot be gamed by the party it would favour: a seller does
-  // not falsely admit to having been paid.
-  if (input.to === "RETURNED_TO_SELLER" && order.sellerConfirmedAt) {
-    return { ok: false, reason: "already-paid" };
-  }
-
   // Cancelling a Safest deal whose channel we are holding closed the order,
   // put the listing back on sale, and left a staff agent personally owning
   // the seller's Google channel with RETURNED_TO_SELLER no longer
@@ -1566,15 +1759,15 @@ export async function resolveDeal(input: {
 
   // Everything below is a decision rather than a rule.
   //
-  // Both of these reverse something that has already happened, and in both
-  // the evidence is one party's unverified word: `buyerPaidAt` is stamped
-  // by the buyer completing a step whose payment reference is free text,
-  // and `handoverAt` by the buyer saying they received access. Treating
-  // either as proof made the guard a dead end — a buyer could type a
-  // reference, pay nothing, and strand the seller's channel with the agent
-  // for ever; and a refund became unreachable in the only state a Fastest
-  // refund exists for, leaving the money in the platform's position with
-  // no route out at all.
+  // Both of these reverse something that has already happened. Returning a
+  // Safest channel once `buyerPaidAt` is set undoes a purchase the buyer
+  // has paid us for — the price is refunded, but the buyer loses a channel
+  // they were owed. A Fastest refund once `handoverAt` is set, or the
+  // seller has handed over, reverses the buyer's own word that access
+  // arrived. Refusing either outright made the guard a dead end: a refund
+  // became unreachable in the only state a Fastest refund exists for, and a
+  // failed Google transfer would have left the buyer's price with us for
+  // ever.
   //
   // So they are not refused, they are routed: through a dispute, where a
   // moderator sees what each side claims and the decision is on the record.

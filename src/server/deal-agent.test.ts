@@ -10,6 +10,7 @@ import {
   recordOpeningPayment,
 } from "@/server/deals";
 import { seedListing, seedUser, withCleanDb } from "@/test/db";
+import { runStep } from "@/test/deal-steps";
 
 /** Every state in which a Safest agent is holding the seller's channel. */
 const HOLDING: readonly OrderStatus[] = [
@@ -243,12 +244,11 @@ async function atHandover(priceUsd: number) {
     agent: seeded.agent.id,
   };
   for (const step of templateFor("SAFEST")) {
-    if (step.position < 2 || step.position >= 8) continue;
-    const r = await advanceStep({
+    if (step.position < 2 || step.position >= 7) continue;
+    const r = await runStep({
       orderId: seeded.orderId,
       position: step.position,
       userId: actors[step.actor],
-      ...(step.position === 6 ? { paymentRef: "0xabc" } : {}),
     });
     if (!r.ok) throw new Error(`step ${step.position}: ${r.reason}`);
   }
@@ -261,20 +261,20 @@ test(
     const { orderId, actors, staff } = await atHandover(600_000);
 
     expect(
-      await advanceStep({ orderId, position: 8, userId: actors.agent }),
+      await advanceStep({ orderId, position: 7, userId: actors.agent }),
     ).toMatchObject({ ok: false, reason: "needs-approval" });
 
     expect(
       await advanceStep({
         orderId,
-        position: 8,
+        position: 7,
         userId: actors.agent,
         approvedById: staff.id,
       }),
     ).toMatchObject({ ok: true });
 
     const step = await db.transferStep.findFirstOrThrow({
-      where: { orderId, position: 8 },
+      where: { orderId, position: 7 },
     });
     expect(step.approvedById).toBe(staff.id);
   }),
@@ -285,7 +285,7 @@ test(
   withCleanDb(async () => {
     const { orderId, actors } = await atHandover(10_000);
     expect(
-      await advanceStep({ orderId, position: 8, userId: actors.agent }),
+      await advanceStep({ orderId, position: 7, userId: actors.agent }),
     ).toMatchObject({ ok: true });
   }),
 );
@@ -297,7 +297,7 @@ test(
     expect(
       await advanceStep({
         orderId,
-        position: 8,
+        position: 7,
         userId: actors.agent,
         approvedById: actors.agent,
       }),
@@ -312,7 +312,7 @@ test(
     expect(
       await advanceStep({
         orderId,
-        position: 8,
+        position: 7,
         userId: actors.agent,
         approvedById: actors.buyer,
       }),

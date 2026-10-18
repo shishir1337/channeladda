@@ -544,9 +544,10 @@ model Order {
 
   feePaidAt         DateTime? // opening payment cleared
   custodyAt         DateTime? // safest: agent confirmed it owns the channel
-  buyerPaidAt       DateTime? // safest: buyer says they paid the seller
-  /// On-chain reference for the buyer-to-seller leg, so a dispute has
-  /// something checkable rather than one party's word against the other's.
+  buyerPaidAt       DateTime? // safest: the price reached Channel Adda (set by the system)
+  /// The Safest price payment's own name — an invoice reference, a balance
+  /// payment or a payment finance recorded by hand — so a second arrival can
+  /// be told from a retry. Set by the system, never typed by the buyer.
   buyerPaymentRef   String?
   sellerConfirmedAt DateTime? // safest: seller says the money arrived
   handoverAt        DateTime? // Fastest: the BUYER confirmed access (step 5); starts the recovery hold
@@ -919,7 +920,8 @@ model Upload {
 
 /// What an invoice was raised for.
 enum InvoicePurpose {
-  DEAL
+  DEAL // the opening payment: the whole amount on Fastest, the admin fee on Safest
+  DEAL_PRICE // the channel price on Safest, paid after custody and inspection
   TOPUP
 }
 

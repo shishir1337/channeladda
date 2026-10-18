@@ -7,10 +7,13 @@ import {
   createDeal,
   getDealFor,
   listDealsFor,
+  platformPositionFor,
   recordOpeningPayment,
+  recordPricePayment,
   resolveDeal,
 } from "@/server/deals";
 import { passHold, seedListing, seedUser, withCleanDb } from "@/test/db";
+import { runStep } from "@/test/deal-steps";
 
 type Mode = "SAFEST" | "FASTEST";
 
@@ -60,13 +63,10 @@ async function runTo(
   for (const step of templateFor(mode)) {
     if (step.position < 2 || step.position >= stopBefore) continue;
     await passHold(orderId);
-    const result = await advanceStep({
+    const result = await runStep({
       orderId,
       position: step.position,
       userId: actors[step.actor],
-      ...(mode === "SAFEST" && step.position === 6
-        ? { paymentRef: "0xabc" }
-        : {}),
     });
     if (!result.ok) {
       throw new Error(`step ${step.position} failed: ${result.reason}`);
@@ -82,28 +82,35 @@ const listingStatus = async (id: string) =>
 // ---------------------------------------------------------------- advancement
 
 test(
-  "a safest deal runs end to end",
+  "a safest deal pays the seller's wallet on completion",
   withCleanDb(async () => {
-    const { orderId, listing, seller } = await runTo("SAFEST", 10);
+    const { orderId, listing, seller } = await runTo("SAFEST", 9);
 
     const order = await db.order.findUniqueOrThrow({ where: { id: orderId } });
     expect(order.status).toBe("COMPLETED");
     expect(order.custodyAt).not.toBeNull();
     expect(order.buyerPaidAt).not.toBeNull();
-    expect(order.sellerConfirmedAt).not.toBeNull();
     expect(order.handoverAt).not.toBeNull();
     expect(await listingStatus(listing.id)).toBe("SOLD");
 
-    // The fee was held and is now earned; nothing is released to the seller.
+    // The buyer paid the price to us, so it is ours to pass on: into the
+    // seller's Channel Adda wallet, with our fee kept.
+    expect(await balanceOf(seller.id)).toBe(10_000);
+    expect(await platformPositionFor(orderId)).toBe(300);
     expect(
-      await db.ledgerEntry.count({
+      await db.ledgerEntry.findFirstOrThrow({
         where: { orderId, kind: "ESCROW_RELEASE", userId: seller.id },
       }),
-    ).toBe(0);
-    expect(
-      await db.ledgerEntry.count({ where: { orderId, kind: "BUYER_FEE" } }),
-    ).toBe(1);
-    expect(await balanceOf(seller.id)).toBe(0);
+    ).toMatchObject({ amountUsd: 10_000 });
+  }),
+);
+
+test(
+  "a safest seller fee is taken from the price on completion",
+  withCleanDb(async () => {
+    const { orderId, seller } = await runTo("SAFEST", 9, { sellerFeeBp: 500 });
+    expect(await balanceOf(seller.id)).toBe(9_500);
+    expect(await platformPositionFor(orderId)).toBe(800);
   }),
 );
 
@@ -199,30 +206,80 @@ test(
 );
 
 test(
-  "the buyer's direct payment records its reference",
+  "the buyer cannot mark the price paid themselves",
   withCleanDb(async () => {
     const { orderId, actors } = await runTo("SAFEST", 6);
     expect(
-      await advanceStep({
-        orderId,
-        position: 6,
-        userId: actors.buyer,
-        paymentRef: "0xdeadbeef",
-      }),
-    ).toMatchObject({ ok: true });
+      await advanceStep({ orderId, position: 6, userId: actors.buyer }),
+    ).toMatchObject({ ok: false, reason: "pay-in-checkout" });
+    const order = await db.order.findUniqueOrThrow({ where: { id: orderId } });
+    expect(order.status).toBe("AWAITING_BUYER_PAYMENT");
+    expect(order.buyerPaidAt).toBeNull();
+  }),
+);
+
+test(
+  "the price paid to Channel Adda is held and moves the deal on",
+  withCleanDb(async () => {
+    const { orderId } = await runTo("SAFEST", 6);
+    expect(await recordPricePayment(orderId, "price-1", "USDT")).toBe(
+      "applied",
+    );
 
     const order = await db.order.findUniqueOrThrow({ where: { id: orderId } });
-    expect(order.buyerPaymentRef).toBe("0xdeadbeef");
+    expect(order.status).toBe("AWAITING_HANDOVER");
+    expect(order.buyerPaymentRef).toBe("price-1");
     expect(order.buyerPaidAt).not.toBeNull();
+    expect(
+      await db.transferStep.findFirstOrThrow({
+        where: { orderId, position: 6 },
+      }),
+    ).toMatchObject({ completedAt: expect.any(Date) });
+    expect(
+      await db.ledgerEntry.findFirstOrThrow({
+        where: { orderId, userId: null, note: { contains: "price" } },
+      }),
+    ).toMatchObject({ kind: "ESCROW_HOLD", amountUsd: 10_000 });
+
+    // The same payment again is a retry, not a second payment.
+    expect(await recordPricePayment(orderId, "price-1", "USDT")).toBe(
+      "already-applied",
+    );
+  }),
+);
+
+test(
+  "a second price payment goes to the buyer's balance",
+  withCleanDb(async () => {
+    const { orderId, buyer } = await runTo("SAFEST", 6);
+    await recordPricePayment(orderId, "price-1", "USDT");
+    await db.invoice.create({
+      data: {
+        reference: "DEAL-second",
+        purpose: "DEAL_PRICE",
+        amountUsd: 10_000,
+        userId: buyer.id,
+        orderId,
+        settledAt: new Date(),
+      },
+    });
+
+    expect(await recordPricePayment(orderId, "DEAL-second", "USDT")).toBe(
+      "second-payment-credited",
+    );
+    expect(await balanceOf(buyer.id)).toBe(10_000);
+    const order = await db.order.findUniqueOrThrow({ where: { id: orderId } });
+    expect(order.status).toBe("AWAITING_HANDOVER");
+    expect(order.buyerPaymentRef).toBe("price-1");
   }),
 );
 
 test(
   "a completed deal rejects further steps",
   withCleanDb(async () => {
-    const { orderId, actors } = await runTo("SAFEST", 10);
+    const { orderId, actors } = await runTo("SAFEST", 9);
     expect(
-      await advanceStep({ orderId, position: 9, userId: actors.agent }),
+      await advanceStep({ orderId, position: 8, userId: actors.agent }),
     ).toMatchObject({ ok: false, reason: "terminal" });
   }),
 );
@@ -387,7 +444,7 @@ test(
     expect((await getDealFor(seller.id, orderId))?.agentEmail).toBe(
       "transfers@channeladda.test",
     );
-    expect(asBuyer?.steps).toHaveLength(9);
+    expect(asBuyer?.steps).toHaveLength(8);
     expect(asBuyer?.totalUsd).toBe(300);
 
     expect((await getDealFor(seller.id, orderId))?.viewerRole).toBe("seller");
@@ -407,7 +464,7 @@ test(
 test(
   "a completed deal has no next step",
   withCleanDb(async () => {
-    const { orderId, buyer } = await runTo("SAFEST", 10);
+    const { orderId, buyer } = await runTo("SAFEST", 9);
     const view = await getDealFor(buyer.id, orderId);
     expect(view?.status).toBe("COMPLETED");
     expect(view?.nextStep).toBeNull();
@@ -449,7 +506,7 @@ test(
 test(
   "a finished deal is waiting on nobody",
   withCleanDb(async () => {
-    const { buyer } = await runTo("SAFEST", 10);
+    const { buyer } = await runTo("SAFEST", 9);
     expect((await listDealsFor(buyer.id))[0].awaiting).toBeNull();
   }),
 );

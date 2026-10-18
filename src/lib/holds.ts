@@ -23,7 +23,7 @@ export function requiredHold(order: {
 }): number {
   if (order.paymentRef === null) return 0;
   if (order.mode === "FASTEST") return order.totalUsd;
-  return order.buyerFeeUsd;
+  return order.buyerFeeUsd + (order.buyerPaidAt ? order.priceUsd : 0);
 }
 
 /**

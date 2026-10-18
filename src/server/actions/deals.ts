@@ -48,6 +48,8 @@ const MESSAGES: Record<repo.DealFailure, string> = {
   "already-paid":
     "The buyer has already paid the seller, so this cannot be undone here.",
   "bad-proof": "Attach an uploaded file or an https link.",
+  "pay-in-checkout":
+    "The price is paid to Channel Adda from this page, by crypto or from your balance. The step completes on its own when the money arrives.",
   "books-mismatch":
     "What Channel Adda is holding for this deal does not match what the deal says was paid, so nothing has been moved. It is listed on the money desk for a developer to look at.",
 };
@@ -224,6 +226,59 @@ export async function markOpeningPaymentReceived(
   } catch (error) {
     // Only an order that does not exist, or a row that kept moving under
     // the write, reaches here now. Everything else has an outcome.
+    return {
+      ok: false,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Could not record that payment.",
+    };
+  }
+}
+
+/**
+ * Finance recording a Safest price that reached us outside Cryptomus.
+ *
+ * The same desk and the same rules as `markOpeningPaymentReceived`, for the
+ * second payment on a Safest deal: FINANCE only, because it decides money
+ * arrived and releases the channel transfer behind it.
+ */
+export async function markPriceReceived(
+  orderId: string,
+  ref: string,
+  asset: string,
+): Promise<DealResult> {
+  await requireRole("FINANCE");
+
+  const reference = ref.trim();
+  if (!reference) {
+    return { ok: false, error: "Enter the payment reference." };
+  }
+
+  const outcomes: Record<repo.PaymentOutcome, string> = {
+    applied: "Price recorded. Our agent can transfer the channel now.",
+    "already-applied":
+      "That price payment was already recorded. Nothing has changed.",
+    "second-payment-credited":
+      "The price was already paid, so that payment went to the buyer's balance.",
+    "reference-mismatch":
+      "The price is already paid under another reference, and there is no settled invoice matching this one. Nothing was credited — the mismatch is in the audit trail for you to reconcile.",
+    "credited-to-balance":
+      "This deal is not waiting on its price, so that payment went to the buyer's balance.",
+  };
+
+  try {
+    const outcome = await repo.recordManualPricePayment(
+      orderId,
+      reference,
+      asset.trim() || "USDT",
+    );
+    refresh(orderId);
+    if (outcome === "reference-mismatch") {
+      return { ok: false, error: outcomes[outcome] };
+    }
+    return { ok: true, message: outcomes[outcome] };
+  } catch (error) {
     return {
       ok: false,
       error:

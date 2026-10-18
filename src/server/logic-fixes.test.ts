@@ -12,6 +12,7 @@ import {
 import { counterOffer, createOffer, withdrawOffer } from "@/server/offers";
 import { creditDeposit, payFromWallet } from "@/server/wallet";
 import { seedListing, seedUser, withCleanDb } from "@/test/db";
+import { runStep } from "@/test/deal-steps";
 
 /**
  * Findings from the business-logic review: rules that did exactly what the
@@ -46,13 +47,10 @@ async function runTo(mode: Mode, stopBefore: number) {
   };
   for (const step of templateFor(mode)) {
     if (step.position < 2 || step.position >= stopBefore) continue;
-    const r = await advanceStep({
+    const r = await runStep({
       orderId: o.orderId,
       position: step.position,
       userId: actors[step.actor],
-      ...(mode === "SAFEST" && step.position === 6
-        ? { paymentRef: "0xabc" }
-        : {}),
     });
     if (!r.ok) throw new Error(`step ${step.position}: ${r.reason}`);
   }
@@ -223,30 +221,6 @@ test(
 );
 
 // ------------------------------------------- the payment reference is required
-
-test(
-  "a safest buyer cannot record paying the seller without saying how",
-  withCleanDb(async () => {
-    // The requirement lived only in the browser. buyerPaidAt was stamped with
-    // or without a reference — and once set it forces any return of the
-    // channel through a dispute, with the one piece of evidence a dispute
-    // needs left blank.
-    const o = await runTo("SAFEST", 6);
-
-    expect(
-      await advanceStep({
-        orderId: o.orderId,
-        position: 6,
-        userId: o.buyer.id,
-      }),
-    ).toMatchObject({ ok: false, reason: "needs-reference" });
-
-    const order = await db.order.findUniqueOrThrow({
-      where: { id: o.orderId },
-    });
-    expect(order.buyerPaidAt).toBeNull();
-  }),
-);
 
 // ---------------------------------------- whose offer is it to withdraw
 

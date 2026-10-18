@@ -10,6 +10,7 @@ import {
   recordOpeningPayment,
 } from "@/server/deals";
 import { seedListing, seedUser, withCleanDb } from "@/test/db";
+import { runStep } from "@/test/deal-steps";
 
 async function completeSafestDeal() {
   const seeded = await seedListing();
@@ -39,11 +40,10 @@ async function completeSafestDeal() {
   };
   for (const step of templateFor("SAFEST")) {
     if (step.position < 2) continue;
-    const r = await advanceStep({
+    const r = await runStep({
       orderId,
       position: step.position,
       userId: actors[step.actor],
-      ...(step.position === 6 ? { paymentRef: "0xabc" } : {}),
     });
     if (!r.ok) throw new Error(`step ${step.position}: ${r.reason}`);
   }

@@ -33,6 +33,10 @@ test("safest holds the fee", () => {
   expect(requiredHold(order)).toBe(300);
 });
 
+test("safest holds the price once it is paid", () => {
+  expect(requiredHold({ ...order, buyerPaidAt: new Date() })).toBe(10_300);
+});
+
 test("safest keeps its fee once custody is reached", () => {
   expect(keptFee(order)).toBe(0);
   expect(keptFee({ ...order, custodyAt: new Date() })).toBe(300);

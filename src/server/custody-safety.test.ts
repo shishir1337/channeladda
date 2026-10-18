@@ -2,7 +2,6 @@ import { expect, test } from "vitest";
 import { db } from "@/lib/db";
 import { templateFor } from "@/lib/deal-templates";
 import {
-  advanceStep,
   balanceOf,
   createDeal,
   expireStaleDeals,
@@ -11,6 +10,7 @@ import {
   resolveDeal,
 } from "@/server/deals";
 import { seedListing, seedUser, withCleanDb } from "@/test/db";
+import { runStep } from "@/test/deal-steps";
 
 type Mode = "SAFEST" | "FASTEST";
 
@@ -47,13 +47,10 @@ async function runTo(mode: Mode, stopBefore: number, priceUsd?: number) {
   };
   for (const step of templateFor(mode)) {
     if (step.position < 2 || step.position >= stopBefore) continue;
-    const r = await advanceStep({
+    const r = await runStep({
       orderId: o.orderId,
       position: step.position,
       userId: actors[step.actor],
-      ...(mode === "SAFEST" && step.position === 6
-        ? { paymentRef: "0xabc" }
-        : {}),
     });
     if (!r.ok) throw new Error(`step ${step.position}: ${r.reason}`);
   }
@@ -70,7 +67,7 @@ test(
     // second staff member. resolveDeal checked none of that, and the same
     // transition is legal for an agent, so one call closed a Safest deal with
     // the agent still holding the channel the buyer had already paid for.
-    const o = await runTo("SAFEST", 8);
+    const o = await runTo("SAFEST", 7);
 
     const result = await resolveDeal({
       orderId: o.orderId,
@@ -117,17 +114,14 @@ test(
 test(
   "handing a channel back is not a one-click action once a payment is claimed",
   withCleanDb(async () => {
-    // The guard read sellerConfirmedAt — the seller's own say-so. So a seller
-    // who had been paid simply never pressed "I received it", raised a
-    // dispute, and a moderator handed the channel back: the seller kept the
-    // money and the asset. buyerPaidAt is the buyer's recorded payment, with
-    // its transaction reference, and it is what the guard must read.
+    // Once the buyer has paid the price to us, giving the channel back
+    // undoes a purchase. buyerPaidAt is that payment, recorded by the system
+    // when the money arrived, and it is what the guard reads.
     const o = await runTo("SAFEST", 7);
     const mid = await db.order.findUniqueOrThrow({
       where: { id: o.orderId },
     });
     expect(mid.buyerPaidAt).not.toBeNull();
-    expect(mid.sellerConfirmedAt).toBeNull();
 
     const result = await resolveDeal({
       orderId: o.orderId,
@@ -273,64 +267,6 @@ test(
 
     expect(result).toMatchObject({ ok: false, reason: "needs-dispute" });
     expect(await balanceOf(o.buyer.id)).toBe(0);
-  }),
-);
-
-test(
-  "a seller's channel can be returned when the buyer only claims to have paid",
-  withCleanDb(async () => {
-    // buyerPaidAt is stamped by the buyer completing a step whose payment
-    // reference is free text nobody validates. Treating it as proof let a
-    // buyer type "0x0", pay nothing, and strand the seller's channel with the
-    // agent for ever: returning it was refused, and the only other ending
-    // refunded nothing and meant something else.
-    const o = await runTo("SAFEST", 7);
-    const mid = await db.order.findUniqueOrThrow({ where: { id: o.orderId } });
-    expect(mid.buyerPaidAt).not.toBeNull();
-    expect(mid.sellerConfirmedAt).toBeNull();
-
-    await resolveDeal({
-      orderId: o.orderId,
-      to: "DISPUTED",
-      byUserId: o.seller.id,
-      note: "no payment arrived",
-    });
-
-    const result = await resolveDeal({
-      orderId: o.orderId,
-      to: "RETURNED_TO_SELLER",
-      byUserId: o.finance.id,
-      note: "checked the chain, nothing was sent",
-    });
-
-    expect(result).toMatchObject({ ok: true });
-  }),
-);
-
-test(
-  "a channel is never handed back once the seller says they were paid",
-  withCleanDb(async () => {
-    // The seller's own admission is the one signal that cannot be gamed by
-    // the party it would favour, so it stays an outright refusal.
-    const o = await runTo("SAFEST", 8);
-    const mid = await db.order.findUniqueOrThrow({ where: { id: o.orderId } });
-    expect(mid.sellerConfirmedAt).not.toBeNull();
-
-    await resolveDeal({
-      orderId: o.orderId,
-      to: "DISPUTED",
-      byUserId: o.seller.id,
-      note: "changed my mind",
-    });
-
-    expect(
-      await resolveDeal({
-        orderId: o.orderId,
-        to: "RETURNED_TO_SELLER",
-        byUserId: o.staff.id,
-        note: "seller asked",
-      }),
-    ).toMatchObject({ ok: false, reason: "already-paid" });
   }),
 );
 

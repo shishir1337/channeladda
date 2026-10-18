@@ -1,6 +1,7 @@
 import { expect, test } from "vitest";
 import { db } from "@/lib/db";
-import { createDeal } from "@/server/deals";
+import { templateFor } from "@/lib/deal-templates";
+import { createDeal, recordOpeningPayment } from "@/server/deals";
 import {
   creditDeposit,
   getWallet,
@@ -9,9 +10,41 @@ import {
   settleWithdrawal,
 } from "@/server/wallet";
 import { seedListing, seedUser, withCleanDb } from "@/test/db";
+import { runStep } from "@/test/deal-steps";
 
 async function fund(userId: string, cents: number, ref = "dep-1") {
   await creditDeposit(userId, cents, ref, "USDT");
+}
+
+/** A Safest deal paid and walked up to, not including, `stopBefore`. */
+async function safestAt(stopBefore: number) {
+  const seeded = await seedListing();
+  const created = await createDeal({
+    listingId: seeded.listing.id,
+    buyerId: seeded.buyer.id,
+    mode: "SAFEST",
+  });
+  if (!created.ok) throw new Error(created.reason);
+  await db.order.update({
+    where: { id: created.orderId },
+    data: { agentId: seeded.agent.id },
+  });
+  await recordOpeningPayment(created.orderId, `pay-${created.orderId}`, "USDT");
+  const actors: Record<string, string> = {
+    buyer: seeded.buyer.id,
+    seller: seeded.seller.id,
+    agent: seeded.agent.id,
+  };
+  for (const step of templateFor("SAFEST")) {
+    if (step.position < 2 || step.position >= stopBefore) continue;
+    const r = await runStep({
+      orderId: created.orderId,
+      position: step.position,
+      userId: actors[step.actor],
+    });
+    if (!r.ok) throw new Error(`step ${step.position}: ${r.reason}`);
+  }
+  return { ...seeded, orderId: created.orderId };
 }
 
 test(
@@ -115,6 +148,48 @@ test(
       { kind: "ESCROW_HOLD", userId: seeded.buyer.id, amountUsd: -300 },
       { kind: "ESCROW_HOLD", userId: null, amountUsd: 300 },
     ]);
+  }),
+);
+
+test(
+  "a safest buyer pays the price from the balance",
+  withCleanDb(async () => {
+    const { orderId, buyer } = await safestAt(6);
+    await fund(buyer.id, 12_000);
+
+    expect(await payFromWallet(orderId, buyer.id)).toEqual({ ok: true });
+
+    const wallet = await getWallet(buyer.id);
+    expect(wallet.availableUsd).toBe(2_000);
+    const order = await db.order.findUniqueOrThrow({ where: { id: orderId } });
+    expect(order.status).toBe("AWAITING_HANDOVER");
+    expect(order.buyerPaymentRef).toMatch(/^wallet:.*:price$/);
+    // Held, not paid to anybody yet.
+    expect(
+      await db.ledgerEntry.findMany({
+        where: { orderId, note: { contains: "price" } },
+        orderBy: { amountUsd: "asc" },
+        select: { userId: true, kind: true, amountUsd: true },
+      }),
+    ).toEqual([
+      { userId: buyer.id, kind: "ESCROW_HOLD", amountUsd: -10_000 },
+      { userId: null, kind: "ESCROW_HOLD", amountUsd: 10_000 },
+    ]);
+  }),
+);
+
+test(
+  "the price cannot be paid from the balance before the inspection",
+  withCleanDb(async () => {
+    // In custody, not yet inspected: the buyer approves the channel before
+    // being asked for the price.
+    const { orderId, buyer } = await safestAt(5);
+    await fund(buyer.id, 12_000);
+    expect(await payFromWallet(orderId, buyer.id)).toMatchObject({
+      ok: false,
+      reason: "not-payable",
+    });
+    expect((await getWallet(buyer.id)).availableUsd).toBe(12_000);
   }),
 );
 

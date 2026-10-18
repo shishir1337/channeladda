@@ -70,8 +70,9 @@ type Transition = {
 };
 
 const TRANSITIONS: readonly Transition[] = Object.freeze([
-  // ---- Safest: the agent takes the channel, the buyer pays the seller
-  // between the two Google waiting periods, the agent hands it on.
+  // ---- Safest: the agent takes the channel, the buyer pays the price to
+  // Channel Adda between the two Google waiting periods, the agent hands it
+  // on and the price is released to the seller.
   {
     mode: "SAFEST",
     from: "AWAITING_PAYMENT",
@@ -94,7 +95,9 @@ const TRANSITIONS: readonly Transition[] = Object.freeze([
     mode: "SAFEST",
     from: "AWAITING_BUYER_PAYMENT",
     to: "AWAITING_HANDOVER",
-    actors: ["seller"],
+    // The price arriving moves it, recorded by the system. Nobody confirms
+    // it by hand: we saw the money.
+    actors: ["system"],
   },
   {
     mode: "SAFEST",

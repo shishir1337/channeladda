@@ -12,12 +12,14 @@
  * Every calculation also takes the deal's mode, because the two modes charge
  * differently and the difference is not cosmetic:
  *
- * - **Safest** — the buyer pays Channel Adda the admin fee and nothing else.
- *   The price goes straight from buyer to seller and never passes through the
- *   platform, so there is nothing to deduct a seller fee from and `totalUsd`
- *   is the fee alone.
- * - **Fastest** — the buyer pays the price and the fee together, the platform
- *   holds it, and the seller is credited the price less the seller fee.
+ * - **Safest** — the buyer pays Channel Adda the admin fee up front, so
+ *   `totalUsd` is the fee alone, and pays the price to Channel Adda later,
+ *   once our agent holds the channel and the buyer has inspected it.
+ * - **Fastest** — the buyer pays the price and the fee together, up front.
+ *
+ * Either way the platform holds what was paid, and on completion the seller
+ * is credited the price less the seller fee. A buyer never pays a seller
+ * directly.
  */
 
 import type { DealMode } from "@/generated/prisma/enums";
@@ -28,7 +30,7 @@ export type FeeSettings = {
   /** The same, on a Fastest deal. Set separately: Fastest is more work for
    *  the platform and it carries the funds, so it may be priced higher. */
   buyerFeeBpFastest: number;
-  /** Deducted before the seller is credited. Only ever applies to Fastest. */
+  /** Deducted from the price before the seller is credited, in both modes. */
   sellerFeeBp: number;
 };
 
@@ -83,9 +85,8 @@ export function buyerTotal(price: number, fees: FeeSettings, mode: DealMode) {
 /**
  * What the seller receives.
  *
- * Only meaningful for Fastest, where the platform pays the seller. On a Safest
- * deal the buyer pays the seller directly and the platform is not in the path,
- * so the payout is the whole price.
+ * The price less the seller fee, credited to the seller's Channel Adda wallet
+ * when the deal completes, in both modes.
  */
 export function sellerPayout(price: number, fees: FeeSettings, mode: DealMode) {
   const q = quote(price, fees, mode);
@@ -102,15 +103,16 @@ export function orderAmounts(
   mode: DealMode,
 ) {
   const buyerFeeUsd = applyBp(priceCents, buyerBpFor(fees, mode));
-  const sellerFeeUsd =
-    mode === "FASTEST" ? applyBp(priceCents, fees.sellerFeeBp) : 0;
+  // Taken from the price when it is released, in both modes: the price
+  // passes through Channel Adda on a Safest deal too.
+  const sellerFeeUsd = applyBp(priceCents, fees.sellerFeeBp);
 
   return {
     priceUsd: priceCents,
     buyerFeeUsd,
     sellerFeeUsd,
-    // A Safest buyer is charged the fee and nothing else; the price reaches
-    // the seller without the platform touching it.
+    // What the buyer pays up front: everything on Fastest, the fee alone on
+    // Safest, whose price is paid to us later, after custody and inspection.
     totalUsd: mode === "FASTEST" ? priceCents + buyerFeeUsd : buyerFeeUsd,
     payoutUsd: priceCents - sellerFeeUsd,
   };

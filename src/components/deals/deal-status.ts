@@ -27,7 +27,7 @@ export const STATUS_LABELS: Record<OrderStatus, string> = {
   AGENT_VERIFYING: "Our agent is checking the channel",
   AWAITING_CUSTODY: "Waiting for the seller to hand the channel over",
   IN_CUSTODY: "Our agent is holding the channel",
-  AWAITING_BUYER_PAYMENT: "Waiting for the buyer to pay the seller",
+  AWAITING_BUYER_PAYMENT: "Waiting for the buyer to pay the price",
   AWAITING_HANDOVER: "Transfer under way",
   AWAITING_RELEASE: "Releasing the seller's funds",
   COMPLETED: "Completed",
@@ -50,7 +50,7 @@ export const STATUS_SHORT: Record<OrderStatus, string> = {
   AGENT_VERIFYING: "Being checked",
   AWAITING_CUSTODY: "Handing over to us",
   IN_CUSTODY: "We hold the channel",
-  AWAITING_BUYER_PAYMENT: "Buyer paying seller",
+  AWAITING_BUYER_PAYMENT: "Buyer paying the price",
   AWAITING_HANDOVER: "Transferring",
   AWAITING_RELEASE: "Paying the seller",
   COMPLETED: "Completed",
@@ -147,29 +147,29 @@ export function statusSentence(
 
     case "IN_CUSTODY":
       if (viewer === "buyer") {
-        return "Our agent owns the channel now, not the seller. Look it over, and only then pay the seller directly.";
+        return "Our agent owns the channel now, not the seller. Look it over, and only then pay the price — to Channel Adda, never to the seller.";
       }
       if (viewer === "seller") {
-        return "The channel is with our agent — out of your hands and not yet in the buyer's. The buyer pays you directly next.";
+        return "The channel is with our agent — out of your hands and not yet in the buyer's. The buyer pays the price to Channel Adda next, and it is held for you.";
       }
       return "You are holding this channel.";
 
     case "AWAITING_BUYER_PAYMENT":
       if (viewer === "buyer") {
-        return "Send the channel's price straight to the seller, then record the transaction reference here. Our agent keeps the channel until the seller confirms the money arrived.";
+        return "Pay the price to Channel Adda here, by crypto or from your balance. We hold it until the channel is yours, then pay the seller — never pay the seller yourself.";
       }
       if (viewer === "seller") {
-        return "The buyer is paying you directly. Confirm here once the money is in your account — our agent holds the channel until you do.";
+        return "The buyer is paying the price to Channel Adda. It is held for you and reaches your Channel Adda wallet when the transfer completes.";
       }
-      return "The buyer is paying the seller directly. The channel stays with the agent until the seller confirms.";
+      return "The buyer is paying the price to Channel Adda. The channel stays with you until it arrives.";
 
     case "AWAITING_HANDOVER":
       if (safest) {
         if (viewer === "buyer") {
-          return "The seller has been paid and our agent is transferring the channel to you. Google's second waiting period applies.";
+          return "Your payment is with Channel Adda and our agent is transferring the channel to you. Google's second waiting period applies.";
         }
         if (viewer === "seller") {
-          return "You have confirmed the payment, so your part is done. Our agent is transferring the channel to the buyer.";
+          return "The buyer has paid the price to Channel Adda, so your part is done. Our agent is transferring the channel, and the price reaches your wallet when it completes.";
         }
         return "Transfer the channel to the buyer.";
       }
@@ -252,20 +252,6 @@ const BY_OPEN_STEP: Partial<Record<string, Override>> = {
         "You have invited our agent, so your part is done for now. Google runs its own waiting period while our agent takes the channel over.",
       agent:
         "The seller has invited you. Accept it, then confirm custody once Google's transfer completes.",
-    },
-  },
-  // Safest buyer payment: the buyer pays (step 6), then the seller confirms
-  // it arrived (step 7).
-  "SAFEST:AWAITING_BUYER_PAYMENT:seller": {
-    label: "Waiting for the seller to confirm the payment",
-    short: "Seller confirming",
-    sentence: {
-      buyer:
-        "You have recorded paying the seller. Our agent keeps the channel until the seller confirms the money arrived.",
-      seller:
-        "The buyer says they have paid you. Confirm here once the money is in your account — our agent holds the channel until you do.",
-      agent:
-        "The buyer has recorded paying the seller. The seller confirms it arrived next.",
     },
   },
   // Fastest verifying: the seller invites the agent as manager (step 2)

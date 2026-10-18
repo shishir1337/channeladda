@@ -117,11 +117,11 @@ export async function getBuyerSummary(userId: string): Promise<BuyerSummary> {
   ]);
 
   // On a Fastest deal totalUsd is everything the buyer paid. On a Safest
-  // deal it is only our fee — the price went to the seller directly — so
-  // summing totalUsd showed a buyer who had just completed a $10,000
-  // purchase “Spent on purchases: $3”, while the seller's mirror tile read
-  // $10,000 for the same deal. A completed Safest deal means the seller
-  // confirmed the payment arrived, so the price counts.
+  // deal it is only the fee paid up front — the price is paid to us later,
+  // after custody — so summing totalUsd showed a buyer who had just completed
+  // a $10,000 purchase “Spent on purchases: $3”, while the seller's mirror
+  // tile read $10,000 for the same deal. A completed Safest deal means the
+  // price reached us, so it counts.
   let count = 0;
   let spentCents = 0;
   for (const row of bought) {

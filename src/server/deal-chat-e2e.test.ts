@@ -6,7 +6,6 @@ import {
   advanceStep,
   assignAgent,
   createDeal,
-  getDealFor,
   recordOpeningPayment,
 } from "@/server/deals";
 import { openConversation, sendMessage } from "@/server/messages";
@@ -16,7 +15,6 @@ import {
   createOffer,
   proposePrice,
 } from "@/server/offers";
-import { saveSellerPayTo } from "@/server/pay-to";
 import type { CurrentUser } from "@/server/session";
 import { creditDeposit, payFromWallet } from "@/server/wallet";
 import { passHold, seedListing, seedUser, withCleanDb } from "@/test/db";
@@ -167,26 +165,12 @@ test(
       agent: "step:theirs",
     });
 
-    // The seller says where to be paid, early, as the panel asks.
-    expect(
-      await saveSellerPayTo({
-        orderId: order.id,
-        userId: seller.id,
-        text: "USDT (TRC20): TQn9Y2khEsLJW1ChVWFMSMeRDow5KcbLSE",
-      }),
-    ).toEqual({ ok: true });
-
     const people = { buyer, seller, agent } as const;
-    const step = async (
-      position: number,
-      by: keyof typeof people,
-      extra: { paymentRef?: string } = {},
-    ) => {
+    const step = async (position: number, by: keyof typeof people) => {
       const done = await advanceStep({
         orderId: order.id,
         position,
         userId: people[by].id,
-        ...extra,
       });
       if (!done.ok) throw new Error(`${position}: ${done.reason}`);
       expect(await lastLine(id)).toMatchObject({
@@ -200,20 +184,19 @@ test(
     await step(3, "agent");
     await step(4, "agent");
     expect((await kinds(id)).buyer).toBe("step:mine");
-    // Not yet: the buyer has not reached their turn to pay.
-    expect((await getDealFor(buyer.id, order.id))?.sellerPayTo).toBeNull();
     await step(5, "buyer");
-    // Now the buyer sees where to pay.
-    expect((await getDealFor(buyer.id, order.id))?.sellerPayTo).toContain(
-      "TQn9Y2",
-    );
-    await step(6, "buyer", { paymentRef: "0xabc123" });
-    expect((await kinds(id)).seller).toBe("step:mine");
-    await step(7, "seller");
-    await step(8, "agent");
+    // The buyer pays the price to Channel Adda — here from their balance —
+    // and never to the seller. Nobody presses anything for it.
+    expect((await kinds(id)).buyer).toBe("step:mine");
+    await creditDeposit(buyer.id, 10_000, "top-chat", "USDT");
+    expect(await payFromWallet(order.id, buyer.id)).toEqual({ ok: true });
+    expect(await lastLine(id)).toMatchObject({ kind: "EVENT", senderId: null });
+    expect((await lastLine(id)).body).toMatch(/to Channel Adda/);
+    expect((await kinds(id)).agent).toBe("step:mine");
+    await step(7, "agent");
     const done = await advanceStep({
       orderId: order.id,
-      position: 9,
+      position: 8,
       userId: agent.id,
     });
     if (!done.ok) throw new Error(done.reason);

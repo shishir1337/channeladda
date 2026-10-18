@@ -15,7 +15,7 @@ async function openDeal(mode: "SAFEST" | "FASTEST" = "SAFEST") {
 }
 
 test(
-  "creating a safest deal reserves the listing and seeds nine steps",
+  "creating a safest deal reserves the listing and seeds eight steps",
   withCleanDb(async () => {
     const { listing, buyer, orderId, reference } = await openDeal("SAFEST");
 
@@ -27,12 +27,13 @@ test(
     expect(order.status).toBe("AWAITING_PAYMENT");
     expect(order.mode).toBe("SAFEST");
     expect(order.buyerId).toBe(buyer.id);
-    // The buyer owes the 3% admin fee and nothing else.
+    // The buyer owes the 3% admin fee up front; the price is paid to us
+    // later, at step 6.
     expect(order.priceUsd).toBe(10_000);
     expect(order.buyerFeeUsd).toBe(300);
     expect(order.totalUsd).toBe(300);
-    expect(order.steps).toHaveLength(9);
-    expect(order.steps[5].label).toBe("Pay the seller directly");
+    expect(order.steps).toHaveLength(8);
+    expect(order.steps[5].label).toBe("Pay the price to Channel Adda");
     expect(reference).toMatch(/^CA-\d{5}$/);
 
     const after = await db.listing.findUniqueOrThrow({

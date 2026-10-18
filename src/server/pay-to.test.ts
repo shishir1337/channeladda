@@ -10,6 +10,7 @@ import {
 } from "@/server/deals";
 import { saveSellerPayTo } from "@/server/pay-to";
 import { seedListing, seedUser, withCleanDb } from "@/test/db";
+import { runStep } from "@/test/deal-steps";
 
 /**
  * Where a Safest buyer pays the seller.
@@ -61,11 +62,10 @@ async function safestTo(
   };
   for (const step of templateFor("SAFEST")) {
     if (step.position < 2 || step.position >= stopBefore) continue;
-    const done = await advanceStep({
+    const done = await runStep({
       orderId,
       position: step.position,
       userId: actors[step.actor],
-      ...(step.position === 6 ? { paymentRef: "0xabc" } : {}),
     });
     if (!done.ok) throw new Error(`${step.position}: ${done.reason}`);
   }
