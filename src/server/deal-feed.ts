@@ -2,6 +2,7 @@ import "server-only";
 
 import type { OrderStatus } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
+import type { DealActor } from "@/lib/deal-machine";
 
 /**
  * Everything that has happened to every deal, newest first.
@@ -112,7 +113,7 @@ export async function listDealActivity(
  * rail showed every unclaimed deal on the platform, which is not a queue.
  */
 export async function listDealsForAgent(agentId: string, limit = 50) {
-  return db.order.findMany({
+  const orders = await db.order.findMany({
     where: {
       agentId,
       status: {
@@ -137,8 +138,20 @@ export async function listDealsForAgent(agentId: string, limit = 50) {
       // Where the agent talks to both sides and can work the steps.
       conversationId: true,
       listing: { select: { title: true, slug: true } },
+      // Whose move it is comes from the first open step, not the status:
+      // one status can cover the seller's step and then the agent's.
+      steps: {
+        where: { completedAt: null },
+        orderBy: { position: "asc" },
+        take: 1,
+        select: { actor: true },
+      },
     },
   });
+  return orders.map(({ steps, ...order }) => ({
+    ...order,
+    awaiting: (steps[0]?.actor as DealActor | undefined) ?? null,
+  }));
 }
 
 /** Deals with nobody holding them, oldest first. */

@@ -534,7 +534,10 @@ export default async function AdminDealsPage({
                 // Whose move it is, from the status vocabulary: the agent's
                 // own turns earn the gold flag; anybody else's is a quiet
                 // "with the buyer". A handover is shared, so it says nothing.
-                const whose = ORDER_STATUS[order.status]?.whose ?? null;
+                // The open step decides, so the row moves on the moment
+                // the seller has done their part of a shared status.
+                const whose =
+                  order.awaiting ?? ORDER_STATUS[order.status]?.whose ?? null;
                 return (
                   <ListItem key={order.id} padded={false}>
                     <Link

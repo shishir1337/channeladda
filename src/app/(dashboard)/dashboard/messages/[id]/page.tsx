@@ -4,7 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Reference } from "@/components/app/kit";
 import { AgentInvite } from "@/components/deals/agent-invite";
-import { STATUS_LABELS, STATUS_TONE } from "@/components/deals/deal-status";
+import { dealHeadline, STATUS_TONE } from "@/components/deals/deal-status";
 import { DealNextStep, RaiseDispute } from "@/components/deals/deal-timeline";
 import { PayNow } from "@/components/deals/pay-now";
 import { PayToCard } from "@/components/deals/pay-to";
@@ -167,7 +167,14 @@ export default async function ThreadPage({
                 size="sm"
                 className="max-w-full whitespace-normal app:h-auto app:min-h-5 app:py-0.5 app:leading-4"
               >
-                {STATUS_LABELS[deal.status]}
+                {
+                  dealHeadline(
+                    deal.status,
+                    deal.mode,
+                    deal.viewerRole,
+                    deal.nextStep?.actor ?? null,
+                  ).label
+                }
               </Badge>
               <span className="inline-flex items-center gap-1.5">
                 {deal.mode === "SAFEST" ? "Safest" : "Fastest"} deal

@@ -21,8 +21,8 @@ import {
 } from "@/components/app/kit";
 import {
   ACTOR_LABELS,
+  dealHeadline,
   SIDE_LABELS,
-  STATUS_SHORT,
   STATUS_TONE,
 } from "@/components/deals/deal-status";
 import { Badge } from "@/components/ui/badge";
@@ -192,7 +192,14 @@ function DealRows({ deals }: { deals: DealListRow[] }) {
 
                 <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 sm:shrink-0 sm:justify-end">
                   <Badge variant={STATUS_TONE[deal.status]} size="sm">
-                    {STATUS_SHORT[deal.status]}
+                    {
+                      dealHeadline(
+                        deal.status,
+                        deal.mode,
+                        deal.side,
+                        deal.awaiting,
+                      ).short
+                    }
                   </Badge>
                   {deal.awaiting && !frozen ? (
                     <TurnFlag

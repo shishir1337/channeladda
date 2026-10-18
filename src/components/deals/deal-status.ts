@@ -225,6 +225,110 @@ export function statusSentence(
   }
 }
 
+/** One reader's headline: the badge, its short form, and the sentence. */
+export type DealHeadline = { label: string; short: string; sentence: string };
+
+type Override = {
+  label: string;
+  short: string;
+  sentence: Record<"buyer" | "seller" | "agent", string>;
+};
+
+/**
+ * The statuses that span steps owned by different people, keyed
+ * `MODE:STATUS:whose step is open`. Only the combinations where the
+ * status-level copy would be wrong are listed; everything else falls back.
+ */
+const BY_OPEN_STEP: Partial<Record<string, Override>> = {
+  // Safest custody: the seller invites (step 2), then the agent accepts and
+  // waits out Google's transfer (steps 3 and 4).
+  "SAFEST:AWAITING_CUSTODY:agent": {
+    label: "Our agent is taking the channel",
+    short: "Agent taking over",
+    sentence: {
+      buyer:
+        "The seller has invited our agent, who is taking the channel over while Google runs its own waiting period. You pay the seller only once it is verifiably ours.",
+      seller:
+        "You have invited our agent, so your part is done for now. Google runs its own waiting period while our agent takes the channel over.",
+      agent:
+        "The seller has invited you. Accept it, then confirm custody once Google's transfer completes.",
+    },
+  },
+  // Safest buyer payment: the buyer pays (step 6), then the seller confirms
+  // it arrived (step 7).
+  "SAFEST:AWAITING_BUYER_PAYMENT:seller": {
+    label: "Waiting for the seller to confirm the payment",
+    short: "Seller confirming",
+    sentence: {
+      buyer:
+        "You have recorded paying the seller. Our agent keeps the channel until the seller confirms the money arrived.",
+      seller:
+        "The buyer says they have paid you. Confirm here once the money is in your account — our agent holds the channel until you do.",
+      agent:
+        "The buyer has recorded paying the seller. The seller confirms it arrived next.",
+    },
+  },
+  // Fastest verifying: the seller invites the agent as manager (step 2)
+  // before the agent can check anything (step 3).
+  "FASTEST:AGENT_VERIFYING:seller": {
+    label: "Waiting for the seller to invite our agent",
+    short: "Seller inviting agent",
+    sentence: {
+      buyer:
+        "Channel Adda is holding your payment. The seller is giving our agent manager access, so the handover is supervised.",
+      seller:
+        "Give our agent manager access to the channel — the address to invite is on this page. The buyer's payment is with Channel Adda in the meantime.",
+      agent: "The seller is inviting you as manager.",
+    },
+  },
+  // Fastest handover: the seller promotes the buyer (step 4), then the buyer
+  // confirms access (step 5).
+  "FASTEST:AWAITING_HANDOVER:buyer": {
+    label: "Waiting for the buyer to confirm access",
+    short: "Buyer confirming",
+    sentence: {
+      buyer:
+        "The seller says you are now the primary owner. Confirm here once you are in control of the channel — that is what releases their money.",
+      seller:
+        "You have promoted the buyer. Channel Adda releases your money once they confirm access.",
+      agent: "The buyer is confirming they have access.",
+    },
+  },
+};
+
+/**
+ * What the deal says at the top for this reader, given whose step is open.
+ *
+ * A status can cover several steps owned by different people, and copy
+ * written for the status alone went stale the moment the first of them was
+ * done: the seller who had just invited the agent was still told to invite
+ * the agent, and the agent's desk still said "with the seller".
+ */
+export function dealHeadline(
+  status: OrderStatus,
+  mode: DealMode,
+  viewer: DealActor,
+  awaiting: DealActor | null,
+): DealHeadline {
+  const override = awaiting
+    ? BY_OPEN_STEP[`${mode}:${status}:${awaiting}`]
+    : undefined;
+  if (override) {
+    const reader =
+      viewer === "buyer" || viewer === "seller" ? viewer : ("agent" as const);
+    return {
+      label: override.label,
+      short: override.short,
+      sentence: override.sentence[reader],
+    };
+  }
+  return {
+    label: STATUS_LABELS[status],
+    short: STATUS_SHORT[status],
+    sentence: statusSentence(status, mode, viewer),
+  };
+}
+
 /**
  * Where the money is, in one line, for this reader.
  *

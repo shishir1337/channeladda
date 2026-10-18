@@ -21,10 +21,10 @@ import {
 } from "@/components/app/kit";
 import { AgentInvite } from "@/components/deals/agent-invite";
 import {
+  dealHeadline,
   moneyNote,
   STATUS_LABELS,
   STATUS_TONE,
-  statusSentence,
 } from "@/components/deals/deal-status";
 import { DealSteps, RaiseDispute } from "@/components/deals/deal-timeline";
 import { PayNow } from "@/components/deals/pay-now";
@@ -70,7 +70,16 @@ export default async function DealPage({
   const viewer = deal.viewerRole;
   const terminal = isTerminal(deal.status);
   const disputed = deal.status === "DISPUTED";
-  const sentence = statusSentence(deal.status, deal.mode, viewer);
+  // By whose step is open as well as by status: one status can cover the
+  // seller's step and then the agent's, and the headline has to move on
+  // the moment the first is done.
+  const headline = dealHeadline(
+    deal.status,
+    deal.mode,
+    viewer,
+    deal.nextStep?.actor ?? null,
+  );
+  const sentence = headline.sentence;
 
   // Only the agent is ever asked to name a second approver, and only on the
   // step that hands the channel over. Nobody else needs the staff list, and
@@ -109,7 +118,7 @@ export default async function DealPage({
               size="sm"
               className="max-w-full whitespace-normal app:h-auto app:min-h-5 app:py-0.5 app:leading-4"
             >
-              {STATUS_LABELS[deal.status]}
+              {headline.label}
             </Badge>
             <span className="inline-flex items-center gap-1.5 font-medium text-muted">
               <ModeIcon aria-hidden="true" className="size-3.5 text-subtle" />

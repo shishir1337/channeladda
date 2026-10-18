@@ -52,6 +52,46 @@ async function completeSafestDeal() {
 }
 
 test(
+  "the agent's desk knows whose step is open, not only the status",
+  withCleanDb(async () => {
+    // Walked in the browser: the seller had sent the invite, so the next
+    // move was the agent's, and the desk still said "with the seller" —
+    // the status covers both steps.
+    const seeded = await seedListing();
+    const staff = await seedUser("FINANCE");
+    const created = await createDeal({
+      listingId: seeded.listing.id,
+      buyerId: seeded.buyer.id,
+      mode: "SAFEST",
+    });
+    if (!created.ok) throw new Error(created.reason);
+    await assignAgent({
+      orderId: created.orderId,
+      agentId: seeded.agent.id,
+      agentEmail: "transfers@channeladda.test",
+      agentBrand: "Channel Adda Transfers",
+      byUserId: staff.id,
+    });
+    await recordOpeningPayment(created.orderId, "pay-open", "USDT");
+
+    const { listDealsForAgent } = await import("@/server/deal-feed");
+    const [before] = await listDealsForAgent(seeded.agent.id);
+    expect(before.awaiting).toBe("seller");
+
+    const r = await advanceStep({
+      orderId: created.orderId,
+      position: 2,
+      userId: seeded.seller.id,
+    });
+    if (!r.ok) throw new Error(r.reason);
+
+    const [after] = await listDealsForAgent(seeded.agent.id);
+    expect(after.status).toBe("AWAITING_CUSTODY");
+    expect(after.awaiting).toBe("agent");
+  }),
+);
+
+test(
   "every stage of a deal reaches the feed, newest first",
   withCleanDb(async () => {
     const { orderId } = await completeSafestDeal();
