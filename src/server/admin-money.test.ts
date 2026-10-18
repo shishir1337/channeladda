@@ -467,6 +467,39 @@ describe("invoices", () => {
   );
 
   test(
+    "the desk reads a deal's price invoice apart from its fee invoice",
+    withCleanDb(async () => {
+      const deal = await paidDeal("SAFEST");
+      await db.invoice.create({
+        data: {
+          reference: "DEAL-price-a",
+          purpose: "DEAL_PRICE",
+          amountUsd: 10_000,
+          userId: deal.buyer.id,
+          orderId: deal.orderId,
+          lastStatus: "check",
+          createdAt: new Date(Date.now() - 60_000),
+        },
+      });
+      // A newer fee invoice must not stand in for the price on the desk.
+      await db.invoice.create({
+        data: {
+          reference: "DEAL-fee-b",
+          purpose: "DEAL",
+          amountUsd: 300,
+          userId: deal.buyer.id,
+          orderId: deal.orderId,
+          lastStatus: "check",
+        },
+      });
+      const price = await latestInvoicesFor([deal.orderId], "DEAL_PRICE");
+      expect(price.get(deal.orderId)?.reference).toBe("DEAL-price-a");
+      const any = await latestInvoicesFor([deal.orderId]);
+      expect(any.get(deal.orderId)?.reference).toBe("DEAL-fee-b");
+    }),
+  );
+
+  test(
     "a safest price invoice that reached its deal is marked as landed",
     withCleanDb(async () => {
       const deal = await paidDeal("SAFEST");

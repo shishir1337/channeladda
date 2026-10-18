@@ -102,6 +102,40 @@ const ROWS: Row[] = [
     want: { kind: "pay", dealId: "d1" },
   },
   {
+    name: "buyer: safest price due",
+    viewer: "buyer",
+    input: {
+      listingStatus: "RESERVED",
+      deal: deal({
+        mode: "SAFEST",
+        status: "AWAITING_BUYER_PAYMENT",
+        nextStep: {
+          position: 6,
+          label: "Pay the price to Channel Adda",
+          actor: "buyer",
+        },
+      }),
+    },
+    want: { kind: "pay", dealId: "d1" },
+  },
+  {
+    name: "seller: safest price due is the buyer's move",
+    viewer: "seller",
+    input: {
+      listingStatus: "RESERVED",
+      deal: deal({
+        mode: "SAFEST",
+        status: "AWAITING_BUYER_PAYMENT",
+        nextStep: {
+          position: 6,
+          label: "Pay the price to Channel Adda",
+          actor: "buyer",
+        },
+      }),
+    },
+    want: { kind: "step", dealId: "d1", yourMove: false },
+  },
+  {
     name: "buyer: deal running, their move",
     viewer: "buyer",
     input: {

@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { safeNext } from "@/lib/safe-next";
 import { createInvoice, isConfigured } from "@/server/cryptomus";
 import { newReference, recordInvoice } from "@/server/invoices";
 import { requireRole, requireUser } from "@/server/session";
@@ -43,8 +44,18 @@ function siteUrl(): string {
   return base.replace(/\/$/, "");
 }
 
-/** Raise an invoice that tops up the signed-in person's balance. */
-export async function startTopUp(dollars: number): Promise<WalletResult> {
+/**
+ * Raise an invoice that tops up the signed-in person's balance.
+ *
+ * `returnTo` is where the processor sends them back to once paid — the deal
+ * whose payment the top-up is for, so they can pay it from the balance
+ * straight away. Only a path on this site is taken; anything else goes back
+ * to the wallet, so the parameter cannot be used to bounce somebody off-site.
+ */
+export async function startTopUp(
+  dollars: number,
+  returnTo?: string,
+): Promise<WalletResult> {
   const user = await requireUser();
 
   const cents = toCents(dollars);
@@ -73,6 +84,11 @@ export async function startTopUp(dollars: number): Promise<WalletResult> {
   const reference = newReference("TOPUP");
   const base = siteUrl();
 
+  const back =
+    returnTo && safeNext(returnTo, "") === returnTo
+      ? `${base}${returnTo}`
+      : null;
+
   try {
     await recordInvoice({
       reference,
@@ -85,8 +101,8 @@ export async function startTopUp(dollars: number): Promise<WalletResult> {
       amountUsd: cents,
       orderId: reference,
       callbackUrl: `${base}/api/webhooks/cryptomus`,
-      successUrl: `${base}/dashboard/wallet?topped=1`,
-      returnUrl: `${base}/dashboard/wallet`,
+      successUrl: back ?? `${base}/dashboard/wallet?topped=1`,
+      returnUrl: back ?? `${base}/dashboard/wallet`,
     });
     return { ok: true, message: "Opening the payment page…", url: invoice.url };
   } catch (error) {

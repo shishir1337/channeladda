@@ -95,10 +95,18 @@ export default async function DealPage({
       })
     : undefined;
 
-  // The buyer's opening payment is the action at this point, so it takes the
-  // place of the step's own action rather than sitting beside it.
-  const payingNow = deal.status === "AWAITING_PAYMENT" && viewer === "buyer";
-  const wallet = payingNow ? await getWallet(user.id) : null;
+  // A payment the buyer owes is the action at this point — the opening one,
+  // or a Safest deal's price — so it takes the place of the step's own
+  // action rather than sitting beside it.
+  const payStage =
+    viewer !== "buyer"
+      ? null
+      : deal.status === "AWAITING_PAYMENT"
+        ? ("opening" as const)
+        : safest && deal.status === "AWAITING_BUYER_PAYMENT"
+          ? ("price" as const)
+          : null;
+  const wallet = payStage ? await getWallet(user.id) : null;
 
   const ModeIcon = safest ? ShieldCheckIcon : ZapIcon;
 
@@ -184,10 +192,13 @@ export default async function DealPage({
               deal={deal}
               staffIds={staffIds}
               payment={
-                payingNow && wallet ? (
+                payStage && wallet ? (
                   <PayNow
                     orderId={deal.id}
-                    totalUsd={deal.totalUsd}
+                    stage={payStage}
+                    amountUsd={
+                      payStage === "price" ? deal.priceUsd : deal.totalUsd
+                    }
                     priceUsd={deal.priceUsd}
                     mode={deal.mode}
                     availableUsd={wallet.availableUsd}

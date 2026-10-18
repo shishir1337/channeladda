@@ -94,6 +94,15 @@ export function dealPanelState(input: PanelInput): PanelState {
         ? { kind: "pay", dealId: deal.id }
         : { kind: "waiting-for-payment", dealId: deal.id };
     }
+    // The Safest price is the buyer paying us, not a button: the same panel
+    // as the opening payment. Everyone else sees whose move it is.
+    if (
+      viewer === "buyer" &&
+      deal.mode === "SAFEST" &&
+      deal.status === "AWAITING_BUYER_PAYMENT"
+    ) {
+      return { kind: "pay", dealId: deal.id };
+    }
     // The same rule as the deal page's next-step card: a dispute freezes
     // every step, and a running recovery hold means the release step exists
     // but is not available yet.

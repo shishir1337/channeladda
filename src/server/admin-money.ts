@@ -570,11 +570,13 @@ export type InvoiceSummary = {
 /** The newest invoice raised for each of these deals. */
 export async function latestInvoicesFor(
   orderIds: readonly string[],
+  /** One payment's invoices only: a Safest deal has the fee's and the price's. */
+  purpose?: "DEAL" | "DEAL_PRICE",
 ): Promise<Map<string, InvoiceSummary>> {
   if (orderIds.length === 0) return new Map();
 
   const invoices = await db.invoice.findMany({
-    where: { orderId: { in: [...orderIds] } },
+    where: { orderId: { in: [...orderIds] }, ...(purpose ? { purpose } : {}) },
     orderBy: { createdAt: "desc" },
     select: {
       orderId: true,

@@ -31,6 +31,8 @@ const fake = vi.hoisted(() => ({
     }
   >(),
   created: [] as string[],
+  /** Where the last checkout sends the payer once they have paid. */
+  lastSuccessUrl: "",
 }));
 
 vi.mock("@/server/session", () => ({
@@ -57,7 +59,12 @@ vi.mock("@/server/cryptomus", async (original) => {
       merchantId: "test-merchant",
       paymentKey: "test-payment-key",
     }),
-    createInvoice: async (request: { orderId: string; amountUsd: number }) => {
+    createInvoice: async (request: {
+      orderId: string;
+      amountUsd: number;
+      successUrl: string;
+    }) => {
+      fake.lastSuccessUrl = request.successUrl;
       let row = fake.invoices.get(request.orderId);
       if (!row) {
         row = {
@@ -92,6 +99,7 @@ vi.mock("@/server/cryptomus", async (original) => {
 });
 
 const { startPayment } = await import("@/server/actions/payments");
+const { startTopUp } = await import("@/server/actions/wallet");
 const { POST } = await import("@/app/api/webhooks/cryptomus/route");
 
 beforeEach(() => {
@@ -426,5 +434,22 @@ test(
         where: { userId: buyer.id, kind: "DEPOSIT" },
       }),
     ).toBe(1);
+  }),
+);
+
+test(
+  "a top-up started from a deal goes back to that deal, and only to this site",
+  withCleanDb(async () => {
+    const seeded = await seedListing();
+    fake.buyerId = seeded.buyer.id;
+
+    expect((await startTopUp(41.5, "/dashboard/deals/abc")).ok).toBe(true);
+    expect(fake.lastSuccessUrl.endsWith("/dashboard/deals/abc")).toBe(true);
+
+    // Anything that is not a path on this site goes back to the wallet.
+    await startTopUp(41.5, "//evil.example/x");
+    expect(fake.lastSuccessUrl.endsWith("/dashboard/wallet?topped=1")).toBe(
+      true,
+    );
   }),
 );

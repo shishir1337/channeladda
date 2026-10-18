@@ -238,7 +238,14 @@ export default async function ThreadPage({
               ) : panel.kind === "pay" && deal && wallet ? (
                 <PayNow
                   orderId={deal.id}
-                  totalUsd={deal.totalUsd}
+                  stage={
+                    deal.status === "AWAITING_PAYMENT" ? "opening" : "price"
+                  }
+                  amountUsd={
+                    deal.status === "AWAITING_PAYMENT"
+                      ? deal.totalUsd
+                      : deal.priceUsd
+                  }
                   priceUsd={deal.priceUsd}
                   mode={deal.mode}
                   availableUsd={wallet.availableUsd}

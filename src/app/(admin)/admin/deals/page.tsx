@@ -252,14 +252,23 @@ export default async function AdminDealsPage({
     listDealsNeedingReassignment(),
     isFinance
       ? db.order.findMany({
-          where: { status: "AWAITING_PAYMENT" },
+          // Every payment owed to us: an opening payment, or a Safest
+          // deal's price after the buyer has inspected the channel.
+          where: {
+            OR: [
+              { status: "AWAITING_PAYMENT" },
+              { mode: "SAFEST", status: "AWAITING_BUYER_PAYMENT" },
+            ],
+          },
           orderBy: { createdAt: "asc" },
           take: 25,
           select: {
             id: true,
             reference: true,
             mode: true,
+            status: true,
             totalUsd: true,
+            priceUsd: true,
             createdAt: true,
             listing: { select: { title: true } },
           },
@@ -272,13 +281,27 @@ export default async function AdminDealsPage({
 
   const oldestUnheld = needingAgent.at(0)?.createdAt;
   const oldestUnpaid = awaitingPayment.at(0)?.createdAt;
-  const owed = awaitingPayment.reduce((sum, order) => sum + order.totalUsd, 0);
+  const dueNow = (order: (typeof awaitingPayment)[number]) =>
+    order.status === "AWAITING_PAYMENT" ? order.totalUsd : order.priceUsd;
+  const owed = awaitingPayment.reduce((sum, order) => sum + dueNow(order), 0);
 
-  // What the processor has said about each unpaid deal, so finance is not
-  // recording a payment by hand — irreversibly — on data it cannot see.
-  const invoices = await latestInvoicesFor(
-    awaitingPayment.map((order) => order.id),
-  );
+  // What the processor has said about each payment owed, so finance is not
+  // recording one by hand — irreversibly — on data it cannot see. A Safest
+  // price has invoices of its own, read apart from the fee's.
+  const [openingInvoices, priceInvoices] = await Promise.all([
+    latestInvoicesFor(
+      awaitingPayment
+        .filter((order) => order.status === "AWAITING_PAYMENT")
+        .map((order) => order.id),
+      "DEAL",
+    ),
+    latestInvoicesFor(
+      awaitingPayment
+        .filter((order) => order.status === "AWAITING_BUYER_PAYMENT")
+        .map((order) => order.id),
+      "DEAL_PRICE",
+    ),
+  ]);
 
   // As many columns as there are figures, so a desk with three queues does
   // not leave a hole where a fourth would be.
@@ -443,13 +466,16 @@ export default async function AdminDealsPage({
         >
           {awaitingPayment.length === 0 ? (
             <AllClear
-              title="Every opening payment has cleared"
+              title="Every payment owed has cleared"
               body="The sweep is still watching for callbacks that go missing."
             />
           ) : (
             <List>
               {awaitingPayment.map((order) => {
-                const invoice = invoices.get(order.id) ?? null;
+                const price = order.status === "AWAITING_BUYER_PAYMENT";
+                const invoice =
+                  (price ? priceInvoices : openingInvoices).get(order.id) ??
+                  null;
                 const line = describeInvoice(invoice, { checkoutOn });
                 return (
                   <ListItem
@@ -462,17 +488,19 @@ export default async function AdminDealsPage({
                       tags={
                         <>
                           <DealModeBadge mode={order.mode} />
-                          <OrderStatusBadge status="AWAITING_PAYMENT" />
+                          <OrderStatusBadge status={order.status} />
                           <Waited since={order.createdAt} prefix="open" />
                         </>
                       }
                       amount={
                         <Amount
-                          cents={order.totalUsd}
+                          cents={dueNow(order)}
                           caption={
-                            order.mode === "SAFEST"
-                              ? "admin fee due"
-                              : "price + fee due"
+                            price
+                              ? "price due"
+                              : order.mode === "SAFEST"
+                                ? "admin fee due"
+                                : "price + fee due"
                           }
                         />
                       }
@@ -511,7 +539,10 @@ export default async function AdminDealsPage({
                     {invoice && !invoice.appliedAt ? (
                       <CheckInvoice reference={invoice.reference} />
                     ) : null}
-                    <RecordPayment orderId={order.id} />
+                    <RecordPayment
+                      orderId={order.id}
+                      stage={price ? "price" : "opening"}
+                    />
                   </ListItem>
                 );
               })}

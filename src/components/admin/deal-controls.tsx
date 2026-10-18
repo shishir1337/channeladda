@@ -21,6 +21,7 @@ import {
   claimDeal,
   endDeal,
   markOpeningPaymentReceived,
+  markPriceReceived,
 } from "@/server/actions/deals";
 import { checkInvoiceNow } from "@/server/actions/money";
 import type { AssignableAgent } from "@/server/admin-users";
@@ -225,16 +226,22 @@ export function ClaimDeal({
 }
 
 /**
- * Recording the opening payment by hand.
+ * Recording a payment by hand: the opening one, or a Safest deal's price.
  *
  * Stands in for the Cryptomus webhook. Every later step of a deal unlocks
- * behind this, so it is the one control on this page that staff will use on
+ * behind it, so it is the one control on this page that staff will use on
  * every single deal until payments are wired.
  *
  * A secondary button, not the gold one: the processor's callback is the
  * expected way a payment clears, and this is the exception to it.
  */
-export function RecordPayment({ orderId }: { orderId: string }) {
+export function RecordPayment({
+  orderId,
+  stage = "opening",
+}: {
+  orderId: string;
+  stage?: "opening" | "price";
+}) {
   const router = useRouter();
   const ids = { ref: useId(), asset: useId() };
   const [ref, setRef] = useState("");
@@ -274,11 +281,11 @@ export function RecordPayment({ orderId }: { orderId: string }) {
           onClick={() => {
             setMessage(null);
             startTransition(async () => {
-              const result = await markOpeningPaymentReceived(
-                orderId,
-                ref.trim(),
-                asset.trim(),
-              );
+              const record =
+                stage === "price"
+                  ? markPriceReceived
+                  : markOpeningPaymentReceived;
+              const result = await record(orderId, ref.trim(), asset.trim());
               setOk(result.ok);
               setMessage(result.ok ? result.message : result.error);
               if (result.ok) router.refresh();
@@ -287,7 +294,7 @@ export function RecordPayment({ orderId }: { orderId: string }) {
         >
           <SteadyLabel
             pending={pending}
-            idle="Payment received"
+            idle={stage === "price" ? "Price received" : "Payment received"}
             busy="Recording…"
           />
         </Button>

@@ -187,8 +187,9 @@ test(
     expect((await kinds(id)).buyer).toBe("step:mine");
     await step(5, "buyer");
     // The buyer pays the price to Channel Adda — here from their balance —
-    // and never to the seller. Nobody presses anything for it.
-    expect((await kinds(id)).buyer).toBe("step:mine");
+    // and never to the seller. Nobody presses anything for it: the panel
+    // is the payment, as it is for the opening one.
+    expect((await kinds(id)).buyer).toBe("pay");
     await creditDeposit(buyer.id, 10_000, "top-chat", "USDT");
     expect(await payFromWallet(order.id, buyer.id)).toEqual({ ok: true });
     expect(await lastLine(id)).toMatchObject({ kind: "EVENT", senderId: null });
