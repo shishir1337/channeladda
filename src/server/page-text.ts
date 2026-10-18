@@ -111,8 +111,14 @@ function once(
             "too-large",
           );
           clearTimeout(timer);
-          req.destroy(tooLarge);
           reject(tooLarge);
+          // All three, not just the request: a decompressor that is merely
+          // ignored keeps inflating what it already holds — a few hundred
+          // bytes of brotli can be hundreds of megabytes.
+          body.removeAllListeners("data");
+          body.destroy();
+          res.destroy();
+          req.destroy(tooLarge);
           return;
         }
         chunks.push(chunk);

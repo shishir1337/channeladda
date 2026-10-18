@@ -4,6 +4,7 @@ import {
   newOwnershipCode,
   normaliseChannelUrl,
   parseChannelUrl,
+  suggestHandle,
 } from "@/lib/channel-url";
 
 // ---------------------------------------------------- the four YouTube forms
@@ -92,6 +93,57 @@ test("instagram, telegram and facebook links are recognised", () => {
     kind: "handle",
     value: "meta",
   });
+});
+
+test("telegram's preview link names the channel after the /s/", () => {
+  // t.me/s/durov is the web preview of t.me/durov. Reading "s" as the
+  // channel made the lookup refuse it and the handle come out as "s".
+  expect(parseChannelUrl("https://t.me/s/durov")).toEqual({
+    platform: "TELEGRAM",
+    kind: "handle",
+    value: "durov",
+  });
+});
+
+test("a post, reel or story link is not taken for the account", () => {
+  // The path word would become the handle — a listing called @reel.
+  for (const input of [
+    "https://www.instagram.com/p/C1a2b3c4d5/",
+    "https://www.instagram.com/reel/C1a2b3c4d5/",
+    "https://www.instagram.com/stories/natgeo/123/",
+    "https://www.instagram.com/explore/tags/travel/",
+    "https://www.facebook.com/groups/123456/",
+    "https://www.facebook.com/watch/?v=1",
+  ]) {
+    expect(parseChannelUrl(input)).toBeNull();
+  }
+});
+
+test("a numbered facebook profile link has no handle to offer", () => {
+  // profile.php is a page, not a name; the id is in the query string, so
+  // it has to survive normalising or the link stops naming the account.
+  expect(
+    suggestHandle("https://www.facebook.com/profile.php?id=100064"),
+  ).toBeNull();
+  expect(
+    normaliseChannelUrl("https://www.facebook.com/profile.php?id=100064&ref=x"),
+  ).toBe("https://www.facebook.com/profile.php?id=100064");
+});
+
+test("a telegram invite link has no handle to offer", () => {
+  // Private by construction, and "+AbC" or "joinchat" is not a name.
+  expect(suggestHandle("https://t.me/+AbCdEfGh")).toBeNull();
+  expect(suggestHandle("https://t.me/joinchat/AbCdEfGh")).toBeNull();
+  expect(suggestHandle("https://t.me/durov")).toBe("durov");
+});
+
+test("the ownership check's handle is never filtered", () => {
+  // Verification overwrites whatever the seller typed with the verified
+  // channel's own handle. Filtering an unusual one to null there would let
+  // a typed @MrBeast survive on a verified listing.
+  const encoded = "https://www.youtube.com/@caf%C3%A9";
+  expect(handleFromUrl(encoded)).toBe("caf%C3%A9");
+  expect(suggestHandle(encoded)).toBeNull();
 });
 
 test("any other site is treated as a website listing", () => {

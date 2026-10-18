@@ -158,13 +158,27 @@ function NavLink({
   onNavigate?: () => void;
 }) {
   const waiting = item.waiting && item.waiting > 0 ? item.waiting : 0;
+  // Radix only reports a change that differs from the `open` it was given,
+  // so a hover on the open rail used to set this and never clear it — and
+  // folding the rail then popped every tooltip touched on the way. Requests
+  // made while open are ignored, and every fold or unfold starts it shut
+  // (state adjusted during render, React's pattern for following a prop).
   const [tip, setTip] = useState(false);
+  const [tipFor, setTipFor] = useState(collapsed);
+  if (tipFor !== collapsed) {
+    setTipFor(collapsed);
+    setTip(false);
+  }
+  const tipOpen = collapsed && tip;
 
   // The tooltip is always in the tree, and simply kept shut while the rail
   // is open. Mounting it only when collapsed swapped the link for a new
   // element on every toggle, which threw away the fade in the middle of it.
   return (
-    <Tooltip.Root open={collapsed && tip} onOpenChange={setTip}>
+    <Tooltip.Root
+      open={tipOpen}
+      onOpenChange={(open) => setTip(open && collapsed)}
+    >
       <Tooltip.Trigger asChild>
         <Link
           href={item.href}
@@ -375,8 +389,11 @@ export function AppShell({
   function toggle() {
     setCollapsed((value) => {
       const next = !value;
+      // Worked out before the try: the React Compiler gives up on a whole
+      // component over a conditional inside a try block.
+      const stored = next ? "collapsed" : "expanded";
       try {
-        localStorage.setItem("ca-sidebar", next ? "collapsed" : "expanded");
+        localStorage.setItem("ca-sidebar", stored);
       } catch {
         // Not worth failing the interaction over.
       }

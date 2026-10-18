@@ -31,7 +31,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ImageUpload } from "@/components/upload/image-upload";
-import { handleFromUrl, parseChannelUrl } from "@/lib/channel-url";
+import { parseChannelUrl, suggestHandle } from "@/lib/channel-url";
 import { type FeeSettings, formatRate, quote } from "@/lib/fees";
 import type { ListingDraftInput, PLATFORM_IDS } from "@/lib/listing-form";
 import { cn } from "@/lib/utils";
@@ -55,7 +55,7 @@ export type PlatformChoice = {
  * verified channel's own.
  */
 function handleFor(link: string, platform: string): string {
-  const fromLink = handleFromUrl(link);
+  const fromLink = suggestHandle(link);
   if (fromLink) return fromLink;
   if (platform === "website") {
     const parsed = parseChannelUrl(link);
@@ -415,7 +415,10 @@ export function ListingForm({
    * own would lose it — but that rule on its own meant pasting the *wrong*
    * link first left the wrong name and handle stuck in the form for ever.
    */
-  const lastImport = useRef<ImportedChannel | null>(null);
+  // State, not a ref: the render reads it to decide whether the handle is
+  // still the channel's, and a ref read during render stops the React
+  // Compiler optimising this whole form.
+  const [lastImport, setLastImport] = useState<ImportedChannel | null>(null);
 
   /** Any edit makes the "saved" line stale, so it goes. */
   const edit = (fn: (current: Draft) => Draft) => {
@@ -448,9 +451,10 @@ export function ListingForm({
       };
     });
 
-  const applyImport = (channel: ImportedChannel) => {
-    const previous = lastImport.current;
-    lastImport.current = channel;
+  /** Fills the form from a confirmed channel; returns how many fields changed. */
+  const applyImport = (channel: ImportedChannel): number => {
+    const previous = lastImport;
+    setLastImport(channel);
     setEditingHandle(false);
 
     /**
@@ -459,9 +463,23 @@ export function ListingForm({
      * Blanks are filled, and so is anything the *previous* lookup put there —
      * which is what makes pasting the wrong link first recoverable. Anything
      * the seller typed themselves is left exactly as they typed it.
+     *
+     * A saved listing hands its blank figures back as "0" — the columns are
+     * not nullable — so on the edit page a zero counts as blank wherever the
+     * channel has a real figure to offer. Without that, an import there
+     * filled nothing and said it had.
      */
-    const take = (current: string, wasImported: string, next: string) =>
-      current === "" || current === wasImported ? next : current;
+    const take = (
+      current: string,
+      wasImported: string,
+      next: string,
+      zeroIsBlank = false,
+    ) =>
+      current.trim() === "" ||
+      current === wasImported ||
+      (zeroIsBlank && next !== "" && Number(current) === 0)
+        ? next
+        : current;
 
     const subs = (c: ImportedChannel | null) =>
       c && c.subscribers > 0 ? String(c.subscribers) : "";
@@ -469,23 +487,31 @@ export function ListingForm({
       c && c.ageYears > 0 ? String(c.ageYears) : "";
     const rate = (c: ImportedChannel | null) =>
       c && c.engagement !== null ? String(c.engagement) : "";
-    // The title needs ten characters and a channel name often has fewer.
+    // The title needs ten characters, and a channel name often has fewer;
+    // it allows 120, and a Telegram title can run to 128.
     const titleOf = (c: ImportedChannel | null) => {
       if (!c?.title) return "";
       const name = platforms.find((p) => p.id === c.platform.toLowerCase());
-      return c.title.trim().length >= 10
-        ? c.title
-        : `${c.title} — ${name?.name ?? "the"} channel`;
+      const title =
+        c.title.trim().length >= 10
+          ? c.title.trim()
+          : `${c.title.trim()} — ${name?.name ?? "the"} channel`;
+      return title.length > 120 ? `${title.slice(0, 119).trimEnd()}…` : title;
     };
-    /** A picture the lookup stored, unless the seller has their own. */
+    /**
+     * A picture the lookup stored, unless the seller has their own. A saved
+     * listing with no picture hands back "", not null.
+     */
     const picture = (
       current: string | null,
       wasImported: string | null | undefined,
       next: string | null,
-    ) =>
-      current === null || current === wasImported ? (next ?? current) : current;
+    ) => (!current || current === wasImported ? (next ?? current) : current);
 
-    edit((current) => ({
+    // Worked out from this render's draft rather than inside a state
+    // updater, so the count of what changed can be returned.
+    const current = draft;
+    const next: Draft = {
       ...current,
       platform: (channel.platform.toLowerCase() ||
         current.platform) as Draft["platform"],
@@ -507,16 +533,31 @@ export function ListingForm({
         channel.avatarUrl,
       ),
       coverUrl: picture(current.coverUrl, previous?.coverUrl, channel.coverUrl),
-      audience: take(current.audience, subs(previous), subs(channel)),
-      ageYears: take(current.ageYears, years(previous), years(channel)),
+      audience: take(current.audience, subs(previous), subs(channel), true),
+      ageYears: take(current.ageYears, years(previous), years(channel), true),
       country: take(
         current.country,
         previous?.country ?? "",
         channel.country ?? "",
       ),
       niche: take(current.niche, previous?.niche ?? "", channel.niche ?? ""),
-      engagement: take(current.engagement, rate(previous), rate(channel)),
-    }));
+      engagement: take(current.engagement, rate(previous), rate(channel), true),
+    };
+    edit(() => next);
+
+    const FILLED = [
+      "title",
+      "handle",
+      "avatarUrl",
+      "coverUrl",
+      "audience",
+      "ageYears",
+      "country",
+      "niche",
+      "engagement",
+    ] as const;
+    return FILLED.filter((key) => next[key] && next[key] !== current[key])
+      .length;
   };
 
   const platform =
@@ -529,8 +570,7 @@ export function ListingForm({
     draft.handle !== "" &&
     !editingHandle &&
     !errors.handle &&
-    (draft.handle === suggestedHandle ||
-      draft.handle === lastImport.current?.handle);
+    (draft.handle === suggestedHandle || draft.handle === lastImport?.handle);
   const showHandleField =
     !handleFollowsLink &&
     (editingHandle ||
@@ -728,7 +768,20 @@ export function ListingForm({
     setSaved(false);
     setSending(forReview ? "review" : "draft");
     startTransition(async () => {
-      const result = await saveListing(listingId, toInput(), forReview);
+      let result: Awaited<ReturnType<typeof saveListing>>;
+      try {
+        result = await saveListing(listingId, toInput(), forReview);
+      } catch {
+        // A dropped connection or a deploy mid-save. Thrown out of the
+        // transition it would reach the error boundary and take every field
+        // with it; here it is one line above a form that is still full.
+        result = {
+          ok: false,
+          errors: {
+            form: "We could not reach Channel Adda, so nothing was saved. Check your connection and press the same button again — everything you typed is still here.",
+          },
+        };
+      }
       if (!result.ok) {
         setErrors(result.errors);
         setSending(null);
@@ -748,7 +801,11 @@ export function ListingForm({
 
   return (
     <div className="flex flex-col gap-4 sm:gap-5">
+      {/* noValidate: the browser's own "Please fill out this field" ran
+          before the save and blocked every half-finished draft, though the
+          server's draft rules allow one. The server decides what is valid. */}
       <form
+        noValidate
         className="flex flex-col gap-4 sm:gap-5"
         onSubmit={(e) => {
           e.preventDefault();
@@ -968,7 +1025,15 @@ export function ListingForm({
               </InfoTip>
               <button
                 type="button"
-                onClick={() => setEditingHandle(true)}
+                aria-label="Edit handle"
+                onClick={() => {
+                  setEditingHandle(true);
+                  // This button goes as the field arrives; without moving
+                  // focus into the field, a keyboard user lands on <body>.
+                  requestAnimationFrame(() =>
+                    document.getElementById(ids.handle)?.focus(),
+                  );
+                }}
                 className="ml-1 inline-flex h-11 shrink-0 cursor-pointer items-center gap-1 rounded-md px-1.5 text-[0.8125rem] font-medium text-muted transition-colors duration-150 hover:bg-surface-2 hover:text-fg pointer-fine:h-7"
               >
                 <PencilIcon aria-hidden="true" className="size-3" />

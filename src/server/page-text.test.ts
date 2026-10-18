@@ -14,6 +14,8 @@ type Answer =
 const server = vi.hoisted(() => ({
   answers: new Map<string, Answer>(),
   asked: [] as string[],
+  /** The last response handed out, to see whether it was torn down. */
+  lastResponse: null as { destroyed: boolean } | null,
 }));
 
 vi.mock("node:https", () => ({
@@ -35,6 +37,7 @@ vi.mock("node:https", () => ({
       };
       res.statusCode = answer.status;
       res.headers = answer.headers ?? {};
+      server.lastResponse = res;
       queueMicrotask(() => {
         req.emit("response", res);
         res.end(answer.body ?? "");
@@ -122,6 +125,9 @@ test("a page larger than the cap is not read past it", async () => {
   await expect(
     readPage("https://www.youtube.com/@big/about", OPTIONS),
   ).rejects.toMatchObject({ kind: "too-large" });
+  // Torn down, not just ignored: a small compressed body can keep inflating
+  // long after the cap if only the request is stopped.
+  expect(server.lastResponse?.destroyed).toBe(true);
 });
 
 test("a page that never answers is given up on at the deadline", async () => {

@@ -10,6 +10,7 @@ import {
   normaliseChannelUrl,
   type ParsedChannel,
   parseChannelUrl,
+  suggestHandle,
 } from "@/lib/channel-url";
 import { db } from "@/lib/db";
 import { recordAudit } from "@/server/audit";
@@ -96,7 +97,7 @@ async function youtubeFromApi(
       // From the canonical URL Google returns, not only from the link the
       // seller pasted: a /channel/UC… link has no handle in it, but the
       // channel may still have one.
-      handle: handleFromUrl(facts.canonicalUrl) ?? handleFromUrl(url),
+      handle: suggestHandle(facts.canonicalUrl) ?? suggestHandle(url),
       title: facts.title,
       description: facts.description,
       avatarFrom: facts.avatarUrl,
@@ -137,7 +138,11 @@ async function youtubeFromPage(parsed: ParsedChannel): Promise<Found> {
   return {
     platform: "YOUTUBE",
     channelId: page.channelId,
-    handle: page.handle,
+    // Read off the page decoded, so it can be one the listing rule refuses.
+    handle:
+      page.handle && /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(page.handle)
+        ? page.handle
+        : null,
     title: page.title,
     description: page.description,
     avatarFrom: page.avatarUrl,
@@ -152,7 +157,7 @@ async function youtubeFromPage(parsed: ParsedChannel): Promise<Found> {
     engagement: null,
     engagementBasis: null,
     canonicalUrl: page.handle
-      ? `https://www.youtube.com/@${page.handle}`
+      ? `https://www.youtube.com/@${encodeURIComponent(page.handle)}`
       : `https://www.youtube.com/channel/${page.channelId}`,
     manual: false,
     source: "page",
@@ -190,7 +195,10 @@ async function telegramFromPage(name: string): Promise<Found> {
  * Lookups per person, per hour.
  *
  * The YouTube quota is ten thousand units a day for the whole platform, and a
- * lookup costs one. Without a cap, one signed-in account in a loop disables
+ * lookup with a key costs up to three: the channel, its latest uploads, and
+ * their figures. Twelve an hour is far more than a seller listing a channel
+ * needs, and keeps one account from spending more than a few percent of the
+ * day. Without a cap, one signed-in account in a loop disables
  * automated ownership verification for everybody until midnight — so this is
  * a shared resource being spent, not just a request being served.
  *
@@ -198,7 +206,7 @@ async function telegramFromPage(name: string): Promise<Found> {
  * rate limiting in `src/lib/auth.ts` and is honest about what it is: a
  * backstop against a runaway client, not a security control.
  */
-const LOOKUPS_PER_HOUR = 30;
+const LOOKUPS_PER_HOUR = 12;
 const lookupCounts = new Map<string, { count: number; resetAt: number }>();
 
 function withinLookupBudget(userId: string): boolean {
@@ -243,7 +251,7 @@ export async function lookupChannel(url: string): Promise<LookupResult> {
       ok: true,
       platform: parsed.platform,
       channelId: parsed.kind === "id" ? parsed.value : null,
-      handle: handleFromUrl(url),
+      handle: suggestHandle(url),
       title: "",
       description: "",
       avatarUrl: null,

@@ -281,37 +281,50 @@ export async function fetchChannelPage(
     throw new YouTubeError("That is not a YouTube channel.", "failed");
   }
 
-  const value = encodeURIComponent(parsed.value);
-  const path =
-    parsed.kind === "id"
-      ? `channel/${value}`
-      : parsed.kind === "handle"
-        ? `@${value}`
-        : `c/${value}`;
-
-  // One deadline for the answer and the page together: the page is about
-  // 3MB, and a timeout while its body is still arriving is as much "did not
-  // answer in time" as one before the headers.
-  let status: number;
-  let html: string;
+  // The value came out of a URL, so it may already be percent-encoded;
+  // decoding first means it is encoded exactly once.
+  let raw = parsed.value;
   try {
-    ({ status, text: html } = await readPage(
-      `https://www.youtube.com/${path}/about`,
-      {
-        headers: PAGE_HEADERS,
-        timeoutMs: 10_000,
-        maxBytes: 8 * 1024 * 1024,
-        // An old /c/ link redirects to the channel's current address.
-        allowHosts: /^(www\.|m\.)?youtube\.com$/,
-      },
-    ));
-  } catch (error) {
-    throw new YouTubeError(
-      error instanceof PageReadError && error.kind === "timeout"
-        ? "YouTube did not answer in time. Try again, or fill it in by hand."
-        : "We could not reach YouTube. Try again, or fill it in by hand.",
-      "failed",
-    );
+    raw = decodeURIComponent(parsed.value);
+  } catch {
+    // Not valid percent-encoding: encode it as it stands.
+  }
+  const value = encodeURIComponent(raw);
+  // An old name may live under /c/ or /user/ and parses the same either way;
+  // only one of the two answers for a given channel.
+  const paths =
+    parsed.kind === "id"
+      ? [`channel/${value}`]
+      : parsed.kind === "handle"
+        ? [`@${value}`]
+        : [`c/${value}`, `user/${value}`];
+
+  let status = 404;
+  let html = "";
+  for (const path of paths) {
+    // One deadline for the answer and the page together: the page is about
+    // 3MB, and a timeout while its body is still arriving is as much "did
+    // not answer in time" as one before the headers.
+    try {
+      ({ status, text: html } = await readPage(
+        `https://www.youtube.com/${path}/about`,
+        {
+          headers: PAGE_HEADERS,
+          timeoutMs: 10_000,
+          maxBytes: 8 * 1024 * 1024,
+          // An old /c/ link redirects to the channel's current address.
+          allowHosts: /^(www\.|m\.)?youtube\.com$/,
+        },
+      ));
+    } catch (error) {
+      throw new YouTubeError(
+        error instanceof PageReadError && error.kind === "timeout"
+          ? "YouTube did not answer in time. Try again, or fill it in by hand."
+          : "We could not reach YouTube. Try again, or fill it in by hand.",
+        "failed",
+      );
+    }
+    if (status !== 404) break;
   }
 
   if (status === 404) {

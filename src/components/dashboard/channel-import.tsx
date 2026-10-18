@@ -140,7 +140,7 @@ type Lookup =
   | { kind: "idle" }
   | { kind: "found"; channel: ImportedChannel }
   | { kind: "confirmed"; channel: ImportedChannel; filled: number }
-  | { kind: "error"; message: string };
+  | { kind: "error"; message: string; for: PlatformId };
 
 type PlatformInfo = {
   id: PlatformId;
@@ -184,8 +184,8 @@ export function ChannelLinkField({
   onChange: (url: string) => void;
   /** A link from another platform was pasted; the form follows it. */
   onPlatform: (platform: PlatformId) => void;
-  /** The seller said the channel is theirs. */
-  onConfirm: (channel: ImportedChannel) => void;
+  /** The seller said the channel is theirs. Returns how many fields it filled. */
+  onConfirm: (channel: ImportedChannel) => number;
   error?: string;
   /** The link already saved on this listing, when one is being edited. */
   savedUrl?: string;
@@ -200,11 +200,13 @@ export function ChannelLinkField({
     null,
   );
   const [pending, startTransition] = useTransition();
-  const lookup: Lookup =
-    (found.kind === "found" || found.kind === "confirmed") &&
-    ID_OF[found.channel.platform] !== platform.id
-      ? { kind: "idle" }
-      : found;
+  const about =
+    found.kind === "error"
+      ? found.for
+      : found.kind === "idle"
+        ? platform.id
+        : ID_OF[found.channel.platform];
+  const lookup: Lookup = about === platform.id ? found : { kind: "idle" };
   const note = notice?.for === platform.id ? notice.text : null;
   // A link replaced while the last one was still being looked up must not
   // have the old answer land on it.
@@ -218,10 +220,22 @@ export function ChannelLinkField({
     const mine = ++ticket.current;
     setLookup({ kind: "idle" });
     startTransition(async () => {
-      const result = await lookupChannel(url);
+      let result: LookupResult;
+      try {
+        result = await lookupChannel(url);
+      } catch {
+        // A dropped connection, or a deploy that retired this action. Thrown
+        // out of a transition it would reach the error boundary and take the
+        // half-filled form with it.
+        result = {
+          ok: false,
+          error:
+            "We could not reach Channel Adda just now. Check your connection and try again — nothing you typed is lost.",
+        };
+      }
       if (mine !== ticket.current) return;
       if (!result.ok) {
-        setLookup({ kind: "error", message: result.error });
+        setLookup({ kind: "error", message: result.error, for: target });
         return;
       }
       const { ok: _ok, ...channel } = result;
@@ -252,20 +266,16 @@ export function ChannelLinkField({
         text: `That is a ${names[detected]} link, so the platform is now ${names[detected]}.`,
         for: detected,
       });
-    } else {
-      setNote(null);
     }
     if (andLookUp) run(link, target);
   }
 
   const confirm = () => {
     if (lookup.kind !== "found") return;
-    onConfirm(lookup.channel);
-    setLookup({
-      kind: "confirmed",
-      channel: lookup.channel,
-      filled: fieldsFrom(lookup.channel, platform.metricLabel).length,
-    });
+    // What the form actually changed, not what the channel offered: on a
+    // listing that already has its pictures and figures, fewer go in.
+    const filled = onConfirm(lookup.channel);
+    setLookup({ kind: "confirmed", channel: lookup.channel, filled });
   };
 
   const notMine = () => {
@@ -423,14 +433,21 @@ export function ChannelLinkField({
         </p>
       ) : null}
 
+      {/* The platform switch is said here too: the note under the field is
+          only seen, and it changes the meaning of everything below it. */}
       <p aria-live="polite" className="sr-only">
-        {pending
-          ? "Looking up that link."
-          : lookup.kind === "found"
-            ? `Found ${lookup.channel.title || "the channel"}. Check it is yours.`
-            : lookup.kind === "confirmed"
-              ? "Filled in from the channel."
-              : ""}
+        {[
+          note,
+          pending
+            ? "Looking up that link."
+            : lookup.kind === "found"
+              ? `Found ${lookup.channel.title || "the channel"}. Check it is yours.`
+              : lookup.kind === "confirmed"
+                ? "Filled in from the channel."
+                : null,
+        ]
+          .filter(Boolean)
+          .join(" ")}
       </p>
 
       {pending ? <PreviewSkeleton /> : null}

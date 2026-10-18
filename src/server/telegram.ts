@@ -7,7 +7,7 @@ import {
   parseTelegramPostViews,
   postReachPercent,
 } from "@/lib/channel-pages";
-import { readPage } from "@/server/page-text";
+import { PageReadError, readPage } from "@/server/page-text";
 
 /**
  * A Telegram channel's public facts, from t.me.
@@ -41,9 +41,11 @@ async function page(url: string): Promise<string> {
       allowHosts: /^t\.me$/,
       redirects: 0,
     });
-  } catch {
+  } catch (error) {
     throw new TelegramError(
-      "Telegram did not answer in time. Try again, or fill it in by hand.",
+      error instanceof PageReadError && error.kind === "timeout"
+        ? "Telegram did not answer in time. Try again, or fill it in by hand."
+        : "We could not read that Telegram page. Try again, or fill it in by hand.",
     );
   }
   if (result.status !== 200) {

@@ -49,6 +49,38 @@ const SOCIAL_HOSTS: ReadonlyArray<{ hosts: string[]; platform: Platform }> = [
   },
 ];
 
+/**
+ * First path words that are a page *on* the platform, not an account.
+ *
+ * A link to a post, a reel or a group is the most common wrong thing to
+ * paste, and taking its first word as the account produced listings called
+ * @reel and @p.
+ */
+const NOT_AN_ACCOUNT: Partial<Record<Platform, ReadonlySet<string>>> = {
+  INSTAGRAM: new Set([
+    "p",
+    "reel",
+    "reels",
+    "stories",
+    "explore",
+    "tv",
+    "accounts",
+    "direct",
+  ]),
+  FACEBOOK: new Set([
+    "groups",
+    "watch",
+    "events",
+    "marketplace",
+    "photo",
+    "photo.php",
+    "story.php",
+    "permalink.php",
+    "share",
+    "reel",
+  ]),
+};
+
 /** Only these two schemes. `javascript:` and friends never reach a fetch. */
 function asUrl(input: string): URL | null {
   const trimmed = input.trim();
@@ -109,8 +141,13 @@ export function parseChannelUrl(input: string): ParsedChannel | null {
 
   for (const { hosts, platform } of SOCIAL_HOSTS) {
     if (!hosts.includes(host)) continue;
-    const [first] = segments;
+    // t.me/s/name is the web preview of t.me/name.
+    const [first] =
+      platform === "TELEGRAM" && segments[0] === "s" && segments[1]
+        ? segments.slice(1)
+        : segments;
     if (!first) return null;
+    if (NOT_AN_ACCOUNT[platform]?.has(first.toLowerCase())) return null;
     return { platform, kind: "handle", value: first.replace(/^@/, "") };
   }
 
@@ -147,8 +184,19 @@ export function normaliseChannelUrl(input: string): string | null {
 
   // Rebuilt from the parsed URL rather than string-prefixed, so a stray
   // trailing slash or an uppercase host comes back the same every time.
-  return `${url.protocol}//${url.host}${url.pathname.replace(/\/$/, "")}`;
+  const base = `${url.protocol}//${url.host}${url.pathname.replace(/\/$/, "")}`;
+
+  // The one link whose account is in the query string: without its id, a
+  // numbered Facebook profile link names nobody.
+  const id = url.searchParams.get("id");
+  if (url.pathname.endsWith("/profile.php") && id) {
+    return `${base}?id=${encodeURIComponent(id)}`;
+  }
+  return base;
 }
+
+/** Path words that parse as a handle and are not one. */
+const NOT_A_NAME = new Set(["profile.php", "joinchat"]);
 
 /**
  * The handle a link carries, if it carries one.
@@ -163,6 +211,21 @@ export function normaliseChannelUrl(input: string): string | null {
 export function handleFromUrl(input: string): string | null {
   const parsed = parseChannelUrl(input);
   return parsed?.kind === "handle" ? parsed.value : null;
+}
+
+/**
+ * The handle to *suggest* in the form: `handleFromUrl`, but only when it is
+ * something the listing's own handle rule would accept.
+ *
+ * An invite code ("+AbC"), a page name ("profile.php") or an encoded
+ * non-Latin name is left for the seller to type, rather than filled in and
+ * then refused on save. Deliberately not used by the ownership check, which
+ * must always overwrite a typed handle with the verified channel's own.
+ */
+export function suggestHandle(input: string): string | null {
+  const handle = handleFromUrl(input);
+  if (!handle || NOT_A_NAME.has(handle.toLowerCase())) return null;
+  return /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(handle) ? handle : null;
 }
 
 /**
