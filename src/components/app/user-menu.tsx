@@ -91,16 +91,22 @@ export function UserMenu({
         aria-label={`Account menu for ${user.name}`}
         className={cn(
           "group flex cursor-pointer items-center rounded-md text-left outline-none transition-colors duration-150 hover:bg-black/[0.04] focus-visible:outline-2 focus-visible:outline-ring data-[state=open]:bg-black/[0.04] dark:hover:bg-white/[0.06] dark:data-[state=open]:bg-white/[0.06]",
-          variant === "sidebar" && !collapsed && "w-full gap-2.5 p-1.5",
-          variant === "sidebar" &&
-            collapsed &&
-            "mx-auto size-10 justify-center",
+          // One shape open or folded: the avatar holds its place and the
+          // rail's own width decides how much of the rest shows.
+          variant === "sidebar" && "w-full gap-2.5 overflow-hidden p-1.5",
           variant === "compact" && "size-11 justify-center pointer-fine:size-9",
         )}
       >
         <Avatar name={user.name} />
-        {variant === "sidebar" && !collapsed ? (
-          <>
+        {variant === "sidebar" ? (
+          <span
+            className={cn(
+              "flex min-w-0 flex-1 items-center gap-2.5 transition-opacity",
+              collapsed
+                ? "opacity-0 duration-100"
+                : "opacity-100 duration-200 delay-100",
+            )}
+          >
             <span className="min-w-0 flex-1">
               <span className="block truncate text-[0.8125rem] leading-5 font-medium text-fg">
                 {user.name}
@@ -113,7 +119,7 @@ export function UserMenu({
               aria-hidden="true"
               className="size-3.5 shrink-0 text-subtle transition-colors group-hover:text-muted"
             />
-          </>
+          </span>
         ) : null}
       </DropdownMenu.Trigger>
 

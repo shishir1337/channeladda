@@ -128,6 +128,24 @@ function NavIconSlot({
   );
 }
 
+/**
+ * How the rail's contents move when it folds.
+ *
+ * Only the rail's width animates; everything inside it stays mounted and
+ * stays put. Icons sit at the same 22px from the edge in both widths, which
+ * is the centre of the 60px rail, so they never jump sideways. Words fade
+ * out quickly as the rail starts to close, and fade back in a beat after it
+ * starts to open, so the reader never sees a half-clipped label sliding
+ * past. Swapping elements in and out on the toggle is what made the old
+ * rail feel like it snapped rather than moved.
+ */
+const RAIL_MOTION = "duration-300 ease-in-out";
+const fadeWith = (collapsed: boolean) =>
+  cn(
+    "transition-opacity",
+    collapsed ? "opacity-0 duration-100" : "opacity-100 duration-200 delay-100",
+  );
+
 function NavLink({
   item,
   active,
@@ -140,63 +158,68 @@ function NavLink({
   onNavigate?: () => void;
 }) {
   const waiting = item.waiting && item.waiting > 0 ? item.waiting : 0;
+  const [tip, setTip] = useState(false);
 
-  const link = (
-    <Link
-      href={item.href}
-      onClick={onNavigate}
-      aria-current={active ? "page" : undefined}
-      className={cn(
-        "group relative flex h-11 items-center gap-2.5 rounded-md px-2.5 text-sm transition-[background-color,color,box-shadow] duration-150 pointer-fine:h-8 pointer-fine:px-2",
-        collapsed && "justify-center px-0 pointer-fine:h-9 pointer-fine:px-0",
-        active
-          ? "bg-surface font-medium text-fg shadow-xs ring-1 ring-line dark:bg-surface-2"
-          : "text-muted hover:bg-black/[0.04] hover:text-fg dark:hover:bg-white/[0.05]",
-      )}
-    >
-      <NavIconSlot icon={ICONS[item.icon]} active={active} />
-      {collapsed ? (
-        <>
-          <span className="sr-only">
+  // The tooltip is always in the tree, and simply kept shut while the rail
+  // is open. Mounting it only when collapsed swapped the link for a new
+  // element on every toggle, which threw away the fade in the middle of it.
+  return (
+    <Tooltip.Root open={collapsed && tip} onOpenChange={setTip}>
+      <Tooltip.Trigger asChild>
+        <Link
+          href={item.href}
+          onClick={onNavigate}
+          aria-current={active ? "page" : undefined}
+          className={cn(
+            "group relative flex h-11 items-center gap-2.5 rounded-md px-3 text-sm transition-[background-color,color,box-shadow] duration-150 pointer-fine:h-8",
+            active
+              ? "bg-surface font-medium text-fg shadow-xs ring-1 ring-line dark:bg-surface-2"
+              : "text-muted hover:bg-black/[0.04] hover:text-fg dark:hover:bg-white/[0.05]",
+          )}
+        >
+          <NavIconSlot icon={ICONS[item.icon]} active={active} />
+          {/* Still the link's name when folded: faded, not removed. */}
+          <span
+            className={cn(
+              "min-w-0 flex-1 overflow-hidden whitespace-nowrap",
+              !collapsed && "text-ellipsis",
+              fadeWith(collapsed),
+            )}
+          >
             {item.label}
-            {waiting ? `, ${waiting} waiting on you` : ""}
           </span>
           {waiting ? (
-            <span
-              aria-hidden="true"
-              className="absolute top-1.5 right-1.5 size-1.5 rounded-full bg-primary ring-2 ring-bg"
-            />
+            <>
+              <span className={fadeWith(collapsed)}>
+                <WaitingCount count={waiting} />
+              </span>
+              <span
+                aria-hidden="true"
+                className={cn(
+                  "absolute top-1.5 left-[1.625rem] size-1.5 rounded-full bg-primary ring-2 ring-bg transition-[opacity,scale] duration-200",
+                  collapsed ? "scale-100 opacity-100" : "scale-50 opacity-0",
+                )}
+              />
+            </>
           ) : null}
-        </>
-      ) : (
-        <>
-          <span className="min-w-0 flex-1 truncate">{item.label}</span>
-          {waiting ? <WaitingCount count={waiting} /> : null}
-        </>
-      )}
-    </Link>
-  );
-
-  if (!collapsed) return link;
-
-  // Collapsed, the label lives in a tooltip so the rail stays legible.
-  return (
-    <Tooltip.Root>
-      <Tooltip.Trigger asChild>{link}</Tooltip.Trigger>
-      <Tooltip.Portal>
-        <Tooltip.Content
-          side="right"
-          sideOffset={10}
-          className="z-50 flex items-center gap-2 rounded-md bg-fg px-2 py-1 text-xs font-medium text-bg shadow-lift data-[state=closed]:animate-pop-out data-[state=delayed-open]:animate-pop-in"
-        >
-          {item.label}
-          {waiting ? (
-            <span className="rounded-full bg-primary px-1.5 text-[0.625rem] font-semibold text-primary-fg tabular-nums">
-              {waiting}
-            </span>
-          ) : null}
-        </Tooltip.Content>
-      </Tooltip.Portal>
+        </Link>
+      </Tooltip.Trigger>
+      {collapsed ? (
+        <Tooltip.Portal>
+          <Tooltip.Content
+            side="right"
+            sideOffset={10}
+            className="z-50 flex items-center gap-2 rounded-md bg-fg px-2 py-1 text-xs font-medium text-bg shadow-lift data-[state=closed]:animate-pop-out data-[state=delayed-open]:animate-pop-in"
+          >
+            {item.label}
+            {waiting ? (
+              <span className="rounded-full bg-primary px-1.5 text-[0.625rem] font-semibold text-primary-fg tabular-nums">
+                {waiting}
+              </span>
+            ) : null}
+          </Tooltip.Content>
+        </Tooltip.Portal>
+      ) : null}
     </Tooltip.Root>
   );
 }
@@ -220,16 +243,26 @@ function NavList({
           key={group.label ?? `group-${index}`}
           className="flex flex-col gap-px"
         >
-          {group.label && !collapsed ? (
-            <p className="px-2 pb-1 text-xs font-medium text-subtle">
-              {group.label}
-            </p>
-          ) : null}
-          {group.label && collapsed ? (
-            <span
-              aria-hidden="true"
-              className="mx-auto mb-2 h-px w-5 bg-line-strong/70"
-            />
+          {/* One slot of one height for both the heading and the rule that
+              stands in for it, so folding the rail moves nothing up or down. */}
+          {group.label ? (
+            <div className="relative h-6 shrink-0">
+              <p
+                className={cn(
+                  "absolute inset-x-0 bottom-1 overflow-hidden px-3 text-xs leading-4 font-medium whitespace-nowrap text-subtle",
+                  fadeWith(collapsed),
+                )}
+              >
+                {group.label}
+              </p>
+              <span
+                aria-hidden="true"
+                className={cn(
+                  "absolute top-1/2 left-3 h-px w-4 bg-line-strong/70 transition-opacity duration-200",
+                  collapsed ? "opacity-100 delay-100" : "opacity-0",
+                )}
+              />
+            </div>
           ) : null}
           {group.items.map((item) => (
             <NavLink
@@ -256,30 +289,32 @@ function Wordmark({
   staff?: boolean;
 }) {
   return (
+    // The mark sits 16px from the edge either way, which is also the middle
+    // of the folded rail — so it holds still while the name fades.
     <Link
       href={href}
-      className={cn(
-        "flex h-11 min-w-0 items-center gap-2 rounded-md px-1 pointer-fine:h-9",
-        collapsed && "justify-center px-0",
-      )}
+      className="flex h-11 min-w-0 flex-1 items-center gap-2 overflow-hidden rounded-md px-1 pointer-fine:h-9"
       aria-label={staff ? "Channel Adda staff area" : "Channel Adda dashboard"}
     >
       <ChannelAddaLogo className="size-7 shrink-0" />
-      {!collapsed ? (
-        <>
-          <span className="truncate text-[0.9375rem] font-semibold tracking-[-0.01em] text-fg">
-            Channel Adda
+      <span
+        className={cn(
+          "flex min-w-0 items-center gap-2 whitespace-nowrap",
+          fadeWith(collapsed),
+        )}
+      >
+        <span className="truncate text-[0.9375rem] font-semibold tracking-[-0.01em] text-fg">
+          Channel Adda
+        </span>
+        {/* The staff and member areas are never allowed to look like each
+            other — but a word is enough to tell them apart. */}
+        {staff ? (
+          <span className="inline-flex h-5 shrink-0 items-center gap-1 rounded-md border border-line bg-surface px-1.5 text-[0.6875rem] font-medium text-muted shadow-xs">
+            <ShieldCheckIcon aria-hidden="true" className="size-3" />
+            Staff
           </span>
-          {/* The staff and member areas are never allowed to look like each
-              other — but a word is enough to tell them apart. */}
-          {staff ? (
-            <span className="inline-flex h-5 shrink-0 items-center gap-1 rounded-md border border-line bg-surface px-1.5 text-[0.6875rem] font-medium text-muted shadow-xs">
-              <ShieldCheckIcon aria-hidden="true" className="size-3" />
-              Staff
-            </span>
-          ) : null}
-        </>
-      ) : null}
+        ) : null}
+      </span>
     </Link>
   );
 }
@@ -404,29 +439,20 @@ export function AppShell({
           </a>
 
           {/* ---- rail, desktop only ---------------------------------------- */}
+          {/* Padding is the same open or folded; only the width moves, and
+              whatever no longer fits is clipped by the rail itself. */}
           <aside
             className={cn(
-              "fixed inset-y-0 left-0 z-30 hidden flex-col border-r border-line bg-bg lg:flex",
+              "fixed inset-y-0 left-0 z-30 hidden flex-col overflow-hidden border-r border-line bg-bg lg:flex",
               collapsed ? "w-15" : "w-60",
-              mounted &&
-                "transition-[width] duration-200 ease-[var(--ease-out-soft)]",
+              mounted && cn("transition-[width]", RAIL_MOTION),
             )}
           >
-            <div
-              className={cn(
-                "flex h-14 shrink-0 items-center px-3",
-                collapsed && "justify-center px-0",
-              )}
-            >
+            <div className="flex h-14 shrink-0 items-center px-3">
               <Wordmark collapsed={collapsed} href={home} staff={staff} />
             </div>
 
-            <div
-              className={cn(
-                "no-scrollbar flex-1 overflow-y-auto px-3 pt-2 pb-4",
-                collapsed && "px-2.5",
-              )}
-            >
+            <div className="no-scrollbar flex-1 overflow-x-hidden overflow-y-auto px-2.5 pt-2 pb-4">
               <NavList
                 groups={groups}
                 currentHref={current?.item.href}
@@ -434,12 +460,7 @@ export function AppShell({
               />
             </div>
 
-            <div
-              className={cn(
-                "shrink-0 border-t border-line p-2",
-                collapsed && "px-2.5",
-              )}
-            >
+            <div className="shrink-0 border-t border-line px-2.5 py-2">
               <UserMenu user={user} area={area} collapsed={collapsed} />
             </div>
           </aside>
@@ -448,8 +469,7 @@ export function AppShell({
           <div
             className={cn(
               collapsed ? "lg:pl-15" : "lg:pl-60",
-              mounted &&
-                "transition-[padding] duration-200 ease-[var(--ease-out-soft)]",
+              mounted && cn("transition-[padding]", RAIL_MOTION),
             )}
           >
             <header className="sticky top-0 z-20 flex h-14 items-center gap-2 border-b border-line bg-bg/80 px-3 backdrop-blur-md backdrop-saturate-150 sm:px-5 lg:px-6">
