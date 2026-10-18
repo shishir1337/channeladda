@@ -1,6 +1,6 @@
 "use client";
 
-import { twoFactorClient } from "better-auth/client/plugins";
+import { emailOTPClient, twoFactorClient } from "better-auth/client/plugins";
 import { createAuthClient } from "better-auth/react";
 
 /**
@@ -21,6 +21,8 @@ export const authClient = createAuthClient({
         window.location.href = "/signin/two-factor";
       },
     }),
+    // The six-digit code that confirms an email address.
+    emailOTPClient(),
   ],
 });
 

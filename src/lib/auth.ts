@@ -1,7 +1,7 @@
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { nextCookies } from "better-auth/next-js";
-import { twoFactor } from "better-auth/plugins";
+import { emailOTP, twoFactor } from "better-auth/plugins";
 import { db } from "@/lib/db";
 import { sendMail } from "@/server/mailer";
 
@@ -86,22 +86,21 @@ export const auth = betterAuth({
     },
   },
 
+  // The address is confirmed with a six-digit code typed on /verify-email,
+  // sent by the emailOTP plugin below. There is deliberately no
+  // sendVerificationEmail here: Better Auth merges a plugin's settings under
+  // these, so one written here would quietly keep sending links.
   emailVerification: {
     sendOnSignUp: true,
-    autoSignInAfterVerification: true,
-    async sendVerificationEmail({ user, token }) {
-      // Built here rather than using the supplied `url` so the visitor lands
-      // back on a page that says what happened, instead of silently on the
-      // homepage with no confirmation that anything worked.
-      const link = new URL("/api/auth/verify-email", baseURL);
-      link.searchParams.set("token", token);
-      link.searchParams.set("callbackURL", "/verify-email?verified=1");
-
-      await sendMail({
-        to: user.email,
-        subject: "Confirm your email address",
-        body: "Confirm this address to finish setting up your Channel Adda account.",
-        link: link.toString(),
+    // Off: a code proves the inbox, not the password, so it must not open a
+    // session — on an account with two-factor that would walk round both.
+    // Someone who signed up is already signed in and simply stays so.
+    autoSignInAfterVerification: false,
+    // Better Auth only keeps a yes or no; the audit trail wants the moment.
+    async afterEmailVerification(user) {
+      await db.user.update({
+        where: { id: user.id },
+        data: { emailVerifiedAt: new Date() },
       });
     },
   },
@@ -176,6 +175,19 @@ export const auth = betterAuth({
     },
   },
 
+  // The emailOTP plugin brings passwordless sign-in, password reset and email
+  // change by code along with verification. Only verification is wanted:
+  // sign-in by code would walk round the password and two-factor, and reset
+  // and email change already have their own reviewed flows.
+  disabledPaths: [
+    "/sign-in/email-otp",
+    "/email-otp/request-password-reset",
+    "/email-otp/reset-password",
+    "/forget-password/email-otp",
+    "/email-otp/request-email-change",
+    "/email-otp/change-email",
+  ],
+
   socialProviders: socialProviders(),
 
   account: {
@@ -214,6 +226,34 @@ export const auth = betterAuth({
       // someone fetching their phone, and a longer one leaves a half-signed-in
       // session lying around.
       twoFactorCookieMaxAge: 600,
+    }),
+    emailOTP({
+      overrideDefaultEmailVerification: true,
+      otpLength: 6,
+      // Ten minutes: time to switch to the mail app and back, not long
+      // enough for a code in an old email to still be worth anything.
+      expiresIn: 600,
+      // A typo or two, then a new code. Five guesses at a million codes,
+      // behind a rate limit, is not a way in.
+      allowedAttempts: 5,
+      rateLimit: { window: 60, max: 5 },
+      // A copy of the database must not hold codes that still work.
+      storeOTP: "hashed",
+      // An unknown address gets nothing: accounts are made on the sign-up
+      // form, which asks for a name, a password and the terms.
+      disableSignUp: true,
+      async sendVerificationOTP({ email, otp, type }) {
+        if (type !== "email-verification") return;
+        await sendMail({
+          to: email,
+          subject: `${otp} is your Channel Adda code`,
+          body:
+            "Enter this code on Channel Adda to confirm your email address. " +
+            "It works once and expires in 10 minutes. " +
+            "If you did not sign up, ignore this email.",
+          code: otp,
+        });
+      },
     }),
     // Must stay last: it lets Better Auth set cookies from server actions.
     nextCookies(),

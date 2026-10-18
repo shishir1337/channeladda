@@ -22,6 +22,8 @@ export type Mail = {
   body: string;
   /** Included in the log line, and as a link in the HTML, so it is clickable. */
   link?: string;
+  /** A code to type on the site, set large in the HTML so it reads at a glance. */
+  code?: string;
 };
 
 type SmtpConfig = {
@@ -75,9 +77,10 @@ function transporter(config: SmtpConfig): Transporter {
   return globalForMail.mailer;
 }
 
-/** Plain text, with the link on its own line so every client makes it clickable. */
+/** Plain text, with the code or link on its own line so it is easy to pick out. */
 function textBody(mail: Mail): string {
-  return mail.link ? `${mail.body}\n\n${mail.link}\n` : `${mail.body}\n`;
+  const extra = [mail.code, mail.link].filter(Boolean).join("\n\n");
+  return extra ? `${mail.body}\n\n${extra}\n` : `${mail.body}\n`;
 }
 
 /**
@@ -103,6 +106,10 @@ function htmlBody(mail: Mail): string {
     )
     .join("");
 
+  const code = mail.code
+    ? `<p style="margin:24px 0;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:32px;font-weight:700;letter-spacing:8px">${escapeHtml(mail.code)}</p>`
+    : "";
+
   const link = mail.link
     ? `<p style="margin:24px 0"><a href="${escapeHtml(mail.link)}" style="display:inline-block;padding:12px 20px;background:#111;color:#fff;border-radius:10px;text-decoration:none;font-weight:600">Open Channel Adda</a></p>` +
       `<p style="margin:0;color:#666;font-size:13px">Or paste this into your browser:<br>${escapeHtml(mail.link)}</p>`
@@ -111,6 +118,7 @@ function htmlBody(mail: Mail): string {
   return (
     `<div style="font-family:system-ui,-apple-system,Segoe UI,sans-serif;font-size:15px;line-height:1.6;color:#111;max-width:520px">` +
     paragraphs +
+    code +
     link +
     `</div>`
   );
@@ -148,6 +156,7 @@ export async function sendMail(mail: Mail): Promise<void> {
         `Subject: ${mail.subject}`,
         "",
         mail.body,
+        mail.code ? `\nCode: ${mail.code}` : "",
         mail.link ? `\n${mail.link}` : "",
         "─────────────────────────────────────────────────────────────────────",
         "",

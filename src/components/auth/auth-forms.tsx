@@ -36,7 +36,7 @@ function messageFor(code: string | undefined, fallback: string) {
     case "PASSWORD_TOO_SHORT":
       return `Use at least ${MIN_PASSWORD} characters.`;
     case "EMAIL_NOT_VERIFIED":
-      return "Confirm your email address before signing in. Check your inbox for the link.";
+      return "Confirm your email address before signing in, with the code we emailed you.";
     case "INVALID_TOKEN":
     case "TOKEN_EXPIRED":
       return "That link has expired. Request a new one and try again.";
