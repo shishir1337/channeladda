@@ -1,6 +1,7 @@
 import "server-only";
 
 import { headers } from "next/headers";
+import { clientIp } from "@/lib/client-ip";
 import { db } from "@/lib/db";
 
 /**
@@ -48,11 +49,9 @@ export async function recordAudit(entry: AuditEntry): Promise<void> {
   // automated actions happened.
   let ip: string | null = null;
   try {
-    const headerList = await headers();
-    ip =
-      headerList.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-      headerList.get("x-real-ip") ??
-      null;
+    // Not the first X-Forwarded-For entry: that is whatever the browser
+    // chose to send.
+    ip = clientIp(await headers());
   } catch {
     // No request context. Carry on without it.
   }

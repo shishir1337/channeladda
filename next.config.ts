@@ -46,6 +46,28 @@ const nextConfig: NextConfig = {
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },
+
+  // One address for the whole site. Sign-in only answers requests from
+  // BETTER_AUTH_URL's own origin, so on www every sign-in failed with a 403
+  // that told the visitor nothing.
+  async redirects() {
+    const site = new URL(
+      process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
+    );
+    const bare =
+      site.hostname.includes(".") &&
+      !site.hostname.startsWith("www.") &&
+      !/^[\d.]+$/.test(site.hostname);
+    if (!bare) return [];
+    return [
+      {
+        source: "/:path*",
+        has: [{ type: "host" as const, value: `www.${site.hostname}` }],
+        destination: `${site.origin}/:path*`,
+        permanent: true,
+      },
+    ];
+  },
 };
 
 export default nextConfig;

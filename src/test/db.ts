@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { UserRole } from "@/generated/prisma/enums";
+import type { ListingStatus, UserRole } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
 import { clearSettingsCache } from "@/server/settings";
 
@@ -148,7 +148,7 @@ export const TEST_SETTINGS: TestSettings = {
 
 export type SeedOverrides = {
   priceUsd?: number;
-  listingStatus?: "DRAFT" | "LIVE" | "RESERVED" | "SOLD";
+  listingStatus?: ListingStatus;
   settings?: Partial<TestSettings>;
 };
 

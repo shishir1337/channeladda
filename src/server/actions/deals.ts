@@ -70,6 +70,14 @@ export async function startDeal(
 ): Promise<DealResult & { orderId?: string }> {
   const user = await requireUser();
 
+  // As for offers: every update about the deal goes to this address.
+  if (!user.emailVerified) {
+    return {
+      ok: false,
+      error: "Confirm your email address before starting a deal.",
+    };
+  }
+
   // Three published policies say the buyer acknowledges this at checkout.
   // Checked here as well as in the browser, because a policy is only worth
   // the record behind it.

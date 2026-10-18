@@ -4,8 +4,9 @@ Supersedes the runbook artifact published earlier in development, which
 predates payments, the wallet, chat media and the scheduled sweep. This file
 lives beside the code so it cannot drift from it again.
 
-Target: one Ubuntu VPS, nginx in front, pm2 running the app, PostgreSQL local.
-Project at `/var/www/channeladda`, running as root (the owner's choice).
+Target: one Ubuntu VPS, Cloudflare in front of nginx, pm2 running the app,
+PostgreSQL local. Project at `/var/www/channeladda`, running as root (the
+owner's choice). Cloudflare changes what nginx sees — read section 4a.
 
 ---
 
@@ -22,7 +23,7 @@ Project at `/var/www/channeladda`, running as root (the owner's choice).
 | `CRON_SECRET` | `openssl rand -base64 32` | **abandoned deals hold listings off the market for ever** |
 | `GOOGLE_CLIENT_ID` / `_SECRET` | Google Cloud → Credentials → OAuth client | no "Continue with Google" button |
 | `YOUTUBE_API_KEY` | Google Cloud → YouTube Data API v3 | sellers type their own figures; staff verify codes by eye |
-| `SMTP_HOST` / `_PORT` / `_USER` / `_PASS` | any provider: Resend, Postmark, SES, Mailgun | **password reset silently does nothing** |
+| `SMTP_HOST` / `_PORT` / `_USER` / `_PASS` | any provider: Resend, Postmark, SES, Mailgun | **sign-up codes never arrive, so password sign-ups cannot buy, sell or make offers until staff mark them verified; password reset fails** |
 | `MAIL_FROM` | an address the provider has verified | mail is accepted and then dropped |
 
 `BETTER_AUTH_URL` **must be https in production.** `src/lib/auth.ts` sets
@@ -191,7 +192,54 @@ server {
 
 HSTS belongs here, with whatever terminates TLS — not in `next.config.ts`,
 which deliberately omits it so a developer cannot make localhost unreachable
-in their own browser for two years.
+in their own browser for two years. Behind Cloudflare, turn it on there
+instead (4a).
+
+---
+
+## 4a. Cloudflare
+
+channeladda.com is proxied by Cloudflare, so every request reaches nginx from
+a Cloudflare address, not the visitor's. Three things depend on getting this
+right.
+
+**1. Give nginx the visitor's real address.** Without it, the Cryptomus
+`allow 91.227.144.54` above sees a Cloudflare address and **refuses every
+payment callback** (payments then land only when the sweep reconciles them),
+and `X-Real-IP` names Cloudflare rather than the visitor:
+
+```bash
+{ for ip in $(curl -s https://www.cloudflare.com/ips-v4) \
+            $(curl -s https://www.cloudflare.com/ips-v6); do
+    echo "set_real_ip_from $ip;"
+  done
+  echo "real_ip_header CF-Connecting-IP;"
+} > /etc/nginx/conf.d/cloudflare-realip.conf
+nginx -t && systemctl reload nginx
+```
+
+The app reads `CF-Connecting-IP` first for its own rate limits and audit
+trail (`src/lib/client-ip.ts`), so sign-in limits are per visitor either way.
+
+**2. Only let Cloudflare reach the server.** Anyone who finds the server's
+own address could otherwise skip Cloudflare and send a made-up
+`CF-Connecting-IP`. Allow ports 80 and 443 from the same two lists only
+(`ufw allow from <range> to any port 443` for each), and keep SSH as it is.
+
+**3. Settings in the Cloudflare dashboard:**
+
+- SSL/TLS mode **Full (strict)**, with a Cloudflare origin certificate or a
+  real one on nginx. "Flexible" sends traffic to the server unencrypted.
+- **Always Use HTTPS** on, and **HSTS** on under Edge Certificates.
+- No **Cache Everything** rule. Pages are personal to whoever is signed in;
+  uploaded files already say `private` and Cloudflare leaves those alone.
+- After turning on **Bot Fight Mode**, pay one real invoice and check the
+  deal moves on its own. If callbacks stop arriving, turn it off: the free
+  plan cannot exempt a single path from it.
+
+`www.channeladda.com` is redirected to `channeladda.com` by the app itself
+(`next.config.ts`), because sign-in refuses any other origin. A Cloudflare
+redirect rule doing the same is fine too.
 
 ---
 
@@ -204,9 +252,13 @@ is reserved for ever — for free, on every listing.
 
 ```bash
 # /etc/cron.d/channeladda
-*/10 * * * * root curl -fsS -m 30 -X POST https://channeladda.com/api/cron \
+*/10 * * * * root curl -fsS -m 30 -X POST http://127.0.0.1:3000/api/cron \
   -H "authorization: Bearer THE_CRON_SECRET" >/dev/null 2>&1
 ```
+
+Straight to the app on the server, not through `https://channeladda.com`:
+that way runs through Cloudflare, whose bot protection can challenge `curl`,
+and the sweep would quietly stop.
 
 A bearer-guarded endpoint rather than an in-process timer, because the moment
 the app runs twice an in-process timer sweeps twice. Every handler is
@@ -215,7 +267,7 @@ idempotent and every write is a compare-and-set, so an overlapping run is safe.
 Check it works:
 
 ```bash
-curl -fsS -X POST https://channeladda.com/api/cron \
+curl -fsS -X POST http://127.0.0.1:3000/api/cron \
   -H "authorization: Bearer $CRON_SECRET"
 # {"ok":true,"reconciled":0,"deals":0,"offers":0,"acceptances":0,"media":0,"messages":0,"orphans":0}
 ```
@@ -265,6 +317,13 @@ Authorised redirect URI, exactly:
 https://channeladda.com/api/auth/callback/google
 ```
 
+Authorised JavaScript origin: `https://channeladda.com`.
+
+**Publish the app** (Google Auth Platform → Audience → Publish app). While it
+is in *Testing*, only the test users listed there can sign in with Google;
+everyone else gets "access blocked". With only the scopes below, publishing
+needs no review from Google.
+
 Only `openid`, `email` and `profile` are requested. If the consent screen ever
 asks for YouTube scopes, something is wrong — a marketplace has no business
 holding a token that can read a seller's channel.
@@ -287,6 +346,25 @@ tar -czf /root/backups/uploads-$(date +%F).tar.gz \
 Chat attachments are deleted after 48 hours by design, so a backup older than
 that will not contain them. That is intended.
 
+Run both every night, and copy the results off the server — a backup on the
+same disk is lost with the disk:
+
+```bash
+# /etc/cron.d/channeladda-backup
+15 3 * * * root mkdir -p /root/backups && su - postgres -c "pg_dump -Fc channeladda" > /root/backups/db-$(date +\%F).dump && tar -czf /root/backups/uploads-$(date +\%F).tar.gz -C /var/www/channeladda .data/uploads && find /root/backups -mtime +14 -delete
+```
+
+(`%` must be escaped in a crontab.) Then sync `/root/backups` somewhere else —
+another server, S3, Backblaze — and restore one into a scratch database once,
+so you know it works.
+
+pm2 keeps every log line for ever unless told otherwise; on a small VPS that
+fills the disk:
+
+```bash
+pm2 install pm2-logrotate
+```
+
 ---
 
 ## 9. Deploying a change
@@ -303,6 +381,10 @@ pm2 restart channeladda
 `pnpm build` is the gate: `next.config.ts` sets
 `typescript: { ignoreBuildErrors: false }`, so a type error fails the deploy
 rather than shipping.
+
+Migrate **before** building. The homepage is pre-rendered from the database
+during the build, so building against an unmigrated database fails with
+"The column … does not exist in the current database".
 
 ---
 
@@ -322,12 +404,23 @@ that wrong by hand produces a hang rather than an error.
 one is usually accepted at send time and dropped afterwards, which looks
 exactly like working.
 
+An email address is confirmed with a six-digit code sent at sign-up and
+typed on `/verify-email` (10 minutes, 5 tries; "Send a new code" replaces
+it). Until it is confirmed, an account can look around but cannot make an
+offer, start a deal or send a listing for review. Google sign-ins arrive
+already confirmed.
+
+The From address also needs SPF and DKIM records for channeladda.com — the
+provider lists them when you add the domain. Without them the codes land in
+spam, which to the person signing up looks exactly like no email at all.
+
 **With `SMTP_HOST` unset, `sendMail` throws in production.** Better Auth
 catches it, so sign-up and sign-in still work and nothing returns a 500 — but
-password reset silently does nothing and logs "Failed to run background
-task". Two-step verification is unaffected either way, because it uses an
-authenticator app; but without email, somebody who loses both their password
-and their backup codes needs a manual database change to get back in.
+no code ever arrives, so password sign-ups stay unconfirmed until staff mark
+them verified on `/admin/users/<id>`, and password reset fails. Two-step
+verification is unaffected either way, because it uses an authenticator app;
+but without email, somebody who loses both their password and their backup
+codes needs a manual database change to get back in.
 
 ---
 

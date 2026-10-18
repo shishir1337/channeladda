@@ -9,7 +9,11 @@ const viewer = vi.hoisted(() => ({ id: "" }));
 const youtube = vi.hoisted(() => ({ configured: false, codeFound: true }));
 
 vi.mock("@/server/session", () => ({
-  requireUser: async () => ({ id: viewer.id, role: "USER" }),
+  requireUser: async () => ({
+    id: viewer.id,
+    role: "USER",
+    emailVerified: true,
+  }),
 }));
 vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
 vi.mock("@/server/youtube", async (original) => ({

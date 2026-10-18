@@ -359,6 +359,14 @@ export async function checkOwnershipCode(
 ): Promise<VerifyResult> {
   const user = await requireUser();
 
+  // A passing check sends the listing to a moderator, which is selling.
+  if (!user.emailVerified) {
+    return {
+      ok: false,
+      error: "Confirm your email address before sending a listing for review.",
+    };
+  }
+
   const listing = await db.listing.findUnique({
     where: { id: listingId },
     select: {

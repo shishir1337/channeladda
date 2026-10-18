@@ -14,7 +14,11 @@ const fake = vi.hoisted(() => ({
 }));
 
 vi.mock("@/server/session", () => ({
-  requireUser: async () => ({ id: "seller-1", role: "USER" }),
+  requireUser: async () => ({
+    id: "seller-1",
+    role: "USER",
+    emailVerified: true,
+  }),
 }));
 vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
 vi.mock("@/server/youtube", async (original) => {

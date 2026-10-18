@@ -32,6 +32,13 @@ const NOT_YOURS = {
   errors: { form: "That listing could not be found." },
 };
 
+const EMAIL_FIRST = {
+  ok: false as const,
+  errors: {
+    form: "Confirm your email address before sending a listing for review.",
+  },
+};
+
 const LOCKED = {
   ok: false as const,
   errors: {
@@ -100,6 +107,7 @@ export async function saveListing(
 /** The seller confirms the code is live on their profile. */
 export async function submitForReview(id: string): Promise<ActionResult> {
   const user = await requireUser();
+  if (!user.emailVerified) return EMAIL_FIRST;
   const result = await repo.submitForReview(user.id, id);
   if (!result.ok) {
     if (result.reason === "not-found") return NOT_YOURS;

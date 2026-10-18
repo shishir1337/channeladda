@@ -2,6 +2,7 @@ import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { nextCookies } from "better-auth/next-js";
 import { emailOTP, twoFactor } from "better-auth/plugins";
+import { CLIENT_IP_HEADERS } from "@/lib/client-ip";
 import { db } from "@/lib/db";
 import { sendMail } from "@/server/mailer";
 
@@ -143,6 +144,11 @@ export const auth = betterAuth({
     // production; this is a marketplace holding other people's money.
     useSecureCookies: process.env.NODE_ENV === "production",
     cookiePrefix: "channeladda",
+    // Who is asking, for the rate limits below. Behind Cloudflare and nginx,
+    // X-Forwarded-For holds two addresses and Better Auth will not guess
+    // between them; left at its default, every visitor fell into one shared
+    // bucket and the whole site got three sign-in attempts per ten seconds.
+    ipAddress: { ipAddressHeaders: [...CLIENT_IP_HEADERS] },
   },
 
   rateLimit: {
