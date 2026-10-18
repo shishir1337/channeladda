@@ -9,6 +9,7 @@ import {
   parseYouTubeAboutPage,
 } from "@/lib/channel-pages";
 import { containsOwnershipCode, type ParsedChannel } from "@/lib/channel-url";
+import { PageReadError, readPage } from "@/server/page-text";
 
 /**
  * The YouTube Data API, for the two things a listing needs.
@@ -288,28 +289,41 @@ export async function fetchChannelPage(
         ? `@${value}`
         : `c/${value}`;
 
-  let response: Response;
+  // One deadline for the answer and the page together: the page is about
+  // 3MB, and a timeout while its body is still arriving is as much "did not
+  // answer in time" as one before the headers.
+  let status: number;
+  let html: string;
   try {
-    response = await fetch(`https://www.youtube.com/${path}/about`, {
-      headers: PAGE_HEADERS,
-      cache: "no-store",
-      signal: AbortSignal.timeout(8_000),
-    });
-  } catch {
-    throw new YouTubeError("YouTube did not answer in time.", "failed");
+    ({ status, text: html } = await readPage(
+      `https://www.youtube.com/${path}/about`,
+      {
+        headers: PAGE_HEADERS,
+        timeoutMs: 10_000,
+        maxBytes: 8 * 1024 * 1024,
+        // An old /c/ link redirects to the channel's current address.
+        allowHosts: /^(www\.|m\.)?youtube\.com$/,
+      },
+    ));
+  } catch (error) {
+    throw new YouTubeError(
+      error instanceof PageReadError && error.kind === "timeout"
+        ? "YouTube did not answer in time. Try again, or fill it in by hand."
+        : "We could not reach YouTube. Try again, or fill it in by hand.",
+      "failed",
+    );
   }
 
-  if (response.status === 404) {
+  if (status === 404) {
     throw new YouTubeError(
       "No YouTube channel matched that link. Check it opens in a browser.",
       "not-found",
     );
   }
-  if (!response.ok) {
-    throw new YouTubeError(`YouTube returned ${response.status}.`, "failed");
+  if (status < 200 || status >= 300) {
+    throw new YouTubeError(`YouTube returned ${status}.`, "failed");
   }
-
-  const facts = parseYouTubeAboutPage(await response.text());
+  const facts = parseYouTubeAboutPage(html);
   if (!facts) {
     throw new YouTubeError(
       "We could not read that channel's page. Fill the figures in by hand — nothing is lost.",

@@ -1,3 +1,5 @@
+import { readdir } from "node:fs/promises";
+import { join } from "node:path";
 import { afterEach, expect, test, vi } from "vitest";
 import { db } from "@/lib/db";
 import { isAllowedRemoteImage, storeRemoteImage } from "@/server/remote-image";
@@ -73,6 +75,26 @@ test(
       attachedAt: null,
     });
     await deleteUpload(key);
+  }),
+);
+
+test(
+  "a picture whose record could not be written is not left on disk",
+  withCleanDb(async () => {
+    const dir = join(process.cwd(), ".data", "uploads", "avatar");
+    const before = new Set(await readdir(dir).catch(() => []));
+    vi.stubGlobal("fetch", answer(PNG, { "content-type": "image/png" }));
+
+    // No such seller, so the record fails after the file is written.
+    const url = await storeRemoteImage(
+      "https://yt3.googleusercontent.com/abc=s512",
+      "avatar",
+      "no-such-seller",
+    );
+
+    expect(url).toBeNull();
+    const after = await readdir(dir).catch(() => []);
+    expect(after.filter((name) => !before.has(name))).toEqual([]);
   }),
 );
 

@@ -7,6 +7,7 @@ import {
   parseTelegramPostViews,
   postReachPercent,
 } from "@/lib/channel-pages";
+import { readPage } from "@/server/page-text";
 
 /**
  * A Telegram channel's public facts, from t.me.
@@ -30,16 +31,25 @@ export class TelegramError extends Error {
 const PUBLIC_NAME = /^[A-Za-z][A-Za-z0-9_]{3,31}$/;
 
 async function page(url: string): Promise<string> {
-  const response = await fetch(url, {
-    headers: PAGE_HEADERS,
-    cache: "no-store",
-    redirect: "error",
-    signal: AbortSignal.timeout(8_000),
-  });
-  if (!response.ok) {
-    throw new TelegramError(`Telegram answered ${response.status}.`);
+  let result: { status: number; text: string };
+  try {
+    result = await readPage(url, {
+      headers: PAGE_HEADERS,
+      timeoutMs: 8_000,
+      maxBytes: 2 * 1024 * 1024,
+      // t.me never needs to send us anywhere else.
+      allowHosts: /^t\.me$/,
+      redirects: 0,
+    });
+  } catch {
+    throw new TelegramError(
+      "Telegram did not answer in time. Try again, or fill it in by hand.",
+    );
   }
-  return response.text();
+  if (result.status !== 200) {
+    throw new TelegramError(`Telegram answered ${result.status}.`);
+  }
+  return result.text;
 }
 
 export async function fetchTelegramChannel(name: string): Promise<{

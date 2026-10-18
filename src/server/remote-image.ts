@@ -1,7 +1,7 @@
 import "server-only";
 
 import { db } from "@/lib/db";
-import { MAX_UPLOAD_BYTES, putUpload } from "@/server/storage";
+import { deleteUpload, MAX_UPLOAD_BYTES, putUpload } from "@/server/storage";
 
 /**
  * Copying a channel's own picture and banner into the listing.
@@ -71,15 +71,22 @@ export async function storeRemoteImage(
       }),
       kind,
     );
-    await db.upload.create({
-      data: {
-        key: stored.key,
-        uploaderId,
-        kind,
-        bytes: stored.bytes,
-        contentType: stored.contentType,
-      },
-    });
+    try {
+      await db.upload.create({
+        data: {
+          key: stored.key,
+          uploaderId,
+          kind,
+          bytes: stored.bytes,
+          contentType: stored.contentType,
+        },
+      });
+    } catch (error) {
+      // A file with no record is one the sweep can never find, so it goes
+      // now rather than sitting on disk for ever.
+      await deleteUpload(stored.key);
+      throw error;
+    }
     return stored.url;
   } catch (error) {
     console.error("[remote-image]", kind, error);
