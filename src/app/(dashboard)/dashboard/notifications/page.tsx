@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { InfoTip } from "@/components/app/info-tip";
 import {
   Dot,
   EmptyState,
@@ -66,13 +67,14 @@ export default async function NotificationsPage() {
 
   return (
     <>
+      {/* The one line is the unread count, and only while there is one;
+          what the page is for waits behind the (i). */}
       <PageHeader
         title="Notifications"
         description={
-          unread > 0
-            ? `${unread} of these have not been read yet.`
-            : "Everything that has happened on your deals, listings and offers."
+          unread > 0 ? `${unread} of these have not been read yet.` : undefined
         }
+        info="Everything that has happened on your deals, listings and offers."
         actions={unread > 0 ? <MarkAllRead /> : undefined}
       />
 
@@ -80,8 +82,16 @@ export default async function NotificationsPage() {
         {items.length === 0 ? (
           <EmptyState
             icon={BellIcon}
-            title="Nothing yet"
-            body="Offers on your listings, messages, and anything a deal needs from you will show up here — and by email, so you do not have to keep checking."
+            title={
+              <>
+                Nothing yet
+                <InfoTip label="What shows up here" className="ml-1.5">
+                  Offers on your listings, messages, and anything a deal needs
+                  from you will show up here — and by email, so you do not have
+                  to keep checking.
+                </InfoTip>
+              </>
+            }
             action={
               <Button asChild size="md">
                 <Link href="/browse">Browse accounts</Link>

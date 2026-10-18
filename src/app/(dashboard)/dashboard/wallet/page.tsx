@@ -3,26 +3,27 @@ import {
   BanknoteIcon,
   CircleCheckIcon,
   CoinsIcon,
-  InfoIcon,
   LockIcon,
   PlusIcon,
   RotateCcwIcon,
   SlidersHorizontalIcon,
   TagIcon,
-  TimerIcon,
   WalletIcon,
 } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import type { ComponentType, SVGProps } from "react";
+import { InfoTip } from "@/components/app/info-tip";
 import {
   Card,
+  Disclosure,
   EmptyState,
   IconTile,
   List,
   ListItem,
   PageHeader,
   Section,
+  SplitBar,
 } from "@/components/app/kit";
 import {
   PayoutAddressForm,
@@ -48,7 +49,8 @@ type Icon = ComponentType<SVGProps<SVGSVGElement>>;
  *
  * The database calls these things ESCROW_HOLD and ESCROW_RELEASE. Nobody
  * reading their own money is obliged to learn our vocabulary, so every row
- * carries a title and a sentence explaining why the number moved.
+ * carries a title and, behind its (i), a sentence explaining why the number
+ * moved.
  */
 const KINDS: Record<string, { title: string; meaning: string; icon: Icon }> = {
   DEPOSIT: {
@@ -143,7 +145,7 @@ export default async function WalletPage({
     <>
       <PageHeader
         title="Wallet"
-        description="What is here, what is spendable right now, and what every movement was for."
+        info="What is here, what is spendable right now, and what every movement was for."
       />
 
       {/* The success Callout's look, built from spans: an <output> may only
@@ -177,12 +179,12 @@ export default async function WalletPage({
                   className="size-3.5 shrink-0 text-subtle"
                 />
                 Your balance
+                <InfoTip label="About your balance">
+                  Everything credited to you, less everything already paid out.
+                </InfoTip>
               </dt>
               <dd className={FIGURE}>
                 <Price usd={wallet.balanceUsd / 100} />
-              </dd>
-              <dd className="mt-1.5 text-xs leading-relaxed text-subtle">
-                Everything credited to you, less everything already paid out.
               </dd>
             </div>
 
@@ -193,32 +195,51 @@ export default async function WalletPage({
                   className="size-3.5 shrink-0 text-subtle"
                 />
                 Available to use now
+                <InfoTip label="About what is available">
+                  {held ? (
+                    <>
+                      <Price
+                        usd={wallet.pendingWithdrawalUsd / 100}
+                        className="font-semibold text-fg"
+                      />{" "}
+                      is held while finance checks the payout you asked for. It
+                      is still your money — it just cannot be spent twice.
+                    </>
+                  ) : (
+                    "All of it. Nothing is being held against a payout."
+                  )}
+                </InfoTip>
               </dt>
               <dd className={FIGURE}>
                 <Price usd={wallet.availableUsd / 100} />
               </dd>
-              {held ? (
-                <dd className="mt-1.5 flex items-start gap-1.5 text-xs leading-relaxed text-muted">
-                  <TimerIcon
-                    aria-hidden="true"
-                    className="mt-px size-3.5 shrink-0 text-primary-text"
-                  />
-                  <span>
-                    <Price
-                      usd={wallet.pendingWithdrawalUsd / 100}
-                      className="font-semibold text-fg"
-                    />{" "}
-                    is held while finance checks the payout you asked for. It is
-                    still your money — it just cannot be spent twice.
-                  </span>
-                </dd>
-              ) : (
-                <dd className="mt-1.5 text-xs leading-relaxed text-subtle">
-                  All of it. Nothing is being held against a payout.
-                </dd>
-              )}
             </div>
           </dl>
+
+          {/* The two figures differ only while a payout waits for finance,
+              and then the bar shows where the gap went before any figure
+              is compared. */}
+          {held ? (
+            <div className="border-t border-line px-4 py-4 sm:px-6">
+              <SplitBar
+                label="Your balance: available now and held for a payout"
+                parts={[
+                  {
+                    label: "Available",
+                    value: Math.max(0, wallet.availableUsd),
+                    display: <Price usd={wallet.availableUsd / 100} />,
+                    tone: "verified",
+                  },
+                  {
+                    label: "Held for your payout",
+                    value: wallet.pendingWithdrawalUsd,
+                    display: <Price usd={wallet.pendingWithdrawalUsd / 100} />,
+                    tone: "primary",
+                  },
+                ]}
+              />
+            </div>
+          ) : null}
 
           <div className="flex flex-col gap-2 rounded-b-[inherit] border-t border-line bg-surface-2/50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:px-6">
             <div className="min-w-0">
@@ -248,12 +269,14 @@ export default async function WalletPage({
           </div>
         </Card>
 
-        <p className="mt-3 flex items-start gap-2 text-xs leading-relaxed text-muted">
-          <InfoIcon
-            aria-hidden="true"
-            className="mt-px size-3.5 shrink-0 text-subtle"
-          />
-          <span>
+        {/* Folded rather than put behind an (i): it carries a link, and a
+            tooltip's contents cannot be reached from the keyboard. */}
+        <Disclosure
+          bare
+          title="Which sales reach this balance"
+          className="mt-2"
+        >
+          <p className="max-w-[72ch]">
             Only <strong className="font-semibold text-fg">Fastest</strong>{" "}
             sales reach this balance, because that is the mode where the buyer
             pays Channel Adda. On a{" "}
@@ -266,8 +289,8 @@ export default async function WalletPage({
               How the two modes differ
             </Link>
             .
-          </span>
-        </p>
+          </p>
+        </Disclosure>
       </Section>
 
       {/* ---- putting money in, taking it out ----------------------------- */}
@@ -289,7 +312,7 @@ export default async function WalletPage({
       <Section
         id="history"
         title="History"
-        description="Every movement in and out of your balance, newest first."
+        info="Every movement in and out of your balance, newest first."
       >
         {wallet.entries.length === 0 ? (
           <EmptyState
@@ -304,18 +327,23 @@ export default async function WalletPage({
               const out = entry.amountUsd < 0;
               const EntryIcon = kind?.icon ?? CoinsIcon;
 
+              const title = kind?.title ?? entry.kind;
+
               return (
                 <ListItem key={entry.id}>
-                  <div className="flex items-start gap-3">
+                  <div className="flex items-center gap-3">
                     <IconTile icon={EntryIcon} />
 
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm leading-5 font-medium text-fg">
-                        {kind?.title ?? entry.kind}
-                      </p>
-                      <p className="mt-0.5 text-[0.8125rem] leading-relaxed text-muted">
-                        {kind?.meaning ??
-                          "Ask support if this entry is not clear."}
+                      {/* What the kind of movement means is the same on every
+                          row of that kind, so it waits behind the (i) rather
+                          than repeating down the list. */}
+                      <p className="flex items-center gap-1.5 text-sm leading-5 font-medium text-fg">
+                        <span className="min-w-0">{title}</span>
+                        <InfoTip label={`What “${title}” means`}>
+                          {kind?.meaning ??
+                            "Ask support if this entry is not clear."}
+                        </InfoTip>
                       </p>
                       {entry.note ? (
                         <p className="mt-1 text-xs leading-relaxed break-words text-subtle">

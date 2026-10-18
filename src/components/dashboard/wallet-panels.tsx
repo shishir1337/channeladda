@@ -35,21 +35,33 @@ import {
  * button that does it rather than in a paragraph at the top nobody reads.
  */
 
-/** One panel, one job, with the job named at the top of it. */
+/**
+ * One panel, one job, with the job named at the top of it. Why the job works
+ * the way it does sits behind the (i); only a line that stops a mistake is
+ * left on the card.
+ */
 function Panel({
   icon,
   title,
-  blurb,
+  description,
+  info,
   children,
 }: {
   icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
   title: string;
-  blurb: string;
+  description?: string;
+  info?: ReactNode;
   children: ReactNode;
 }) {
   return (
     <Card className="flex flex-col">
-      <CardHeader as="h2" icon={icon} title={title} description={blurb} />
+      <CardHeader
+        as="h2"
+        icon={icon}
+        title={title}
+        description={description}
+        info={info}
+      />
       {/* A column, so the action can sit at the foot of the card and two
           panels side by side line their buttons up. */}
       <CardBody className="flex flex-1 flex-col">{children}</CardBody>
@@ -178,7 +190,7 @@ export function TopUp() {
     <Panel
       icon={PlusIcon}
       title="Add funds"
-      blurb="Top up once and pay for deals without raising a new invoice each time. You pay in crypto; your balance is held in US dollars."
+      info="Top up once and pay for deals without raising a new invoice each time. You pay in crypto; your balance is held in US dollars."
     >
       <fieldset className="flex min-w-0 flex-wrap gap-2">
         <legend className="sr-only">Common amounts</legend>
@@ -267,7 +279,10 @@ export function PayoutAddressForm({
     <Panel
       icon={LockIcon}
       title="Where your payouts go"
-      blurb="Payouts are sent to this address and nowhere else. Check it against your own wallet, character by character, before you save it."
+      // The check stays on the card: it is what stops the mistake the
+      // warning below describes.
+      description="Check it against your own wallet, character by character, before you save it."
+      info="Payouts are sent to this address and nowhere else."
     >
       <div className="max-w-2xl">
         {/* Stated before the change, not after it. Somebody who finds out
@@ -397,7 +412,7 @@ export function RequestPayout({
     <Panel
       icon={ArrowUpRightIcon}
       title="Withdraw"
-      blurb="Finance checks every payout, normally within one working day. The amount is held against your balance while they do, so it cannot be spent twice."
+      info="Finance checks every payout, normally within one working day. The amount is held against your balance while they do, so it cannot be spent twice."
     >
       {hasAddress && belowMinimum && minimumUsd > 0 ? (
         <Note icon={LockIcon} className="mb-4">

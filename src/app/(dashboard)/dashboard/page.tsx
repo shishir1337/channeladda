@@ -1,9 +1,9 @@
 import {
   ArrowUpRightIcon,
   CompassIcon,
+  EyeIcon,
   FingerprintIcon,
   HandshakeIcon,
-  InfoIcon,
   MailWarningIcon,
   PlusIcon,
   StoreIcon,
@@ -14,12 +14,13 @@ import {
 import type { Metadata } from "next";
 import Link from "next/link";
 import type { ComponentType, ReactNode, SVGProps } from "react";
+import { InfoTip } from "@/components/app/info-tip";
 import {
   AllClear,
   Callout,
   Card,
+  CardBody,
   CardHeader,
-  Dot,
   EmptyState,
   IconTile,
   List,
@@ -29,16 +30,15 @@ import {
   Section,
   SeeAll,
   Sep,
+  SplitBar,
   Stat,
   StatGrid,
-  type Tone,
 } from "@/components/app/kit";
 import { statusMeta } from "@/components/dashboard/listing-status";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Price } from "@/components/ui/price";
 import type { ListingStatus, OfferStatus } from "@/generated/prisma/enums";
-import { cn } from "@/lib/utils";
 import { getBuyerSummary, getSellerSummary } from "@/server/dashboard";
 import { getOffersForBuyer, getOffersForSeller } from "@/server/offers";
 import { getMyListings } from "@/server/seller-listings";
@@ -289,14 +289,15 @@ export default async function DashboardPage() {
 
   return (
     <>
+      {/* A greeting and, only when something is waiting, one line on it.
+          The other states said again what the page says just below — the
+          all-clear line, and the live and watching figures under Selling. */}
       <PageHeader
         title={`Hello, ${firstNameOf(user.name)}`}
         description={
           tasks.length > 0
             ? `${tasks.length} ${tasks.length === 1 ? "thing needs" : "things need"} you. Everything else can wait.`
-            : selling.live > 0
-              ? `${selling.live} listing${selling.live === 1 ? "" : "s"} live, ${selling.watching.toLocaleString("en-US")} ${selling.watching === 1 ? "person" : "people"} watching.`
-              : "Nothing needs you. Here is where everything stands."
+            : undefined
         }
         actions={listButton(listIsNext ? "primary" : "secondary")}
       />
@@ -323,8 +324,15 @@ export default async function DashboardPage() {
       {tasks.length === 0 ? (
         <Section>
           <AllClear
-            title="You are all caught up"
-            body="Nothing is waiting on you right now. The moment something is, it appears here and in the menu."
+            title={
+              <>
+                You are all caught up
+                <InfoTip label="About being caught up" className="ml-1.5">
+                  Nothing is waiting on you right now. The moment something is,
+                  it appears here and in the menu.
+                </InfoTip>
+              </>
+            }
           />
         </Section>
       ) : (
@@ -386,7 +394,16 @@ export default async function DashboardPage() {
       {/* ---- money ------------------------------------------------------- */}
       <Section
         title="Your money"
-        description="Lifetime totals. Your spendable balance lives in the wallet."
+        info={
+          <>
+            <p>Lifetime totals. Your spendable balance lives in the wallet.</p>
+            <p className="mt-1.5">
+              On a Safest deal the buyer pays you directly, so that money is
+              counted above but never passes through Channel Adda. Only Fastest
+              sales reach your balance.
+            </p>
+          </>
+        }
       >
         {/* One per row on a phone: these are lifetime money figures, and in
             a wide currency a large one does not fit a half-width card. */}
@@ -412,14 +429,6 @@ export default async function DashboardPage() {
           />
           <WalletDoor />
         </StatGrid>
-        <p className="mt-3 flex items-start gap-2 text-xs leading-relaxed text-subtle">
-          <InfoIcon aria-hidden="true" className="mt-px size-3.5 shrink-0" />
-          <span>
-            On a Safest deal the buyer pays you directly, so that money is
-            counted above but never passes through Channel Adda. Only Fastest
-            sales reach your balance.
-          </span>
-        </p>
       </Section>
 
       {/* ---- the two sides of the desk ----------------------------------- */}
@@ -430,6 +439,17 @@ export default async function DashboardPage() {
               as="h2"
               icon={StoreIcon}
               title="Selling"
+              info={
+                neverSold ? undefined : (
+                  <InfoRows
+                    rows={[
+                      ["Live for buyers to see"],
+                      ["Being checked by us", "Nothing needed from you"],
+                      ["Drafts not sent yet", "Only you can see these"],
+                    ]}
+                  />
+                )
+              }
               actions={<SeeAll href="/dashboard/listings">All listings</SeeAll>}
             />
             {neverSold ? (
@@ -446,30 +466,33 @@ export default async function DashboardPage() {
                 className="py-8"
               />
             ) : (
-              <Figures
-                rows={[
-                  {
-                    label: "Live for buyers to see",
-                    value: selling.live,
-                    note:
-                      selling.watching > 0
-                        ? `${selling.watching.toLocaleString("en-US")} ${selling.watching === 1 ? "person is" : "people are"} watching`
-                        : undefined,
-                    tone: "verified",
-                  },
-                  {
-                    label: "Being checked by us",
-                    value: selling.inReview,
-                    note: "Nothing needed from you",
-                    tone: "info",
-                  },
-                  {
-                    label: "Drafts not sent yet",
-                    value: selling.drafts,
-                    note: "Only you can see these",
-                  },
-                ]}
-              />
+              <CardBody>
+                <SplitBar
+                  label="Your listings: live, in review and drafts"
+                  parts={[
+                    { label: "Live", value: selling.live, tone: "verified" },
+                    {
+                      label: "In review",
+                      value: selling.inReview,
+                      tone: "info",
+                    },
+                    { label: "Drafts", value: selling.drafts, tone: "muted" },
+                  ]}
+                />
+                {selling.watching > 0 ? (
+                  <p className="mt-4 flex items-center gap-1.5 text-[0.8125rem] leading-5 text-muted">
+                    <EyeIcon
+                      aria-hidden="true"
+                      className="size-3.5 shrink-0 text-subtle"
+                    />
+                    <span className="tabular-nums">
+                      {selling.watching.toLocaleString("en-US")}{" "}
+                      {selling.watching === 1 ? "person is" : "people are"}{" "}
+                      watching
+                    </span>
+                  </p>
+                ) : null}
+              </CardBody>
             )}
           </Card>
 
@@ -478,6 +501,17 @@ export default async function DashboardPage() {
               as="h2"
               icon={HandshakeIcon}
               title="Buying"
+              info={
+                neverBought ? undefined : (
+                  <InfoRows
+                    rows={[
+                      ["Offers still open", "Waiting on the seller"],
+                      ["Offers accepted", "The account is held for you"],
+                      ["Accounts bought", "Transfer finished"],
+                    ]}
+                  />
+                )
+              }
               actions={<SeeAll href="/dashboard/offers">All offers</SeeAll>}
             />
             {neverBought ? (
@@ -494,26 +528,20 @@ export default async function DashboardPage() {
                 className="py-8"
               />
             ) : (
-              <Figures
-                rows={[
-                  {
-                    label: "Offers still open",
-                    value: buying.openOffers,
-                    note: "Waiting on the seller",
-                  },
-                  {
-                    label: "Offers accepted",
-                    value: buying.accepted,
-                    note: "The account is held for you",
-                    tone: "verified",
-                  },
-                  {
-                    label: "Accounts bought",
-                    value: buying.bought,
-                    note: "Transfer finished",
-                  },
-                ]}
-              />
+              <CardBody>
+                <SplitBar
+                  label="Your offers: open, accepted and bought"
+                  parts={[
+                    { label: "Open", value: buying.openOffers, tone: "info" },
+                    {
+                      label: "Accepted",
+                      value: buying.accepted,
+                      tone: "verified",
+                    },
+                    { label: "Bought", value: buying.bought },
+                  ]}
+                />
+              </CardBody>
             )}
           </Card>
         </div>
@@ -600,77 +628,52 @@ export default async function DashboardPage() {
  * show one; it matches the stats beside it so the row reads as one band, and
  * where the stats sit two-up it takes the whole row instead of sitting alone
  * at half width.
+ *
+ * What is in the wallet sits behind an (i). A button cannot go inside a link,
+ * so — as `Stat` does — the tip floats over the card, just left of its arrow.
  */
 function WalletDoor() {
   return (
-    <Link
-      href="/dashboard/wallet"
-      className="group flex min-w-0 flex-col rounded-card border border-line bg-surface p-4 shadow-xs transition-[border-color,background-color] duration-150 hover:border-line-strong hover:bg-surface-2/40 sm:col-span-2 lg:col-span-1"
-    >
-      <span className="flex items-center gap-2 text-[0.8125rem] leading-5 font-medium text-muted">
-        <WalletIcon
-          aria-hidden="true"
-          className="size-3.5 shrink-0 text-subtle"
-        />
-        Wallet
-        <ArrowUpRightIcon
-          aria-hidden="true"
-          className="ml-auto size-3.5 shrink-0 text-subtle opacity-60 transition duration-150 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-fg group-hover:opacity-100"
-        />
-      </span>
-      <span className="mt-2 text-[0.9375rem] leading-6 font-semibold text-fg">
-        Open your wallet
-      </span>
-      <span className="mt-1 text-xs leading-snug text-subtle">
+    <div className="relative min-w-0 sm:col-span-2 lg:col-span-1">
+      <Link
+        href="/dashboard/wallet"
+        className="group flex h-full min-w-0 flex-col rounded-card border border-line bg-surface p-4 shadow-xs transition-[border-color,background-color] duration-150 hover:border-line-strong hover:bg-surface-2/40"
+      >
+        <span className="flex items-center gap-2 text-[0.8125rem] leading-5 font-medium text-muted">
+          <WalletIcon
+            aria-hidden="true"
+            className="size-3.5 shrink-0 text-subtle"
+          />
+          Wallet
+          <ArrowUpRightIcon
+            aria-hidden="true"
+            className="ml-auto size-3.5 shrink-0 text-subtle opacity-60 transition duration-150 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-fg group-hover:opacity-100"
+          />
+        </span>
+        <span className="mt-2 text-[0.9375rem] leading-6 font-semibold text-fg">
+          Open your wallet
+        </span>
+      </Link>
+      <InfoTip label="About Wallet" className="absolute top-4 right-9">
         Balance, adding funds, withdrawing, and every movement explained.
-      </span>
-    </Link>
+      </InfoTip>
+    </div>
   );
 }
 
 /**
- * A side's figures as plain label-and-number rows. A zero is greyed so the
- * rows that hold something stand out without colouring every number; the
- * dot says what kind of something it is.
+ * What each part of a card's bar means, for its (i): the name the part had
+ * before it became a bar segment, and what it asks of the reader.
  */
-function Figures({
-  rows,
-}: {
-  rows: {
-    label: string;
-    value: number;
-    note?: string;
-    tone?: Tone;
-  }[];
-}) {
+function InfoRows({ rows }: { rows: [string, string?][] }) {
   return (
-    <dl className="divide-y divide-line">
-      {rows.map((row) => (
-        <div
-          key={row.label}
-          className="flex items-center gap-4 px-4 py-3 sm:px-5"
-        >
-          <dt className="min-w-0 flex-1">
-            <span className="block text-sm leading-5 text-fg">{row.label}</span>
-            {row.note ? (
-              <span className="mt-0.5 block truncate text-[0.8125rem] leading-5 text-muted">
-                {row.note}
-              </span>
-            ) : null}
-          </dt>
-          <dd
-            className={cn(
-              "flex shrink-0 items-center gap-2 text-[0.9375rem] tabular-nums",
-              row.value === 0
-                ? "font-medium text-subtle"
-                : "font-semibold text-fg",
-            )}
-          >
-            {row.tone && row.value > 0 ? <Dot tone={row.tone} /> : null}
-            {row.value.toLocaleString("en-US")}
-          </dd>
-        </div>
+    <ul className="flex flex-col gap-1">
+      {rows.map(([label, note]) => (
+        <li key={label}>
+          <span className="font-medium text-fg">{label}</span>
+          {note ? <> — {note}</> : null}
+        </li>
       ))}
-    </dl>
+    </ul>
   );
 }

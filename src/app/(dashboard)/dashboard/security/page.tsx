@@ -12,6 +12,7 @@ import {
 import type { Metadata } from "next";
 import Link from "next/link";
 import type { ComponentType, ReactNode, SVGProps } from "react";
+import { InfoTip } from "@/components/app/info-tip";
 import {
   Callout,
   Card,
@@ -20,6 +21,7 @@ import {
   CardHeader,
   IconTile,
   PageHeader,
+  Ring,
 } from "@/components/app/kit";
 import { TwoFactorSetup } from "@/components/auth/two-factor-setup";
 import { Badge } from "@/components/ui/badge";
@@ -61,11 +63,54 @@ export default async function SecurityPage() {
 
   const privileged = user.role !== "USER";
 
+  /**
+   * Where the account stands, one row each: a name and a badge on the page,
+   * the why behind each row's (i). Kept as data so the ring above the rows
+   * counts exactly the badges it summarises.
+   */
+  const standing: StatusRowProps[] = [
+    {
+      id: "two-step",
+      icon: SmartphoneIcon,
+      label: "Two-step sign-in",
+      good: twoFactorEnabled,
+      state: twoFactorEnabled ? "On" : "Off",
+      body: twoFactorEnabled
+        ? "Signing in asks for a code from your authenticator app, so your password alone is not enough."
+        : "Your password is the only thing protecting this account right now. A code from your phone takes two minutes to set up.",
+      action: twoFactorEnabled ? null : (
+        <Button asChild size="sm" variant="secondary">
+          <Link href="#two-step">Set it up</Link>
+        </Button>
+      ),
+    },
+    {
+      id: "sign-in",
+      icon: KeyIcon,
+      label: "How you sign in",
+      good: true,
+      state: account !== null ? "Password" : "Google",
+      body:
+        account !== null
+          ? "With an email address and a password. Use one you have used nowhere else."
+          : "With your Google account, so there is no Channel Adda password to steal. Two-step on your Google account protects this one too.",
+    },
+    {
+      id: "payout-hold",
+      icon: TimerIcon,
+      label: "24-hour hold on payout changes",
+      good: true,
+      state: "Always on",
+      body: "Whenever your payout address changes, withdrawals are held for a day. Taking over an account and re-pointing the payout address is how sellers actually lose money, and the delay is the whole defence.",
+    },
+  ];
+  const good = standing.filter((row) => row.good).length;
+
   return (
     <>
       <PageHeader
         title="Security"
-        description="Two-step sign-in and a 24-hour payout hold stand between a stolen password and your money."
+        info="Two-step sign-in and a 24-hour payout hold stand between a stolen password and your money."
       />
 
       {privileged && !twoFactorEnabled ? (
@@ -100,44 +145,22 @@ export default async function SecurityPage() {
             as="h2"
             icon={ShieldCheckIcon}
             title="Where this account stands"
+            actions={
+              <Ring
+                value={good}
+                max={standing.length}
+                label={`${good} of ${standing.length} in good standing`}
+                tone={good === standing.length ? "verified" : "primary"}
+                size={32}
+              >
+                {good}/{standing.length}
+              </Ring>
+            }
           />
           <ul className="divide-y divide-line">
-            <StatusRow
-              icon={SmartphoneIcon}
-              label="Two-step sign-in"
-              good={twoFactorEnabled}
-              state={twoFactorEnabled ? "On" : "Off"}
-              body={
-                twoFactorEnabled
-                  ? "Signing in asks for a code from your authenticator app, so your password alone is not enough."
-                  : "Your password is the only thing protecting this account right now. A code from your phone takes two minutes to set up."
-              }
-              action={
-                twoFactorEnabled ? null : (
-                  <Button asChild size="sm" variant="secondary">
-                    <Link href="#two-step">Set it up</Link>
-                  </Button>
-                )
-              }
-            />
-            <StatusRow
-              icon={KeyIcon}
-              label="How you sign in"
-              good
-              state={account !== null ? "Password" : "Google"}
-              body={
-                account !== null
-                  ? "With an email address and a password. Use one you have used nowhere else."
-                  : "With your Google account, so there is no Channel Adda password to steal. Two-step on your Google account protects this one too."
-              }
-            />
-            <StatusRow
-              icon={TimerIcon}
-              label="24-hour hold on payout changes"
-              good
-              state="Always on"
-              body="Whenever your payout address changes, withdrawals are held for a day. Taking over an account and re-pointing the payout address is how sellers actually lose money, and the delay is the whole defence."
-            />
+            {standing.map((row) => (
+              <StatusRow key={row.id} {...row} />
+            ))}
           </ul>
         </Card>
 
@@ -219,41 +242,36 @@ export default async function SecurityPage() {
   );
 }
 
-/** One line of the account's standing: what it is, where it stands, why. */
-function StatusRow({
-  icon,
-  label,
-  state,
-  good,
-  body,
-  action,
-}: {
+type StatusRowProps = {
+  id: string;
   icon: Icon;
   label: string;
   state: string;
   good: boolean;
   body: string;
   action?: ReactNode;
-}) {
+};
+
+/**
+ * One line of the account's standing: what it is and where it stands, with
+ * the why behind the (i) beside its name.
+ */
+function StatusRow({ icon, label, state, good, body, action }: StatusRowProps) {
   return (
-    <li className="flex flex-col gap-3 px-4 py-3.5 sm:flex-row sm:items-start sm:gap-4 sm:px-5">
-      <div className="flex min-w-0 flex-1 items-start gap-3">
-        <IconTile icon={icon} />
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-sm leading-6 font-medium text-fg">{label}</h3>
-            <Badge size="sm" variant={good ? "verified" : "primary"}>
-              {state}
-            </Badge>
-          </div>
-          <p className="mt-0.5 max-w-[72ch] text-[0.8125rem] leading-relaxed text-muted">
-            {body}
-          </p>
-        </div>
+    <li className="flex items-center gap-3 px-4 py-3 sm:px-5">
+      <IconTile icon={icon} />
+      <div className="flex min-w-0 flex-1 items-center gap-1.5">
+        <h3 className="min-w-0 text-sm leading-5 font-medium text-fg">
+          {label}
+        </h3>
+        <InfoTip label={`About ${label}`}>{body}</InfoTip>
       </div>
-      {action ? (
-        <div className="shrink-0 pl-11 sm:pt-0.5 sm:pl-0">{action}</div>
-      ) : null}
+      <div className="flex shrink-0 items-center gap-3">
+        <Badge size="sm" variant={good ? "verified" : "primary"}>
+          {state}
+        </Badge>
+        {action}
+      </div>
     </li>
   );
 }
