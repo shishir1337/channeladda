@@ -1,5 +1,12 @@
 "use client";
 
+import {
+  Loader2Icon,
+  PauseIcon,
+  PencilIcon,
+  PlayIcon,
+  TrashIcon,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { FormNotice } from "@/components/auth/fields";
@@ -44,15 +51,16 @@ export function ListingControls({
     <div className="flex flex-col gap-3">
       {error ? <FormNotice>{error}</FormNotice> : null}
 
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-wrap items-center gap-2">
         {status === "LIVE" ? (
           <Button
             type="button"
             variant="secondary"
-            size="md"
+            size="sm"
             disabled={pending}
             onClick={() => run(() => setPaused(listingId, true))}
           >
+            <PauseIcon aria-hidden="true" />
             Pause listing
           </Button>
         ) : null}
@@ -60,10 +68,11 @@ export function ListingControls({
         {status === "PAUSED" ? (
           <Button
             type="button"
-            size="md"
+            size="sm"
             disabled={pending}
             onClick={() => run(() => setPaused(listingId, false))}
           >
+            <PlayIcon aria-hidden="true" />
             Put it back up
           </Button>
         ) : null}
@@ -72,10 +81,11 @@ export function ListingControls({
           <Button
             type="button"
             variant="secondary"
-            size="md"
+            size="sm"
             disabled={pending}
             onClick={() => run(() => withdrawFromReview(listingId))}
           >
+            <PencilIcon aria-hidden="true" />
             Pull it back to edit
           </Button>
         ) : null}
@@ -85,8 +95,8 @@ export function ListingControls({
             <>
               <Button
                 type="button"
-                variant="secondary"
-                size="md"
+                variant="danger"
+                size="sm"
                 disabled={pending}
                 onClick={() =>
                   startTransition(async () => {
@@ -100,12 +110,17 @@ export function ListingControls({
                   })
                 }
               >
+                {pending ? (
+                  <Loader2Icon aria-hidden="true" className="animate-spin" />
+                ) : (
+                  <TrashIcon aria-hidden="true" />
+                )}
                 {pending ? "Deleting…" : "Yes, delete it"}
               </Button>
               <Button
                 type="button"
                 variant="ghost"
-                size="md"
+                size="sm"
                 onClick={() => setConfirmingDelete(false)}
               >
                 Keep it
@@ -115,10 +130,12 @@ export function ListingControls({
             <Button
               type="button"
               variant="ghost"
-              size="md"
+              size="sm"
+              className="hover:text-danger"
               disabled={pending}
               onClick={() => setConfirmingDelete(true)}
             >
+              <TrashIcon aria-hidden="true" />
               Delete draft
             </Button>
           )

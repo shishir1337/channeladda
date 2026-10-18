@@ -247,15 +247,15 @@ export function ImageUpload({
 
   return (
     <div className={className}>
-      <p className="block text-sm font-medium text-fg">{label}</p>
+      <p className="block text-[0.8125rem] font-medium text-fg">{label}</p>
       {hint ? (
-        <p id={hintId} className="mt-1 text-xs text-subtle">
+        <p id={hintId} className="mt-1 text-xs leading-relaxed text-subtle">
           {hint}
         </p>
       ) : null}
 
       {value && !multiple ? (
-        <div className="mt-2 flex items-start gap-3">
+        <div className="mt-1.5 flex items-start gap-3">
           {/* biome-ignore lint/performance/noImgElement: a preview of a file the
               person just picked. next/image would round-trip their own upload
               through the optimiser to render a thumbnail. Dimensions are set,
@@ -266,7 +266,7 @@ export function ImageUpload({
             width={aspect === "square" ? 80 : 144}
             height={80}
             className={cn(
-              "rounded-xl border border-line object-cover",
+              "rounded-lg border border-line object-cover shadow-xs",
               aspect === "square" ? "size-20" : "h-20 w-36",
             )}
           />
@@ -277,9 +277,9 @@ export function ImageUpload({
               setItems([]);
               setNotice(null);
             }}
-            className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border border-line px-3 text-sm text-muted transition-colors hover:border-danger/50 hover:text-danger"
+            className="inline-flex h-11 cursor-pointer items-center gap-1.5 rounded-lg border border-line bg-surface px-3 text-[0.8125rem] font-medium text-muted shadow-xs transition-colors duration-150 pointer-fine:h-8 pointer-fine:px-2.5 hover:border-danger/40 hover:text-danger dark:bg-surface-2"
           >
-            <TrashIcon aria-hidden="true" className="size-4" />
+            <TrashIcon aria-hidden="true" className="size-3.5" />
             Remove
             <span className="sr-only"> {label.toLowerCase()}</span>
           </button>
@@ -299,11 +299,11 @@ export function ImageUpload({
               if (!busy) void accept(e.dataTransfer.files);
             }}
             className={cn(
-              "mt-2 flex min-h-[6.5rem] flex-col items-center justify-center gap-2 rounded-xl border border-dashed px-4 py-5 text-center transition-colors",
+              "group mt-1.5 flex min-h-[6.5rem] flex-col items-center justify-center gap-2 rounded-lg border border-dashed px-4 py-5 text-center transition-colors duration-150",
               busy ? "cursor-progress" : "cursor-pointer",
               dragging
-                ? "border-primary bg-primary-soft"
-                : "border-line bg-surface-2 hover:border-line-strong",
+                ? "border-primary bg-primary-soft/60"
+                : "border-line-strong bg-surface hover:border-fg/25 hover:bg-surface-2/50 dark:bg-surface-2/40",
               error && "border-danger",
             )}
           >
@@ -311,9 +311,9 @@ export function ImageUpload({
               <>
                 <Loader2Icon
                   aria-hidden="true"
-                  className="size-5 animate-spin text-primary-text"
+                  className="size-4 animate-spin text-muted"
                 />
-                <span className="text-sm text-muted">
+                <span className="text-[0.8125rem] text-muted">
                   {multiple && active.length > 1
                     ? `Uploading — ${active.length} to go…`
                     : "Uploading…"}
@@ -321,15 +321,15 @@ export function ImageUpload({
               </>
             ) : (
               <>
-                <span className="flex size-9 items-center justify-center rounded-lg bg-surface text-subtle">
+                <span className="flex size-9 items-center justify-center rounded-lg border border-line bg-surface text-muted shadow-xs transition-transform duration-150 group-hover:-translate-y-0.5 dark:bg-surface-2">
                   {aspect === "square" ? (
                     <ImageIcon aria-hidden="true" className="size-4" />
                   ) : (
                     <UploadIcon aria-hidden="true" className="size-4" />
                   )}
                 </span>
-                <span className="text-sm text-muted">
-                  <span className="font-medium text-primary-text">
+                <span className="text-[0.8125rem] text-muted">
+                  <span className="font-medium text-fg underline decoration-line-strong underline-offset-4">
                     {multiple ? "Choose files" : "Choose a file"}
                   </span>{" "}
                   {multiple ? "or drag them here" : "or drag it here"}
@@ -358,13 +358,19 @@ export function ImageUpload({
       )}
 
       {error ? (
-        <p id={errorId} role="alert" className="mt-2 text-sm text-danger">
+        <p
+          id={errorId}
+          role="alert"
+          className="mt-1.5 text-[0.8125rem] text-danger"
+        >
           {error}
         </p>
       ) : null}
 
       {notice ? (
-        <output className="mt-2 block text-sm text-muted">{notice}</output>
+        <output className="mt-1.5 block text-[0.8125rem] text-muted">
+          {notice}
+        </output>
       ) : null}
 
       {items.length > 0 ? (
@@ -383,19 +389,19 @@ export function ImageUpload({
               <li
                 key={item.id}
                 className={cn(
-                  "rounded-xl border p-3",
+                  "rounded-lg border p-3",
                   item.state === "failed"
-                    ? "border-danger/40 bg-danger-soft"
-                    : "border-line bg-surface-2",
+                    ? "border-danger/30 bg-danger-soft/70"
+                    : "border-line bg-surface shadow-xs dark:bg-surface-2",
                 )}
               >
                 <div className="flex items-center gap-3">
-                  <span className="min-w-0 flex-1 truncate text-sm text-fg">
+                  <span className="min-w-0 flex-1 truncate text-[0.8125rem] text-fg">
                     {item.name}
                   </span>
                   <span
                     aria-hidden="true"
-                    className="tnum shrink-0 text-xs text-subtle"
+                    className="shrink-0 text-xs text-subtle tabular-nums"
                   >
                     {item.state === "sending"
                       ? `${Math.round(item.progress * 100)}%`
@@ -407,7 +413,10 @@ export function ImageUpload({
 
                 {item.state === "failed" ? (
                   <>
-                    <p role="alert" className="mt-1.5 text-sm text-danger">
+                    <p
+                      role="alert"
+                      className="mt-1.5 text-[0.8125rem] text-danger"
+                    >
                       {item.error}
                     </p>
                     <div className="mt-2 flex flex-wrap gap-2">
@@ -416,11 +425,11 @@ export function ImageUpload({
                           type="button"
                           disabled={busy || active.length >= limit}
                           onClick={() => void upload(item)}
-                          className="inline-flex min-h-11 cursor-pointer items-center gap-1.5 rounded-xl border border-line bg-surface px-3 text-sm text-muted transition-colors hover:border-line-strong hover:text-fg disabled:cursor-not-allowed disabled:opacity-50"
+                          className="inline-flex h-11 cursor-pointer items-center gap-1.5 rounded-lg border border-line bg-surface px-3 text-[0.8125rem] font-medium text-muted shadow-xs transition-colors duration-150 pointer-fine:h-8 pointer-fine:px-2.5 hover:border-line-strong hover:text-fg disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           <RotateCcwIcon
                             aria-hidden="true"
-                            className="size-4"
+                            className="size-3.5"
                           />
                           Try again
                           <span className="sr-only"> with {item.name}</span>
@@ -433,9 +442,9 @@ export function ImageUpload({
                             list.filter((i) => i.id !== item.id),
                           )
                         }
-                        className="inline-flex min-h-11 cursor-pointer items-center gap-1.5 rounded-xl px-3 text-sm text-muted transition-colors hover:bg-surface hover:text-fg"
+                        className="inline-flex h-11 cursor-pointer items-center gap-1.5 rounded-lg px-3 text-[0.8125rem] font-medium text-muted transition-colors duration-150 pointer-fine:h-8 pointer-fine:px-2.5 hover:bg-black/[0.04] hover:text-fg dark:hover:bg-white/[0.06]"
                       >
-                        <XIcon aria-hidden="true" className="size-4" />
+                        <XIcon aria-hidden="true" className="size-3.5" />
                         Dismiss
                         <span className="sr-only"> {item.name}</span>
                       </button>
@@ -448,7 +457,7 @@ export function ImageUpload({
                     aria-valuemin={0}
                     aria-valuemax={100}
                     aria-valuenow={Math.round(item.progress * 100)}
-                    className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-3"
+                    className="mt-2 h-1 overflow-hidden rounded-full bg-surface-3"
                   >
                     <div
                       className="h-full rounded-full bg-primary transition-[width] duration-200"

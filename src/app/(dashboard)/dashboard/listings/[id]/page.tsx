@@ -1,7 +1,5 @@
 import {
-  ArrowLeftIcon,
   BadgeCheckIcon,
-  CircleAlertIcon,
   ExternalLinkIcon,
   ImageIcon,
   ShieldAlertIcon,
@@ -9,6 +7,19 @@ import {
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import {
+  AllClear,
+  Callout,
+  Card,
+  CardBody,
+  Count,
+  Fact,
+  Facts,
+  PageHeader,
+  Section,
+  Sep,
+  TurnFlag,
+} from "@/components/app/kit";
 import { ListingControls } from "@/components/dashboard/listing-actions";
 import {
   ListingForm,
@@ -19,8 +30,8 @@ import {
   statusMeta,
 } from "@/components/dashboard/listing-status";
 import { OwnershipPanel } from "@/components/dashboard/ownership-check";
-import { Section } from "@/components/dashboard/page-parts";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { platforms } from "@/data/platforms";
 import type { ListingStatus } from "@/generated/prisma/enums";
 import { cn } from "@/lib/utils";
@@ -81,6 +92,19 @@ const AT: Record<ListingStatus, number> = {
 /** Statuses where the stop the listing is parked at is a problem. */
 const STUCK: readonly ListingStatus[] = ["REJECTED", "REMOVED"];
 
+/**
+ * The stop a listing is parked at takes its status badge's colour, so the
+ * bar and the badge never disagree: gold when the move is the seller's, blue
+ * while it is with us, green once it is on sale.
+ */
+const CURRENT_BAR: Record<string, string> = {
+  neutral: "bg-fg/70",
+  primary: "bg-primary",
+  info: "bg-info",
+  verified: "bg-verified",
+  danger: "bg-danger",
+};
+
 /** Statuses that give the seller something to press. */
 const HAS_CONTROLS: readonly ListingStatus[] = [
   "DRAFT",
@@ -115,16 +139,40 @@ export default async function SellerListingPage({
 
   return (
     <>
-      <Link
-        href="/dashboard/listings"
-        className="inline-flex min-h-11 items-center gap-1.5 text-sm text-muted transition-colors hover:text-fg"
-      >
-        <ArrowLeftIcon aria-hidden="true" className="size-4" />
-        Your listings
-      </Link>
+      <PageHeader
+        back={{ href: "/dashboard/listings", label: "Your listings" }}
+        title={listing.title || listing.handle}
+        description={meta.note}
+        meta={
+          <>
+            <ListingStatusBadge status={listing.status} size="sm" />
+            {verified ? (
+              <Badge variant="verified">
+                <BadgeCheckIcon aria-hidden="true" />
+                Ownership verified
+              </Badge>
+            ) : listing.status === "DRAFT" ? null : (
+              <Badge variant="neutral">
+                <ShieldAlertIcon aria-hidden="true" />
+                Not verified yet
+              </Badge>
+            )}
+          </>
+        }
+        actions={
+          listing.status === "LIVE" ? (
+            <Button asChild variant="secondary" size="md">
+              <Link href={`/listing/${listing.slug}`}>
+                View as a buyer
+                <ExternalLinkIcon aria-hidden="true" />
+              </Link>
+            </Button>
+          ) : undefined
+        }
+      />
 
-      <div className="mt-2 overflow-hidden rounded-panel border border-line bg-surface">
-        <div className="h-20 w-full bg-surface-2 sm:h-28">
+      <Card className="overflow-hidden">
+        <div className="h-20 w-full border-b border-line bg-surface-2 sm:h-24">
           {listing.coverUrl ? (
             <>
               {/* biome-ignore lint/performance/noImgElement: the seller's own
@@ -143,8 +191,8 @@ export default async function SellerListingPage({
           )}
         </div>
 
-        <div className="px-4 pb-5 sm:px-6 sm:pb-6">
-          <div className="-mt-8 flex flex-wrap items-end gap-4 sm:-mt-10">
+        <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3 px-4 pb-4 sm:px-5">
+          <div className="flex min-w-0 items-end gap-3">
             {listing.avatarUrl ? (
               <>
                 {/* biome-ignore lint/performance/noImgElement: the account's
@@ -154,133 +202,98 @@ export default async function SellerListingPage({
                   alt=""
                   width={80}
                   height={80}
-                  className="size-16 shrink-0 rounded-2xl border border-line bg-surface object-cover sm:size-20"
+                  className="-mt-7 size-14 shrink-0 rounded-lg border border-line bg-surface object-cover shadow-xs ring-4 ring-surface"
                 />
               </>
             ) : (
-              <span className="flex size-16 shrink-0 items-center justify-center rounded-2xl border border-line bg-surface text-subtle sm:size-20">
+              <span className="-mt-7 flex size-14 shrink-0 items-center justify-center rounded-lg border border-line bg-surface text-subtle shadow-xs ring-4 ring-surface">
                 <ImageIcon aria-hidden="true" className="size-5" />
               </span>
             )}
-            <div className="flex flex-wrap items-center gap-2 pb-1">
-              <ListingStatusBadge status={listing.status} />
-              {verified ? (
-                <Badge variant="verified" size="md">
-                  <BadgeCheckIcon aria-hidden="true" />
-                  Ownership verified
-                </Badge>
-              ) : listing.status === "DRAFT" ? null : (
-                <Badge variant="neutral" size="md">
-                  <ShieldAlertIcon aria-hidden="true" />
-                  Not verified yet
-                </Badge>
-              )}
-            </div>
-          </div>
-
-          <div className="mt-4 flex flex-wrap items-start justify-between gap-4">
-            <div className="min-w-0">
-              <h1 className="font-display text-2xl font-black tracking-tight text-fg sm:text-3xl">
-                {listing.title || listing.handle}
-              </h1>
-              <p className="mt-2 text-sm text-muted">
-                <span className="capitalize">{platformName}</span> ·{" "}
-                {listing.handle} ·{" "}
-                <span className="tnum">
+            <p className="flex min-w-0 flex-wrap items-center gap-x-1.5 pb-0.5 text-[0.8125rem] text-muted">
+              <span className="font-medium text-fg capitalize">
+                {platformName}
+              </span>
+              <Sep />
+              <span className="break-all">{listing.handle}</span>
+              <Sep />
+              <span className="whitespace-nowrap">
+                <span className="tabular-nums">
                   {listing.audience.toLocaleString("en-US")}
                 </span>{" "}
                 audience
-              </p>
-            </div>
-            <div className="shrink-0 text-right">
-              <p className="text-xs text-subtle">Asking price</p>
-              <p className="tnum font-display text-2xl font-black text-fg">
-                {usd(listing.price)}
-              </p>
-              {listing.status === "LIVE" ? (
-                <p className="tnum text-xs text-subtle">
-                  {listing.watching} watching
-                </p>
-              ) : null}
-            </div>
+              </span>
+            </p>
           </div>
-
-          {/* Where it is on the road, and what that means. */}
-          <ol className="mt-5 grid grid-cols-4 gap-1.5 sm:gap-2.5">
-            {PIPELINE.map((stop, i) => {
-              const at = AT[listing.status];
-              const current = i === at;
-              const passed = i < at;
-              const stuck = current && STUCK.includes(listing.status);
-              return (
-                <li key={stop} aria-current={current ? "step" : undefined}>
-                  <span
-                    className={cn(
-                      "block h-1.5 rounded-full",
-                      stuck
-                        ? "bg-danger"
-                        : passed
-                          ? "bg-verified"
-                          : current
-                            ? "bg-primary"
-                            : "bg-surface-3",
-                    )}
-                  />
-                  <span
-                    className={cn(
-                      "mt-2 block text-[0.6875rem] sm:text-xs",
-                      stuck
-                        ? "font-semibold text-danger"
-                        : current
-                          ? "font-semibold text-fg"
-                          : passed
-                            ? "text-muted"
-                            : "text-subtle",
-                    )}
-                  >
-                    {stop}
-                  </span>
-                </li>
-              );
-            })}
-          </ol>
-
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
-            <p className="max-w-[60ch] text-sm leading-relaxed text-muted">
-              {meta.note}
+          <div className="pt-3 sm:text-right">
+            <p className="text-xs text-subtle">Asking price</p>
+            <p className="text-[1.375rem] leading-7 font-semibold tracking-[-0.02em] text-fg tabular-nums">
+              {usd(listing.price)}
             </p>
             {listing.status === "LIVE" ? (
-              <Link
-                href={`/listing/${listing.slug}`}
-                className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-xl border border-line px-4 text-sm text-muted transition-colors hover:border-line-strong hover:text-fg"
-              >
-                View as a buyer
-                <ExternalLinkIcon aria-hidden="true" className="size-4" />
-              </Link>
+              <p className="text-xs text-subtle tabular-nums">
+                {listing.watching} watching
+              </p>
             ) : null}
           </div>
         </div>
-      </div>
+
+        {/* Where it is on the road, and what that means. */}
+        <ol className="grid grid-cols-4 gap-1.5 border-t border-line px-4 py-3.5 sm:gap-2 sm:px-5">
+          {PIPELINE.map((stop, i) => {
+            const at = AT[listing.status];
+            const current = i === at;
+            const passed = i < at;
+            const stuck = current && STUCK.includes(listing.status);
+            return (
+              <li key={stop} aria-current={current ? "step" : undefined}>
+                <span
+                  className={cn(
+                    "block h-1 rounded-full",
+                    stuck
+                      ? "bg-danger"
+                      : passed
+                        ? "bg-fg/70"
+                        : current
+                          ? (CURRENT_BAR[meta.variant ?? "neutral"] ??
+                            "bg-fg/70")
+                          : "bg-surface-3",
+                  )}
+                />
+                <span
+                  className={cn(
+                    "mt-2 block text-xs",
+                    stuck
+                      ? "font-medium text-danger"
+                      : current
+                        ? "font-medium text-fg"
+                        : passed
+                          ? "text-muted"
+                          : "text-subtle",
+                  )}
+                >
+                  {stop}
+                </span>
+              </li>
+            );
+          })}
+        </ol>
+      </Card>
 
       {listing.status === "REJECTED" && listing.rejectionReason ? (
-        <div className="mt-6 rounded-panel border border-danger/30 bg-danger-soft p-5 sm:p-6">
-          <h2 className="flex items-center gap-2 font-display text-base font-bold text-fg sm:text-lg">
-            <CircleAlertIcon
-              aria-hidden="true"
-              className="size-[1.15rem] shrink-0 text-danger"
-            />
-            What needs changing
-          </h2>
-          <p className="mt-2.5 max-w-[68ch] text-sm leading-relaxed text-fg">
+        <Callout tone="danger" title="What needs changing" className="mt-6">
+          <p className="max-w-[68ch] text-sm leading-relaxed text-fg">
             {listing.rejectionReason}
           </p>
-          <p className="mt-3 border-t border-danger/20 pt-3 text-sm leading-relaxed text-muted">
+          <p className="mt-2 max-w-[68ch]">
             Nothing is lost. Change what the note asks for in the form below,
             then press{" "}
-            <span className="text-fg">Save and verify ownership</span> again to
-            send it back. This note disappears as soon as you save.
+            <span className="font-medium text-fg">
+              Save and verify ownership
+            </span>{" "}
+            again to send it back. This note disappears as soon as you save.
           </p>
-        </div>
+        </Callout>
       ) : null}
 
       {verified ? (
@@ -288,25 +301,20 @@ export default async function SellerListingPage({
           title="Ownership check"
           description="Done. This is the part buyers trust most."
         >
-          <div className="rounded-panel border border-verified/30 bg-verified-soft p-5 sm:p-6">
-            <p className="flex items-center gap-2 font-display text-base font-bold text-fg">
-              <BadgeCheckIcon
-                aria-hidden="true"
-                className="size-[1.15rem] shrink-0 text-verified"
-              />
-              Ownership verified
-              {listing.ownershipVerifiedAt ? (
-                <span className="text-sm font-normal text-muted">
-                  on {fullDay(listing.ownershipVerifiedAt)}
-                </span>
-              ) : null}
-            </p>
-            <p className="mt-2 max-w-[68ch] text-sm leading-relaxed text-muted">
-              We read your code from the {platformName} account itself, so
-              buyers see a verified badge on this listing. You can take the code
-              out of your description now.
-            </p>
-          </div>
+          <AllClear
+            title={
+              <>
+                Ownership verified
+                {listing.ownershipVerifiedAt ? (
+                  <span className="font-normal text-muted">
+                    {" "}
+                    on {fullDay(listing.ownershipVerifiedAt)}
+                  </span>
+                ) : null}
+              </>
+            }
+            body={`We read your code from the ${platformName} account itself, so buyers see a verified badge on this listing. You can take the code out of your description now.`}
+          />
         </Section>
       ) : null}
 
@@ -315,10 +323,15 @@ export default async function SellerListingPage({
           title="Ownership check"
           description={
             listing.status === "CODE_CHECK"
-              ? "Your move. Until we can see the code, nothing goes in front of buyers."
+              ? "Until we can see the code, nothing goes in front of buyers."
               : listing.status === "ADMIN_REVIEW"
-                ? "A moderator is looking. Leave the code where it is until this clears."
+                ? // The panel says "A moderator is looking" itself; saying
+                  // it twice in a hundred pixels reads as a glitch.
+                  undefined
                 : "This listing is not ownership-verified yet. Buyers trust a verified listing far more, and it only takes a minute."
+          }
+          actions={
+            listing.status === "CODE_CHECK" ? <TurnFlag mine /> : undefined
           }
         >
           <OwnershipPanel
@@ -388,7 +401,9 @@ export default async function SellerListingPage({
                 : undefined
           }
         >
-          <ListingControls listingId={listing.id} status={listing.status} />
+          <Card padded>
+            <ListingControls listingId={listing.id} status={listing.status} />
+          </Card>
         </Section>
       ) : (
         <div className="mt-8">
@@ -424,35 +439,43 @@ function ReadOnlySummary({
       title="The details"
       description="Locked while this listing is with us. Pull it back to make changes."
     >
-      <div className="rounded-panel border border-line bg-surface p-5 sm:p-6">
-        <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
-          {rows.map(([label, value]) => (
-            <div
-              key={label}
-              className="flex justify-between gap-4 border-b border-line pb-2"
-            >
-              <dt className="text-sm text-subtle">{label}</dt>
-              <dd className="tnum text-sm font-medium text-fg">{value}</dd>
-            </div>
-          ))}
-        </dl>
+      <Card>
+        <CardBody className="py-2 sm:py-2.5">
+          <Facts columns={2}>
+            {rows.map(([label, value], i) => (
+              <Fact
+                key={label}
+                label={label}
+                // Two columns: the last row of the left one closes the card
+                // too, so it drops its rule like the very last row does.
+                className={
+                  rows.length % 2 === 0 && i === rows.length - 2
+                    ? "sm:border-b-0"
+                    : undefined
+                }
+              >
+                {value}
+              </Fact>
+            ))}
+          </Facts>
+        </CardBody>
 
         {listing.description ? (
-          <>
-            <h3 className="mt-6 text-sm font-semibold text-fg">
+          <div className="border-t border-line p-4 sm:p-5">
+            <h3 className="text-sm font-semibold text-fg">
               About this account
             </h3>
-            <p className="mt-2 max-w-[68ch] text-sm leading-relaxed whitespace-pre-line text-muted">
+            <p className="mt-1.5 max-w-[68ch] text-sm leading-relaxed whitespace-pre-line text-muted">
               {listing.description}
             </p>
-          </>
+          </div>
         ) : null}
 
         {listing.proofs.length > 0 ? (
-          <>
-            <h3 className="mt-6 text-sm font-semibold text-fg">
-              Proof you sent (
-              <span className="tnum">{listing.proofs.length}</span>)
+          <div className="border-t border-line p-4 sm:p-5">
+            <h3 className="flex items-center gap-2 text-sm font-semibold text-fg">
+              Proof you sent
+              <Count value={listing.proofs.length} label="screenshots" />
             </h3>
             <ul className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
               {listing.proofs.map((proof) => (
@@ -464,17 +487,17 @@ function ReadOnlySummary({
                     alt=""
                     width={160}
                     height={104}
-                    className="h-[6.5rem] w-full rounded-lg border border-line object-cover"
+                    className="h-[6.5rem] w-full rounded-lg border border-line bg-surface-2 object-cover"
                   />
-                  <p className="mt-1.5 text-xs leading-relaxed text-subtle">
+                  <p className="mt-1.5 text-xs leading-relaxed text-muted">
                     {proof.label}
                   </p>
                 </li>
               ))}
             </ul>
-          </>
+          </div>
         ) : null}
-      </div>
+      </Card>
     </Section>
   );
 }

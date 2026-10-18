@@ -17,6 +17,7 @@ import {
 import { useRouter } from "next/navigation";
 import type { ComponentType, ReactNode, SVGProps } from "react";
 import { useEffect, useId, useRef, useState, useTransition } from "react";
+import { IconTile, inputClass, labelClass } from "@/components/app/kit";
 import { FormNotice, TextArea, TextField } from "@/components/auth/fields";
 import {
   ChannelImport,
@@ -168,6 +169,13 @@ function focusTarget(elementId: string) {
 
 type StepState = "done" | "todo" | "error" | "optional";
 
+/**
+ * Clears the dashboard header and the pinned progress bar, so a section
+ * reached from the bar's links lands with its title in view rather than
+ * tucked underneath it.
+ */
+const SECTION_SCROLL = "scroll-mt-52 sm:scroll-mt-40";
+
 /** One numbered block of the form. */
 function FormSection({
   id,
@@ -195,34 +203,40 @@ function FormSection({
       id={id}
       aria-labelledby={`${id}-title`}
       className={cn(
-        "scroll-mt-24 overflow-hidden rounded-panel border bg-surface",
+        SECTION_SCROLL,
+        "rounded-card border bg-surface shadow-xs transition-colors duration-150",
         state === "error" ? "border-danger/40" : "border-line",
       )}
     >
-      <div className="flex flex-wrap items-center gap-3 border-b border-line bg-surface-2 px-4 py-3.5 sm:px-6 sm:py-4">
-        <span
-          className={cn(
-            "flex size-9 shrink-0 items-center justify-center rounded-xl border",
+      <div className="flex items-start gap-3 border-b border-line px-4 py-3.5 sm:px-5">
+        <IconTile
+          icon={Icon}
+          size="sm"
+          tone={
             state === "done"
-              ? "border-verified/30 bg-verified-soft text-verified"
+              ? "verified"
               : state === "error"
-                ? "border-danger/30 bg-danger-soft text-danger"
-                : "border-line bg-surface text-muted",
-          )}
-        >
-          <Icon aria-hidden="true" className="size-[1.15rem]" />
-        </span>
+                ? "danger"
+                : "neutral"
+          }
+          className="mt-0.5"
+        />
         <div className="min-w-0 flex-1">
-          <p className="font-mono text-[0.625rem] font-semibold tracking-[0.12em] text-subtle uppercase">
-            Step <span className="tnum">{step}</span> of{" "}
-            <span className="tnum">{of}</span>
+          <p className="text-xs leading-5 text-subtle">
+            Step <span className="tabular-nums">{step}</span> of{" "}
+            <span className="tabular-nums">{of}</span>
           </p>
           <h2
             id={`${id}-title`}
-            className="font-display text-base font-bold text-fg sm:text-lg"
+            className="text-sm leading-5 font-semibold text-fg"
           >
             {title}
           </h2>
+          {description ? (
+            <p className="mt-1 max-w-[72ch] text-[0.8125rem] leading-relaxed text-muted">
+              {description}
+            </p>
+          ) : null}
         </div>
         <Badge
           variant={
@@ -232,7 +246,8 @@ function FormSection({
                 ? "danger"
                 : "neutral"
           }
-          size="md"
+          size="sm"
+          className="mt-0.5"
         >
           {state === "done" ? (
             <CheckIcon aria-hidden="true" />
@@ -243,16 +258,7 @@ function FormSection({
         </Badge>
       </div>
 
-      <div className="px-4 py-5 sm:px-6">
-        {description ? (
-          <p className="max-w-[68ch] text-sm leading-relaxed text-muted">
-            {description}
-          </p>
-        ) : null}
-        <div className={cn("flex flex-col gap-5", description && "mt-5")}>
-          {children}
-        </div>
-      </div>
+      <div className="flex flex-col gap-5 p-4 sm:p-5">{children}</div>
     </section>
   );
 }
@@ -271,13 +277,15 @@ function Requirement({
     <li className="flex items-start gap-3">
       <span
         className={cn(
-          "mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border",
+          "mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border transition-colors duration-150",
           done
-            ? "border-verified/40 bg-verified-soft text-verified"
-            : "border-line-strong text-subtle",
+            ? "border-verified/30 bg-verified-soft text-verified"
+            : "border-line-strong bg-surface text-subtle",
         )}
       >
-        {done ? <CheckIcon aria-hidden="true" className="size-3" /> : null}
+        {done ? (
+          <CheckIcon aria-hidden="true" className="size-3" strokeWidth={3} />
+        ) : null}
       </span>
       <span className="min-w-0 flex-1 text-sm leading-relaxed">
         <span className={done ? "text-muted" : "text-fg"}>{label}</span>
@@ -285,7 +293,7 @@ function Requirement({
           <button
             type="button"
             onClick={() => focusTarget(target)}
-            className="ml-2 cursor-pointer text-sm text-primary-text underline-offset-4 hover:underline"
+            className="ml-2 cursor-pointer rounded-sm text-[0.8125rem] font-medium text-muted underline decoration-line-strong underline-offset-4 transition-colors duration-150 hover:text-fg hover:decoration-fg"
           >
             Go there
           </button>
@@ -610,7 +618,7 @@ export function ListingForm({
   const busy = pending || sending !== null;
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="flex flex-col gap-4 sm:gap-5">
       {/* Outside the form: pasting a link fills the fields in, it does not
           submit anything. */}
       <ChannelImport
@@ -619,7 +627,7 @@ export function ListingForm({
       />
 
       <form
-        className="flex flex-col gap-5"
+        className="flex flex-col gap-4 sm:gap-5"
         onSubmit={(e) => {
           e.preventDefault();
           submit(false);
@@ -627,14 +635,14 @@ export function ListingForm({
       >
         {/* Progress, pinned under the dashboard header: on a form this long
             the one question people ask is how much is left. */}
-        <div className="sticky top-14 z-10 rounded-card border border-line bg-bg/92 px-4 py-3 shadow-soft backdrop-blur-xl">
+        <div className="sticky top-14 z-10 rounded-card border border-line bg-bg/85 px-3 py-2.5 backdrop-blur-xl sm:px-4">
           <div className="flex items-center justify-between gap-3">
-            <p className="text-sm font-medium text-fg">
+            <p className="text-[0.8125rem] leading-5 font-medium text-fg">
               {remaining === 0
                 ? "Everything needed is filled in"
                 : `${remaining} ${remaining === 1 ? "field" : "fields"} left to fill in`}
             </p>
-            <p className="tnum shrink-0 text-xs text-subtle">
+            <p className="shrink-0 text-xs text-subtle tabular-nums">
               {totalDone}/{totalRequired}
             </p>
           </div>
@@ -644,14 +652,17 @@ export function ListingForm({
             aria-valuemin={0}
             aria-valuemax={100}
             aria-valuenow={percent}
-            className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-3"
+            className="mt-2 h-1 overflow-hidden rounded-full bg-surface-3"
           >
             <div
-              className="h-full rounded-full bg-primary transition-[width] duration-500 ease-[var(--ease-out-soft)]"
+              className={cn(
+                "h-full rounded-full transition-[width,background-color] duration-500 ease-[var(--ease-out-soft)]",
+                percent === 100 ? "bg-verified" : "bg-primary",
+              )}
               style={{ width: `${percent}%` }}
             />
           </div>
-          <ul className="no-scrollbar mt-2.5 flex gap-1.5 overflow-x-auto">
+          <ul className="no-scrollbar -mx-1 mt-1.5 flex gap-0.5 overflow-x-auto px-1">
             {steps.map((s, i) => {
               const state = stepState(s);
               return (
@@ -659,18 +670,27 @@ export function ListingForm({
                   <a
                     href={`#${s.id}`}
                     className={cn(
-                      "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs whitespace-nowrap transition-colors",
+                      "inline-flex h-11 items-center gap-1.5 rounded-md px-2 text-xs font-medium whitespace-nowrap transition-colors duration-150 pointer-fine:h-7",
                       state === "error"
-                        ? "border-danger/35 bg-danger-soft text-danger"
-                        : state === "done"
-                          ? "border-verified/30 bg-verified-soft text-verified"
-                          : "border-line bg-surface-2 text-muted hover:text-fg",
+                        ? "bg-danger-soft text-danger hover:bg-danger-soft/70"
+                        : "text-muted hover:bg-surface-2 hover:text-fg",
                     )}
                   >
                     {state === "done" ? (
-                      <CheckIcon aria-hidden="true" className="size-3" />
+                      <span className="inline-flex size-4 items-center justify-center rounded-full bg-verified-soft text-verified">
+                        <CheckIcon
+                          aria-hidden="true"
+                          className="size-2.5"
+                          strokeWidth={3}
+                        />
+                      </span>
+                    ) : state === "error" ? (
+                      <CircleAlertIcon
+                        aria-hidden="true"
+                        className="size-3.5"
+                      />
                     ) : (
-                      <span className="tnum font-mono text-[0.625rem]">
+                      <span className="inline-flex size-4 items-center justify-center rounded-full border border-line-strong text-[0.625rem] leading-none text-subtle tabular-nums">
                         {i + 1}
                       </span>
                     )}
@@ -686,39 +706,43 @@ export function ListingForm({
           /* tabIndex -1: focus is moved here after a failed save, so the
              messages are announced and the seller lands on them instead of
              hunting through a long form. Not reachable by tabbing. */
-          <div ref={alertsRef} tabIndex={-1} className="flex flex-col">
+          <div
+            ref={alertsRef}
+            tabIndex={-1}
+            className="flex flex-col rounded-card"
+          >
             {errors.form ? <FormNotice>{errors.form}</FormNotice> : null}
 
             {summary.length > 0 ? (
               <div
                 role="alert"
-                className="rounded-panel border border-danger/30 bg-danger-soft p-4 sm:p-5"
+                className="rounded-card border border-danger/25 bg-danger-soft/60 px-4 py-3.5 sm:px-5"
               >
-                <p className="flex items-center gap-2 font-display text-base font-bold text-fg">
+                <p className="flex items-center gap-2 text-sm leading-5 font-semibold text-fg">
                   <CircleAlertIcon
                     aria-hidden="true"
-                    className="size-[1.15rem] shrink-0 text-danger"
+                    className="size-4 shrink-0 text-danger"
                   />
                   {summary.length === 1
                     ? "One thing to fix"
                     : `${summary.length} things to fix`}
                 </p>
-                <p className="mt-1.5 text-sm leading-relaxed text-muted">
+                <p className="mt-0.5 pl-6 text-[0.8125rem] leading-relaxed text-muted">
                   Nothing you typed was lost. Fix these and press the same
                   button again.
                 </p>
                 {/* Every message, including the ones no field renders — a
                     caption or a channel link failing used to make both
                     buttons do nothing at all, silently. */}
-                <ul className="mt-3 flex flex-col gap-1.5">
+                <ul className="mt-2 flex flex-col pl-6">
                   {summary.map((item) => (
                     <li key={item.key}>
                       <button
                         type="button"
                         onClick={() => focusTarget(item.target)}
-                        className="block min-h-11 cursor-pointer py-2 text-left text-sm leading-relaxed"
+                        className="group block min-h-11 cursor-pointer py-2 text-left text-[0.8125rem] leading-relaxed pointer-fine:min-h-0 pointer-fine:py-1"
                       >
-                        <span className="font-medium text-fg underline decoration-danger/40 underline-offset-4">
+                        <span className="font-medium text-fg underline decoration-danger/40 underline-offset-4 transition-colors duration-150 group-hover:decoration-danger">
                           {labelForError(item.key)}
                         </span>
                         <span className="text-muted"> — {item.message}</span>
@@ -742,27 +766,45 @@ export function ListingForm({
           description="This is what buyers search and filter on, so be specific."
         >
           <fieldset>
-            <legend className="text-sm font-medium text-fg">Platform</legend>
-            <div className="mt-2 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-              {platforms.map((p) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  onClick={() => set("platform", p.id)}
-                  aria-pressed={draft.platform === p.id}
-                  className={cn(
-                    "inline-flex min-h-11 cursor-pointer items-center justify-center rounded-xl border px-4 text-sm font-medium transition-colors sm:justify-start",
-                    draft.platform === p.id
-                      ? "border-primary bg-primary-soft text-primary-text"
-                      : "border-line bg-surface-2 text-muted hover:border-line-strong hover:text-fg",
-                  )}
-                >
-                  {p.name}
-                </button>
-              ))}
+            <legend className={labelClass}>Platform</legend>
+            <div className="mt-1.5 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+              {platforms.map((p) => {
+                const chosen = draft.platform === p.id;
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => set("platform", p.id)}
+                    aria-pressed={chosen}
+                    className={cn(
+                      "inline-flex h-11 cursor-pointer items-center justify-between gap-2 rounded-lg border bg-surface px-3 text-sm font-medium shadow-xs transition-[border-color,background-color,color,box-shadow] duration-150 pointer-fine:h-10 dark:bg-surface-2",
+                      chosen
+                        ? "border-fg text-fg ring-1 ring-fg"
+                        : errors.platform
+                          ? "border-danger text-muted hover:text-fg"
+                          : "border-line text-muted hover:border-line-strong hover:bg-surface-2/60 hover:text-fg",
+                    )}
+                  >
+                    <span className="truncate">{p.name}</span>
+                    <span
+                      aria-hidden="true"
+                      className={cn(
+                        "inline-flex size-4 shrink-0 items-center justify-center rounded-full transition-[background-color,opacity] duration-150",
+                        chosen
+                          ? "bg-fg text-bg opacity-100"
+                          : "border border-line-strong opacity-70",
+                      )}
+                    >
+                      {chosen ? (
+                        <CheckIcon className="size-2.5" strokeWidth={3.5} />
+                      ) : null}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
             {errors.platform ? (
-              <p role="alert" className="mt-2 text-sm text-danger">
+              <p role="alert" className="mt-1.5 text-[0.8125rem] text-danger">
                 {errors.platform}
               </p>
             ) : null}
@@ -770,19 +812,24 @@ export function ListingForm({
 
           {draft.sourceUrl || errors.sourceUrl ? (
             <div>
-              <div className="flex items-start gap-2.5 rounded-xl border border-line bg-surface-2 p-3.5">
+              <div
+                className={cn(
+                  "flex items-start gap-2.5 rounded-lg border bg-surface-2/60 px-3 py-2.5",
+                  errors.sourceUrl ? "border-danger" : "border-line",
+                )}
+              >
                 <LinkIcon
                   aria-hidden="true"
-                  className="mt-0.5 size-4 shrink-0 text-subtle"
+                  className="mt-0.5 size-3.5 shrink-0 text-subtle"
                 />
                 <div className="min-w-0">
                   <p className="text-xs text-subtle">
                     The link this listing points at
                   </p>
-                  <p className="mt-0.5 text-sm break-all text-fg">
+                  <p className="mt-0.5 text-[0.8125rem] font-medium break-all text-fg">
                     {draft.sourceUrl || "Nothing yet"}
                   </p>
-                  <p className="mt-1.5 text-xs leading-relaxed text-muted">
+                  <p className="mt-1 text-xs leading-relaxed text-muted">
                     Set by the box at the top of this page. It is the account
                     your ownership code is read from, so it has to be the one
                     you are selling.
@@ -793,7 +840,7 @@ export function ListingForm({
                   without this line a bad link stops every save with nothing
                   on screen to explain why. */}
               {errors.sourceUrl ? (
-                <p role="alert" className="mt-2 text-sm text-danger">
+                <p role="alert" className="mt-1.5 text-[0.8125rem] text-danger">
                   {errors.sourceUrl} Paste it again at the top of this page.
                 </p>
               ) : null}
@@ -827,18 +874,20 @@ export function ListingForm({
               {draft.title.trim().length < 10 ? (
                 <>
                   At least 10 characters —{" "}
-                  <span className="tnum">{draft.title.trim().length}</span> so
-                  far.
+                  <span className="tabular-nums">
+                    {draft.title.trim().length}
+                  </span>{" "}
+                  so far.
                 </>
               ) : (
                 <>
-                  <span className="tnum">{draft.title.length}</span> of 120
-                  characters.
+                  <span className="tabular-nums">{draft.title.length}</span> of
+                  120 characters.
                 </>
               )}
             </p>
           </div>
-          <div className="grid gap-5 sm:grid-cols-2">
+          <div className="grid gap-x-4 gap-y-5 sm:grid-cols-2">
             <TextField
               id={ids.niche}
               name="niche"
@@ -873,7 +922,7 @@ export function ListingForm({
           title="The numbers"
           description="Buyers check these against the screenshots you upload below, and so does a moderator. Put down what is actually there — a figure that does not match is the most common reason a listing comes back."
         >
-          <div className="grid gap-5 sm:grid-cols-2">
+          <div className="grid gap-x-4 gap-y-5 sm:grid-cols-2">
             <TextField
               id={ids.audience}
               name="audience"
@@ -932,32 +981,39 @@ export function ListingForm({
             />
           </div>
 
-          <label
-            htmlFor={ids.monetized}
-            className="flex cursor-pointer items-start gap-3 rounded-xl border border-line bg-surface-2 p-3.5 text-sm text-muted"
-          >
-            <input
-              id={ids.monetized}
-              type="checkbox"
-              checked={draft.monetized}
-              onChange={(e) => set("monetized", e.target.checked)}
-              className="mt-0.5 size-4 shrink-0 cursor-pointer accent-primary"
-            />
-            <span>
-              <span className="font-medium text-fg">
-                This account is monetized.
+          <div>
+            <label
+              htmlFor={ids.monetized}
+              className={cn(
+                "flex cursor-pointer items-start gap-3 rounded-lg border bg-surface px-3.5 py-3 text-sm text-muted shadow-xs transition-[border-color,background-color,box-shadow] duration-150 has-[:checked]:border-fg has-[:checked]:ring-1 has-[:checked]:ring-fg dark:bg-surface-2",
+                errors.monetized
+                  ? "border-danger"
+                  : "border-line hover:border-line-strong hover:bg-surface-2/60",
+              )}
+            >
+              <input
+                id={ids.monetized}
+                type="checkbox"
+                checked={draft.monetized}
+                onChange={(e) => set("monetized", e.target.checked)}
+                className="mt-0.5 size-4 shrink-0 cursor-pointer accent-fg"
+              />
+              <span>
+                <span className="font-medium text-fg">
+                  This account is monetized.
+                </span>
+                <span className="mt-0.5 block text-xs leading-relaxed text-subtle">
+                  Claiming this when it is not is the fastest way to have a
+                  listing rejected.
+                </span>
               </span>
-              <span className="mt-0.5 block text-xs text-subtle">
-                Claiming this when it is not is the fastest way to have a
-                listing rejected.
-              </span>
-            </span>
-          </label>
-          {errors.monetized ? (
-            <p role="alert" className="text-sm text-danger">
-              {errors.monetized}
-            </p>
-          ) : null}
+            </label>
+            {errors.monetized ? (
+              <p role="alert" className="mt-1.5 text-[0.8125rem] text-danger">
+                {errors.monetized}
+              </p>
+            ) : null}
+          </div>
         </FormSection>
 
         <FormSection
@@ -974,6 +1030,7 @@ export function ListingForm({
             id={ids.price}
             name="price"
             label="Asking price (USD)"
+            className="sm:max-w-xs"
             inputMode="decimal"
             value={draft.price}
             onChange={(e) => set("price", e.target.value)}
@@ -982,40 +1039,40 @@ export function ListingForm({
             required
           />
           {preview && safest ? (
-            <div className="rounded-xl border border-line bg-surface-2 p-4 sm:p-5">
-              <p className="font-mono text-[0.625rem] font-semibold tracking-[0.12em] text-subtle uppercase">
+            <div>
+              <p className="text-xs font-medium text-muted">
                 On a Fastest deal
               </p>
-              <dl className="mt-3 grid gap-px overflow-hidden rounded-xl border border-line bg-line sm:grid-cols-3">
-                <div className="bg-surface p-4">
+              <dl className="mt-2 grid gap-px overflow-hidden rounded-lg border border-line bg-line sm:grid-cols-3">
+                <div className="bg-surface px-3.5 py-3 dark:bg-surface-2">
                   <dt className="text-xs text-subtle">Buyer pays</dt>
-                  <dd className="tnum mt-1 font-display text-lg font-bold text-fg">
+                  <dd className="mt-1 text-lg leading-6 font-semibold tracking-[-0.01em] text-fg tabular-nums">
                     {money(preview.total)}
                   </dd>
                 </div>
-                <div className="bg-surface p-4">
+                <div className="bg-surface px-3.5 py-3 dark:bg-surface-2">
                   <dt className="text-xs text-subtle">
                     Channel Adda fee ({formatRate(fees.sellerFeeBp)}%)
                   </dt>
-                  <dd className="tnum mt-1 font-display text-lg font-bold text-muted">
+                  <dd className="mt-1 text-lg leading-6 font-semibold tracking-[-0.01em] text-muted tabular-nums">
                     −{money(preview.sellerFee)}
                   </dd>
                 </div>
-                <div className="bg-surface p-4">
+                <div className="bg-surface px-3.5 py-3 dark:bg-surface-2">
                   <dt className="text-xs text-subtle">
                     Into your Channel Adda balance
                   </dt>
-                  <dd className="tnum mt-1 font-display text-lg font-bold text-verified">
+                  <dd className="mt-1 text-lg leading-6 font-semibold tracking-[-0.01em] text-verified tabular-nums">
                     {money(preview.payout)}
                   </dd>
                 </div>
               </dl>
-              <p className="mt-3 text-xs leading-relaxed text-subtle">
+              <p className="mt-2.5 text-xs leading-relaxed text-subtle">
                 Fastest: the buyer pays Channel Adda up front, you hand the
                 account over with an agent watching, and your balance is
                 credited once the buyer confirms.
               </p>
-              <p className="mt-2 border-t border-line pt-3 text-xs leading-relaxed text-subtle">
+              <p className="mt-2.5 border-t border-line pt-2.5 text-xs leading-relaxed text-subtle">
                 On a <span className="font-medium text-muted">Safest</span> deal
                 the figures are different: the buyer pays Channel Adda only the{" "}
                 {money(safest.total)} admin fee, our agent takes the account
@@ -1025,7 +1082,7 @@ export function ListingForm({
               </p>
             </div>
           ) : (
-            <p className="text-sm text-muted">
+            <p className="rounded-lg border border-dashed border-line-strong bg-surface-2/40 px-3.5 py-3 text-[0.8125rem] text-muted">
               Enter a price and we will show you exactly what reaches you on
               each kind of deal.
             </p>
@@ -1042,7 +1099,7 @@ export function ListingForm({
           title="Images"
           description="A cover for the listing card and a profile picture for the account itself. Both are needed before this can go in front of buyers — a draft saves fine without them."
         >
-          <div className="grid gap-5 sm:grid-cols-2">
+          <div className="grid gap-x-4 gap-y-5 sm:grid-cols-2">
             {/* The chip sits on the uploader's own label line, so whether a
                 picture is still needed is answered without scrolling to the
                 checklist at the bottom. */}
@@ -1109,14 +1166,14 @@ export function ListingForm({
           title="Proof the account is yours"
           description="Screenshots from inside the account — analytics, revenue, the account settings page. This is what a moderator checks your numbers against, and it is never shown to buyers in full. At least one is needed, up to eight."
         >
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-sm font-medium text-fg">
+          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+            <p className="text-[0.8125rem] font-medium text-fg">
               Screenshots added:{" "}
-              <span className="tnum">{draft.proofs.length}</span> of{" "}
-              {MAX_PROOFS}
+              <span className="tabular-nums">{draft.proofs.length}</span> of{" "}
+              <span className="tabular-nums">{MAX_PROOFS}</span>
             </p>
             {draft.proofs.length > 0 && !captionsDone ? (
-              <Badge variant="primary" size="md">
+              <Badge variant="primary" size="sm">
                 Each one needs a caption
               </Badge>
             ) : null}
@@ -1133,9 +1190,9 @@ export function ListingForm({
                   <li
                     key={proof.url}
                     className={cn(
-                      "rounded-card border bg-surface-2 p-3",
+                      "rounded-lg border bg-surface p-3 transition-colors duration-150 dark:bg-surface-2",
                       captionError || fileError
-                        ? "border-danger/40"
+                        ? "border-danger"
                         : "border-line",
                     )}
                   >
@@ -1148,10 +1205,10 @@ export function ListingForm({
                         alt=""
                         width={64}
                         height={64}
-                        className="size-16 shrink-0 rounded-lg border border-line object-cover"
+                        className="size-14 shrink-0 rounded-md border border-line bg-surface-2 object-cover"
                       />
-                      <p className="min-w-0 flex-1 font-mono text-[0.625rem] font-semibold tracking-[0.12em] text-subtle uppercase">
-                        Screenshot <span className="tnum">{i + 1}</span>
+                      <p className="min-w-0 flex-1 pt-0.5 text-xs font-medium text-muted">
+                        Screenshot <span className="tabular-nums">{i + 1}</span>
                       </p>
                       <button
                         type="button"
@@ -1162,7 +1219,7 @@ export function ListingForm({
                           }))
                         }
                         aria-label={`Remove screenshot ${i + 1}`}
-                        className="inline-flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-line text-muted transition-colors hover:border-danger/50 hover:text-danger"
+                        className="inline-flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-lg text-subtle transition-colors duration-150 hover:bg-danger-soft hover:text-danger pointer-fine:size-8"
                       >
                         <TrashIcon aria-hidden="true" className="size-4" />
                       </button>
@@ -1170,7 +1227,7 @@ export function ListingForm({
 
                     <label
                       htmlFor={captionId}
-                      className="mt-3 block text-sm font-medium text-fg"
+                      className={cn(labelClass, "mt-3")}
                     >
                       What this shows
                       <span aria-hidden="true" className="ml-0.5 text-danger">
@@ -1194,12 +1251,7 @@ export function ListingForm({
                         }))
                       }
                       placeholder="e.g. Last 28 days of revenue"
-                      className={cn(
-                        "mt-1.5 h-11 w-full rounded-xl border bg-surface px-3.5 text-base text-fg placeholder:text-subtle focus:outline-none sm:text-[0.9375rem]",
-                        captionError
-                          ? "border-danger focus:border-danger"
-                          : "border-line focus:border-primary/60",
-                      )}
+                      className={cn(inputClass, "mt-1.5")}
                     />
                     {/* Without this the whole form died silently: the schema
                         requires a caption, a screenshot arrives with an empty
@@ -1210,13 +1262,16 @@ export function ListingForm({
                       <p
                         id={`${captionId}-error`}
                         role="alert"
-                        className="mt-1.5 text-sm text-danger"
+                        className="mt-1.5 text-[0.8125rem] text-danger"
                       >
                         {captionError}
                       </p>
                     ) : null}
                     {fileError ? (
-                      <p role="alert" className="mt-1.5 text-sm text-danger">
+                      <p
+                        role="alert"
+                        className="mt-1.5 text-[0.8125rem] text-danger"
+                      >
                         {fileError} Remove this one and upload it again.
                       </p>
                     ) : null}
@@ -1225,7 +1280,7 @@ export function ListingForm({
               })}
             </ul>
           ) : (
-            <p className="rounded-card border border-dashed border-line-strong bg-surface-2 px-4 py-5 text-center text-sm leading-relaxed text-muted">
+            <p className="rounded-lg border border-dashed border-line-strong bg-surface-2/40 px-4 py-5 text-center text-[0.8125rem] leading-relaxed text-muted">
               Nothing uploaded yet. One screenshot of your analytics is enough
               to start.
             </p>
@@ -1268,8 +1323,11 @@ export function ListingForm({
               error={errors.proofs}
             />
           ) : (
-            <p className="flex items-center gap-2 text-sm text-subtle">
-              <CheckIcon aria-hidden="true" className="size-4 text-verified" />
+            <p className="flex items-center gap-2 text-[0.8125rem] text-muted">
+              <CheckIcon
+                aria-hidden="true"
+                className="size-3.5 text-verified"
+              />
               That is the maximum of eight.
             </p>
           )}
@@ -1277,7 +1335,7 @@ export function ListingForm({
           {/* The uploader renders `errors.proofs` while it is on screen. At
               the cap it is not, and the message still needs somewhere to go. */}
           {errors.proofs && draft.proofs.length >= MAX_PROOFS ? (
-            <p role="alert" className="text-sm text-danger">
+            <p role="alert" className="text-[0.8125rem] text-danger">
               {errors.proofs}
             </p>
           ) : null}
@@ -1316,8 +1374,8 @@ export function ListingForm({
               error={errors.description}
             />
             <p className="mt-1.5 text-xs text-subtle">
-              <span className="tnum">{draft.description.length}</span> of 4,000
-              characters.
+              <span className="tabular-nums">{draft.description.length}</span>{" "}
+              of 4,000 characters.
             </p>
           </div>
 
@@ -1325,6 +1383,7 @@ export function ListingForm({
             id={ids.whatsapp}
             name="whatsapp"
             label="WhatsApp number (Channel Adda only)"
+            className="sm:max-w-sm"
             hint="Never shown to buyers. We use it to reach you if a transfer stalls, which is the one moment email is too slow."
             inputMode="tel"
             value={draft.whatsapp}
@@ -1334,15 +1393,23 @@ export function ListingForm({
           />
         </FormSection>
 
-        <div className="rounded-panel border border-line bg-surface p-4 sm:p-6">
-          <h2 className="font-display text-base font-bold text-fg sm:text-lg">
-            Before buyers can see it
-          </h2>
-          <p className="mt-1.5 max-w-[60ch] text-sm leading-relaxed text-muted">
-            A draft saves without any of this. These three are what the next
-            button needs.
-          </p>
-          <ul className="mt-4 flex flex-col gap-2.5">
+        <section
+          aria-labelledby="listing-requirements-title"
+          className="rounded-card border border-line bg-surface shadow-xs"
+        >
+          <div className="border-b border-line px-4 py-3.5 sm:px-5">
+            <h2
+              id="listing-requirements-title"
+              className="text-sm leading-6 font-semibold text-fg"
+            >
+              Before buyers can see it
+            </h2>
+            <p className="text-[0.8125rem] leading-relaxed text-muted">
+              A draft saves without any of this. These three are what the next
+              button needs.
+            </p>
+          </div>
+          <ul className="flex flex-col gap-2.5 p-4 sm:p-5">
             <Requirement
               done={Boolean(draft.coverUrl)}
               label="A cover image"
@@ -1359,28 +1426,28 @@ export function ListingForm({
               target={STEP.proof}
             />
           </ul>
-          <p className="mt-4 border-t border-line pt-4 text-xs leading-relaxed text-subtle">
+          <p className="rounded-b-[inherit] border-t border-line bg-surface-2/50 px-4 py-3 text-xs leading-relaxed text-subtle sm:px-5">
             After that you get a one-time code to put in your{" "}
             {platform?.name ?? "account"} description. We read it back to prove
             the account is yours, then a moderator checks the listing — usually
             within a few hours.
           </p>
-        </div>
+        </section>
 
         {/* The save buttons follow the page down. A draft being safe is the
             thing sellers most need to believe on a form this long, and it
             cannot be believable if the button is only at the bottom. */}
-        <div className="sticky bottom-0 z-10 rounded-card border border-line bg-bg/92 p-3 shadow-lift backdrop-blur-xl sm:px-4">
+        <div className="sticky bottom-3 z-10 rounded-card border border-line bg-bg/85 p-3 shadow-lift backdrop-blur-xl sm:bottom-4 sm:py-2.5 sm:pr-2.5 sm:pl-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p
               aria-live="polite"
-              className="flex items-start gap-2 text-xs leading-relaxed text-muted sm:text-sm"
+              className="flex min-w-0 items-start gap-2 text-xs leading-relaxed text-muted sm:items-center sm:text-[0.8125rem]"
             >
               {saved ? (
                 <>
                   <CheckIcon
                     aria-hidden="true"
-                    className="mt-0.5 size-4 shrink-0 text-verified"
+                    className="mt-0.5 size-3.5 shrink-0 text-verified sm:mt-0"
                   />
                   <span>
                     Draft saved. Still private — nothing is shown to buyers yet.
@@ -1390,7 +1457,7 @@ export function ListingForm({
                 <>
                   <LockIcon
                     aria-hidden="true"
-                    className="mt-0.5 size-4 shrink-0 text-subtle"
+                    className="mt-0.5 size-3.5 shrink-0 text-subtle sm:mt-0"
                   />
                   <span>
                     Private to you. Save a draft at any point and come back —
@@ -1399,20 +1466,17 @@ export function ListingForm({
                 </>
               )}
             </p>
-            <div className="flex flex-col gap-2.5 sm:flex-row">
+            <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
               <Button
                 type="submit"
                 variant="secondary"
                 size="md"
-                className="w-full sm:w-auto"
+                className="w-full sm:w-auto sm:min-w-[6.5rem]"
                 disabled={busy}
               >
                 {sending === "draft" ? (
                   <>
-                    <Loader2Icon
-                      aria-hidden="true"
-                      className="size-4 animate-spin"
-                    />
+                    <Loader2Icon aria-hidden="true" className="animate-spin" />
                     Saving…
                   </>
                 ) : (
@@ -1422,16 +1486,13 @@ export function ListingForm({
               <Button
                 type="button"
                 size="md"
-                className="w-full sm:w-auto"
+                className="w-full sm:w-auto sm:min-w-[13.5rem]"
                 disabled={busy}
                 onClick={() => submit(true)}
               >
                 {sending === "review" ? (
                   <>
-                    <Loader2Icon
-                      aria-hidden="true"
-                      className="size-4 animate-spin"
-                    />
+                    <Loader2Icon aria-hidden="true" className="animate-spin" />
                     Saving…
                   </>
                 ) : (

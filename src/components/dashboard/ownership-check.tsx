@@ -1,8 +1,14 @@
 "use client";
 
-import { CheckIcon, CopyIcon, LinkIcon } from "lucide-react";
+import {
+  CheckIcon,
+  CircleAlertIcon,
+  CopyIcon,
+  LinkIcon,
+  Loader2Icon,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useId, useState, useTransition } from "react";
+import { type ReactNode, useId, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { platforms } from "@/data/platforms";
 import type { ListingStatus } from "@/generated/prisma/enums";
@@ -114,216 +120,257 @@ export function OwnershipPanel({
   return (
     <section
       aria-labelledby={headingId}
-      className={cn(
-        "rounded-panel border p-5 sm:p-6",
-        waitingOnSeller
-          ? "border-primary/30 bg-primary-soft"
-          : "border-line bg-surface",
-      )}
+      className="rounded-card border border-line bg-surface shadow-xs"
     >
-      <h2 id={headingId} className="font-display text-lg font-bold text-fg">
-        Prove the {meta.name} account is yours
-      </h2>
-      <p className="mt-1.5 max-w-[60ch] text-sm leading-relaxed text-muted">
-        Anyone can paste a link. Only the owner can edit {how.place} — so put
-        this code there and{" "}
-        {how.automatic
-          ? "we will read it back"
-          : "a moderator will look for it"}
-        . It can come out again once the listing is approved.
-      </p>
+      <div className="border-b border-line px-4 py-3 sm:px-5">
+        <h3 id={headingId} className="text-sm leading-6 font-semibold text-fg">
+          Prove the {meta.name} account is yours
+        </h3>
+        <p className="max-w-[68ch] text-[0.8125rem] leading-relaxed text-muted">
+          Anyone can paste a link. Only the owner can edit {how.place} — so put
+          this code there and{" "}
+          {how.automatic
+            ? "we will read it back"
+            : "a moderator will look for it"}
+          . It can come out again once the listing is approved.
+        </p>
+      </div>
 
-      {code ? (
-        <>
-          <div className="mt-4 flex flex-wrap items-center gap-3">
-            <code className="rounded-xl border border-line-strong bg-surface px-4 py-3 font-mono text-base font-semibold tracking-wider break-all text-fg select-all">
-              {code}
-            </code>
-            <Button
-              type="button"
-              variant="secondary"
-              size="md"
-              aria-describedby={stepsId}
-              onClick={() => void copy(code)}
-            >
-              {copied ? (
-                <>
-                  <CheckIcon aria-hidden="true" className="size-4" />
-                  Copied
-                </>
-              ) : (
-                <>
-                  <CopyIcon aria-hidden="true" className="size-4" />
-                  Copy code
-                </>
-              )}
-            </Button>
-          </div>
+      <div className="p-4 sm:p-5">
+        {code ? (
+          <>
+            {/* The code and its copy button share one well, so there is no
+                doubt which string the button copies. */}
+            <div className="flex max-w-md items-center gap-3 rounded-lg border border-line bg-surface-2 py-1.5 pr-1.5 pl-3.5">
+              <code className="min-w-0 flex-1 font-mono text-[0.9375rem] leading-6 font-semibold tracking-wider break-all text-fg select-all">
+                {code}
+              </code>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                className="min-w-[6.5rem]"
+                aria-describedby={stepsId}
+                onClick={() => void copy(code)}
+              >
+                {copied ? (
+                  <>
+                    <CheckIcon aria-hidden="true" className="text-verified" />
+                    Copied
+                  </>
+                ) : (
+                  <>
+                    <CopyIcon aria-hidden="true" />
+                    Copy code
+                  </>
+                )}
+              </Button>
+            </div>
 
-          <ol
-            id={stepsId}
-            className="mt-4 flex list-decimal flex-col gap-1.5 pl-5 text-sm leading-relaxed text-muted"
+            <ol id={stepsId} className="mt-5 flex flex-col gap-3">
+              {how.steps.map((step, i) => (
+                <Step key={step} n={i + 1}>
+                  {step}
+                </Step>
+              ))}
+              <Step n={how.steps.length + 1}>
+                {how.automatic
+                  ? "Come back and press check. It is usually instant."
+                  : "Come back here and tell us it is there."}
+              </Step>
+            </ol>
+          </>
+        ) : (
+          <Button
+            type="button"
+            size="md"
+            disabled={pending}
+            onClick={() =>
+              run("issue", async () => {
+                const result = await issueOwnershipCode(listingId);
+                if (!result.ok) return { tone: "bad", text: result.error };
+                setCode(result.code);
+                return null;
+              })
+            }
           >
-            {how.steps.map((step) => (
-              <li key={step}>{step}</li>
-            ))}
-            <li>
-              {how.automatic
-                ? "Come back and press check. It is usually instant."
-                : "Come back here and tell us it is there."}
-            </li>
-          </ol>
-        </>
-      ) : (
-        <Button
-          type="button"
-          size="md"
-          className="mt-4"
-          disabled={pending}
-          onClick={() =>
-            run("issue", async () => {
-              const result = await issueOwnershipCode(listingId);
-              if (!result.ok) return { tone: "bad", text: result.error };
-              setCode(result.code);
-              return null;
-            })
-          }
-        >
-          {busy === "issue" ? "Getting a code…" : "Get my code"}
-        </Button>
-      )}
+            {busy === "issue" ? (
+              <>
+                <Loader2Icon aria-hidden="true" className="animate-spin" />
+                Getting a code…
+              </>
+            ) : (
+              "Get my code"
+            )}
+          </Button>
+        )}
 
-      {!how.automatic && code ? (
-        <p className="mt-4 flex items-start gap-2.5 rounded-card border border-info/30 bg-info-soft p-3.5 text-sm leading-relaxed text-fg">
-          <LinkIcon
-            aria-hidden="true"
-            className="mt-0.5 size-4 shrink-0 text-info"
-          />
-          <span>
-            {meta.name} has no public way for us to read {how.place}{" "}
-            automatically, so a moderator opens the account and checks it by
-            hand — usually within a few hours of you sending it.
-          </span>
-        </p>
-      ) : null}
+        {!how.automatic && code ? (
+          <p className="mt-5 flex items-start gap-2.5 rounded-lg border border-info/20 bg-info-soft/70 px-3 py-2.5 text-[0.8125rem] leading-relaxed text-fg">
+            <LinkIcon
+              aria-hidden="true"
+              className="mt-0.5 size-3.5 shrink-0 text-info"
+            />
+            <span>
+              {meta.name} has no public way for us to read {how.place}{" "}
+              automatically, so a moderator opens the account and checks it by
+              hand — usually within a few hours of you sending it.
+            </span>
+          </p>
+        ) : null}
 
-      {waitingOnSeller && code && !hasProof ? (
-        <p className="mt-4 text-sm text-danger">
-          You will also need at least one screenshot from inside the account
-          before this can go for review.
-        </p>
-      ) : null}
+        {waitingOnSeller && code && !hasProof ? (
+          <p className="mt-4 flex items-start gap-2 text-[0.8125rem] leading-relaxed text-danger">
+            <CircleAlertIcon
+              aria-hidden="true"
+              className="mt-0.5 size-3.5 shrink-0"
+            />
+            You will also need at least one screenshot from inside the account
+            before this can go for review.
+          </p>
+        ) : null}
 
-      {inReview ? (
-        <p className="mt-4 text-sm leading-relaxed text-muted">
-          A moderator is looking. Leave the code where it is until this clears.
-        </p>
-      ) : status === "REJECTED" ? (
-        <p className="mt-4 text-sm leading-relaxed text-muted">
-          Make the change the moderator asked for and save the listing below.
-          The code is checked again once it is back with us, so leave it in
-          place.
-        </p>
-      ) : null}
+        {inReview ? (
+          <p className="mt-4 text-[0.8125rem] leading-relaxed text-muted">
+            A moderator is looking. Leave the code where it is until this
+            clears.
+          </p>
+        ) : status === "REJECTED" ? (
+          <p className="mt-4 text-[0.8125rem] leading-relaxed text-muted">
+            Make the change the moderator asked for and save the listing below.
+            The code is checked again once it is back with us, so leave it in
+            place.
+          </p>
+        ) : null}
 
-      {code && waitingOnSeller ? (
-        <div className="mt-5 flex flex-wrap gap-3">
-          {canCheck ? (
-            <Button
-              type="button"
-              size="md"
-              disabled={pending}
-              onClick={() =>
-                run("check", async () => {
-                  const result = await checkOwnershipCode(listingId);
-                  if (result.ok) {
+        {code && waitingOnSeller ? (
+          <div className="mt-5 flex flex-col gap-2 border-t border-line pt-4 sm:flex-row sm:flex-wrap">
+            {canCheck ? (
+              <Button
+                type="button"
+                size="md"
+                className="max-sm:whitespace-normal"
+                disabled={pending}
+                onClick={() =>
+                  run("check", async () => {
+                    const result = await checkOwnershipCode(listingId);
+                    if (result.ok) {
+                      router.refresh();
+                      return { tone: "ok", text: result.message };
+                    }
+                    // "A moderator will look" is a route, not a failure.
+                    if (result.manual) router.refresh();
+                    return {
+                      tone: result.manual ? "info" : "bad",
+                      text: result.error,
+                    };
+                  })
+                }
+              >
+                {busy === "check" ? (
+                  <>
+                    <Loader2Icon aria-hidden="true" className="animate-spin" />
+                    Checking…
+                  </>
+                ) : (
+                  "I have added it — check now"
+                )}
+              </Button>
+            ) : null}
+
+            {waitingOnSeller ? (
+              <Button
+                type="button"
+                size="md"
+                variant={how.automatic ? "secondary" : "primary"}
+                className="max-sm:whitespace-normal"
+                disabled={pending}
+                onClick={() =>
+                  run("send", async () => {
+                    const result = await submitForReview(listingId);
+                    if (!result.ok) {
+                      return {
+                        tone: "bad",
+                        text:
+                          result.errors.form ?? "That did not work. Try again.",
+                      };
+                    }
                     router.refresh();
-                    return { tone: "ok", text: result.message };
-                  }
-                  // "A moderator will look" is a route, not a failure.
-                  if (result.manual) router.refresh();
-                  return {
-                    tone: result.manual ? "info" : "bad",
-                    text: result.error,
-                  };
-                })
-              }
-            >
-              {busy === "check" ? "Checking…" : "I have added it — check now"}
-            </Button>
-          ) : null}
+                    return null;
+                  })
+                }
+              >
+                {busy === "send" ? (
+                  <>
+                    <Loader2Icon aria-hidden="true" className="animate-spin" />
+                    Sending…
+                  </>
+                ) : how.automatic ? (
+                  "The check cannot see it — ask a moderator"
+                ) : (
+                  "The code is live — send for review"
+                )}
+              </Button>
+            ) : null}
 
-          {waitingOnSeller ? (
-            <Button
-              type="button"
-              size="md"
-              variant={how.automatic ? "secondary" : "primary"}
-              disabled={pending}
-              onClick={() =>
-                run("send", async () => {
-                  const result = await submitForReview(listingId);
-                  if (!result.ok) {
-                    return {
-                      tone: "bad",
-                      text:
-                        result.errors.form ?? "That did not work. Try again.",
-                    };
-                  }
-                  router.refresh();
-                  return null;
-                })
-              }
-            >
-              {busy === "send"
-                ? "Sending…"
-                : how.automatic
-                  ? "The check cannot see it — ask a moderator"
-                  : "The code is live — send for review"}
-            </Button>
-          ) : null}
+            {waitingOnSeller ? (
+              <Button
+                type="button"
+                size="md"
+                variant="ghost"
+                disabled={pending}
+                onClick={() =>
+                  run("draft", async () => {
+                    const result = await withdrawFromReview(listingId);
+                    if (!result.ok) {
+                      return {
+                        tone: "bad",
+                        text:
+                          result.errors.form ?? "That did not work. Try again.",
+                      };
+                    }
+                    router.refresh();
+                    return null;
+                  })
+                }
+              >
+                {busy === "draft" ? "Working…" : "Back to draft"}
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
 
-          {waitingOnSeller ? (
-            <Button
-              type="button"
-              size="md"
-              variant="ghost"
-              disabled={pending}
-              onClick={() =>
-                run("draft", async () => {
-                  const result = await withdrawFromReview(listingId);
-                  if (!result.ok) {
-                    return {
-                      tone: "bad",
-                      text:
-                        result.errors.form ?? "That did not work. Try again.",
-                    };
-                  }
-                  router.refresh();
-                  return null;
-                })
-              }
-            >
-              {busy === "draft" ? "Working…" : "Back to draft"}
-            </Button>
-          ) : null}
-        </div>
-      ) : null}
-
-      {notice ? (
-        <p
-          role={notice.tone === "bad" ? "alert" : "status"}
-          className={cn(
-            "mt-3 text-sm leading-relaxed",
-            notice.tone === "bad"
-              ? "text-danger"
-              : notice.tone === "ok"
-                ? "text-verified"
-                : "text-muted",
-          )}
-        >
-          {notice.text}
-        </p>
-      ) : null}
+        {notice ? (
+          <p
+            role={notice.tone === "bad" ? "alert" : "status"}
+            className={cn(
+              "mt-3 text-[0.8125rem] leading-relaxed",
+              notice.tone === "bad"
+                ? "text-danger"
+                : notice.tone === "ok"
+                  ? "text-verified"
+                  : "text-muted",
+            )}
+          >
+            {notice.text}
+          </p>
+        ) : null}
+      </div>
     </section>
+  );
+}
+
+/** One numbered instruction. The number is drawn; the list already counts. */
+function Step({ n, children }: { n: number; children: ReactNode }) {
+  return (
+    <li className="flex items-start gap-3 text-sm leading-relaxed text-fg">
+      <span
+        aria-hidden="true"
+        className="mt-px inline-flex size-5 shrink-0 items-center justify-center rounded-full border border-line bg-surface-2 text-xs font-medium text-muted tabular-nums"
+      >
+        {n}
+      </span>
+      <span className="min-w-0">{children}</span>
+    </li>
   );
 }
