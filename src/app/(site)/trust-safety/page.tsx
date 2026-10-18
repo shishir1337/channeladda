@@ -16,7 +16,7 @@ export const metadata: Metadata = {
 const disputeSteps = [
   {
     title: "You open the dispute",
-    body: "One button on the deal page. The deal freezes where it stands, the account stays in our custody if it is there, and the seller cannot withdraw a balance held with us — including from earlier sales.",
+    body: "One button on the deal page. The deal freezes where it stands, the account stays in our custody if it is there, and the money we hold for it stays with us: it is not in the seller's balance until the deal completes, so it cannot be withdrawn while the dispute is open.",
   },
   {
     title: "A moderator reads the record",

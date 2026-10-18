@@ -115,12 +115,7 @@ function LookupRow({ deal }: { deal: DealLookupRow }) {
             <span className="text-xs text-subtle">{deal.listingHandle}</span>
           </>
         }
-        amount={
-          <Amount
-            cents={deal.priceUsd}
-            caption={deal.mode === "SAFEST" ? "price, paid direct" : "price"}
-          />
-        }
+        amount={<Amount cents={deal.priceUsd} caption="price" />}
         chevron
       />
       <p className="mt-2 grid gap-x-6 gap-y-0.5 text-xs text-muted sm:grid-cols-2">

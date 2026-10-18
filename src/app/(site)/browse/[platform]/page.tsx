@@ -118,7 +118,7 @@ export default async function PlatformBrowsePage({
                 — long enough for the window in which a previous owner can still
                 attempt account recovery. On a Fastest deal we are holding your
                 payment through that window. On a Safest deal we are holding the
-                account itself, and you have paid us nothing but our fee.
+                account itself, and the price you pay us after inspecting it.
               </p>
               <Link
                 href="/how-it-works"

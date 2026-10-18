@@ -76,7 +76,7 @@ export const ORDER_STATUS: Record<
     label: "Awaiting buyer payment",
     variant: "info",
     whose: "buyer",
-    note: "Safest. The buyer pays the seller directly, off-platform. That money never reaches us.",
+    note: "Safest. The buyer has inspected the channel and is paying the price to Channel Adda. It is held until the transfer completes.",
   },
   AWAITING_HANDOVER: {
     label: "Awaiting handover",
@@ -160,9 +160,9 @@ export const DEAL_MODE: Record<
 > = {
   SAFEST: {
     label: "Safest",
-    escrow: "channel escrowed",
+    escrow: "channel and money escrowed",
     blurb:
-      "The buyer pays us an admin fee only. An agent takes ownership of the channel, the buyer then pays the seller directly off-platform, and the agent transfers it on. Two Google waiting periods.",
+      "The buyer pays us the admin fee, an agent takes ownership of the channel, the buyer then pays the price to us, and the agent transfers the channel on. We release the price to the seller when it completes. Two Google waiting periods.",
   },
   FASTEST: {
     label: "Fastest",
@@ -247,10 +247,10 @@ export function DealHead({
 /**
  * What is in whose hands right now, and what can still be undone.
  *
- * The asymmetry between the modes is the thing that gets got wrong under
- * pressure: on a Safest deal the purchase price goes buyer-to-seller
- * off-platform, so there is no price for us to refund however angry the buyer
- * is — only the admin fee, and only before the agent took custody.
+ * What gets got wrong under pressure is what each mode can still give back.
+ * On a Safest deal the price is only with us once the buyer has paid it after
+ * inspecting the channel, and the admin fee is kept once the agent has taken
+ * custody — so what returning a channel refunds depends on how far it got.
  *
  * `facts` matters most for DISPUTED, which is the only status staff decide
  * a deal from — and the one the status alone cannot describe, because a
@@ -305,7 +305,7 @@ export function custodyFacts(
     recoverable = "Nothing has moved. Cancelling costs nobody anything.";
   } else if (agentHolds) {
     recoverable =
-      "The channel has to go back to the seller, or on to the buyer. Returning it refunds whatever we hold except the admin fee, which the agent has earned; finance decides.";
+      "The channel has to go back to the seller, or on to the buyer. Returning it refunds whatever we hold, less the admin fee once our agent has taken custody; finance decides.";
   } else if (platformHolds) {
     recoverable =
       "We hold the full amount. Refunding or cancelling returns all of it to the buyer; finance decides which.";

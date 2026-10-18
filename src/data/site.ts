@@ -121,11 +121,11 @@ export const serviceMap = Object.fromEntries(
 export const faqs = [
   {
     q: "How does Channel Adda protect my money?",
-    a: "Every purchase is supervised, and you choose which half we hold. On a Safest deal one of our agents takes ownership of the account first, and you pay the seller directly only once it is verifiably in our hands — so the seller cannot take it back or sell it twice. On a Fastest deal we hold your payment instead, and release it to the seller only once you confirm you have control. Either way, a handover that fails leaves you no worse off.",
+    a: "Every purchase is supervised, and your payment always goes to Channel Adda, never to the seller. On a Safest deal one of our agents takes ownership of the account first, and you pay the price to us only once it is verifiably in our hands — so the seller cannot take it back or sell it twice. On a Fastest deal you pay us up front and we release it to the seller only once you confirm you have control. Either way, a handover that fails leaves you no worse off.",
   },
   {
     q: "What is the difference between Quick and Safest checkout?",
-    a: "Safest means we hold the account: one of our agents takes ownership of it first, you pay the seller directly once it is verifiably in our hands, and we transfer it to you afterwards. Two Google waiting periods. Fastest means we hold the money: you pay us the price and our fee together, our agent supervises while the seller transfers the account straight to you, and we pay the seller once you confirm access. One waiting period. You choose on every listing; there is no price threshold.",
+    a: "Safest means we hold the account and then the money: one of our agents takes ownership of it first, you pay the price to Channel Adda once it is verifiably in our hands, and we transfer it to you afterwards and then pay the seller. Two Google waiting periods. Fastest means we hold the money: you pay us the price and our fee together, our agent supervises while the seller transfers the account straight to you, and we pay the seller once you confirm access. One waiting period. You choose on every listing; there is no price threshold.",
   },
   {
     q: "Which payment methods do you accept?",
@@ -137,11 +137,11 @@ export const faqs = [
   },
   {
     q: "What fees does Channel Adda charge?",
-    a: "Buyers pay a platform fee, set by us and shown in full on every listing and on the fees page before you commit. On a Safest deal that fee is the only thing you pay us — the price goes directly to the seller. Sellers pay a success fee only on a Fastest deal, where the money passes through us; there is no cost to create an account or publish a listing.",
+    a: "Buyers pay a platform fee, set by us and shown in full on every listing and on the fees page before you commit. On both kinds of deal you pay the price to us too, never to the seller — on a Safest deal after our agent holds the account. Sellers pay a success fee, taken from the price when a deal completes; there is no cost to create an account or publish a listing.",
   },
   {
     q: "What happens if a transfer goes wrong?",
-    a: "Open a dispute from the order page and the deal freezes where it stands while our moderation team reviews the order-linked chat, proof uploads and transfer log. What a decision can recover depends on the deal: on a Fastest deal we are holding your payment and can return it in full. On a Safest deal we are holding the account and can return that, but the price went from you straight to the seller — we never held it, and no decision of ours can reach it.",
+    a: "Open a dispute from the order page and the deal freezes where it stands while our moderation team reviews the order-linked chat, proof uploads and transfer log. What a decision can recover depends on the deal: on a Fastest deal we are holding your payment and can return it in full. On a Safest deal we are holding the account, and the price too once you have paid it, so a decision can return the channel to the seller and the price to you. The admin fee is kept once our agent has held the account.",
   },
   {
     q: "Can I negotiate the listed price?",

@@ -236,9 +236,10 @@ export function DisputeCase({
   );
   const overdue = decideBy.getTime() < Date.now();
   const done = dispute.steps.filter((s) => s.completedAt !== null).length;
-  // Every outcome on a paid Fastest deal moves money we hold — cancelling
-  // returns all of it — so the decision is finance's whichever way it goes.
-  const financesCall = dispute.mode === "FASTEST" && dispute.paid;
+  // Every outcome on a paid deal moves money we hold — cancelling or
+  // returning the channel hands it back, completing pays it out — so the
+  // decision is finance's whichever way it goes, in both modes.
+  const financesCall = dispute.paid;
 
   return (
     <article
@@ -296,7 +297,9 @@ export function DisputeCase({
         <Amount
           cents={dispute.priceUsd}
           caption={
-            dispute.mode === "SAFEST" ? "price, paid off-platform" : "price"
+            dispute.mode === "SAFEST" && !dispute.buyerPaidAt
+              ? "price, not paid yet"
+              : "price"
           }
         />
       </header>
@@ -583,7 +586,7 @@ export function DisputeCase({
         {/* Where the money goes is never behind the (i). */}
         <p className="mt-0.5 max-w-[72ch] text-xs leading-relaxed text-muted">
           {dispute.mode === "SAFEST"
-            ? "Safest: we never held the price, so there is none to refund. If the agent holds the channel it goes back to the seller or on to the buyer."
+            ? "Safest: if the buyer has paid the price, we are holding it. Returning the channel to the seller refunds it to the buyer; deciding for the seller releases it to them. The admin fee is kept once our agent has taken custody."
             : "Fastest: we hold the money, so deciding it either way moves money — the buyer back, or the seller paid."}
         </p>
         {financesCall && !canMoveMoney ? (
@@ -592,9 +595,9 @@ export function DisputeCase({
             className="mt-3 max-w-[72ch]"
             title="Leave this decision to finance."
           >
-            Cancelling here would also return everything we hold to the buyer —
-            the same money as a refund — so add what you know to the record and
-            hand it over.
+            Every ending here hands back or pays out money we hold — the same
+            money as a refund — so add what you know to the record and hand it
+            over.
           </Callout>
         ) : null}
         <EndDeal

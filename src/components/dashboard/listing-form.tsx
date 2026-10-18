@@ -1250,11 +1250,11 @@ export function ListingForm({
               </p>
               <p className="mt-2.5 border-t border-line pt-2.5 text-xs leading-relaxed text-subtle">
                 On a <span className="font-medium text-muted">Safest</span> deal
-                the figures are different: the buyer pays Channel Adda only the{" "}
-                {money(safest.total)} admin fee, our agent takes the account
-                from you, and the buyer pays you the {money(priceNumber)}{" "}
-                directly — nothing passes through the platform, so nothing is
-                deducted here.
+                the buyer pays Channel Adda the {money(safest.total)} admin fee
+                first, our agent takes the account from you, and then the buyer
+                pays the {money(priceNumber)} to Channel Adda as well. You
+                receive the same {money(safest.payout)} into your balance when
+                the transfer completes.
               </p>
             </div>
           ) : (

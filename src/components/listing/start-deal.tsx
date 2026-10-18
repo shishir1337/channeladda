@@ -16,9 +16,11 @@ import { startDeal } from "@/server/actions/deals";
  *
  * The two modes are not tiers of service, they are two different things the
  * buyer is trusting, and the copy says which: in Safest the channel sits with
- * a Channel Adda agent and the buyer pays the seller once it is there; in
- * Fastest Channel Adda holds the money instead. Whichever they pick, the
- * figure they will be asked for is on screen before they commit.
+ * a Channel Adda agent and the buyer pays the price to us once it is there;
+ * in Fastest the buyer pays us everything up front and the seller hands the
+ * channel over directly. Either way the money goes to Channel Adda, never to
+ * the seller, and the figure they will be asked for is on screen before they
+ * commit.
  */
 const MODES = [
   {
@@ -27,7 +29,7 @@ const MODES = [
     icon: ShieldCheckIcon,
     holds: "We hold the channel",
     blurb:
-      "Our agent takes ownership of the channel first. You pay the seller directly once it is verifiably in our hands, and we transfer it to you after that. Two Google waiting periods.",
+      "Our agent takes ownership of the channel first. You pay the price to Channel Adda once it is verifiably in our hands, and we transfer it to you after that. Two Google waiting periods.",
     upfrontNote: "Up front you pay our fee only",
   },
   {
@@ -161,7 +163,7 @@ export function StartDeal({
         </div>
         {mode === "SAFEST" ? (
           <div className="flex items-center justify-between gap-3 text-xs text-subtle">
-            <dt>Then, direct to the seller</dt>
+            <dt>Then, to Channel Adda once our agent holds it</dt>
             <dd>
               <Price usd={price} />
             </dd>

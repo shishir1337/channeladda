@@ -61,7 +61,7 @@ enum OfferStatus {
 
 /// The two deal shapes, with mirror-image protections.
 enum DealMode {
-  SAFEST // the channel is escrowed with an agent; buyer pays the seller direct
+  SAFEST // an agent escrows the channel; the buyer pays us the fee, then the price
   FASTEST // the money is escrowed with the platform; it pays the seller
 }
 
@@ -72,13 +72,13 @@ enum OrderStatus {
   AGENT_VERIFYING // fastest: agent checking the channel matches the listing
   AWAITING_CUSTODY // safest: seller must hand ownership to the agent
   IN_CUSTODY // safest: agent owns it, buyer inspecting
-  AWAITING_BUYER_PAYMENT // safest: buyer owes the seller directly
+  AWAITING_BUYER_PAYMENT // safest: buyer inspected; the price is owed to Channel Adda
   AWAITING_HANDOVER // both: final ownership transfer under way
   AWAITING_RELEASE // fastest: buyer has access, seller not yet paid
   COMPLETED
   PAYMENT_EXPIRED
   CANCELLED // before anything moved
-  RETURNED_TO_SELLER // safest: buyer never paid, agent handed it back
+  RETURNED_TO_SELLER // safest: agent handed the channel back; any price held refunded
   REFUNDED // fastest: platform returned the funds
   DISPUTED // a pause, not an outcome: staff resolve it onward
 }
@@ -960,8 +960,7 @@ model PlatformSettings {
   /// is more work and carries the funds, so it may be priced higher.
   buyerFeeBpSafest  Int @default(300)
   buyerFeeBpFastest Int @default(300)
-  /// Deducted before a Fastest seller is credited. A Safest sale cannot be
-  /// charged one: the price never passes through the platform.
+  /// Deducted from the price before the seller is credited, in both modes.
   sellerFeeBp       Int @default(0)
 
   /// How many Safest channels one agent may hold at once. Google caps how many

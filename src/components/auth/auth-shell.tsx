@@ -24,7 +24,7 @@ const trustPoints = [
 const glimpse = [
   { label: "Admin fee paid", state: "done" },
   { label: "Agent holds the channel", state: "done" },
-  { label: "Buyer pays the seller", state: "now" },
+  { label: "Price paid to Channel Adda", state: "now" },
   { label: "Ownership handed over", state: "next" },
 ] as const;
 
@@ -151,7 +151,7 @@ export async function AuthShell({
 
         <div className="relative">
           <h2 className="max-w-[18ch] text-[2rem] leading-[1.15] font-semibold tracking-[-0.025em] text-white">
-            We hold the money, or we hold the account.
+            We hold the money, and on Safest the account too.
           </h2>
           <p className="mt-3 max-w-[38ch] text-sm leading-relaxed text-white/55">
             Until the handover is confirmed, neither side has to trust a

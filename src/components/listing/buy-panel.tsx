@@ -107,13 +107,13 @@ export function BuyPanel({
           Nobody can be left short
         </p>
         <p className="mt-2 text-xs leading-relaxed text-muted">
-          Whichever way you buy, one side of the deal is always held by Channel
-          Adda — the channel on a Safest deal, the money on a Fastest one. On a
-          Fastest deal the seller is paid{" "}
+          Whichever way you buy, you pay Channel Adda, never the seller, and we
+          hold the money until the channel is yours. On a Fastest deal the
+          seller is paid{" "}
           <span className="font-medium text-fg">{holdDays} days</span> after you
           confirm, which covers the window in which an old owner could try to
           recover the account. On a Safest deal our agent holds the channel
-          itself until you have paid the seller.
+          itself as well, and you pay the price only once it is in our hands.
         </p>
       </div>
 

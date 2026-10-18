@@ -38,12 +38,12 @@ export const helpArticles: HelpArticle[] = [
     summary:
       "Where your payment sits between checkout and payout, and what triggers a refund.",
     body: [
-      "What protects you depends on which deal you chose, and the two work in opposite directions. On a Fastest deal your payment goes to us, not to the seller: it stays with us while the handover happens and reaches the seller only once you have confirmed you have full control. On a Safest deal we hold the account instead — one of our agents takes ownership of it before you pay anything but our fee, and you pay the seller directly once it is verifiably in our hands.",
+      "On both kinds of deal your payment goes to us, never to the seller, and reaches the seller only once the account is yours. On a Fastest deal you pay it all up front and the seller hands the account to you directly while our agent watches. On a Safest deal we hold the account as well — one of our agents takes ownership of it before you pay anything but our fee, and you pay the price to us once it is verifiably in our hands.",
       "Either way the gap is deliberate. Handing over a login is not the same as losing access forever: on several platforms a previous owner can attempt account recovery for days or weeks afterwards. Something has to sit between the two sides until that window closes — on a Fastest deal it is your money, on a Safest deal it is the account itself.",
-      "If the handover fails at any point, you open a dispute and the deal freezes where it stands. Nothing moves until a moderator has read the order record and decided. Be clear about what that can recover: on a Fastest deal we are holding your money and can return it. On a Safest deal we are holding the account and can return that — but the price went straight from you to the seller and we were never holding it, so what a dispute can give you back is the channel, not the payment. That is the trade you are making when you choose to pay the seller direct.",
+      "If the handover fails at any point, you open a dispute and the deal freezes where it stands. Nothing moves until a moderator has read the order record and decided. What that can recover: on a Fastest deal we are holding your money and can return it. On a Safest deal we are holding the account, and the price once you have paid it, so a dispute can return the channel to the seller and the price to you. Our admin fee is kept once an agent has held the account — it paid for that work.",
     ],
     steps: [
-      "You pay — on a Fastest deal we hold the money; on a Safest deal just our fee, and the account is held instead",
+      "You pay Channel Adda — the whole amount up front on a Fastest deal; on a Safest deal our fee first, and the price once our agent holds the account",
       "The seller starts the transfer, working a platform-specific checklist",
       "You verify and confirm you have full control",
       "The cooling-off period passes",
@@ -57,7 +57,7 @@ export const helpArticles: HelpArticle[] = [
     summary: "The buyer fee, when it is charged, and what happens on a refund.",
     body: [
       "Buyers pay the listing price plus a platform fee — the current rate is on the fees page, and it can differ between Safest and Fastest. The total is shown in full on the listing page before you commit to anything — there is never a number that appears for the first time at checkout.",
-      "The fee is charged when the deal opens. On a Fastest deal a full refund returns the fee with it. On a Safest deal the fee comes back on its own if the deal dies before one of our agents takes custody of the account; after that it has paid for work that was actually done. A partial settlement adjusts it to match the amount settled.",
+      "The fee is charged when the deal opens. On a Fastest deal a full refund returns the fee with it. On a Safest deal the fee comes back on its own if the deal dies before one of our agents takes custody of the account; after that it has paid for work that was actually done.",
     ],
   },
   {
@@ -107,7 +107,7 @@ export const helpArticles: HelpArticle[] = [
     category: "selling",
     summary: "Payout timing, the seller fee, and withdrawal security.",
     body: [
-      "This is a Fastest deal: the buyer paid us, so we pay you. When they confirm the handover and the cooling-off period ends, the sale amount — less the seller fee, if one is set, which you can check at /fees — lands in your Channel Adda balance. You then withdraw to your own crypto wallet, usually within the hour. On a Safest deal nothing lands here at all, because the buyer pays you directly.",
+      "The buyer paid us, so we pay you, on both kinds of deal. While the deal runs, the price shows in your wallet under Held for your sales. When the transfer completes — after the cooling-off period on a Fastest deal, after Google's second waiting period on a Safest one — the sale amount, less the seller fee if one is set (check /fees), lands in your Channel Adda balance. You then withdraw to your own crypto wallet, usually within the hour.",
       "For your own protection, adding or changing a payout address locks withdrawals for 24 hours and sends you an email. Address-change attacks are the most common way marketplace sellers lose money, and this delay is what stops them.",
     ],
   },

@@ -28,9 +28,9 @@ export const legalDocs: Record<string, LegalDoc> = {
         heading: "What Channel Adda is",
         paragraphs: [
           "Channel Adda is a marketplace and a supervised transfer service. We introduce buyers and sellers of social media accounts and content websites, and on every deal one side of the exchange is held by us while the other moves.",
-          "On a Safest deal we hold the account. One of our agents takes ownership of it, the buyer pays the seller directly once it is verifiably in our hands, and we transfer it on to the buyer afterwards. The purchase price never passes through Channel Adda.",
+          "On a Safest deal we hold the account and then the money. One of our agents takes ownership of the account, the buyer pays the purchase price to Channel Adda once it is verifiably in our hands, and we transfer the account on to the buyer afterwards. We hold the price until that transfer completes and then credit it to the seller's Channel Adda balance. On no deal does a buyer pay a seller directly.",
           "On a Fastest deal we hold the money. The buyer pays us the price and our fee together, our agent supervises while the seller transfers the account to the buyer, and we pay the seller once the buyer confirms access.",
-          "We are not a party to the sale itself. The contract for the account is between the buyer and the seller. Our role is to hold one side of the exchange — the money on a Fastest deal, the account on a Safest one — to verify what we reasonably can, and to decide disputes fairly on the record in front of us.",
+          "We are not a party to the sale itself. The contract for the account is between the buyer and the seller. Our role is to hold the buyer's payment on every deal — and on a Safest deal the account as well — to verify what we reasonably can, and to decide disputes fairly on the record in front of us.",
         ],
       },
       {
@@ -50,7 +50,7 @@ export const legalDocs: Record<string, LegalDoc> = {
       {
         heading: "Fees",
         paragraphs: [
-          "Buyers pay a percentage on top of the listing price, set by us and shown in full on the listing page and at /fees before you commit. A seller fee applies only on a Fastest deal, where the sale price passes through us; it is deducted on completion and is currently zero. On a Safest deal we are not in the payment path and charge the seller nothing. Listing is free, and no fee is charged on a deal that does not complete. The rates in force are always the ones shown at /fees.",
+          "Buyers pay a percentage on top of the listing price, set by us and shown in full on the listing page and at /fees before you commit. A seller fee may apply on either kind of deal; it is deducted from the sale price on completion and is currently zero. Listing is free, and no seller fee is charged on a deal that does not complete; when the buyer fee is returned is set out in our refund policy. The rates in force are always the ones shown at /fees.",
         ],
       },
       {
@@ -74,7 +74,7 @@ export const legalDocs: Record<string, LegalDoc> = {
       {
         heading: "Limits of our liability",
         paragraphs: [
-          "Our liability on any order is limited to what we are holding for that order: on a Fastest deal, the amount paid to us; on a Safest deal, the account in our custody and the fee you paid us. We do not hold the purchase price on a Safest deal and cannot return money we never received. We are not liable for indirect losses, including lost advertising revenue, lost future earnings, or the value of an audience that declines after a sale.",
+          "Our liability on any order is limited to what we are holding for that order: the money paid to us for it, and on a Safest deal the account in our custody as well. We cannot return money that was paid to a seller outside Channel Adda. We are not liable for indirect losses, including lost advertising revenue, lost future earnings, or the value of an audience that declines after a sale.",
         ],
       },
     ],
@@ -155,9 +155,9 @@ export const legalDocs: Record<string, LegalDoc> = {
       {
         heading: "A Safest deal",
         paragraphs: [
-          "You pay us our fee and nothing else. The account's price goes straight from you to the seller, and only after one of our agents has taken ownership of the account and you have inspected it. Channel Adda never holds that money and therefore cannot refund it.",
-          "What protects you is the order of events, not a pot of money we are sitting on. Before you pay the seller a penny, the account is already out of their hands and in ours — they cannot take it back, sell it twice, or disappear with it.",
-          "If a deal fails before our agent has taken custody, we refund our fee in full. If it fails after that, we return the account to the seller and you have paid nobody but us. If you have already paid the seller and something then goes wrong, we decide the outcome by moving the account — to you, or back to the seller — because the account is the thing we hold.",
+          "You pay us our fee first, and the account's price once one of our agents has taken ownership of the account and you have inspected it. Both are paid to Channel Adda, never to the seller, and we hold the price until the account is yours.",
+          "What protects you is the order of events and the fact that we hold the money. Before you pay the price, the account is already out of the seller's hands and in ours — they cannot take it back, sell it twice, or disappear with it — and the seller is paid only once the account is yours.",
+          "If a deal fails before our agent has taken custody, we refund our fee in full. If it fails after that, we return the account to the seller and refund any price you have paid us; the fee has paid for the agent's work and is kept. If something goes wrong after you have paid the price, we decide the outcome on the record: the account goes to you and the price to the seller, or the account goes back to the seller and the price back to you.",
         ],
       },
       {
@@ -166,14 +166,14 @@ export const legalDocs: Record<string, LegalDoc> = {
           "Advertising revenue not continuing after the sale — this is disclosed on the listing and acknowledged at checkout, because ad accounts cannot be transferred",
           "The audience declining after you take over",
           "A change of mind after you have confirmed the handover and the hold period has ended",
-          "On a Safest deal, money you paid the seller directly — we were never holding it, and no part of this policy can conjure it back",
+          "Money paid to a seller outside Channel Adda, on either kind of deal — we never held it, and no part of this policy can bring it back. Never pay a seller directly",
           "A platform banning the account for something you did after taking ownership",
         ],
       },
       {
         heading: "Platform action after completion",
         paragraphs: [
-          "If a platform suspends or bans a sold account within the hold period for a reason that pre-dates the sale, that is treated as the account being materially different from the listing — but raise it before the deal completes. Once a deal is closed it cannot be reopened, on either side, which is why the hold periods exist and why we ask you to check the account properly before confirming. On a Fastest deal raised in time you are refunded in full. On a Safest deal, if our agent still holds the account it goes back to the seller and your fee is returned; if you have already paid the seller, we will pursue it with them on your behalf but cannot guarantee recovery of money we never held.",
+          "If a platform suspends or bans a sold account within the hold period for a reason that pre-dates the sale, that is treated as the account being materially different from the listing — but raise it before the deal completes. Once a deal is closed it cannot be reopened, on either side, which is why the hold periods exist and why we ask you to check the account properly before confirming. On a Fastest deal raised in time you are refunded in full. On a Safest deal raised in time, if our agent still holds the account it goes back to the seller and any price you have paid us is refunded; the fee is returned only if our agent had not yet taken custody.",
           "After the hold period ends, the account is yours and the risk sits with you. This is why the hold periods are set by each platform's own recovery and review windows rather than picked for convenience.",
         ],
       },

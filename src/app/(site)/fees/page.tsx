@@ -108,13 +108,13 @@ export default async function FeesPage() {
             <ModeTable
               mode="SAFEST"
               fees={fees}
-              title="Safest — the account passes through us"
-              note="You pay Channel Adda the fee and nothing else. The price goes from you straight to the seller, once our agent holds the account."
+              title="Safest — the account passes through us, and so does the money"
+              note="You pay Channel Adda the fee up front, and the price once our agent holds the account and you have inspected it. We pay the seller when the account is yours."
               columns={[
                 "Sale price",
                 "Our fee",
                 "Buyer pays us",
-                "Buyer pays the seller",
+                "Seller fee",
                 "Seller receives",
                 "Channel Adda earns",
               ]}
@@ -260,14 +260,11 @@ function ModeTable({
                     <Price usd={b.fee} />
                   </td>
                   <td className="px-4 py-4 font-medium">
-                    <Price usd={b.total} />
+                    {/* Safest takes it in two payments, fee then price. */}
+                    <Price usd={mode === "SAFEST" ? price + b.fee : b.total} />
                   </td>
                   <td className="px-4 py-4 text-muted">
-                    {mode === "SAFEST" ? (
-                      <Price usd={price} />
-                    ) : (
-                      <Price usd={s.fee} />
-                    )}
+                    <Price usd={s.fee} />
                   </td>
                   <td className="px-4 py-4 font-medium text-verified">
                     <Price usd={s.payout} />

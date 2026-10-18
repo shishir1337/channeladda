@@ -106,6 +106,13 @@ function SettingRow({
   onChange: (value: string) => void;
 }) {
   const { onChange, ...input } = props;
+  // Worked out before the markup: the React Compiler cannot lower a ternary
+  // inside a logical expression in JSX, and bails out of the whole component.
+  const describedBy = [
+    hint ? `${id}-hint` : null,
+    tip ? `${id}-tip` : null,
+    error ? `${id}-error` : null,
+  ].filter(Boolean);
   return (
     <div className="grid gap-x-8 gap-y-2 px-4 py-4 sm:grid-cols-[minmax(0,1fr)_12rem] sm:items-start sm:px-5">
       <div className="min-w-0 sm:pt-2">
@@ -136,13 +143,7 @@ function SettingRow({
             required
             aria-invalid={Boolean(error)}
             aria-describedby={
-              [
-                hint ? `${id}-hint` : null,
-                tip ? `${id}-tip` : null,
-                error ? `${id}-error` : null,
-              ]
-                .filter(Boolean)
-                .join(" ") || undefined
+              describedBy.length > 0 ? describedBy.join(" ") : undefined
             }
             className={cn(
               inputClass,
@@ -332,7 +333,7 @@ export function SettingsForm({
           name="buyerFeeBpSafest"
           label="Buyer fee, Safest"
           unit="%"
-          hint="The only thing a Safest buyer pays us."
+          hint="Paid up front. The price follows, to us, after the buyer inspects the channel."
           inputMode="decimal"
           value={safest}
           onChange={setSafest}
@@ -354,7 +355,7 @@ export function SettingsForm({
           name="sellerFeeBp"
           label="Seller fee"
           unit="%"
-          hint="Fastest only — a Safest price never reaches us."
+          hint="Taken from the price on completion, on both kinds of deal."
           inputMode="decimal"
           value={seller}
           onChange={setSeller}

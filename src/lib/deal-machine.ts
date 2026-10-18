@@ -173,8 +173,9 @@ const TRANSITIONS: readonly Transition[] = Object.freeze([
     actors: ["staff"] as const,
   })),
 
-  // ---- Giving the money back. Only Fastest: on a Safest deal the price went
-  // straight from buyer to seller and the platform has nothing to return.
+  // ---- Giving the money back. A Fastest refund; a Safest deal's money goes
+  // back through RETURNED_TO_SELLER instead, because returning the channel
+  // and refunding the buyer are one decision there.
   ...PLATFORM_HOLDS.map((from) => ({
     mode: "FASTEST" as const,
     from,

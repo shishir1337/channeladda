@@ -23,7 +23,7 @@ const steps = [
   {
     icon: LockIcon,
     title: "Choose how to pay",
-    body: "Fastest: your crypto payment goes to Channel Adda, not the seller, and the seller starts the transfer knowing it is secured. Safest: you pay our fee only, and an agent takes the account into our hands first.",
+    body: "Fastest: your crypto payment goes to Channel Adda, not the seller, and the seller starts the transfer knowing it is secured. Safest: you pay our fee first, an agent takes the account into our hands, and then you pay the price — to Channel Adda, never to the seller.",
   },
   {
     icon: HandshakeIcon,
@@ -33,7 +33,7 @@ const steps = [
   {
     icon: BanknoteIcon,
     title: "You confirm, seller gets paid",
-    body: "On a Fastest deal we hold the money and release it when you confirm full control. On a Safest deal we hold the account instead, and you pay the seller only once it is in our hands.",
+    body: "On a Fastest deal we hold the money and release it when you confirm full control. On a Safest deal we hold the account as well, and you pay the price to us only once it is in our hands.",
   },
 ];
 
@@ -60,7 +60,7 @@ const modes = [
     release: "After you confirm",
     accent: true,
     points: [
-      "We hold the account, not your money — you pay the seller once it is ours",
+      "We hold the account, then your payment — you pay the price to us once the account is ours",
       "Two waiting periods: seller to us, then us to you",
       "Recovery email and 2FA reset supervised by an agent",
       "If it breaks before our agent takes the channel, we refund our fee",

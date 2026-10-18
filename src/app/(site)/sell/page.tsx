@@ -37,7 +37,7 @@ const steps = [
   },
   {
     title: "Get paid in crypto",
-    body: "On a Fastest deal the buyer's money is with us before you hand anything over, and reaches your Channel Adda balance once they confirm. On a Safest deal you give the account to our agent first and the buyer pays you directly — you are not handing anything to the buyer until you have been paid.",
+    body: "On a Fastest deal the buyer's money is with us before you hand anything over, and reaches your Channel Adda balance once they confirm. On a Safest deal you give the account to our agent first, the buyer pays the price to Channel Adda, and it reaches your balance when the transfer completes. No money passes between you and the buyer, so there is nobody to chase.",
   },
 ];
 
@@ -202,7 +202,7 @@ export default async function SellPage() {
               {
                 icon: LockIcon,
                 title: "You are protected too",
-                body: "A buyer cannot vanish mid-deal with your credentials. On a Fastest deal their money is with us before you start; on a Safest deal the account is with our agent, and you are paid before it reaches them.",
+                body: "A buyer cannot vanish mid-deal with your credentials. On a Fastest deal their money is with us before you start; on a Safest deal the account is with our agent, and the buyer's money is with us before it reaches them.",
               },
               {
                 icon: BadgeCheckIcon,
