@@ -1,12 +1,12 @@
 # Safest deals: the buyer pays Channel Adda, never the seller
 
-**Status:** proposed on 2026-10-18 and waiting for the owner's answers to the
-four questions in "Decisions for the owner". Every *(call)* is open for the
+**Status:** decided by the owner on 2026-10-18. Every *(call)* is open for the
 owner to overrule.
 **Date:** 2026-10-18
-**Builds on:** `2026-10-17-agent-custody-design.md` (the two deal modes and the
-agent) and `2026-10-18-deal-chat-design.md` (which added the "where to pay me"
-field this design removes).
+**Builds on:**
+- `2026-10-17-agent-custody-design.md`: the two deal modes and the agent.
+- `2026-10-18-deal-chat-design.md`: added the "where to pay me" field, which
+  this design removes.
 
 ## Why
 
@@ -21,338 +21,293 @@ The owner's words, after running a Safest deal end to end in the browser:
 > pay from cryptomus directly and it will add in sellers wallet or also if
 > buyer already have amount in his wallet then he can use that funds"
 
+And when asked whether the price should move to the start:
+
+> "first buyer pays the admin fee to start the deal and channel adda agent join
+> in the process then after first 7 days period and channel's access now in
+> hand of channel adda then the channel's payment comes … current website flow
+> is also same like we have just instead of custom personal transaction it will
+> be go through wallet … only in fastest deal buyer pay the full amount in
+> start"
+
 The rule that follows: **no money ever moves directly between a buyer and a
-seller.** The buyer pays Channel Adda, by Cryptomus or from their Channel Adda
-balance, and the seller is paid into their Channel Adda wallet. Withdrawing to
-a personal wallet is a separate step that the seller takes, through the payout
-queue that already exists.
+seller.**
+- The Safest steps stay as they are: the fee first, then the price once our
+  agent holds the channel.
+- The price is paid to Channel Adda, by Cryptomus or from the buyer's balance,
+  and it lands in the seller's Channel Adda wallet.
+- Withdrawing to a personal wallet is a separate step the seller takes, through
+  the payout queue that already exists.
 
 ## What we got wrong
 
-These are the design mistakes in the Safest flow as it was built, found by
-reading the code after the walkthrough.
+These are the design mistakes in the Safest flow as built, found by reading the
+code after the walkthrough.
 
 1. **We sent the buyer to pay the seller outside the platform.** At step 6 the
-   buyer paid the price to an address the seller typed in. Our own Trust &
-   Safety page tells people that paying crypto to someone's wallet outside the
-   platform is how scams work.
-2. **The seller's word was the only proof of payment.** The seller pressed
-   "The money has arrived" to move the deal on. A seller could say they were
-   never paid, and a buyer could claim to have paid. Staff had a pasted
-   transaction reference and nothing else to check.
+   buyer paid the price to an address the seller had typed in. Our own Trust &
+   Safety page says paying crypto to someone's wallet outside the platform is a
+   scam.
+2. **The seller's word was the only proof of payment.** The seller pressed "The
+   money has arrived" to move the deal on. A seller could say they were never
+   paid, and a buyer could claim to have paid. Staff had a pasted transaction
+   reference and nothing else to check.
 3. **We could never give the buyer their money back.** The price never reached
-   our books, so a disputed Safest deal could return the channel to the seller
-   but could not refund the buyer. `REFUNDED` was impossible for Safest.
+   our books. A disputed Safest deal could return the channel to the seller,
+   but it could not refund the buyer. `REFUNDED` was impossible for Safest.
 4. **A personal payment address was shown to the other party.** That exposed
-   the seller's wallet. It also gave both sides a ready-made way to take their
+   the seller's wallet, and it gave both sides a ready-made way to take their
    next deal off the platform.
-5. **A buyer could inspect the channel and never pay.** Nothing timed out after
-   the inspection step. The seller's channel could sit with our agent
-   indefinitely, and it kept counting against that agent's limit.
-6. **The numbers counted money we never saw.**
+5. **The numbers counted money we never saw.**
    - The seller's dashboard showed "Earned from sales" for Safest prices that
      never passed through us.
-   - The buyer's "Spent" figure added those prices too.
-   - The wallet never showed a Safest sale at all.
-7. **The last Safest step had no second approval.** On Fastest, the step that
-   releases money needs a second staff member above $5,000. On Safest, the step
-   that completed the deal had no such check.
-8. **Copy promised what the code didn't do.**
-   - **Promises the new design reverses:** the Terms, the Refund policy, the
-     FAQ, the Help centre, the fees page and every deal screen said "Channel
-     Adda never holds the price". This design makes that sentence false, and
-     each of these pages has to change.
-   - **Promises that were never built:**
+   - The wallet never showed a Safest sale.
+6. **The last Safest step had no second approval.** The step that completed the
+   deal had none, while Fastest's release step needs a second staff member
+   above $5,000.
+7. **The copy promised what the code didn't do.**
+   - The Terms, the Refund policy, the FAQ, the Help centre, the fees page and
+     every deal screen said "Channel Adda never holds the price". That becomes
+     untrue now.
+   - Some promises were never built at all:
      - Trust & Safety says a seller cannot withdraw money held with us during a
        dispute. No such lock exists.
      - The Help centre promises partial settlements. No code path produces one.
      - The staff desk says the admin fee is not returned when a channel goes
-       back to the seller. It is returned, if the agent had not yet taken
-       custody.
+       back to the seller, but it is returned before custody.
+8. **Two money holes were small only because we held so little.** Both are
+   fixed here.
+   - **A payment recorded by hand and also by Cryptomus was credited twice.**
+   - **A refund made in Cryptomus could be paid again into the balance.**
 
-## The new Safest deal
-
-Safest stays the slow, careful mode: our agent takes ownership of the channel
-and passes it to the buyer. Two things change:
-
-- the money now goes through Channel Adda as well;
-- the seller is paid into their Channel Adda wallet.
-
-### Recommended: the buyer pays the price and the fee up front
+## The Safest deal, paid through Channel Adda
 
 | # | Step | Who | Deal status after |
 |---|------|-----|-------------------|
-| 1 | Pay the price and the fee | buyer (by Cryptomus or from balance) | Awaiting custody |
+| 1 | Pay the admin fee | buyer, by Cryptomus or from balance | Awaiting custody |
 | 2 | Invite the agent as channel owner | seller | |
 | 3 | Accept and confirm custody | agent | |
 | 4 | Hold 1 complete, ownership verified | agent | In custody |
-| 5 | Inspect the channel | buyer | Awaiting handover |
-| 6 | Transfer ownership to the buyer | agent, second approval above the threshold | |
-| 7 | Hold 2 complete, ownership verified | agent, second approval above the threshold | Completed, and the seller is paid |
+| 5 | Inspect the channel | buyer | Awaiting the price |
+| 6 | Pay the price to Channel Adda | buyer, by Cryptomus or from balance; the payment itself completes the step | Awaiting handover |
+| 7 | Transfer ownership to the buyer | agent; second approval above the threshold | |
+| 8 | Hold 2 complete, ownership verified | agent; second approval above the threshold | Completed, and the seller is paid |
 
-Why up front rather than after the inspection:
+What changed from today:
 
-- **The seller is protected before giving anything up.** The seller hands the
-  channel to our agent only after the buyer's money is already held by
-  Channel Adda. A buyer can no longer inspect the channel and walk away while
-  the seller's channel sits in Google's waiting periods.
-- **The buyer is still fully protected.** The money is held by us, not paid to
-  the seller. If the channel does not reach the buyer, they get it back.
-- **One payment instead of two.** That means one checkout and one crypto
-  network fee. Two steps disappear (9 become 7), and so does the "inspected
-  but never paid" dead end. Deals can still stall in other places; see
-  "Deals that stall".
-- **It reuses the escrow that Fastest already runs**, which is tested and
-  reconciled on the money desk. A second payment stage would add new code to
-  every payment path: invoices, webhook, reconciliation, balance payment,
-  manual recording, and underpayment and late-payment credit. Each of those is
-  a place for a money bug.
+- **Step 6** used to be "Pay the seller directly" with a typed transaction
+  reference. Now it is a real payment to us, and the system completes the step
+  when the money arrives. The buyer cannot mark it done by hand.
+- **Old step 7, "Confirm the payment arrived" (seller), is gone.** There is
+  nothing for the seller to confirm: we saw the money.
+- **Step 8 gains a second approval above the threshold**
+  (`secondApprovalAboveUsd`, $5,000 by default), because it now releases the
+  price. Step 7 keeps the one it has.
 
-The alternative, which keeps a separate price step after the inspection, is
-described in "Decisions for the owner".
+Fastest is unchanged: the buyer pays the price and fee at the start.
 
 ### Where the money is at each moment
 
-The ledger already has the right entries. Safest now writes the same entries
-Fastest has always written.
+Both modes now follow one rule: **everything a buyer pays is held, and only
+becomes ours or the seller's when it is earned.**
 
 | Moment | Ledger | What people see |
 |--------|--------|-----------------|
-| Buyer pays by Cryptomus | platform `ESCROW_HOLD` +price+fee | Buyer: "Paid, held by Channel Adda". Seller: "The buyer's payment is held by Channel Adda, so you can invite our agent." |
-| Buyer pays from balance | buyer `ESCROW_HOLD` −total, platform `ESCROW_HOLD` +total | The same, and the buyer's wallet shows "Paid into deal CA-…" |
-| While the deal runs | nothing new | Seller's wallet, under **Held for your sales**: "$X from CA-…, paid by the buyer, moves to your balance when the transfer completes". This amount cannot be withdrawn yet. |
-| Completed (step 7) | platform `ESCROW_RELEASE` −total, seller `ESCROW_RELEASE` +price, platform `BUYER_FEE` +fee, and the `SELLER_FEE` pair if a seller fee applies | Seller's balance goes up and can be withdrawn through the existing payout queue |
-| Channel returned to the seller *before* our agent had custody | `REFUND` pair, price+fee | Buyer's balance gets everything back |
-| Channel returned to the seller *after* custody | `REFUND` pair for the price. The fee is kept as income: platform `ESCROW_RELEASE` −fee, then `BUYER_FEE` +fee | Buyer's balance gets the price back. The fee pays for the agent's work, as /fees already says. |
-| Cancelled before custody | `REFUND` pair, price+fee (nothing moves on an unpaid deal) | Buyer's balance gets everything back |
+| Buyer pays the fee (step 1) | platform `ESCROW_HOLD` +fee. From balance, also buyer `ESCROW_HOLD` −fee. | The deal starts. |
+| Buyer pays the price (step 6) | platform `ESCROW_HOLD` +price. From balance, also buyer `ESCROW_HOLD` −price. | **Buyer:** "Paid, held by Channel Adda". **Seller:** under *Held for your sales*, "$X from CA-…, paid by the buyer, moves to your balance when the transfer completes". It cannot be withdrawn yet. |
+| Completed (step 8) | platform `ESCROW_RELEASE` −(price+fee); seller `ESCROW_RELEASE` +price; platform `BUYER_FEE` +fee; and the `SELLER_FEE` pair if a seller fee applies | The seller's balance goes up and can be withdrawn through the payout queue. |
+| Cancelled before custody | `REFUND` pair for everything held (the fee) | The buyer's balance gets the fee back. |
+| Returned to the seller after custody, before the price was paid | fee kept: platform `ESCROW_RELEASE` −fee, `BUYER_FEE` +fee | Nothing comes back. The fee pays for the agent's work, as /fees already says. |
+| Returned to the seller after the price was paid | `REFUND` pair for the price; fee kept as above | The buyer's balance gets the price back. |
 
-**The invariant, the same one Fastest already checks:**
+**Why Safest's fee is now held at payment, not taken as income:**
 
-- The platform's own position on an order is:
+- A fee refunded before custody stops counting as lost revenue.
+- A price refund is never mistaken for one. Until now, every Safest `REFUND`
+  was subtracted from revenue as a returned fee, which would have shown a
+  $10,000 price refund as −$10,000 of income.
+- The money desk's revenue is now the `BUYER_FEE` and `SELLER_FEE` rows, in
+  both modes.
+
+**The invariant:**
+- The platform's position on an order is:
   - on a completed deal, the buyer fee plus any seller fee;
   - on a deal returned after custody, the buyer fee;
-  - on a deal returned or cancelled before custody, zero.
-- The money desk's "held for buyers" figure is the sum of live paid deals, now
-  for both modes.
-- The month's revenue is the `BUYER_FEE` and `SELLER_FEE` rows. Refunding held
-  money is not lost revenue: until now, every Safest `REFUND` was subtracted as
-  a returned fee, which would show a $10,000 return as −$10,000 of income.
-- **Before any money moves:** completion and every refund first check that the
-  platform's hold on the order equals the order's `totalUsd`. If it doesn't,
-  they refuse, and the deal shows on the staff desk instead of writing rows
-  that don't net. This is the guard against an order whose books don't match
-  its amounts, such as an old fee-only order.
+  - on a deal cancelled before custody, zero.
+- "Held for buyers" on the money desk is the sum of live paid deals, in both
+  modes.
 
-### When the seller can withdraw
+**Before any money moves**, completion and every refund check that the
+platform's hold on the order equals what it should be:
+- Fastest: price + fee.
+- Safest: the fee, plus the price once step 6 has been paid.
 
-**Recommended: when the deal completes.** The price shows in the seller's
-wallet from the moment the buyer pays, under **Held for your sales**. It moves
-to the withdrawable balance at step 7, once the buyer is the channel's owner.
+If the hold is wrong, the move is refused and the deal is flagged for staff,
+instead of writing rows that don't net.
 
-That is what makes a refund possible: until the buyer has the channel, the
-money is still ours to give back.
+### Paying the price
 
-There is no further waiting period after a Safest deal completes *(call)*. The
-seller left the channel at Hold 1, two Google waiting periods before the money
-is released, so Fastest's 14-day recovery hold has nothing to protect against
-here.
+The price is a second payment on the same deal. Unlike the opening payment, it
+has to be built:
+
+- **Kept apart from the opening payment.** Each invoice is marked for the fee
+  or for the price, with a new invoice purpose `DEAL_PRICE`. The price is
+  recorded under its own reference, `buyerPaymentRef`, which is now set by the
+  system and never typed.
+  - Today a second payment on a paid deal is treated as an accidental extra and
+    booked to the buyer's balance. That rule now applies per stage.
+- **Checked against its own amount.** Underpayment checks compare what was paid
+  with that invoice's amount. Today the opening payment is compared with the
+  order's total, and for Safest that total is the fee alone.
+- **A price that arrives late,** after the deal was closed, is credited to the
+  buyer's balance at the amount the invoice was for.
+- **Every way in works:** Cryptomus, the buyer's balance, and staff recording
+  "Price received" by hand when it arrived some other way. Recording it by hand
+  is finance-only, and it is refused while a price invoice is still open.
 
 ### Paying from the balance
 
-- **If the balance covers the total**, "Pay from your balance" works as it does
-  today, at the larger amount.
-- **If the balance is short but not empty**, the payment panel says so: "You
-  have $1,000. Add $4,150 to pay from your balance." The button tops the
-  wallet up by exactly the shortfall through the existing top-up. The balance
-  then covers the deal, and the buyer pays from it. *(call)*
-- **If the shortfall is above the $10,000 top-up limit**, the panel offers the
+This applies to both payments, the fee and the price.
+
+- **If the balance covers it,** "Pay from your balance" works as it does today.
+- **If the balance is short but not empty,** the panel says so: "You have
+  $1,000. Add $4,150 to pay from your balance." Its button tops the wallet up
+  by exactly the shortfall through the existing top-up, after which the buyer
+  pays from the balance. *(call)*
+- **If the shortfall is above the $10,000 top-up limit,** the panel offers the
   direct Cryptomus payment only.
 - Splitting one payment between the balance and an invoice is out of scope.
 
-### Second approvals
+### When the seller can withdraw
 
-- Step 6, the transfer, keeps its second approval above the threshold
-  (`secondApprovalAboveUsd`, $5,000 by default).
-- Step 7 gains one, because it releases the price. This matches Fastest, where
-  the release step already has one.
+**When the deal completes** (owner's decision). The price appears in the
+seller's wallet under *Held for your sales* from the moment the buyer pays it.
+It moves to the withdrawable balance at step 8, once the buyer owns the
+channel. Until then we can still refund the buyer.
+
+There is no further waiting period after a Safest completion *(call)*. The
+seller left the channel at Hold 1, two Google waiting periods before release,
+so Fastest's 14-day recovery hold has nothing to guard here.
 
 ### Deals that stall
 
-A paid deal can stall in two places, now with the whole price held:
+**Staff unstick them from the Stuck deals desk** (owner's decision). That desk
+already lists every live deal and flags it at 3 and 7 days. The places a paid
+Safest deal can stall:
 
-- **The seller never invites the agent** (Awaiting custody, step 2 open).
-- **The buyer never inspects** (In custody, step 5 open).
+- **The seller never invites the agent.** Finance cancels, and the fee is
+  refunded.
+- **The buyer never inspects, or inspects and never pays the price.** Finance
+  returns the channel. The fee is kept, because custody was reached.
 
-**Recommended for now: staff unstick them.** The **Stuck deals** desk already
-lists every live deal and flags it at 3 and 7 days. From there, finance
-cancels the deal (full refund) or returns the channel (price refunded, fee
-kept). Automatic timers can follow once real deals show how long these steps
-take. The alternative is in "Decisions for the owner".
+No automatic timers in this change.
 
-### Holes this closes on the way
+### Guards
 
-These existed already, but they could only lose a fee. With the whole price on
-our books they could lose a channel's worth of money, so they are fixed as part
-of this change.
-
-- **A payment recorded by hand and also by Cryptomus was credited twice.**
-  "Payment received" names the payment by the deal reference, while Cryptomus
-  names it by the invoice reference. If both arrived, the second was booked to
-  the buyer's balance as a fresh payment. The fix: "Payment received" is
-  refused while the deal has a checkout invoice that is not dead, and on a deal
-  that is already paid. A late payment on a closed deal is credited only once
-  per invoice.
-- **A refund made in Cryptomus could be paid again into the balance.** A
-  processor refund freezes the deal as disputed. Returning or cancelling it
-  then also credited the buyer's balance. The fix: when a processor refund is
-  on record, the outcome writes only the platform's side ("Refunded by the
-  processor") and credits nobody.
+- **Returning the channel needs a dispute first once the price has been paid**
+  (`buyerPaidAt`, now stamped by the system when the price arrives). This holds
+  after the agent starts the transfer (`handoverAt`) as well. If Google's
+  second transfer fails, finance can still return the channel from a dispute
+  and refund the price. So "if the channel does not reach you, you get the
+  money back" stays true until the deal completes.
+- **The "seller has confirmed payment" guard goes** with the step it was keyed
+  on.
+- **Returning or cancelling a paid Safest deal moves platform money,** so it
+  needs the Finance role (or superadmin), exactly like a refund. The staff
+  desk's "Finance only" badge and outcome warnings follow the same rule.
 
 ### What goes away
 
-- The **"Where to pay me"** card and field, with its chat event, buyer
-  notification, seller reminder and email. The `sellerPayTo*` columns go too.
-- **"Pay the seller directly"** and the transaction-reference box.
-- **"Confirm the payment arrived"**, the seller's step, and every guard keyed
-  on it. The `buyerPaymentRef`, `buyerPaidAt` and `sellerConfirmedAt` columns
-  go.
-- The `AWAITING_BUYER_PAYMENT` status is no longer reachable. The value stays
-  in the database enum, because Postgres cannot drop an enum value cleanly, and
-  a comment in the schema says it is retired.
-
-### Guards that change meaning
-
-- **Returning the channel needs a dispute first once the buyer has approved
-  the inspection** (new `inspectedAt`, stamped by step 5). This replaces the
-  old `buyerPaidAt` rule and still applies after the agent starts the transfer
-  (`handoverAt`, stamped by step 6). If Google's second transfer fails, finance
-  can still return the channel from a dispute and refund the price, so "if the
-  channel does not reach you, you get the money back" stays true until the
-  deal completes.
-- **The "seller has confirmed payment" guard goes**, along with the step it
-  was keyed on.
-- **Returning or cancelling a paid Safest deal now moves platform money**, so
-  it needs the Finance role (or superadmin), exactly like a refund. The staff
-  desk's "Finance only" badge and its outcome warnings follow the same rule.
+- **The "Where to pay me" card and field,** with its chat event, buyer
+  notification, seller reminder and email. The `sellerPayTo*` columns are
+  dropped.
+- **The transaction-reference box** on step 6.
+- **"Confirm the payment arrived"** and `sellerConfirmedAt`.
+- `buyerPaidAt` and `buyerPaymentRef` stay, now written by the system when the
+  price arrives.
 
 ### Fees
 
-- Safest totals become **price + buyer fee**, as on Fastest. The buyer fee rate
-  is still the Safest rate (`buyerFeeBpSafest`).
-- The seller fee setting applies to both modes *(call)*. It is 0% by default,
-  so nothing changes until finance sets a rate.
+- **The buyer fee is unchanged:** a Safest buyer still pays the fee up front,
+  at the Safest rate.
+- **The seller fee setting now applies to Safest as well** *(call)*. It is 0%
+  today, so nothing changes until finance sets a rate. It used to be forced to
+  zero only because the price never passed through us.
 
 ### Deals that already exist
 
 Nothing is live: `main` has never been deployed, and every deal in the
-databases is test data.
+databases is test data. **The migration closes every Safest deal that is still
+running** (owner's decision), with the note "Closed when Safest moved to
+on-platform payment":
 
-**Recommended: a clean switch.** The migration closes every Safest deal that
-is still running, with the note "Closed when Safest moved to on-platform
-payment":
+- A deal whose agent never took custody becomes **Cancelled**.
+- A deal whose agent did becomes **Returned to seller**, because a deal in
+  custody cannot be cancelled.
+- The listing goes back on sale.
+- Whatever the platform held, the fee at most, goes back to the buyer's
+  balance.
+- The timestamps the desks read are stamped.
 
-- a deal whose agent never took custody becomes **Cancelled**;
-- a deal whose agent has taken custody becomes **Returned to seller**, because
-  a deal in custody cannot be cancelled;
-- the listing goes back on sale;
-- whatever the platform held for the deal, the fee at most, goes back to the
-  buyer's balance;
-- the timestamps the desks read are stamped.
+It also re-labels the fee on old Safest deals that were refunded: what was
+taken at payment becomes `ESCROW_HOLD` instead of `BUYER_FEE`, because under the
+new rule a refunded fee was never income. Finished deals, and fees that were
+kept, are left as they are.
 
-It also re-labels old fee rows so the widened money desk adds up:
-
-- On old Safest deals that were later refunded, the fee taken at payment is
-  re-labelled from `BUYER_FEE` to `ESCROW_HOLD`. Under the new rule a refunded
-  fee was never income.
-- Finished deals and fees that were kept stay as they are.
-
-This runs before any other part of the change, so no old fee-only order ever
-meets the new completion code.
-
-This keeps a single Safest flow in the code instead of two forever. It applies
-when the owner runs `pnpm db:migrate` on the dev database, so the test deals
-there are closed too.
+The migration runs first, so no old deal ever meets the new code. It applies to
+the owner's dev database when `pnpm db:migrate` is run there.
 
 ## Words on the site
 
-Every sentence listed in the research (`src/app/(site)`, `data/site.ts`,
-`data/help.ts`, `data/legal.ts`, the home components, the listing and
-buy panels, deal status and timeline, pay panel, wallet, dashboard, emails,
-admin vocabulary and desks) is rewritten to the new rule. These are the
-replacement lines; each page adapts them:
+Every sentence the research lists is rewritten to the new rule. The research
+covers `src/app/(site)`, `data/site.ts`, `data/help.ts`, `data/legal.ts`, the
+home components, the listing and buy panels, deal status and timeline, the pay
+panel, wallet, dashboard, emails, and the admin vocabulary and desks. The lines
+each page adapts:
 
-- **Safest:** "Our agent takes ownership of the channel and passes it to you.
-  You pay Channel Adda up front. We hold the money until the channel is yours,
-  then pay the seller."
-- **Fastest:** "The seller hands the channel to you directly while our agent
-  watches. We hold your payment through a 14-day safety period, then pay the
-  seller."
+- **Safest:** "You pay our fee to start. Once our agent owns the channel and
+  you have inspected it, you pay the price, to Channel Adda, never to the
+  seller. We hold it until the channel is yours, then pay the seller."
+- **Fastest:** "You pay the price and our fee at the start. The seller hands
+  the channel to you directly while our agent watches, and we hold your
+  payment through a 14-day safety period, then pay the seller."
 - **Both:** "You never pay a seller directly. If anyone asks you to, it is a
   scam. Report it."
 
-**Legal text** (Terms, Refund policy): I draft the changes and mark them in
-the summary. They change what Channel Adda promises to hold and refund, so the
+**Legal text** (Terms, Refund policy): I draft the changes and list them in the
+summary. They change what Channel Adda promises to hold and refund, so the
 owner must read them before this ships.
 
 **Promises that were never built:**
+- Trust & Safety's "can't withdraw during a dispute" becomes true for held
+  money, because a held price never reaches the seller's withdrawable balance
+  until release. It is reworded to say exactly that.
+- The Help centre's partial-settlement line is removed.
+- The desk's fee-return line is corrected.
 
-- **Trust & Safety, "can't withdraw during a dispute":** this becomes true for
-  held money, because a held price is never in the seller's withdrawable
-  balance until release. The line is reworded to say exactly that.
-- **Help, "partial settlements":** the line is removed.
-- **Staff desk, "fee not returned on a return":** corrected to the real rule.
-
-A test fails the build if any banned phrase reappears in `src`. The banned
-phrases are "pay the seller directly", "never holds the price", "off-platform"
-and "paid direct".
-
-## Decisions for the owner
-
-1. **When does the buyer pay the price?**
-   - **Up front, with the fee (recommended).** Reasons above.
-   - **After the inspection, as a second payment.** The buyer pays only the fee
-     first, then the price once they have seen the channel in our hands. It is
-     credited to the seller's held balance either way. This option costs:
-     - a second checkout and network fee for the buyer;
-     - a second payment stage through every payment path;
-     - a new time limit, after which an unpaid deal returns the channel to the
-       seller and the fee is kept;
-     - nine steps instead of seven.
-2. **When can the seller withdraw?**
-   - **At completion (recommended).**
-   - **The moment the buyer pays.** We then cannot refund the buyer if the
-     transfer fails.
-3. **A paid deal that stalls:**
-   - **Staff unstick it from the Stuck deals desk (recommended for now).**
-   - Automatic timers:
-     - if the seller hasn't invited the agent within 3 days of payment, the
-       deal is cancelled and the buyer is refunded in full;
-     - if the buyer hasn't inspected within 3 days of custody, the channel is
-       returned and the price refunded.
-4. **Test deals that are mid-way when this lands:**
-   - **Close them and return the fee (recommended, since nothing is live).**
-   - Keep the old flow alive for them. This is only worth it if a real deal is
-     running somewhere.
+A test fails the build if the old promise reappears anywhere in `src`. The
+banned phrasing is "pay the seller directly", "never holds the price",
+"payment … off-platform", "paid direct", and "price never passes".
+Moderation copy about taking deals off the platform stays allowed.
 
 ## Not in this change
 
 - Splitting one payment between balance and Cryptomus.
+- Automatic timers for stalled deals.
 - Partial settlements and the unused `Dispute` model.
 - KYC before withdrawal.
-- Automatic payouts through a processor API (finance still sends by hand).
-- A per-deal option for staff to refund the fee on a return after custody. The
-  existing rule stands: the fee is kept once the agent has held the channel.
+- Automatic payouts through a processor API. Finance still sends by hand.
+- A per-deal option for staff to refund the fee after custody.
 
 ## Calls I made
 
-- No waiting period after a Safest completion (see "When the seller can
-  withdraw").
+- No waiting period after a Safest completion.
 - "Top up the difference" for a short balance, rather than a split payment.
-- Step 7 gains a second approval above the threshold, as well as step 6.
-- `inspectedAt` is a new column, rather than reusing `buyerPaidAt` under a
-  misleading name.
-- The seller fee setting applies to Safest as well as Fastest. It is 0% today,
-  so nothing changes until finance sets a rate. Until now it was forced to zero
-  only because the price never passed through us.
-- Fastest sellers get the same **Held for your sales** wallet section. It is
-  the same data, and the screen was missing it for them too.
+- A second approval on step 8 as well as step 7.
+- The seller fee setting applies to both modes (0% today).
+- Safest's fee is held at payment and becomes income at completion or when
+  kept, the way Fastest's already does.
+- Fastest sellers get the same *Held for your sales* wallet section. It is the
+  same data, and the screen was missing it for them too.
+- Inspection (step 5) and payment (step 6) stay separate steps, as today, so
+  the buyer approves the channel before being asked for money.

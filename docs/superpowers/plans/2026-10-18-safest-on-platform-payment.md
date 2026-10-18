@@ -2,310 +2,332 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** A Safest buyer pays the price and fee to Channel Adda up front, by Cryptomus or from their balance. The price is held and released into the seller's Channel Adda wallet on completion. Nothing moves directly between buyer and seller.
+**Goal:** A Safest buyer pays the admin fee to start, as today. Once our agent holds the channel and the buyer has inspected it, the buyer pays the price to Channel Adda, by Cryptomus or from their balance. The price is held and released into the seller's Channel Adda wallet on completion. Nothing moves directly between buyer and seller.
 
-**Architecture:** Safest adopts the escrow ledger Fastest already uses:
+**Architecture:**
 
-- `ESCROW_HOLD` on the opening payment;
-- `ESCROW_RELEASE`, `BUYER_FEE` and `SELLER_FEE` on completion;
-- `REFUND` when a deal is undone.
-
-Every money move first checks that the platform's hold on the order equals its `totalUsd`.
-
-The Safest template shrinks from nine steps to seven. The pay-the-seller steps and the "where to pay me" machinery are deleted. The seller's wallet gains "Held for your sales".
+- **Holding.** Everything a buyer pays, in either mode, is booked as a platform `ESCROW_HOLD`. It becomes `BUYER_FEE`, `SELLER_FEE` or a seller's `ESCROW_RELEASE` only when earned. Every move first checks that the platform's hold matches what it should be.
+- **The price payment.** It is a second payment stage on Safest orders: invoice purpose `DEAL_PRICE`, reference `buyerPaymentRef`, and stamp `buyerPaidAt`. A system-only step 6 records it.
+- **Removed.** The seller's "money arrived" step and the "where to pay me" machinery.
+- **Added.** The seller's wallet gains a "Held for your sales" section.
 
 **Tech Stack:** Next.js 16, React 19 with the React Compiler, Prisma 7 on Postgres 16, Vitest, Biome.
 
-**Spec:** `docs/superpowers/specs/2026-10-18-safest-on-platform-payment-design.md`. This plan assumes the spec's four recommended answers. Rewrite it if the owner chooses otherwise.
+**Spec:** `docs/superpowers/specs/2026-10-18-safest-on-platform-payment-design.md` (owner-decided).
 
-**Research:** `.superpowers/revamp/money-model-report.md` has file:line citations for every current money path, step dependency and copy line.
+**Research:** `.superpowers/revamp/money-model-report.md` cites every current money path, step dependency and copy line by file:line.
 
 ## Global Constraints
 
-- **No money moves directly between a buyer and a seller.** Remove every path, field and sentence that suggests otherwise.
-- **Fees:**
-  - Safest `totalUsd = priceUsd + buyerFeeUsd`.
-  - The Safest buyer fee rate stays `buyerFeeBpSafest`.
-  - `sellerFeeBp` applies to both modes.
-- **When the seller is paid:**
-  - The seller's price becomes withdrawable only on `COMPLETED`.
-  - There is no waiting period after a Safest completion.
+- **No money moves directly between a buyer and a seller.** Remove every path, field and sentence that says otherwise.
+- **Amounts.** Safest `totalUsd` stays the buyer fee alone; it is the up-front payment. The price is `priceUsd`, paid at step 6. `sellerFeeBp` applies to both modes. `payoutUsd = priceUsd − sellerFeeUsd`.
+- **Required platform hold on an order:**
+  - nothing paid yet → 0;
+  - Fastest → `totalUsd`;
+  - Safest → `buyerFeeUsd`, plus `priceUsd` once `buyerPaidAt` is set.
+- **Withdrawals.** The seller's price becomes withdrawable only on `COMPLETED`. There is no waiting period after a Safest completion.
 - **Platform position on an order:**
-  - Completed: buyer fee + seller fee.
-  - Returned after custody: buyer fee.
-  - Returned or cancelled before custody: 0.
-- **Refunds:**
-  - A paid Safest return or cancel is FINANCE or SUPERADMIN only.
-  - The fee is kept once `custodyAt` is set. Otherwise everything is refunded.
-- **Approvals:** Safest steps 6 and 7 both carry `needsApprovalAbove` (`secondApprovalAboveUsd`, default 500000 cents).
-- **Retired status:** `AWAITING_BUYER_PAYMENT` stays in the Postgres enum and in every `Record<OrderStatus, …>` map, with "retired" wording. It is unreachable.
+  - Completed → buyer fee + seller fee.
+  - Returned after custody → buyer fee.
+  - Cancelled before custody → 0.
+- **Refunds.** A paid return or cancel needs FINANCE or SUPERADMIN. The Safest fee is kept once `custodyAt` is set.
+- **Approvals.** Safest step 7 (transfer) and step 8 (Hold 2, which completes the deal) carry `needsApprovalAbove` (`secondApprovalAboveUsd`, default 500000 cents).
+- **Stalled deals.** Staff unstick them from the Stuck deals desk. There are no automatic timers.
 - **Migrations:**
   - Hand-written SQL in `prisma/migrations/`, named after `20261019100000_conversation_reads`.
-  - Tables are `"Order"`, `"LedgerEntry"` and `"Listing"`.
-  - `LedgerEntry.id` and every `updatedAt` have no database default, so set them explicitly.
-  - Cast enum literals, for example `'REFUND'::"LedgerKind"`.
+  - Tables are `"Order"`, `"LedgerEntry"`, `"Listing"`, `"Invoice"`.
+  - `LedgerEntry.id` and every `updatedAt` have no database default.
+  - Cast enum literals, e.g. `'REFUND'::"LedgerKind"`.
   - Apply only to `channeladda_test` and `channeladda_e2e` (`DATABASE_URL=<db> pnpm db:migrate`, then `pnpm -s prisma generate`). Never apply to `channeladda`.
 - **Tests:**
-  - Vitest refuses to run unless `DATABASE_URL_TEST` names a `_test` database.
+  - Vitest runs only when `DATABASE_URL_TEST` names a `_test` database.
   - Redirect full-suite output to a scratch file and read the tail.
-- **Commits:**
-  - Lint with `pnpm -s exec biome check .`.
-  - Typecheck with `pnpm -s exec tsc --noEmit -p .`.
-  - Run the React Compiler check (`node rc2.cjs <file>`, session scratchpad) on every changed client component. Expect zero bailouts.
-  - Commit an explicit file list, ending with the session's attribution lines.
-- **Secrets:** never print Cryptomus keys, the dev password or any API key.
-- **Copy:**
-  - Plain sentences that say what happens. No "seamless" and no exclamation marks.
-  - Show money with the `Price` component.
+- **Before each commit:**
+  - `pnpm -s exec biome check .`
+  - `pnpm -s exec tsc --noEmit -p .`
+  - The React Compiler check (`node rc2.cjs <file>` from the session scratchpad) on every changed client component, with zero bailouts.
+  - An explicit file list to commit, and the session's attribution lines.
+- **Secrets.** Never print Cryptomus keys, the dev password or any API key.
+- **Copy.** Plain sentences, no "seamless", no exclamation marks, money through the `Price` component.
 
 ## Review Focus
 
-1. **Late payment.** A Safest payment that arrives after the deal was cancelled or returned is credited once, to the buyer's balance, at price + fee. Test: Task 3, `a late safest payment is credited once at the full amount`.
-2. **Underpayment.** An invoice paid at or above the fee but below price + fee must not open the deal. Test: Task 2, `an underpaid safest invoice does not start the deal`.
-3. **One payment, two names.** A payment recorded by hand and also applied by Cryptomus is credited once. Test: Task 3, `a payment recorded by hand is refused while a checkout invoice is open`.
-4. **Withdrawing held money.** A seller trying to withdraw money that is still held is refused. Test: Task 6, `a held sale cannot be withdrawn`.
-5. **Old history.** Old conversations with `pay-to-saved` events and old step labels render without throwing. Test: Task 5, `an old pay-to event is skipped, not rendered`.
+1. **An underpaid price.** A price invoice paid at or above the fee, but below the price, must not complete step 6. Test: Task 4, `an underpaid price invoice does not move the deal`.
+2. **A price paid twice.** If the price arrives twice (invoice and balance, or invoice and by hand), it is applied once. Any second arrival goes to the buyer's balance once. Tests: Task 3, `a second price payment goes to the buyer's balance`; Task 5, `a price recorded by hand is refused while a price invoice is open`.
+3. **A price that arrives after a return.** It is credited to the buyer's balance at the price amount. Test: Task 4, `a late price payment is credited at the price`.
+4. **A seller withdrawing held money.** The withdrawal is refused. Test: Task 8, `a held sale cannot be withdrawn`.
+5. **Old chat history.** Old conversations with `pay-to-saved` events and old step labels render without throwing. Test: Task 6, `an old pay-to event is skipped, not rendered`.
 
 ---
 
 ### Task 1: Close the running Safest test deals and re-label refunded fees
 
-This goes first so that no fee-only order ever meets the new completion code.
+This goes first, so no old-flow order ever meets the new code.
 
 **Files:**
 - Create: `prisma/migrations/20261020090000_close_old_safest_deals/migration.sql`
 
-**Interfaces:**
-- Produces: no running Safest order in any database the migration has run on.
-  - Every old refunded fee sits under `ESCROW_HOLD`, never `BUYER_FEE`.
-  - Every closed order's platform position is 0.
+- [ ] **Step 1: Snapshot the e2e database.** Save to the scratchpad:
+  - `select status, count(*) from "Order" where mode='SAFEST' group by 1;`
+  - the platform sum per Safest order.
+- [ ] **Step 2: Write one transaction.** "Running" means Safest with status `AWAITING_PAYMENT`, `AWAITING_CUSTODY`, `IN_CUSTODY`, `AWAITING_BUYER_PAYMENT`, `AWAITING_HANDOVER` or `DISPUTED`.
+  1. **Refund what the platform holds.** For each running order, take the platform sum for that order. Where it is above 0, insert a `REFUND` pair: platform −held, buyer +held.
+     - Note: `Closed when Safest moved to on-platform payment`.
+     - ids: `'mig_' || md5(random()::text || o.id || side)`.
+  2. **Close the order.**
+     - `status` becomes `'CANCELLED'` where `"custodyAt"` is null, otherwise `'RETURNED_TO_SELLER'`, cast to `"OrderStatus"`.
+     - Set `"cancelledAt" = now()` and `"updatedAt" = now()`.
+  3. **Reopen the listing.** Listings that are `'RESERVED'` become `'LIVE'`, with `"updatedAt" = now()`.
+  4. **Re-label refunded fees.** Retag platform `BUYER_FEE` rows to `ESCROW_HOLD` on every Safest order that is not `COMPLETED` and has a platform `REFUND` row.
+  - Do not touch `TransferStep`.
+- [ ] **Step 3: Apply to e2e and test**, then re-run the Step 1 queries. Expected:
+  - no running Safest order;
+  - each closed order's platform sum is 0;
+  - completed Safest orders are unchanged against the snapshot;
+  - no `BUYER_FEE` row remains on a refunded, non-completed Safest order.
+- [ ] **Step 4: Run the whole suite.** Expected: green.
+- [ ] **Step 5: Commit**: "chore: running Safest test deals close before Safest moves its money on-platform".
 
-- [ ] **Step 1: Snapshot the e2e database's money**, so the migration can be checked against real old-flow data from the walkthrough. Save the output to the scratchpad.
+### Task 2: Everything paid is held until it is earned
 
-  ```sql
-  select status, count(*) from "Order" where mode='SAFEST' group by 1;
-  select o.id, o.status, sum(l."amountUsd") from "Order" o join "LedgerEntry" l on l."orderId"=o.id and l."userId" is null where o.mode='SAFEST' group by 1,2;
-  ```
-
-- [ ] **Step 2: Write the migration** as one transaction. "Running" means Safest with status in `AWAITING_PAYMENT`, `AWAITING_CUSTODY`, `IN_CUSTODY`, `AWAITING_BUYER_PAYMENT`, `AWAITING_HANDOVER` or `DISPUTED`.
-  1. **Refund what the platform holds.** For each running order, `held = coalesce(sum("amountUsd")) where "orderId"=o.id and "userId" is null`.
-     - Where `held > 0`, insert two `REFUND` rows: platform −held, and buyer +held. Both get the note `Closed when Safest moved to on-platform payment` and id `'mig_' || md5(random()::text || o.id || side)`.
-  2. **Close the order.** Set `status` to `'CANCELLED'` where `"custodyAt" is null`, else `'RETURNED_TO_SELLER'` (cast to `"OrderStatus"`). Set `"cancelledAt" = now()` and `"updatedAt" = now()`.
-  3. **Free the listing.** Set those orders' listings to `'LIVE'` where they are `'RESERVED'`, with `"updatedAt" = now()`.
-  4. **Re-label refunded fees.** Retag platform `BUYER_FEE` rows to `ESCROW_HOLD` on every Safest order whose status is not `COMPLETED` and which has a platform `REFUND` row.
-  - Do not touch `TransferStep` rows.
-- [ ] **Step 3: Apply it** to `channeladda_e2e` and `channeladda_test`.
-  - Then re-run Step 1's queries on e2e. Expected:
-    - no Safest order in a running status;
-    - every closed order's platform sum is 0;
-    - completed Safest orders are unchanged against the snapshot.
-  - Then run `select count(*) from "LedgerEntry" l join "Order" o on o.id=l."orderId" where o.mode='SAFEST' and o.status<>'COMPLETED' and l.kind='BUYER_FEE' and exists (select 1 from "LedgerEntry" r where r."orderId"=o.id and r.kind='REFUND')`. Expected: 0.
-- [ ] **Step 4: Run the whole suite.** Expected: green, since the test database is wiped per test.
-- [ ] **Step 5: Commit** with the message "chore: running Safest test deals close before Safest moves its money on-platform".
-
-### Task 2: Safest money goes through Channel Adda
+The Safest flow is still old here. Only the fee is on our books, so completion earns the fee and credits the seller nothing.
 
 **Files:**
+- Create: `src/lib/holds.ts` and `src/lib/holds.test.ts`
 - Modify:
-  - `src/lib/fees.ts`: `orderAmounts`.
-  - `src/server/deals.ts`:
-    - the opening payment ledger rows in `recordOpeningPayment`;
+  - **`src/server/deals.ts`:**
+    - opening payment rows in `recordOpeningPayment`;
     - `completeOrder`;
-    - the cancel and return block of `resolveDeal`;
+    - the cancel/return block of `resolveDeal`;
     - `movesPlatformMoney`;
     - a new `platformHoldFor`.
-  - `src/server/wallet.ts`: the platform row in `payFromWallet`.
-  - `src/server/dashboard.ts`: `getBuyerSummary`.
-  - `src/server/admin-money.ts`:
-    - `HELD_FOR_BUYERS`, `expectedHold`, and the mismatch query (rename it `holdMismatches`, and update its callers);
-    - the month figures at `:234-265`. Fees net is the platform `BUYER_FEE` and `SELLER_FEE` rows; `REFUND` no longer reduces revenue; `paidIn` covers both modes.
-  - `src/components/admin/vocab.tsx`: `custodyFacts` `platformHolds` is true for any paid deal.
-  - `src/components/admin/deal-controls.tsx`: the "Finance only" badge at `:773-777` and the return's weight at `:503-506` follow `movesPlatformMoney`.
-  - `src/server/actions/deals.ts`: a message for `books-mismatch`.
+  - **`src/server/wallet.ts`:** the platform row in `payFromWallet`.
+  - **`src/server/admin-money.ts`:**
+    - drop the `mode: "FASTEST"` filters from `HELD_FOR_BUYERS`;
+    - replace `expectedHold` with `requiredHold`;
+    - rename `fastestHoldMismatches` to `holdMismatches`, and update its callers;
+    - month figures at `:234-265`: fees net is the platform `BUYER_FEE` + `SELLER_FEE` rows, `REFUND` no longer reduces revenue, and `paidIn` covers both modes.
+  - **`src/components/admin/vocab.tsx`:** `custodyFacts.platformHolds` is true for any paid order.
+  - **`src/components/admin/deal-controls.tsx`:** the "Finance only" badge (`:773-777`) and the return's weight (`:503-506`) follow `movesPlatformMoney`.
+  - **`src/server/actions/deals.ts`:** a message for `books-mismatch`.
 - Test:
-  - `src/lib/fees.test.ts`
   - `src/server/deals.test.ts`
   - `src/server/wallet.test.ts`
   - `src/server/deal-flow.test.ts`
   - `src/server/deal-guards.test.ts`
-  - `src/server/custody-safety.test.ts`: returns at `:134`, `:301`, `:329` and `:539` move to a FINANCE user.
+  - `src/server/custody-safety.test.ts`: returns at `:134`, `:301`, `:329` and `:539` run as FINANCE.
   - `src/server/agent-thread-access.test.ts`
   - `src/server/review-fixes.test.ts`
   - `src/server/admin-money.test.ts`
-  - `src/server/logic-fixes.test.ts`
-  - `src/server/pay-attempts.test.ts`: the underpaid case goes through `reconcileInvoices`, with `@/server/cryptomus` mocked as this file already does.
 
 **Interfaces:**
-- Consumes: Task 1's clean data.
-- Produces:
-  - `orderAmounts(price, fees, mode)`: `totalUsd = price + buyerFee` and `sellerFeeUsd = applyBp(price, sellerFeeBp)` in both modes.
+- Produces in `src/lib/holds.ts`:
+  - `requiredHold(order: { mode; paymentRef; totalUsd; buyerFeeUsd; priceUsd; buyerPaidAt }): number`. In this task Safest returns `buyerFeeUsd` only; Task 3 adds the price term.
+  - `keptFee(order: { mode; custodyAt; buyerFeeUsd }): number`. Returns `buyerFeeUsd` for Safest with `custodyAt`, else 0.
+- Produces in `src/server/deals.ts`:
   - `platformHoldFor(tx, orderId): Promise<number>`: the sum of platform `ESCROW_HOLD`, `ESCROW_RELEASE` and `REFUND` rows on the order.
-  - The new `DealFailure` reason `"books-mismatch"`, returned when that sum ≠ `order.totalUsd` at completion or refund.
-  - `holdMismatches(): Promise<HoldMismatch[]>`, covering both modes.
+  - The `DealFailure` reason `"books-mismatch"`.
 
-- [ ] **Step 1: Write the failing tests.** Amounts are in cents, with a seeded price of 10_000 and a default buyer fee of 300 bp.
-  - **fees.test:**
-    - `a safest buyer owes the price and the fee`: total is 10_300.
-    - `the seller fee applies to safest sales`: at `sellerFeeBp: 500`, the seller fee is 500 and the payout is 9_500.
-    - Delete the two tests asserting the opposite.
-  - **deals.test:** `a paid safest deal holds the price and the fee`. There is one platform row, `ESCROW_HOLD` +10_300, and no `BUYER_FEE`.
-  - **wallet.test:** `paying a safest deal from the balance debits the price and the fee`. The buyer row is `ESCROW_HOLD` −10_300 and the platform row is +10_300.
-  - **deal-flow.test:** `a safest deal pays the seller's wallet on completion` replaces `a safest deal runs end to end`.
-    - `balanceOf(seller)` is 10_000.
-    - `platformPositionFor` is 300.
-    - With `sellerFeeBp: 500`, the seller gets 9_500 and the platform 800.
+- [ ] **Step 1: Write the failing tests.** Seeded price 10_000; buyer fee 300 bp.
+  - **holds.test:**
+    - `nothing is held before payment`
+    - `fastest holds the total`
+    - `safest holds the fee`
+    - `safest keeps its fee once custody is reached`
+  - **deals.test:** `a paid safest deal holds the fee, it does not earn it yet`. Expect one platform `ESCROW_HOLD` of +300 and no `BUYER_FEE`.
+  - **wallet.test:** `paying a safest fee from the balance holds it`. The buyer gets `ESCROW_HOLD` −300 and the platform `ESCROW_HOLD` +300.
+  - **deal-flow.test:** `a completed safest deal earns its fee`. Expect platform `ESCROW_RELEASE` −300, `BUYER_FEE` +300, and a position of 300.
   - **deal-guards.test:**
-    - `returning the channel before custody refunds the price and the fee`: the buyer gets +10_300 and the platform position is 0.
-    - `returning the channel after custody refunds the price and keeps the fee`:
-      - the buyer gets +10_000 and the platform position is 300;
-      - there are platform rows `ESCROW_RELEASE` −300 and `BUYER_FEE` +300;
-      - held-for-buyers on the order is 0.
-    - `returning a paid safest deal needs finance`: a MODERATOR is refused with the existing finance-only reason.
-    - `completion refuses an order whose hold does not match`: an order with `totalUsd` bumped by 1 after payment fails with `books-mismatch` and writes no row.
-    - Delete `cancelling before the agent takes custody refunds the admin fee` and `a completed safest deal leaves the platform holding only its fee`.
-  - **review-fixes.test:** `cancelling a wallet-paid safest deal returns the price and the fee to the wallet` (+10_300).
-  - **pay-attempts.test:** `an underpaid safest invoice does not start the deal`. A settled invoice paying 300 of 10_300 leaves the order `AWAITING_PAYMENT` and writes no ledger row.
+    - `cancelling before custody refunds the fee`: position 0, held-for-buyers 0, and the month's fees net 0.
+    - `returning after custody keeps the fee`: `ESCROW_RELEASE` −300, `BUYER_FEE` +300.
+    - `returning a paid safest deal needs finance`: a MODERATOR is refused.
+    - `a refund refuses an order whose hold does not match`: an extra platform `ESCROW_HOLD` +1 gives `books-mismatch`, and no row is written.
   - **admin-money.test:**
-    - The books test: a completed Safest deal counts in held-for-buyers until release and nets to 0 after.
-    - `returning a safest deal is not negative revenue`: after a return after custody, the month's fees net is 300.
+    - The books test now counts Safest holds.
+    - `a refunded safest fee is not counted as revenue`.
     - `a safest hold that does not match its order is reported`.
-  - **logic-fixes.test:** `a completed safest purchase counts what the buyer paid us`. Spent is 103 dollars (`totalUsd` 10_300 cents), with no added price.
-- [ ] **Step 2: Run them.** `pnpm -s vitest run src/lib/fees.test.ts src/server/deals.test.ts src/server/wallet.test.ts src/server/deal-flow.test.ts src/server/deal-guards.test.ts src/server/review-fixes.test.ts src/server/pay-attempts.test.ts src/server/admin-money.test.ts src/server/logic-fixes.test.ts`
-  - Expected: FAIL on the amounts and rows above.
+  - **review-fixes.test:** `cancelling a wallet-paid safest deal returns the fee to the wallet` is unchanged and still passes.
+- [ ] **Step 2: Run them.** Expected: FAIL.
+
+  ```
+  pnpm -s vitest run src/lib/holds.test.ts src/server/deals.test.ts src/server/wallet.test.ts src/server/deal-flow.test.ts src/server/deal-guards.test.ts src/server/admin-money.test.ts src/server/review-fixes.test.ts
+  ```
+
 - [ ] **Step 3: Implement.**
-  - `orderAmounts`: no mode branches.
-  - **Opening payment** (both paths): the platform row is `ESCROW_HOLD` +`totalUsd` in both modes.
-  - **`completeOrder`:** drop the mode return. Throw `DealAbort("books-mismatch")` unless `platformHoldFor === totalUsd`.
+  - **Opening payment (both paths):** the platform row is `ESCROW_HOLD` +`totalUsd` in both modes.
+  - **`completeOrder`:**
+    - Throw `DealAbort("books-mismatch")` unless `platformHoldFor === requiredHold`.
+    - Write `ESCROW_RELEASE` −`requiredHold` and `BUYER_FEE` +fee.
+    - The seller's `ESCROW_RELEASE` +price and the `SELLER_FEE` pair are written only when the price is held: Fastest always, Safest from Task 3.
   - **`resolveDeal`:**
-    - Run the same check before any refund.
-    - On Safest, the paid refund is `custodyAt ? priceUsd : totalUsd`, for both `CANCELLED` and `RETURNED_TO_SELLER`.
-    - When the fee is kept, add platform `ESCROW_RELEASE` −fee and `BUYER_FEE` +fee.
-  - **`movesPlatformMoney`:** true for `RETURNED_TO_SELLER` and `CANCELLED` when `paymentRef` is set.
-  - **`getBuyerSummary`:** drop the Safest price addition and its comment.
-  - **Comments:** rewrite every comment that says Safest never holds the price (`fees.ts`, `deals.ts`, `deal-machine.ts`, `schema.prisma`; lines are in the research).
-- [ ] **Step 4: Run Step 2's command.**
-  - Then run `custody-safety.test.ts` and `agent-thread-access.test.ts`.
-  - Then the whole suite. Fix every other fee-only Safest expectation: `deal-feed.test`, `admin-disputes.test`, `deal-events.test`, `e2e-lifecycle.test` and `money-safety.test`.
-  - Expected: green.
-- [ ] **Step 5: Commit** with the message "feat: a Safest buyer pays Channel Adda the price and fee up front, and the seller is paid on completion".
+    - Run the same check.
+    - Refund `held − keptFee`.
+    - When `keptFee > 0`, write `ESCROW_RELEASE` −fee and `BUYER_FEE` +fee.
+  - **`movesPlatformMoney`:** true for `RETURNED_TO_SELLER` and `CANCELLED` whenever `paymentRef` is set.
+  - **Comments:** rewrite the ones that say Safest never holds money. The research lists them.
+- [ ] **Step 4: Run Step 2's command, then `custody-safety.test.ts` and `agent-thread-access.test.ts`, then the whole suite.** Fix the fee-classification expectations in `deal-feed.test`, `admin-disputes.test`, `deal-events.test` and `e2e-lifecycle.test`. Expected: green.
+- [ ] **Step 5: Commit**: "feat: everything a buyer pays is held until it is earned, in both modes".
 
-### Task 3: One payment is credited once
+### Task 3: The buyer pays the price into Channel Adda (balance and by hand)
 
 **Files:**
+- Create: `prisma/migrations/20261020100000_safest_price_payment/migration.sql` with `ALTER TYPE "InvoicePurpose" ADD VALUE 'DEAL_PRICE';`.
 - Modify:
-  - `src/server/deals.ts`: `recordManualPayment`, `creditUnusablePayment` and `resolveDeal`.
-  - `src/server/actions/deals.ts`: `markOpeningPaymentReceived` messages.
-- Test: `src/server/money-safety.test.ts`
-
-**Interfaces:**
-- Produces two new manual-record refusals:
-  - `"invoice-open"`: a DEAL invoice for the order exists that is neither applied as dead nor refunded;
-  - `"already-paid"`: `paymentRef` is set.
-- Produces: `resolveDeal` writes only the platform side, with the note "Refunded by the processor", when an audit row `payment.refunded_by_processor` exists for the order.
-
-- [ ] **Step 1: Write the failing tests.**
-  - `a payment recorded by hand is refused while a checkout invoice is open`.
-  - `a payment recorded by hand on a paid deal is refused`. Assert that no `DEPOSIT` row is written.
-  - `a late safest payment is credited once at the full amount`:
-    - `recordOpeningPayment` on a `CANCELLED` order under the invoice reference credits `DEPOSIT` +10_300;
-    - a second call under `order.reference` credits nothing.
-  - `a deal refunded by the processor is not refunded again to the balance`: after the processor-refund freeze, a finance return writes the platform −held row and no buyer row.
-- [ ] **Step 2: Run them.** `pnpm -s vitest run src/server/money-safety.test.ts`
-  - Expected: FAIL.
-- [ ] **Step 3: Implement.** `creditUnusablePayment` credits a name only once per order. If a `late:` row already exists for the order, it credits nothing.
-- [ ] **Step 4: Run Step 2's command and the whole suite.**
-  - Expected: green.
-- [ ] **Step 5: Commit** with the message "fix: one payment is credited once, however many ways it is recorded".
-
-### Task 4: Seven Safest steps
-
-**Files:**
-- Create: `prisma/migrations/20261020100000_safest_inspected_at/migration.sql`. It is `ALTER TABLE "Order" ADD COLUMN "inspectedAt" TIMESTAMP(3);`.
-- Modify:
-  - `prisma/schema.prisma`: `inspectedAt`, plus a "retired" comment on `AWAITING_BUYER_PAYMENT`.
-  - `src/lib/deal-templates.ts`: the doc comment says the rows are seeded at creation.
-  - `src/lib/deal-machine.ts`: remove the status from `TRANSITIONS`, `AGENT_HOLDS` and `DISPUTABLE`.
-  - `src/server/deals.ts`: `STEP_TIMESTAMP`, plus the return guard in `resolveDeal`.
-  - `src/components/deals/deal-status.ts`:
-    - drop the `SAFEST:AWAITING_BUYER_PAYMENT:seller` override;
-    - reword that status in `STATUS_LABELS`, `STATUS_SHORT` and `STATUS_TONE` as retired.
-  - `src/components/admin/vocab.tsx:40`: reworded the same way.
-  - `src/lib/deal-panel.ts`
-  - `src/server/deal-feed.ts:202`
-  - `src/components/admin/stuck-deals.tsx:38`
+  - **`prisma/schema.prisma`:** the enum value, and comments on `buyerPaidAt` and `buyerPaymentRef` saying the system now sets them.
+  - **`src/lib/deal-templates.ts`:** `SAFEST_STEPS`, per Interfaces. Also fix the doc comment so it says rows are seeded at creation.
+  - **`src/lib/deal-machine.ts`:** `AWAITING_BUYER_PAYMENT → AWAITING_HANDOVER` by `system`, not `seller`.
+  - **`src/lib/holds.ts`:** Safest adds `priceUsd` once `buyerPaidAt` is set.
+  - **`src/lib/fees.ts`:** `sellerFeeUsd` is computed in both modes.
+  - **`src/server/deals.ts`:**
+    - `STEP_TIMESTAMP.SAFEST = { 4: "custodyAt", 8: "handoverAt" }`;
+    - `advanceStep` refuses Safest step 6 for everyone, with `"pay-in-checkout"`;
+    - the new `recordPricePayment` and `recordManualPricePayment`;
+    - the seller credit in `completeOrder` for Safest;
+    - the `resolveDeal` return guard: `needs-dispute` keyed on `buyerPaidAt`, and drop the `already-paid` guard.
+  - **`src/server/wallet.ts`:** `payFromWallet` is stage-aware.
+  - **`src/server/actions/deals.ts`:** `markPriceReceived` (FINANCE), plus messages for `pay-in-checkout`.
+  - **`src/components/deals/deal-status.ts`:** remove the `SAFEST:AWAITING_BUYER_PAYMENT:seller` override; add a seller sentence saying the buyer is paying Channel Adda.
 - Test:
   - `src/lib/deal-templates.test.ts`
   - `src/lib/deal-machine.test.ts`
-  - `src/server/deal-flow.test.ts`: `runTo` stops passing `paymentRef`.
+  - `src/lib/holds.test.ts`
+  - `src/lib/fees.test.ts`
+  - `src/server/deal-flow.test.ts`: `runTo` pays the price with `recordPricePayment` instead of passing `paymentRef`.
   - `src/server/custody-safety.test.ts`
   - `src/server/deal-guards.test.ts`
   - `src/server/e2e-lifecycle.test.ts`
+  - `src/server/wallet.test.ts`
   - `src/components/deals/deal-status.test.ts`
   - `src/lib/deal-panel.test.ts`
-  - `src/server/deal-agent.test.ts`: the `HOLDING` list, and the helper at `:251`.
-  - `src/server/agent-demotion.test.ts:37`
+  - Helpers at `src/server/deal-agent.test.ts:251` and `src/server/agent-demotion.test.ts:37`.
 
 **Interfaces:**
-- Consumes: Task 2's money behaviour.
-- Produces: `SAFEST_STEPS` with seven steps.
+- Consumes: Task 2's `requiredHold`, `platformHoldFor`, `keptFee`.
+- Produces `SAFEST_STEPS`:
 
-  | # | Label | Actor | Enters | Flags |
-  |---|-------|-------|--------|-------|
-  | 1 | "Pay the price and the fee" | buyer | | |
+  | # | Label | Actor | Enters status | Flags |
+  |---|-------|-------|---------------|-------|
+  | 1 | "Pay the admin fee" | buyer | | |
   | 2 | "Invite the agent as channel owner" | seller | | |
   | 3 | "Accept and confirm custody" | agent | | |
   | 4 | "Hold 1 complete, ownership verified" | agent | `IN_CUSTODY` | |
-  | 5 | "Inspect the channel" | buyer | `AWAITING_HANDOVER` | |
-  | 6 | "Transfer ownership to the buyer" | agent | | `needsApprovalAbove`, `handsOver` |
-  | 7 | "Hold 2 complete, ownership verified" | agent | `COMPLETED` | `needsApprovalAbove` |
+  | 5 | "Inspect the channel" | buyer | `AWAITING_BUYER_PAYMENT` | |
+  | 6 | "Pay the price to Channel Adda" | buyer | none; the payment performs the transition | |
+  | 7 | "Transfer ownership to the buyer" | agent | | `needsApprovalAbove`, `handsOver` |
+  | 8 | "Hold 2 complete, ownership verified" | agent | `COMPLETED` | `needsApprovalAbove` |
 
-- Produces: `STEP_TIMESTAMP.SAFEST = { 4: "custodyAt", 5: "inspectedAt", 6: "handoverAt" }`.
-- Produces the return rule: once `inspectedAt` is set, a return needs `DISPUTED` first (`needs-dispute`). This holds after `handoverAt` as well. Nothing blocks a finance return from a dispute before `COMPLETED`.
+- Produces `recordPricePayment(orderId, reference, asset): Promise<OpeningOutcome>`. It uses the same outcome union as `recordOpeningPayment`.
+  - **Same reference again:** `"already-applied"`.
+  - **A different reference while `buyerPaymentRef` is set:** goes to `creditSecondPayment`, keyed on the price stage. A settled invoice for it becomes a buyer `DEPOSIT` at that invoice's amount.
+  - **The order is not `SAFEST` in `AWAITING_BUYER_PAYMENT`:** goes to `creditUnusablePayment` at `priceUsd`.
+  - **Otherwise, in one transaction:**
+    - compare-and-set on `buyerPaymentRef: null, status: "AWAITING_BUYER_PAYMENT"`;
+    - set `buyerPaymentRef`, `buyerPaidAt` and status `AWAITING_HANDOVER`;
+    - complete step 6;
+    - write the platform `ESCROW_HOLD` +`priceUsd`;
+    - post the chat event "{buyer} paid {price} to Channel Adda. It is held until the channel is theirs."
+  - **After commit:** `notifyNextActor`.
+- Produces `recordManualPricePayment(orderId, txid, asset, byUserId)`. It audits the txid, then calls `recordPricePayment(orderId, `${order.reference}:price`, asset)`.
+- Produces `payFromWallet(orderId, userId)`:
+  - In `AWAITING_PAYMENT` it pays `totalUsd`, as today.
+  - On Safest in `AWAITING_BUYER_PAYMENT` it pays `priceUsd` with `wallet:<ref>:price`. The ledger rows are buyer `ESCROW_HOLD` −price and platform `ESCROW_HOLD` +price, under the same compare-and-set and step 6 as `recordPricePayment`.
 
 - [ ] **Step 1: Write the failing tests.**
   - **deal-templates.test:**
-    - `safest has seven steps in the spec's order`, with the labels above;
+    - `safest has eight steps in the spec's order`, with the labels above;
     - `both safest transfer steps need a second approval above the threshold`.
   - **deal-machine.test:**
-    - the buyer may move `IN_CUSTODY` → `AWAITING_HANDOVER`;
-    - no transition names `AWAITING_BUYER_PAYMENT`;
-    - `AGENT_HOLDS` omits it.
-  - **custody-safety and deal-guards:**
-    - `returning the channel after the buyer approved it needs a dispute`;
-    - `a failed second transfer can still be returned from a dispute`: with `handoverAt` set, a finance return from `DISPUTED` refunds the price.
-    - Delete the tests built on `buyerPaidAt` and `sellerConfirmedAt`.
-  - **deal-flow.test:** `a deal view tells each side what is theirs to do` now has `totalUsd` 10_300.
-  - **e2e-lifecycle:** `a safest deal, from listing to completed` sees the platform net 300 and the seller hold 10_000.
+    - `the price payment moves a safest deal on, not the seller`: `system` is allowed and `seller` is refused.
+  - **holds.test:** `safest holds the price once it is paid`.
+  - **fees.test:** `the seller fee applies to safest sales`. At 500 bp the seller fee is 500, the payout 9_500, and the total still 300.
+  - **deal-flow.test:**
+    - `a safest deal pays the seller's wallet on completion`:
+      - the seller balance is 10_000 and the platform position is 300;
+      - with `sellerFeeBp: 500`, the seller balance is 9_500 and the platform position is 800.
+    - `the buyer cannot mark the price paid themselves`: `advanceStep` on step 6 returns `pay-in-checkout`.
+    - `a second price payment goes to the buyer's balance`: `recordPricePayment` under a second reference with a settled `DEAL_PRICE` invoice credits a `DEPOSIT` of that amount and does not move the deal.
+  - **wallet.test:**
+    - `a safest buyer pays the price from the balance`: available drops by 10_000 and the deal is `AWAITING_HANDOVER`.
+    - `the price cannot be paid from the balance before the inspection`.
+  - **deal-guards and custody-safety:**
+    - `returning a channel after the price is paid needs a dispute, and refunds the price`: the buyer gets +10_000 and the fee is kept.
+    - `a failed second transfer can still be returned from a dispute`: with `handoverAt` set, finance can return it from `DISPUTED`.
+    - Delete every test built on `sellerConfirmedAt` or a typed `paymentRef`.
+  - **e2e-lifecycle:** `a safest deal, from listing to completed`: the platform nets 300, the seller holds 10_000, and `buyerPaymentRef` starts with `wallet:` or is the manual name.
   - **deal-status.test:**
     - delete `after the buyer records paying, the seller is asked to confirm`;
-    - add `a safest seller waiting on the inspection is told the money is already held`.
-- [ ] **Step 2: Run them.** `pnpm -s vitest run src/lib/deal-templates.test.ts src/lib/deal-machine.test.ts src/server/custody-safety.test.ts src/server/deal-guards.test.ts src/server/deal-flow.test.ts src/server/e2e-lifecycle.test.ts src/components/deals/deal-status.test.ts src/lib/deal-panel.test.ts src/server/deal-agent.test.ts`
-  - Expected: FAIL.
-- [ ] **Step 3: Apply the migration** to `channeladda_test` and `channeladda_e2e`, then generate. Implement the Interfaces.
-- [ ] **Step 4: Run Step 2's command, then the suite and the typecheck.**
-  - Expected: green.
-- [ ] **Step 5: Commit** with the message "feat: Safest runs in seven steps, with no payment between buyer and seller".
+    - add `a safest seller is told the buyer is paying Channel Adda`.
+- [ ] **Step 2: Run the files under Test.** Expected: FAIL.
+- [ ] **Step 3: Apply the migration and generate.** Then implement the Interfaces.
+- [ ] **Step 4: Run Step 2's command, then the suite and typecheck.** Expected: green.
+- [ ] **Step 5: Commit**: "feat: a Safest buyer pays the price into Channel Adda, and the seller is paid on completion".
 
-### Task 5: Remove the direct-payment machinery
+### Task 4: The price by Cryptomus
 
 **Files:**
-- Create: `prisma/migrations/20261020110000_drop_direct_payment/migration.sql`. It drops `sellerPayTo`, `sellerPayToAt`, `sellerPayToChangedAt`, `buyerPaymentRef`, `buyerPaidAt` and `sellerConfirmedAt`.
+- Modify:
+  - **`src/server/actions/payments.ts`:** `startPayment` is stage-aware.
+    - The opening stage uses `purpose: "DEAL"` with `totalUsd`.
+    - The price stage, on Safest in `AWAITING_BUYER_PAYMENT`, uses `purpose: "DEAL_PRICE"` with `priceUsd`.
+    - The invoice-reuse filter adds `purpose`.
+  - **`src/app/api/webhooks/cryptomus/route.ts`:**
+    - Route `DEAL_PRICE` invoices to `recordPricePayment`.
+    - The underpaid check compares against `invoice.amountUsd`.
+  - **`src/server/invoices.ts`:** in `reconcileOne`, the same routing and the same underpaid comparison.
+  - **`src/server/deals.ts`:** `creditUnusablePayment(orderId, reference, amountUsd)` takes the amount from its caller.
+  - **`src/server/admin-money.ts:550`:** "landed on deal" also matches `order.buyerPaymentRef === inv.reference`.
+- Test: `src/server/pay-attempts.test.ts` (it already mocks `@/server/cryptomus`), `src/server/money-safety.test.ts`.
+
+- [ ] **Step 1: Write the failing tests.**
+  - `a price checkout raises an invoice for the price`: the purpose is `DEAL_PRICE` and the amount is 10_000.
+  - `a price checkout never reuses the fee invoice`.
+  - `a settled price invoice moves the deal through reconciliation`.
+  - `an underpaid price invoice does not move the deal`: paid 300 of 10_000 leaves the deal in `AWAITING_BUYER_PAYMENT` with no ledger row.
+  - `a late price payment is credited at the price`: after a return, a `DEPOSIT` of +10_000 goes to the buyer, once.
+- [ ] **Step 2: Run them.** Run `pnpm -s vitest run src/server/pay-attempts.test.ts src/server/money-safety.test.ts`. Expected: FAIL.
+- [ ] **Step 3: Implement.**
+- [ ] **Step 4: Run Step 2's command and the suite.** Expected: green.
+- [ ] **Step 5: Commit**: "feat: the Safest price can be paid by Cryptomus, checked against its own invoice".
+
+### Task 5: One payment is credited once
+
+**Files:**
+- Modify: `src/server/deals.ts`
+  - `recordManualPayment` and `recordManualPricePayment` refuse in two cases:
+    - `"invoice-open"`: an invoice for that stage exists that is neither applied as dead nor refunded;
+    - `"already-paid"`: that stage's reference is set.
+  - `creditUnusablePayment` credits each stage at most once per order. A `late:` row for that stage blocks a second credit.
+  - `resolveDeal`: when the audit row `payment.refunded_by_processor` exists for the order, a refunding outcome writes only the platform side, noted "Refunded by the processor", and credits nobody.
+- Modify: `src/server/actions/deals.ts`, messages for the new refusals.
+- Test: `src/server/money-safety.test.ts`
+
+- [ ] **Step 1: Write the failing tests.** Each test asserts that no unexpected `DEPOSIT` or `REFUND` row is written.
+  - `a payment recorded by hand is refused while a checkout invoice is open`
+  - `a price recorded by hand is refused while a price invoice is open`
+  - `a payment recorded by hand on a paid deal is refused`
+  - `a late payment under two names is credited once`
+  - `a deal refunded by the processor is not refunded again to the balance`
+- [ ] **Step 2: Run them.** Run `pnpm -s vitest run src/server/money-safety.test.ts`. Expected: FAIL.
+- [ ] **Step 3: Implement.**
+- [ ] **Step 4: Run Step 2's command and the suite.** Expected: green.
+- [ ] **Step 5: Commit**: "fix: one payment is credited once, however many ways it is recorded".
+
+### Task 6: Remove the direct-payment machinery
+
+**Files:**
+- Create: `prisma/migrations/20261020110000_drop_direct_payment/migration.sql`. It drops `sellerPayTo`, `sellerPayToAt`, `sellerPayToChangedAt` and `sellerConfirmedAt`.
 - Delete:
   - `src/lib/pay-to.ts` and its test
   - `src/server/pay-to.ts` and its test
   - `src/components/deals/pay-to.tsx`
 - Modify:
-  - `src/server/actions/deals.ts`: remove `savePayTo`, `PAY_TO_MESSAGES`, the `needs-reference` message and step `paymentRef`.
-  - `src/server/deals.ts`:
-    - the pay-to select, visibility and DealView fields;
-    - the step-5 seller reminder;
-    - `buyerPaymentRef` writes;
-    - the `needs-reference` branch.
-  - `src/components/deals/deal-timeline.tsx`: `CONFIRM_LABELS` entries for the removed labels, `WHY_THE_REFERENCE`, `wantsRef` and the reference field.
-  - `src/components/deals/deal-status.ts`: `needsPaymentRef` and the removed labels' `STEP_HELP` entries.
-  - The deal page, the conversation page and `src/components/messages/deal-panel.tsx`: the `PayToCard`.
-  - `src/lib/chat-events.ts`: `pay-to-saved` stays parseable and renders nothing.
-  - `src/server/admin-disputes.ts` (`:99-108`, `:195-204`) and `src/components/admin/dispute-case.tsx`: `inspectedAt` replaces `buyerPaidAt` and `sellerConfirmedAt`.
+  - **`src/server/actions/deals.ts`:** remove `savePayTo`, `PAY_TO_MESSAGES`, the `needs-reference` message and the step `paymentRef` input.
+  - **`src/server/deals.ts`:** remove the pay-to select, visibility and DealView fields, the step-5 seller reminder, and the `needs-reference` branch.
+  - **`src/components/deals/deal-timeline.tsx`:** remove the `CONFIRM_LABELS` entries for removed labels, `WHY_THE_REFERENCE`, `wantsRef` and the reference field.
+  - **`src/components/deals/deal-status.ts`:** remove `needsPaymentRef` and the `STEP_HELP` entries for removed labels.
+  - **The deal page, the conversation page and `src/components/messages/deal-panel.tsx`:** remove `PayToCard`.
+  - **`src/lib/chat-events.ts`:** `pay-to-saved` still parses but renders nothing.
+  - **`src/server/admin-disputes.ts` (`:99-108`, `:195-204`) and `src/components/admin/dispute-case.tsx`:** stop using `sellerConfirmedAt`. "Price paid to Channel Adda" now reads from `buyerPaidAt`.
 - Test:
   - `src/lib/chat-events.test.ts`
   - `src/server/deal-chat-e2e.test.ts`
@@ -313,19 +335,69 @@ This goes first so that no fee-only order ever meets the new completion code.
   - `src/server/logic-fixes.test.ts`: delete `a safest buyer cannot record paying the seller without saying how`.
 
 - [ ] **Step 1: Write the failing tests.**
-  - **chat-events.test:** `an old pay-to event is skipped, not rendered`.
-  - **deal-chat-e2e:** the Safest case never calls `savePayTo`, and the buyer's deal view has no `payTo` key.
-  - **admin-disputes.test:** the case facts carry `inspectedAt`.
-- [ ] **Step 2: Run them.** `pnpm -s vitest run src/lib/chat-events.test.ts src/server/deal-chat-e2e.test.ts src/server/admin-disputes.test.ts`
-  - Expected: FAIL.
-- [ ] **Step 3: Implement**, then apply the migration and generate.
-  - Then run `grep -rn "payTo\|PayTo\|buyerPaidAt\|sellerConfirmedAt\|buyerPaymentRef" src --include=*.ts --include=*.tsx | grep -v generated`.
-  - Expected: no output.
-- [ ] **Step 4: Run Step 2's command, the suite and the typecheck.**
-  - Expected: green.
-- [ ] **Step 5: Commit** with the message "refactor: the seller's pay-to details and the buyer's payment reference are gone".
+  - `an old pay-to event is skipped, not rendered`.
+  - The deal-chat-e2e Safest case:
+    - never calls `savePayTo`;
+    - pays the price with `payFromWallet`;
+    - the buyer's view has no `payTo` key.
+  - The dispute case facts say the price was paid to Channel Adda.
+- [ ] **Step 2: Run them.** Run `pnpm -s vitest run src/lib/chat-events.test.ts src/server/deal-chat-e2e.test.ts src/server/admin-disputes.test.ts`. Expected: FAIL.
+- [ ] **Step 3: Implement, apply the migration, and generate.**
+- [ ] **Step 4: Run `grep -rn "payTo\|PayTo\|sellerConfirmedAt" src --include=*.ts --include=*.tsx | grep -v generated`.** Expected: no output. Then run Step 2's command, the suite and the typecheck. Expected: green.
+- [ ] **Step 5: Commit**: "refactor: the seller's pay-to details and the confirm-receipt step are gone".
 
-### Task 6: The seller sees held sales in their wallet
+### Task 7: Paying the price on screen, and topping up a short balance
+
+**Files:**
+- Create: `src/lib/pay-options.ts` and its test.
+- Modify:
+  - **`src/components/deals/pay-now.tsx`:**
+    - It takes `stage: "opening" | "price"` and `amountUsd`, and uses `balanceRoute`.
+    - It calls `startPayment`, which is stage-aware since Task 4, and `payDealFromWallet`.
+  - **The deal page (`src/app/(dashboard)/dashboard/deals/[id]/page.tsx:101-102, 187-198`):**
+    - Render `PayNow` for the price stage in step 6's slot.
+    - Remove the "Transaction reference" UI.
+  - **`src/lib/deal-panel.ts:92-96` and the conversation page (`:239-246`):** the panel kind `pay` covers Safest `AWAITING_BUYER_PAYMENT`.
+  - **`src/server/actions/wallet.ts`:** `startTopUp(dollars, returnTo?)`. It uses `returnTo` as the `successUrl` only when `safeNext(returnTo) === returnTo`.
+  - **`src/components/admin/deal-controls.tsx` and `src/app/(admin)/admin/deals/page.tsx`:**
+    - Add a "Price received" control (FINANCE) for Safest `AWAITING_BUYER_PAYMENT`, next to the existing "Payment received".
+    - `describeInvoice` gets a price-stage variant.
+- Test:
+  - `src/lib/pay-options.test.ts`
+  - `src/lib/deal-panel.test.ts`
+  - `src/server/admin-money.test.ts` for the price-stage invoice description
+
+**Interfaces:**
+- Produces:
+
+  ```ts
+  balanceRoute(availableUsd, amountUsd):
+    | { kind: "balance" }
+    | { kind: "top-up"; topUpUsd: number }
+    | { kind: "invoice-only" }
+  ```
+
+  All amounts are in cents.
+  - `available >= amount`: `balance`.
+  - `0 < available < amount`: `top-up` with `topUpUsd = max(amount − available, 1_000)`, provided that is at most 1_000_000.
+  - Anything else: `invoice-only`.
+
+- [ ] **Step 1: Write the failing tests.**
+  - **pay-options:**
+    - `a covered amount pays from the balance`
+    - `a short balance tops up exactly the difference`: (100_000, 515_000) gives 415_000.
+    - `a tiny shortfall tops up the $10 minimum`: (9_900, 10_000) gives 1_000.
+    - `an empty balance or a shortfall over $10,000 pays by invoice only`
+  - **deal-panel:** `buyer: safest price due` gives kind `pay` and the label "Pay the price to Channel Adda".
+- [ ] **Step 2: Run them.** Run `pnpm -s vitest run src/lib/pay-options.test.ts src/lib/deal-panel.test.ts src/server/admin-money.test.ts`. Expected: FAIL.
+- [ ] **Step 3: Implement.**
+  - Price-stage body: "Pay the channel price to Channel Adda, never to the seller. We hold it until the channel is yours, then pay the seller."
+  - Opening-stage body: "This is our fee to start. Once our agent owns the channel and you have inspected it, you pay the price, to Channel Adda as well."
+  - A `top-up` route shows "You have {available}. Add {topUp} to pay from your balance." and a secondary button. The button calls `startTopUp(topUp / 100, "/dashboard/deals/<id>")` and follows the checkout URL the same way the crypto button does.
+- [ ] **Step 4: Run Step 2's command and the suite.** Run the React Compiler check on `pay-now.tsx` and `deal-controls.tsx`. Expected: green, zero bailouts.
+- [ ] **Step 5: Commit**: "feat: a Safest buyer pays the price on the deal page, and a short balance can be topped up to cover it".
+
+### Task 8: The seller sees held sales in their wallet
 
 **Files:**
 - Modify:
@@ -335,7 +407,7 @@ This goes first so that no fee-only order ever meets the new completion code.
 - Test: `src/server/wallet.test.ts`
 
 **Interfaces:**
-- Produces: `Wallet` gains `heldForSales: HeldSale[]` and `heldForSalesUsd: number`, where:
+- Produces: `Wallet` gains `heldForSales: HeldSale[]` and `heldForSalesUsd: number`.
 
   ```ts
   HeldSale = {
@@ -349,143 +421,102 @@ This goes first so that no fee-only order ever meets the new completion code.
   ```
 
   - `amountUsd` is `priceUsd − sellerFeeUsd`.
-  - A sale counts as held when the user is the seller, `paymentRef` is not null, and the status is not terminal. This applies in both modes.
+  - A sale is held when the user is the seller, the status is not terminal, and the price is on our books:
+    - Fastest: `paymentRef` is set;
+    - Safest: `buyerPaidAt` is set.
+  - `paidAt` is the moment that happened.
 
 - [ ] **Step 1: Write the failing tests.**
-  - `a seller sees a paid sale as held, not as balance`: 10_000 held, with its reference, and `balanceUsd` 0.
-  - `a held sale moves to the balance on completion`.
+  - `a seller sees a paid price as held, not as balance`
+  - `a held sale moves to the balance on completion`
   - `a held sale cannot be withdrawn`: `requestWithdrawal` of $100 fails with the existing insufficient-balance error.
-  - `a fastest sale is held the same way`.
-- [ ] **Step 2: Run them.** `pnpm -s vitest run src/server/wallet.test.ts`
-  - Expected: FAIL.
+  - `a fastest sale is held the same way`
+  - `a safest sale whose price is not paid yet is not shown as held`
+- [ ] **Step 2: Run them.** Run `pnpm -s vitest run src/server/wallet.test.ts`. Expected: FAIL.
 - [ ] **Step 3: Implement.**
-  - Add one `db.order.findMany` to `getWallet`'s `Promise.all`, ordered by `paidAt` desc.
-  - The page section sits under the balance tiles. Each row shows:
+  - Add one `db.order.findMany` to `getWallet`'s `Promise.all`.
+  - The section sits under the balance tiles. Each row has:
     - the reference, linking to the deal;
     - the title;
-    - the amount, as `Price`;
+    - the amount, rendered with `Price`;
     - the line "Moves to your balance when the transfer completes."
   - Render nothing when nothing is held.
-- [ ] **Step 4: Run Step 2's command and the suite.**
-  - Expected: green.
-- [ ] **Step 5: Commit** with the message "feat: a seller's wallet shows the sales Channel Adda is holding for them".
+- [ ] **Step 4: Run Step 2's command and the suite.** Expected: green.
+- [ ] **Step 5: Commit**: "feat: a seller's wallet shows the sales Channel Adda is holding for them".
 
-### Task 7: Paying from a balance that is short
-
-**Files:**
-- Create: `src/lib/pay-options.ts` and its test
-- Modify:
-  - `src/components/deals/pay-now.tsx`
-  - `src/server/actions/wallet.ts`: `startTopUp(dollars, returnTo?)`. `returnTo` is used as the `successUrl` only when `safeNext(returnTo)` returns it unchanged.
-
-**Interfaces:**
-- Produces:
-
-  ```ts
-  balanceRoute(availableUsd, totalUsd):
-    | { kind: "balance" }
-    | { kind: "top-up"; topUpUsd: number }
-    | { kind: "invoice-only" }
-  ```
-
-  All amounts are in cents.
-  - `available >= total` → `balance`.
-  - `0 < available < total` → `top-up` with `topUpUsd = max(total − available, 1_000)`, when that is ≤ 1_000_000.
-  - Otherwise → `invoice-only`.
-
-- [ ] **Step 1: Write the failing tests.**
-  - `a covered total pays from the balance`.
-  - `a short balance tops up exactly the difference`: (100_000, 515_000) → 415_000.
-  - `a tiny shortfall tops up the $10 minimum`: (10_000, 10_300) → 1_000.
-  - `an empty balance or a shortfall over $10,000 pays by invoice only`.
-- [ ] **Step 2: Run them.** `pnpm -s vitest run src/lib/pay-options.test.ts`
-  - Expected: FAIL.
-- [ ] **Step 3: Implement.**
-  - On `top-up`, PayNow shows "You have {available}. Add {topUp} to pay from your balance."
-  - A secondary button calls `startTopUp(topUp / 100, "/dashboard/deals/<id>")` and follows the returned checkout URL, the same way the crypto button does.
-  - The Safest body reads: "The channel price and our fee. Channel Adda holds the price until the channel is yours, then pays the seller."
-- [ ] **Step 4: Run Step 2's command, the suite, and the React Compiler check on `pay-now.tsx`.**
-  - Expected: green, with zero bailouts.
-- [ ] **Step 5: Commit** with the message "feat: a buyer with part of the price in their balance tops up the difference and pays from it".
-
-### Task 8: Deal screens and emails say what now happens
+### Task 9: Deal screens and emails say what now happens
 
 **Files:**
 - Modify:
-  - `src/components/deals/deal-status.ts`: the headlines and sentences the research lists, plus `STEP_HELP`.
-  - `src/app/(dashboard)/dashboard/deals/[id]/page.tsx`: `:231-232` and `:294-305`. Safest now shows the "Channel Adda is holding" rows "The channel" and "Your payment".
+  - `src/components/deals/deal-status.ts`: the lines the research lists, and `STEP_HELP`.
+  - `src/app/(dashboard)/dashboard/deals/[id]/page.tsx` (`:231-232`, `:294-305`): Safest shows "Channel Adda is holding" with "The channel", plus "Your payment" once the price is paid.
   - `src/server/deal-notify.ts:46-49`
 - Test:
   - `src/components/deals/deal-status.test.ts`
   - `src/server/deal-notify.test.ts`
-  - `src/lib/deal-panel.test.ts`
 
 - [ ] **Step 1: Write the failing tests.**
-  - **deal-notify:** `it says which kind of deal`.
-    - The Safest email contains "our agent takes ownership of the channel" and "We hold your payment until the channel is yours".
+  - `it says which kind of deal`:
+    - The Safest email contains "you pay the price to Channel Adda".
+    - The Fastest email contains "We hold your payment".
     - Neither email contains "pays the seller directly".
-  - **deal-status:** `a safest buyer who has paid is told the money is held`.
-  - **deal-panel:** the label is "Pay the price and the fee".
-- [ ] **Step 2: Run them.** `pnpm -s vitest run src/components/deals/deal-status.test.ts src/server/deal-notify.test.ts src/lib/deal-panel.test.ts`
-  - Expected: FAIL.
-- [ ] **Step 3: Rewrite the copy** from the spec's three replacement lines, adapted for buyer, seller and agent.
-- [ ] **Step 4: Run Step 2's command and the suite.**
-  - Expected: green.
-- [ ] **Step 5: Commit** with the message "copy: deal screens and emails describe Safest as paid through Channel Adda".
+  - `a safest buyer who has paid the price is told it is held`
+- [ ] **Step 2: Run them.** Run `pnpm -s vitest run src/components/deals/deal-status.test.ts src/server/deal-notify.test.ts`. Expected: FAIL.
+- [ ] **Step 3: Rewrite the copy** from the spec's replacement lines, worded for the buyer, the seller and the agent.
+- [ ] **Step 4: Run Step 2's command and the suite.** Expected: green.
+- [ ] **Step 5: Commit**: "copy: deal screens and emails describe Safest as paid through Channel Adda".
 
-### Task 9: Site, help, legal and staff desks, with a guard against the old promise
+### Task 10: Site, help, legal and staff desks, with a guard against the old promise
 
 **Files:**
 - Create: `src/lib/copy-guard.test.ts`
-- Modify every user-facing copy line the research lists, including:
-  - `auth-shell.tsx`, "We hold the money, or we hold the account.";
+- Modify: every user-facing copy line the research lists, including:
+  - `auth-shell.tsx`, the line "We hold the money, or we hold the account.";
   - trust-safety `:19`;
   - help `:60`;
   - deal-controls `:511`.
 
 - [ ] **Step 1: Write the failing test** `no page tells anyone to pay a seller directly`.
-  - Read every `.ts` and `.tsx` file under `src`, except tests and `src/generated`.
-  - Fail on any case-insensitive match of these patterns:
+  - It reads every `.ts` and `.tsx` file under `src`, skipping tests and `src/generated`.
+  - It fails on any case-insensitive match of:
     - `pays? the seller directly`
     - `never holds? the (channel's )?price`
     - `(pay|paid|pays|payment)[^.\n]{0,30}off-platform`
     - `paid direct\b`
     - `price never (passes|passed|reaches|touches)`
     - `Buyer pays the seller`
-  - Name each file and line in the failure message.
-  - Moderation copy about taking deals off-platform stays allowed.
-- [ ] **Step 2: Run it.** `pnpm -s vitest run src/lib/copy-guard.test.ts`
-  - Expected: FAIL, listing the offenders.
+  - The failure message names each file and line.
+- [ ] **Step 2: Run it.** Run `pnpm -s vitest run src/lib/copy-guard.test.ts`. Expected: FAIL, listing the offenders.
 - [ ] **Step 3: Rewrite each offender.**
-  - **`legal.ts`, Terms and Refunds** (`:31`, `:33`, `:53`, `:77`, `:158-184`) must say:
-    - Channel Adda holds the buyer's payment on both kinds of deal;
-    - the price is refunded if the channel does not reach the buyer;
+  - **Terms and Refunds in `legal.ts`** (`:31`, `:33`, `:53`, `:77`, `:158-184`). The new text says:
+    - Channel Adda holds what the buyer pays on both kinds of deal;
+    - on Safest the price is paid to Channel Adda once the agent holds the channel;
+    - it is refunded if the channel does not reach the buyer;
     - the fee is kept once the agent has held the channel.
 
-    Collect the new paragraphs for the owner's review.
+    Collect these paragraphs for the owner.
   - **trust-safety `:19`:** "Money we hold for a sale is not in the seller's balance until the deal completes, so it cannot be withdrawn while a dispute is open."
   - **help `:60`:** delete the partial-settlement sentence.
   - **deal-controls `:511`:** correct the fee-return line.
-- [ ] **Step 4: Run Step 2's command, the suite, and `pnpm -s build` against the e2e database.**
-  - Expected: green, and the build succeeds.
-- [ ] **Step 5: Commit** with the message "copy: every page says the buyer pays Channel Adda, and a test keeps it that way".
+- [ ] **Step 4: Run Step 2's command, the suite, and `pnpm -s build` against the e2e database.** Expected: green, and the build succeeds.
+- [ ] **Step 5: Commit**: "copy: every page says the buyer pays Channel Adda, and a test keeps it that way".
 
-### Task 10: Walk it in the browser
+### Task 11: Walk it in the browser
 
 **Files:** none. A defect found here is fixed under TDD in the owning task's files and committed separately.
 
-- [ ] **Step 1:** Restart the 3122 dev server against `channeladda_e2e`. Use the test accounts in `.superpowers/revamp/test-account.md`.
-- [ ] **Step 2: Walk a Safest deal to completion.**
-  1. As the buyer, start the deal. The pay panel shows price + fee.
-  2. As staff, record "Payment received" (Cryptomus is off in the worktree).
-  3. As the seller, the wallet shows the sale under "Held for your sales", and the deal says the money is held.
-  4. Run steps 2–4. There is no pay-to card anywhere.
-  5. As the buyer, inspect.
-  6. As the agent, run steps 6 and 7.
-  7. The seller's balance shows the price, and "Held for your sales" is empty.
-- [ ] **Step 3: Return a second Safest deal after custody.**
-  - A MODERATOR is refused.
-  - FINANCE succeeds.
+- [ ] **Step 1: Restart the 3122 dev server** against `channeladda_e2e`. Use the test accounts in `.superpowers/revamp/test-account.md`.
+- [ ] **Step 2: Run a Safest deal to completion.**
+  1. Buyer: start the deal. The panel shows the fee only.
+  2. Staff: "Payment received" (Cryptomus is off in the worktree).
+  3. Steps 2–5 run. No pay-to card appears anywhere.
+  4. Buyer: the step 6 panel asks for the price. Pay from the balance, topping it up through "Price received" on a second deal if needed.
+  5. Seller: the wallet shows "Held for your sales".
+  6. Agent: steps 7–8 run.
+  7. Seller: the balance shows the price, and "Held for your sales" is empty.
+- [ ] **Step 3: Return a second Safest deal after the price was paid.**
+  - It needs a dispute first.
+  - A MODERATOR is refused; FINANCE succeeds.
   - The buyer's balance shows the price.
-  - The money desk's held-for-buyers and the month's fees stay correct.
+  - The money desk's held-for-buyers and the month's fees stay right.
 - [ ] **Step 4: Record the walkthrough** in `.superpowers/revamp/progress.md`.
