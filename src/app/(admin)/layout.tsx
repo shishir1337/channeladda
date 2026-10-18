@@ -180,7 +180,12 @@ export default async function AdminLayout({ children }: LayoutProps<"/">) {
     {
       label: "Platform",
       items: [
-        { label: "People", href: "/admin/users", icon: "people" as const },
+        {
+          label: "People",
+          href: "/admin/users",
+          icon: "people" as const,
+          section: true,
+        },
         // Superadmin-only, like Payouts and Settings above: the page appoints
         // staff and hands out invitation links. Drawn only for the role that
         // can open it, because the 404 the others would get throws them out of

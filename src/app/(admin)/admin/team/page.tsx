@@ -1,30 +1,37 @@
 import {
   ClockIcon,
-  ExternalLinkIcon,
   KeyRoundIcon,
+  MailIcon,
   ShieldCheckIcon,
   TriangleAlertIcon,
+  UserPlusIcon,
   UsersIcon,
 } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import {
-  ConsoleHeader,
-  ConsoleSection,
-  MetaItem,
-  Metric,
-  MetricGrid,
-  Nothing,
-  Panel,
-  RowItem,
-  Rows,
-  TableScroller,
-  Td,
-  Th,
-} from "@/components/admin/console";
 import { InviteTeammate, RevokeInvite } from "@/components/admin/team-controls";
 import { elapsed, ROLE_VARIANT } from "@/components/admin/vocab";
+import {
+  Callout,
+  EmptyState,
+  IconTile,
+  List,
+  ListItem,
+  ListRow,
+  MetaItem,
+  PageHeader,
+  Section,
+  Sep,
+  Stat,
+  StatGrid,
+  TableCard,
+  Td,
+  Th,
+  Tr,
+} from "@/components/app/kit";
+import { Avatar } from "@/components/app/user-menu";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
   INVITABLE_ROLES,
@@ -60,6 +67,13 @@ const DATE: Intl.DateTimeFormatOptions = {
   year: "numeric",
 };
 
+const EXPIRES: Intl.DateTimeFormatOptions = {
+  day: "numeric",
+  month: "short",
+  hour: "2-digit",
+  minute: "2-digit",
+};
+
 /** On a staff account, "two-factor off" is a finding rather than a preference. */
 function TwoFactor({ on }: { on: boolean }) {
   return on ? (
@@ -93,7 +107,7 @@ function Load({
 }) {
   if (role !== "AGENT") {
     return (
-      <span className="text-xs text-subtle">
+      <span className="text-subtle">
         &mdash;<span className="sr-only">not an agent</span>
       </span>
     );
@@ -106,7 +120,7 @@ function Load({
     <span className="inline-flex flex-col items-end gap-1">
       <span
         className={cn(
-          "tnum text-sm font-semibold",
+          "text-sm font-medium tabular-nums",
           atCap ? "text-danger" : nearCap ? "text-primary-text" : "text-fg",
         )}
       >
@@ -144,53 +158,46 @@ export default async function AdminTeamPage() {
 
   return (
     <>
-      <ConsoleHeader
-        eyebrow="Platform"
+      <PageHeader
         title="Team"
-        description="Everyone who can reach the staff area, what they can do, and — for agents — how many channels they are holding against the cap. Inviting somebody, changing what they can reach and suspending them all happen here or on their account page; none of it needs a developer."
+        description="Everyone who can reach the staff area, what they can do, and how many channels each agent holds against the cap."
         meta={
-          <>
-            <MetaItem label="Signed in as">{staff.name}</MetaItem>
-            <MetaItem label="With access">
-              {members.length.toLocaleString("en-US")}
-            </MetaItem>
-            <MetaItem label="Per-agent cap">
-              {maxHoldsPerAgent.toLocaleString("en-US")} channels
-            </MetaItem>
-          </>
+          <MetaItem label="Per-agent cap">
+            {maxHoldsPerAgent.toLocaleString("en-US")} channels
+          </MetaItem>
+        }
+        actions={
+          <Button asChild variant="secondary">
+            <Link href="#invite">
+              <UserPlusIcon aria-hidden="true" />
+              Invite a teammate
+            </Link>
+          </Button>
         }
       />
 
       {/* A platform with one superadmin is a platform one locked-out phone
           away from needing a developer and a database console. */}
       {activeSuperadmins < 2 ? (
-        <Panel tone="danger" className="mt-5">
-          <p className="flex items-start gap-2 text-sm leading-relaxed text-fg">
-            <TriangleAlertIcon
-              aria-hidden="true"
-              className="mt-0.5 size-4 shrink-0 text-danger"
-            />
-            <span>
-              <strong className="font-semibold">
-                There is only one superadmin who can sign in.
-              </strong>{" "}
-              Nobody can demote or suspend the last one — that is deliberate —
-              but it also means losing access to that account leaves the
-              platform with nobody who can set fees or appoint staff. Invite a
-              second one below.
-            </span>
-          </p>
-        </Panel>
+        <Callout
+          tone="danger"
+          title="There is only one superadmin who can sign in."
+          className="mb-6"
+        >
+          Nobody can demote or suspend the last one — that is deliberate — but
+          it also means losing access to that account leaves the platform with
+          nobody who can set fees or appoint staff. Invite a second one below.
+        </Callout>
       ) : null}
 
-      <MetricGrid className="mt-5">
-        <Metric
+      <StatGrid>
+        <Stat
           label="With access"
           value={members.length}
           note="Everyone who is not a plain member."
           icon={UsersIcon}
         />
-        <Metric
+        <Stat
           label="Agents free"
           value={available.length}
           tone={
@@ -204,13 +211,13 @@ export default async function AdminTeamPage() {
                 : "Can take another Safest channel."
           }
         />
-        <Metric
+        <Stat
           label="At the cap"
           value={atCap.length}
           tone={atCap.length > 0 ? "danger" : "neutral"}
           note="Holding the most channels one agent may own."
         />
-        <Metric
+        <Stat
           label="Invitations out"
           value={live.length}
           tone={live.length > 0 ? "primary" : "neutral"}
@@ -220,73 +227,90 @@ export default async function AdminTeamPage() {
               : "Links handed out and not yet used."
           }
         />
-      </MetricGrid>
+      </StatGrid>
 
       {noIdentity.length > 0 || noTwoFactor.length > 0 ? (
-        <ConsoleSection
+        <Section
           id="gaps"
           title="Worth fixing"
           tone="primary"
           count={noIdentity.length + noTwoFactor.length}
           description="Neither of these stops anything today. Both are how a transfer goes wrong quietly."
         >
-          <Rows>
+          <List>
             {noIdentity.map((agent) => (
-              <RowItem key={`id-${agent.id}`} flag="primary">
-                <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 p-4 pl-5">
-                  <p className="min-w-0 text-sm leading-relaxed text-fg">
-                    <strong className="font-semibold">{agent.name}</strong> has
-                    no transfer identity, so whoever assigns them a deal types
-                    the address a seller is told to invite. One typo is a
-                    channel invited to nobody.
-                  </p>
-                  <Link
-                    href={`/admin/users/${agent.id}`}
-                    className="inline-flex min-h-11 shrink-0 items-center gap-1.5 text-sm font-medium text-primary-text underline-offset-4 hover:underline"
-                  >
-                    Set it
-                    <ExternalLinkIcon aria-hidden="true" className="size-3.5" />
-                  </Link>
-                </div>
-              </RowItem>
+              <ListItem
+                key={`id-${agent.id}`}
+                href={`/admin/users/${agent.id}`}
+                flag="primary"
+              >
+                <ListRow
+                  leading={
+                    <Avatar name={agent.name} className="size-8 text-xs" />
+                  }
+                  title={agent.name}
+                  meta={
+                    <span className="whitespace-normal">
+                      Has no transfer identity, so whoever assigns them a deal
+                      types the address a seller is told to invite. One typo is
+                      a channel invited to nobody.
+                    </span>
+                  }
+                  trailing={
+                    <span className="hidden text-[0.8125rem] font-medium text-muted transition-colors group-hover:text-fg sm:inline">
+                      Set it
+                    </span>
+                  }
+                  chevron
+                />
+              </ListItem>
             ))}
             {noTwoFactor.map((member) => (
-              <RowItem key={`2fa-${member.id}`} flag="primary">
-                <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 p-4 pl-5">
-                  <p className="min-w-0 text-sm leading-relaxed text-fg">
-                    <strong className="font-semibold">{member.name}</strong> (
-                    {ROLE_LABELS[member.role].toLowerCase()}) has no second
-                    factor. Only they can turn it on, under Security on their
-                    own dashboard.
-                  </p>
-                  <Link
-                    href={`/admin/users/${member.id}`}
-                    className="inline-flex min-h-11 shrink-0 items-center gap-1.5 text-sm font-medium text-primary-text underline-offset-4 hover:underline"
-                  >
-                    Their account
-                    <ExternalLinkIcon aria-hidden="true" className="size-3.5" />
-                  </Link>
-                </div>
-              </RowItem>
+              <ListItem
+                key={`2fa-${member.id}`}
+                href={`/admin/users/${member.id}`}
+                flag="primary"
+              >
+                <ListRow
+                  leading={
+                    <Avatar name={member.name} className="size-8 text-xs" />
+                  }
+                  title={member.name}
+                  meta={
+                    <span className="whitespace-normal">
+                      {ROLE_LABELS[member.role]} with no second factor. Only
+                      they can turn it on, under Security on their own
+                      dashboard.
+                    </span>
+                  }
+                  trailing={
+                    <span className="hidden text-[0.8125rem] font-medium text-muted transition-colors group-hover:text-fg sm:inline">
+                      Their account
+                    </span>
+                  }
+                  chevron
+                />
+              </ListItem>
             ))}
-          </Rows>
-        </ConsoleSection>
+          </List>
+        </Section>
       ) : null}
 
-      <ConsoleSection
+      <Section
         id="people"
         title="With access"
         count={members.length}
         description="Open an account to change what somebody can reach, set an agent's transfer identity, or suspend them."
       >
         {members.length === 0 ? (
-          <Nothing
+          <EmptyState
+            icon={UsersIcon}
             title="Nobody has staff access"
             body="Not even you, which cannot be true — so this is a database that has not been set up rather than an empty team."
           />
         ) : (
-          <TableScroller>
-            <table className="w-full min-w-[46rem] border-collapse text-sm">
+          <TableCard>
+            <table className="w-full min-w-[46rem] border-collapse">
               <caption className="sr-only">
                 Everyone with access: role, channels held against the cap,
                 two-factor, when they joined, and whether they are suspended.
@@ -304,27 +328,28 @@ export default async function AdminTeamPage() {
               </thead>
               <tbody>
                 {members.map((member) => (
-                  <tr
-                    key={member.id}
-                    className="border-t border-line first:border-t-0"
-                  >
-                    <Td>
-                      <Link
-                        href={`/admin/users/${member.id}`}
-                        className="block min-w-0 underline-offset-4 hover:underline"
-                      >
-                        <span className="block font-semibold text-fg">
-                          {member.name}
-                          {member.id === staff.id ? (
-                            <span className="ml-1.5 text-xs font-normal text-subtle">
-                              (you)
-                            </span>
-                          ) : null}
-                        </span>
-                        <span className="block truncate text-xs text-subtle">
-                          {member.agentEmail ?? member.email}
-                        </span>
-                      </Link>
+                  <Tr key={member.id}>
+                    {/* The person cell is the link, stretched over the cell. */}
+                    <Td className="relative">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <Avatar name={member.name} className="size-8 text-xs" />
+                        <div className="min-w-0">
+                          <Link
+                            href={`/admin/users/${member.id}`}
+                            className="block max-w-[15rem] truncate text-sm leading-5 font-medium text-fg underline-offset-4 after:absolute after:inset-0 hover:underline"
+                          >
+                            {member.name}
+                            {member.id === staff.id ? (
+                              <span className="ml-1.5 text-xs font-normal text-subtle">
+                                (you)
+                              </span>
+                            ) : null}
+                          </Link>
+                          <span className="block max-w-[15rem] truncate text-[0.8125rem] leading-5 text-muted">
+                            {member.agentEmail ?? member.email}
+                          </span>
+                        </div>
+                      </div>
                     </Td>
                     <Td>
                       <Badge variant={ROLE_VARIANT[member.role]}>
@@ -338,10 +363,13 @@ export default async function AdminTeamPage() {
                         cap={maxHoldsPerAgent}
                       />
                     </Td>
-                    <Td numeric>
-                      <span className="tnum text-sm text-muted">
-                        {member.liveDeals.toLocaleString("en-US")}
-                      </span>
+                    <Td
+                      numeric
+                      className={
+                        member.liveDeals === 0 ? "text-subtle" : "text-fg"
+                      }
+                    >
+                      {member.liveDeals.toLocaleString("en-US")}
                     </Td>
                     <Td>
                       <TwoFactor on={member.twoFactorEnabled} />
@@ -349,7 +377,7 @@ export default async function AdminTeamPage() {
                     <Td>
                       <time
                         dateTime={member.createdAt.toISOString()}
-                        className="tnum text-xs whitespace-nowrap text-muted"
+                        className="text-[0.8125rem] whitespace-nowrap text-subtle tabular-nums"
                       >
                         {member.createdAt.toLocaleDateString("en-GB", DATE)}
                       </time>
@@ -360,74 +388,92 @@ export default async function AdminTeamPage() {
                       ) : !member.emailVerified ? (
                         <Badge>Email unverified</Badge>
                       ) : (
-                        <span className="text-xs text-subtle">Active</span>
+                        <span className="text-[0.8125rem] text-subtle">
+                          Active
+                        </span>
                       )}
                     </Td>
-                  </tr>
+                  </Tr>
                 ))}
               </tbody>
             </table>
-          </TableScroller>
+          </TableCard>
         )}
-      </ConsoleSection>
+      </Section>
 
       {invites.length > 0 ? (
-        <ConsoleSection
+        <Section
           id="invitations"
           title="Invitations out"
           count={invites.length}
           tone={live.length > 0 ? "primary" : "neutral"}
           description="Links handed out and not yet used. Anyone holding one can create that account, so withdraw any you are no longer sure about."
         >
-          <Rows>
+          <List>
             {invites.map((invite) => {
               const age = elapsed(invite.createdAt);
               return (
-                <RowItem
+                <ListItem
                   key={invite.id}
                   flag={invite.expired ? undefined : "primary"}
                 >
-                  <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2.5 p-4 pl-5">
-                    <div className="min-w-0 flex-1">
-                      <p className="flex flex-wrap items-center gap-2">
-                        <span className="truncate text-sm font-semibold text-fg">
+                  <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2.5">
+                    <div className="flex min-w-0 flex-1 items-center gap-3">
+                      <IconTile icon={MailIcon} />
+                      <div className="min-w-0">
+                        <p className="truncate text-sm leading-5 font-medium text-fg">
                           {invite.email}
-                        </span>
-                        <Badge variant={ROLE_VARIANT[invite.role]}>
-                          {ROLE_LABELS[invite.role]}
-                        </Badge>
-                        {invite.expired ? (
-                          <Badge variant="danger">Expired</Badge>
-                        ) : null}
-                      </p>
-                      <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-subtle">
-                        <span className="inline-flex items-center gap-1">
-                          <ClockIcon aria-hidden="true" className="size-3" />
-                          {invite.expired
-                            ? "The link no longer works"
-                            : `Expires ${invite.expiresAt.toLocaleString("en-GB")}`}
-                        </span>
-                        <span>
-                          Invited {age.label} ago
-                          {invite.invitedByName
-                            ? ` by ${invite.invitedByName}`
-                            : ""}
-                        </span>
-                      </p>
+                        </p>
+                        <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[0.8125rem] leading-5 text-muted">
+                          <Badge variant={ROLE_VARIANT[invite.role]}>
+                            {ROLE_LABELS[invite.role]}
+                          </Badge>
+                          {invite.expired ? (
+                            <Badge variant="danger">Expired</Badge>
+                          ) : null}
+                          <span className="inline-flex items-center gap-1">
+                            <ClockIcon
+                              aria-hidden="true"
+                              className="size-3.5 text-subtle"
+                            />
+                            {invite.expired ? (
+                              "The link no longer works"
+                            ) : (
+                              <time dateTime={invite.expiresAt.toISOString()}>
+                                Expires{" "}
+                                {invite.expiresAt.toLocaleString(
+                                  "en-GB",
+                                  EXPIRES,
+                                )}
+                              </time>
+                            )}
+                          </span>
+                          <Sep />
+                          <span>
+                            {age.label === "just now"
+                              ? "Invited just now"
+                              : `Invited ${age.label} ago`}
+                            {invite.invitedByName
+                              ? ` by ${invite.invitedByName}`
+                              : ""}
+                          </span>
+                        </div>
+                      </div>
                     </div>
                     <RevokeInvite inviteId={invite.id} email={invite.email} />
                   </div>
-                </RowItem>
+                </ListItem>
               );
             })}
-          </Rows>
-        </ConsoleSection>
+          </List>
+        </Section>
       ) : null}
 
-      <ConsoleSection
+      <Section
         id="invite"
         title="Hire somebody"
-        description="An agent, a moderator, someone on finance, or a second superadmin. They set their own password, so no password is ever shared, typed for them or sent by email."
+        description="An agent, a moderator, someone on finance, or a second superadmin."
+        className="scroll-mt-20"
       >
         <InviteTeammate
           roles={INVITABLE_ROLES}
@@ -435,7 +481,7 @@ export default async function AdminTeamPage() {
           blurbs={ROLE_BLURBS}
           consequences={ROLE_CONSEQUENCES}
         />
-      </ConsoleSection>
+      </Section>
     </>
   );
 }

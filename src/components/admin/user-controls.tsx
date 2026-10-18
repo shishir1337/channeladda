@@ -2,13 +2,16 @@
 
 import {
   CheckCircle2Icon,
+  CircleAlertIcon,
   InfoIcon,
+  LockIcon,
   ShieldAlertIcon,
   TriangleAlertIcon,
 } from "lucide-react";
-import { useId, useState, useTransition } from "react";
-import { Panel } from "@/components/admin/console";
+import { type ReactNode, useId, useState, useTransition } from "react";
+import { Callout, Card, CardBody, CardHeader } from "@/components/app/kit";
 import { TextArea, TextField } from "@/components/auth/fields";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { KycStatus, UserRole } from "@/generated/prisma/enums";
 import { cn } from "@/lib/utils";
@@ -28,11 +31,14 @@ import {
  * The powers are kept visually apart because they are different in kind: a
  * role change hands somebody the keys, a suspension takes their account away,
  * a transfer identity decides who a seller hands a channel to. Putting them in
- * one row of buttons invites the wrong click.
+ * one row of buttons invites the wrong click. So each kind is its own card —
+ * access, identity check, getting them back in — and the two that can do real
+ * harm in the wrong hands (suspending, and clearing a second factor) sit apart
+ * at the bottom, in the danger zone.
  *
- * Both of the first two ask twice, and a suspension will not go without a
- * reason — the same four characters the server already insists on, surfaced
- * here so the refusal arrives before the click rather than after it.
+ * A role change and a suspension both ask twice, and a suspension will not go
+ * without a reason — the same four characters the server already insists on,
+ * surfaced here so the refusal arrives before the click rather than after it.
  *
  * The role list is a prop, taken from `ROLES` in `server/admin-users`. It used
  * to be a second list written out here, which is how `AGENT` — the role the
@@ -53,10 +59,203 @@ const MIN_REASON = 4;
  */
 const GRAVE: readonly UserRole[] = ["FINANCE", "SUPERADMIN"];
 
+// ------------------------------------------------------------ shared bits
+
+type ActionResult =
+  | { ok: true; message: string }
+  | { ok: false; error: string };
+
+/** Secondary copy under a control's name. */
+const BODY = "mt-1 text-[0.8125rem] leading-relaxed text-muted";
+
+/**
+ * `outline`, in the danger colour: the first step of something destructive.
+ * The solid red button is kept for the confirmation itself.
+ */
+const DANGER_OUTLINE =
+  "text-danger hover:border-danger/40 hover:bg-danger-soft/60 app:hover:border-danger/40";
+
+const WELL = {
+  neutral: "border-line bg-surface-2/60",
+  warning: "border-primary/30 bg-primary-soft/70",
+  danger: "border-danger/25 bg-danger-soft/70",
+} as const;
+
+/**
+ * The inset that holds a consequence or a confirmation. A tinted well rather
+ * than a card, so a card never holds a card.
+ */
+function Well({
+  tone = "neutral",
+  className,
+  children,
+}: {
+  tone?: keyof typeof WELL;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div
+      className={cn(
+        "rounded-lg border px-3 py-2.5 text-[0.8125rem] leading-relaxed text-fg",
+        WELL[tone],
+        className,
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
+/**
+ * Holds both labels in one cell, so a button keeps the width of the wider
+ * one while it works instead of jumping as "Saving…" swaps in.
+ */
+function Swap({
+  busy,
+  idle,
+  working,
+}: {
+  busy: boolean;
+  idle: ReactNode;
+  working: ReactNode;
+}) {
+  return (
+    <span className="inline-grid justify-items-center">
+      <span className={cn("col-start-1 row-start-1", busy && "invisible")}>
+        {idle}
+      </span>
+      <span className={cn("col-start-1 row-start-1", !busy && "invisible")}>
+        {working}
+      </span>
+    </span>
+  );
+}
+
+/** A radio group drawn as one bordered list, so options read as a set. */
+function Choices({ children }: { children: ReactNode }) {
+  return (
+    <div className="divide-y divide-line overflow-hidden rounded-lg border border-line">
+      {children}
+    </div>
+  );
+}
+
+function Choice({
+  name,
+  value,
+  checked,
+  locked,
+  onSelect,
+  title,
+  tag,
+  detail,
+}: {
+  name: string;
+  value: string;
+  checked: boolean;
+  /** Frozen while a confirmation is open or a save is in flight. */
+  locked: boolean;
+  onSelect: () => void;
+  title: ReactNode;
+  tag?: ReactNode;
+  detail?: ReactNode;
+}) {
+  return (
+    <label
+      className={cn(
+        "flex items-start gap-3 px-3 py-2.5 transition-[background-color,opacity] duration-150",
+        locked ? "cursor-default" : "cursor-pointer",
+        checked
+          ? "bg-surface-2/70"
+          : locked
+            ? "opacity-60"
+            : "hover:bg-surface-2/40",
+      )}
+    >
+      <input
+        type="radio"
+        name={name}
+        value={value}
+        checked={checked}
+        onChange={onSelect}
+        className="mt-0.5 size-4 shrink-0 cursor-[inherit] accent-fg"
+      />
+      <span className="min-w-0">
+        <span className="flex flex-wrap items-center gap-1.5 text-sm leading-5 font-medium text-fg">
+          {title}
+          {tag}
+        </span>
+        {detail ? (
+          <span className="mt-0.5 block text-xs leading-relaxed text-muted">
+            {detail}
+          </span>
+        ) : null}
+      </span>
+    </label>
+  );
+}
+
+/** One remedy's name and what is true of it now. */
+function StepHead({ title, status }: { title: string; status?: ReactNode }) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+      <p className="text-sm leading-5 font-medium text-fg">{title}</p>
+      {status}
+    </div>
+  );
+}
+
+/** "A reason is required", beside the button it is holding back. */
+function ReasonHint({ ready }: { ready: boolean }) {
+  return ready ? null : (
+    <p className="text-xs text-subtle">
+      A reason is required before this can go ahead.
+    </p>
+  );
+}
+
+/** One outcome line, the same shape every card on this page uses. */
+function Outcome({
+  note,
+  error,
+}: {
+  note: string | null;
+  error: string | null;
+}) {
+  if (error) {
+    return (
+      <p
+        role="alert"
+        className="mt-3 flex items-start gap-1.5 text-[0.8125rem] leading-relaxed text-danger"
+      >
+        <TriangleAlertIcon
+          aria-hidden="true"
+          className="mt-1 size-3.5 shrink-0"
+        />
+        <span>{error}</span>
+      </p>
+    );
+  }
+  if (note) {
+    return (
+      <output className="mt-3 flex items-start gap-1.5 text-[0.8125rem] leading-relaxed text-verified">
+        <CheckCircle2Icon
+          aria-hidden="true"
+          className="mt-1 size-3.5 shrink-0"
+        />
+        <span>{note}</span>
+      </output>
+    );
+  }
+  return null;
+}
+
+// ------------------------------------------------------------------ access
+
 export function UserControls({
   userId,
   currentRole,
-  banned,
   canSetRole,
   isSelf,
   roles,
@@ -70,13 +269,12 @@ export function UserControls({
 }: {
   userId: string;
   currentRole: UserRole;
-  banned: boolean;
   /** Only a superadmin sees the role picker at all. */
   canSetRole: boolean;
   /**
    * Whether this is the signed-in person's own account. The server refuses
-   * either action on yourself; this is so the refusal is not the first time
-   * anybody mentions it.
+   * a role change or a suspension on yourself; this is so the refusal is not
+   * the first time anybody mentions it.
    */
   isSelf: boolean;
   /** Every grantable role, in escalating order. From the server. */
@@ -92,10 +290,7 @@ export function UserControls({
   agentEmail: string | null;
   agentBrand: string | null;
 }) {
-  const reasonId = useId();
   const [role, setRole] = useState<UserRole>(currentRole);
-  const [reason, setReason] = useState("");
-  const [armed, setArmed] = useState(false);
   const [roleArmed, setRoleArmed] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -113,13 +308,10 @@ export function UserControls({
         return;
       }
       setNote(result.message ?? null);
-      setReason("");
-      setArmed(false);
       setRoleArmed(false);
     });
   }
 
-  const reasonReady = reason.trim().length >= MIN_REASON;
   const changing = role !== currentRole;
   const grave = GRAVE.includes(role);
   // Removing access from somebody who is holding channels is the case that
@@ -127,187 +319,161 @@ export function UserControls({
   const orphaning = currentRole === "AGENT" && role !== "AGENT" && holds > 0;
 
   return (
-    <div className="grid gap-3.5">
+    <>
       {isSelf ? (
-        <Panel padded={false} className="p-4">
-          <h2 className="flex items-center gap-2 font-display text-sm font-bold text-fg">
-            <ShieldAlertIcon
-              aria-hidden="true"
-              className="size-4 shrink-0 text-subtle"
-            />
-            This is your own account
-          </h2>
-          <p className="mt-1.5 text-xs leading-relaxed text-muted">
-            Nobody can change their own role or suspend themselves, including
-            you. It is how a mistake in this panel stays something another
-            superadmin can undo rather than something that needs a developer and
-            a database. Ask a colleague with the superadmin role.
-          </p>
-        </Panel>
+        <Callout
+          tone="neutral"
+          icon={ShieldAlertIcon}
+          title="This is your own account"
+        >
+          Nobody can change their own role or suspend themselves, including you.
+          It is how a mistake in this panel stays something another superadmin
+          can undo rather than something that needs a developer and a database.
+          Ask a colleague with the superadmin role.
+        </Callout>
       ) : null}
 
       {canSetRole && !isSelf ? (
-        <Panel padded={false} className="p-4">
-          <h2 className="font-display text-sm font-bold text-fg">Access</h2>
-          <p className="mt-1 text-xs leading-relaxed text-muted">
-            What this person can reach in the staff area. Takes effect at once
-            and is written to the audit trail under your name.
-          </p>
+        <Card>
+          <CardHeader
+            title="Access"
+            description="What they can reach in the staff area. Takes effect at once and is written to the audit trail under your name."
+          />
+          <CardBody>
+            <fieldset className="min-w-0" disabled={pending || roleArmed}>
+              <legend className="sr-only">Role</legend>
+              <Choices>
+                {roles.map((option) => (
+                  <Choice
+                    key={option}
+                    name="role"
+                    value={option}
+                    checked={role === option}
+                    locked={pending || roleArmed}
+                    onSelect={() => {
+                      setRole(option);
+                      setError(null);
+                      setNote(null);
+                    }}
+                    title={labels[option]}
+                    tag={
+                      option === currentRole ? (
+                        <Badge size="sm">Current</Badge>
+                      ) : null
+                    }
+                    detail={blurbs[option]}
+                  />
+                ))}
+              </Choices>
+            </fieldset>
 
-          <fieldset className="mt-3 grid gap-2" disabled={pending || roleArmed}>
-            <legend className="sr-only">Role</legend>
-            {roles.map((option) => (
-              <label
-                key={option}
-                className={cn(
-                  "flex items-start gap-2.5 rounded-card border p-2.5 transition-colors",
-                  roleArmed ? "cursor-default" : "cursor-pointer",
-                  role === option
-                    ? "border-primary bg-primary-soft"
-                    : "border-line hover:bg-surface-2",
-                )}
-              >
-                <input
-                  type="radio"
-                  name="role"
-                  value={option}
-                  checked={role === option}
-                  onChange={() => {
-                    setRole(option);
-                    setError(null);
-                    setNote(null);
-                  }}
-                  className="mt-0.5 size-4 shrink-0 accent-[var(--color-primary)]"
-                />
-                <span className="min-w-0">
-                  <span className="flex flex-wrap items-center gap-1.5">
-                    <span className="text-sm font-medium text-fg">
-                      {labels[option]}
-                    </span>
-                    {option === currentRole ? (
-                      <span className="rounded-full border border-line bg-surface-2 px-1.5 py-0.5 text-[0.625rem] font-semibold text-subtle">
-                        current
-                      </span>
-                    ) : null}
-                  </span>
-                  <span className="mt-0.5 block text-xs leading-relaxed text-subtle">
-                    {blurbs[option]}
-                  </span>
-                </span>
-              </label>
-            ))}
-          </fieldset>
-
-          {/* What you are handing over, before you hand it over. */}
-          {changing ? (
-            <div
-              className={cn(
-                "mt-3 rounded-card border p-3",
-                grave
-                  ? "border-danger/40 bg-danger-soft"
-                  : "border-line bg-surface-2",
-              )}
-            >
-              <p className="flex items-start gap-2 text-xs leading-relaxed text-fg">
-                {grave ? (
-                  <TriangleAlertIcon
-                    aria-hidden="true"
-                    className="mt-px size-3.5 shrink-0 text-danger"
-                  />
-                ) : (
-                  <InfoIcon
-                    aria-hidden="true"
-                    className="mt-px size-3.5 shrink-0 text-subtle"
-                  />
-                )}
-                <span>
-                  <strong className="font-semibold">
-                    As {labels[role].toLowerCase()}:
-                  </strong>{" "}
-                  {consequences[role]}
-                </span>
-              </p>
-              {role === "AGENT" ? (
-                <p className="mt-2 text-xs leading-relaxed text-muted">
-                  They may hold up to {maxHolds}{" "}
-                  {maxHolds === 1 ? "channel" : "channels"} at once, which is
-                  the platform-wide cap under Settings. Set the address sellers
-                  invite below, or every deal they take will go out under
-                  whatever the person assigning it types.
-                </p>
-              ) : null}
-              {orphaning ? (
-                <p className="mt-2 flex items-start gap-1.5 text-xs leading-relaxed font-medium text-danger">
-                  <TriangleAlertIcon
-                    aria-hidden="true"
-                    className="mt-px size-3.5 shrink-0"
-                  />
+            {/* What you are handing over, before you hand it over. */}
+            {changing ? (
+              <Well tone={grave ? "danger" : "neutral"} className="mt-3">
+                <p className="flex items-start gap-2">
+                  {grave ? (
+                    <TriangleAlertIcon
+                      aria-hidden="true"
+                      className="mt-1 size-3.5 shrink-0 text-danger"
+                    />
+                  ) : (
+                    <InfoIcon
+                      aria-hidden="true"
+                      className="mt-1 size-3.5 shrink-0 text-subtle"
+                    />
+                  )}
                   <span>
-                    They are holding {holds}{" "}
-                    {holds === 1 ? "channel" : "channels"} right now. Removing
-                    the role does not hand those back: each of those deals keeps
-                    this person as its agent of record until somebody reassigns
-                    it from the deal desk.
+                    <strong className="font-semibold">
+                      As {labels[role].toLowerCase()}:
+                    </strong>{" "}
+                    {consequences[role]}
                   </span>
                 </p>
-              ) : null}
-            </div>
-          ) : null}
+                {role === "AGENT" ? (
+                  <p className="mt-2 pl-5.5 text-muted">
+                    They may hold up to {maxHolds}{" "}
+                    {maxHolds === 1 ? "channel" : "channels"} at once, which is
+                    the platform-wide cap under Settings. Set the address
+                    sellers invite below, or every deal they take will go out
+                    under whatever the person assigning it types.
+                  </p>
+                ) : null}
+                {orphaning ? (
+                  <p className="mt-2 flex items-start gap-2 font-medium text-danger">
+                    <TriangleAlertIcon
+                      aria-hidden="true"
+                      className="mt-1 size-3.5 shrink-0"
+                    />
+                    <span>
+                      They are holding {holds}{" "}
+                      {holds === 1 ? "channel" : "channels"} right now. Removing
+                      the role does not hand those back: each of those deals
+                      keeps this person as its agent of record until somebody
+                      reassigns it from the deal desk.
+                    </span>
+                  </p>
+                ) : null}
+              </Well>
+            ) : null}
 
-          {roleArmed ? (
-            <div
-              className={cn(
-                "mt-3 rounded-card border p-3",
-                grave
-                  ? "border-danger/40 bg-danger-soft"
-                  : "border-primary/40 bg-primary-soft",
-              )}
-            >
-              <p className="text-xs leading-relaxed font-medium text-fg">
-                Change them from {labels[currentRole].toLowerCase()} to{" "}
-                <strong className="font-semibold">
-                  {labels[role].toLowerCase()}
-                </strong>
-                ? This applies immediately and is recorded against your name.
-              </p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={grave ? "danger" : "primary"}
-                  disabled={pending}
-                  onClick={() => run(() => setUserRole(userId, role))}
-                >
-                  {pending ? "Applying…" : `Yes — make ${labels[role]}`}
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  disabled={pending}
-                  onClick={() => setRoleArmed(false)}
-                >
-                  Back
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <Button
-              type="button"
-              size="sm"
-              variant={grave ? "outline" : "primary"}
-              className="mt-3"
-              disabled={pending || !changing}
-              onClick={() => {
-                setError(null);
-                setNote(null);
-                setRoleArmed(true);
-              }}
-            >
-              {changing ? `Make ${labels[role]}` : "No change"}
-            </Button>
-          )}
-        </Panel>
+            {roleArmed ? (
+              <Well tone={grave ? "danger" : "neutral"} className="mt-3">
+                <p className="font-medium">
+                  Change them from {labels[currentRole].toLowerCase()} to{" "}
+                  <strong className="font-semibold">
+                    {labels[role].toLowerCase()}
+                  </strong>
+                  ? This applies immediately and is recorded against your name.
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={grave ? "danger" : "primary"}
+                    disabled={pending}
+                    onClick={() => run(() => setUserRole(userId, role))}
+                  >
+                    <Swap
+                      busy={pending}
+                      idle={`Yes — make ${labels[role]}`}
+                      working="Applying…"
+                    />
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    disabled={pending}
+                    onClick={() => setRoleArmed(false)}
+                  >
+                    Back
+                  </Button>
+                </div>
+              </Well>
+            ) : (
+              <Button
+                type="button"
+                size="sm"
+                // Gold only once there is something to apply; a grave grant
+                // never gets gold at all, only the red confirmation after.
+                variant={
+                  !changing ? "secondary" : grave ? "outline" : "primary"
+                }
+                className="mt-3"
+                disabled={pending || !changing}
+                onClick={() => {
+                  setError(null);
+                  setNote(null);
+                  setRoleArmed(true);
+                }}
+              >
+                {changing ? `Make ${labels[role]}` : "No change"}
+              </Button>
+            )}
+
+            <Outcome note={note} error={error} />
+          </CardBody>
+        </Card>
       ) : null}
 
       {/* Only an agent has one, and only a superadmin sets it. */}
@@ -320,150 +486,14 @@ export function UserControls({
           maxHolds={maxHolds}
         />
       ) : null}
-
-      {isSelf ? null : (
-        <Panel padded={false} className="p-4">
-          <h2 className="font-display text-sm font-bold text-fg">
-            {banned ? "Suspension" : "Suspend this account"}
-          </h2>
-
-          {banned ? (
-            <>
-              <p className="mt-1 text-xs leading-relaxed text-muted">
-                They cannot sign in. Restoring lets them back in; their listings
-                stay paused until they relist them.
-              </p>
-              <Button
-                type="button"
-                size="sm"
-                variant="secondary"
-                className="mt-3"
-                disabled={pending}
-                onClick={() => run(() => setUserBanned(userId, false, ""))}
-              >
-                {pending ? "Restoring…" : "Restore access"}
-              </Button>
-            </>
-          ) : armed ? (
-            <div className="mt-2 rounded-card border border-danger/40 bg-danger-soft p-3">
-              <p className="flex items-start gap-2 text-xs leading-relaxed font-medium text-fg">
-                <TriangleAlertIcon
-                  aria-hidden="true"
-                  className="mt-px size-3.5 shrink-0 text-danger"
-                />
-                <span>
-                  This signs them out of every session, blocks sign-in, and
-                  pauses every live listing they have. They are shown the reason
-                  you typed.
-                </span>
-              </p>
-              {holds > 0 ? (
-                <p className="mt-2 flex items-start gap-1.5 text-xs leading-relaxed font-medium text-danger">
-                  <TriangleAlertIcon
-                    aria-hidden="true"
-                    className="mt-px size-3.5 shrink-0"
-                  />
-                  <span>
-                    They are holding {holds}{" "}
-                    {holds === 1 ? "channel" : "channels"} as an agent.
-                    Suspending them does not return those: the channels stay in
-                    this account&rsquo;s custody until a deal is reassigned or
-                    returned to its seller.
-                  </span>
-                </p>
-              ) : null}
-              <div className="mt-3 flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="danger"
-                  disabled={pending || !reasonReady}
-                  onClick={() => run(() => setUserBanned(userId, true, reason))}
-                >
-                  {pending ? "Suspending…" : "Yes — suspend the account"}
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  disabled={pending}
-                  onClick={() => setArmed(false)}
-                >
-                  Back
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <>
-              <p className="mt-1 text-xs leading-relaxed text-muted">
-                Signs them out, blocks sign-in and pauses every live listing
-                they have. Deals already in flight are not ended by this.
-              </p>
-              <TextArea
-                id={reasonId}
-                name="reason"
-                label="Why"
-                hint="Shown to them, and kept in the audit trail."
-                rows={2}
-                value={reason}
-                onChange={(event) => setReason(event.target.value)}
-                placeholder="Repeatedly asked buyers to pay off-platform"
-                className="mt-2.5"
-                required
-              />
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                className="mt-2.5"
-                disabled={pending || !reasonReady}
-                onClick={() => {
-                  setError(null);
-                  setNote(null);
-                  setArmed(true);
-                }}
-              >
-                Continue
-              </Button>
-              {!reasonReady ? (
-                <p className="mt-2 text-xs text-subtle">
-                  A reason is required before this can go ahead.
-                </p>
-              ) : null}
-            </>
-          )}
-        </Panel>
-      )}
-
-      {error ? (
-        <p
-          role="alert"
-          className="flex items-start gap-1.5 text-xs leading-relaxed text-danger"
-        >
-          <TriangleAlertIcon
-            aria-hidden="true"
-            className="mt-px size-3.5 shrink-0"
-          />
-          <span>{error}</span>
-        </p>
-      ) : null}
-      {note ? (
-        <output className="flex items-start gap-1.5 text-xs leading-relaxed text-verified">
-          <CheckCircle2Icon
-            aria-hidden="true"
-            className="mt-px size-3.5 shrink-0"
-          />
-          <span>{note}</span>
-        </output>
-      ) : null}
-    </div>
+    </>
   );
 }
 
 /**
  * The address a seller is told to invite as channel owner.
  *
- * Its own panel because it is the agent's identity rather than their access,
+ * Its own card because it is the agent's identity rather than their access,
  * and because it is the thing a seller sees: a typo here is a channel invited
  * to nobody and a deal that sits in "awaiting custody" while both sides wait
  * for each other.
@@ -494,132 +524,93 @@ function AgentIdentity({
   const atCap = holds >= maxHolds;
 
   return (
-    <Panel padded={false} className="p-4">
-      <h2 className="font-display text-sm font-bold text-fg">
-        Transfer identity
-      </h2>
-      <p className="mt-1 text-xs leading-relaxed text-muted">
-        Copied onto every deal they take, so one agent reaches every seller as
-        the same person. Without it, whoever assigns the deal types an address
-        from memory.
-      </p>
+    <Card>
+      <CardHeader
+        title="Transfer identity"
+        description="Copied onto every deal they take, so one agent reaches every seller as the same person."
+      />
+      <CardBody>
+        {stored === null ? (
+          <Well tone="warning" className="mb-4">
+            <p className="flex items-start gap-2">
+              <CircleAlertIcon
+                aria-hidden="true"
+                className="mt-1 size-3.5 shrink-0 text-primary-text"
+              />
+              <span>
+                Not set. Nothing will be filled in for them, so whoever assigns
+                the deal types an address from memory.
+              </span>
+            </p>
+          </Well>
+        ) : null}
 
-      {stored === null ? (
-        <p className="mt-2.5 flex items-start gap-1.5 rounded-card border border-primary/35 bg-primary-soft p-2.5 text-xs leading-relaxed text-fg">
-          <TriangleAlertIcon
-            aria-hidden="true"
-            className="mt-px size-3.5 shrink-0 text-primary-text"
+        <div className="grid gap-4">
+          <TextField
+            id={emailId}
+            name="agentEmail"
+            type="email"
+            label="Google account sellers invite"
+            hint="The account that will genuinely own the channel."
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            placeholder="transfers@channeladda.com"
+            autoComplete="off"
+            required
           />
-          <span>Not set. Nothing will be filled in for them.</span>
-        </p>
-      ) : null}
+          <TextField
+            id={brandId}
+            name="agentBrand"
+            label="Shown to the seller as"
+            value={brand}
+            onChange={(event) => setBrand(event.target.value)}
+            placeholder="Channel Adda Transfers"
+            autoComplete="off"
+            required
+          />
+        </div>
 
-      <div className="mt-2.5 grid gap-3">
-        <TextField
-          id={emailId}
-          name="agentEmail"
-          type="email"
-          label="Google account sellers invite"
-          hint="The account that will genuinely own the channel."
-          value={email}
-          onChange={(event) => setEmail(event.target.value)}
-          placeholder="transfers@channeladda.com"
-          autoComplete="off"
-          required
-        />
-        <TextField
-          id={brandId}
-          name="agentBrand"
-          label="Shown to the seller as"
-          value={brand}
-          onChange={(event) => setBrand(event.target.value)}
-          placeholder="Channel Adda Transfers"
-          autoComplete="off"
-          required
-        />
-      </div>
+        <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2">
+          <Button
+            type="button"
+            size="sm"
+            variant={dirty ? "primary" : "secondary"}
+            disabled={pending || !ready || !dirty}
+            onClick={() => {
+              setNote(null);
+              setError(null);
+              startTransition(async () => {
+                const result = await setAgentIdentity(
+                  userId,
+                  email.trim(),
+                  brand.trim(),
+                );
+                if (result.ok) setNote(result.message);
+                else setError(result.error);
+              });
+            }}
+          >
+            <Swap
+              busy={pending}
+              idle={dirty ? "Save identity" : "Saved"}
+              working="Saving…"
+            />
+          </Button>
+          <p
+            className={cn(
+              "text-xs tabular-nums",
+              atCap ? "font-medium text-danger" : "text-subtle",
+            )}
+          >
+            Holding {holds} of {maxHolds}
+            {atCap ? " — at the cap" : ""}
+          </p>
+        </div>
 
-      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
-        <Button
-          type="button"
-          size="sm"
-          disabled={pending || !ready || !dirty}
-          onClick={() => {
-            setNote(null);
-            setError(null);
-            startTransition(async () => {
-              const result = await setAgentIdentity(
-                userId,
-                email.trim(),
-                brand.trim(),
-              );
-              if (result.ok) setNote(result.message);
-              else setError(result.error);
-            });
-          }}
-        >
-          {pending ? "Saving…" : dirty ? "Save identity" : "Saved"}
-        </Button>
-        <p className="tnum text-xs text-subtle">
-          Holding {holds} of {maxHolds}
-          {atCap ? " — at the cap" : ""}
-        </p>
-      </div>
-
-      {error ? (
-        <p role="alert" className="mt-2 text-xs leading-relaxed text-danger">
-          {error}
-        </p>
-      ) : null}
-      {note ? (
-        <output className="mt-2 block text-xs leading-relaxed text-verified">
-          {note}
-        </output>
-      ) : null}
-    </Panel>
+        <Outcome note={note} error={error} />
+      </CardBody>
+    </Card>
   );
-}
-
-// ------------------------------------------------------------ shared bits
-
-type ActionResult =
-  | { ok: true; message: string }
-  | { ok: false; error: string };
-
-/** One outcome line, the same shape every panel on this page uses. */
-function Outcome({
-  note,
-  error,
-}: {
-  note: string | null;
-  error: string | null;
-}) {
-  if (error) {
-    return (
-      <p
-        role="alert"
-        className="mt-2 flex items-start gap-1.5 text-xs leading-relaxed text-danger"
-      >
-        <TriangleAlertIcon
-          aria-hidden="true"
-          className="mt-px size-3.5 shrink-0"
-        />
-        <span>{error}</span>
-      </p>
-    );
-  }
-  if (note) {
-    return (
-      <output className="mt-2 flex items-start gap-1.5 text-xs leading-relaxed text-verified">
-        <CheckCircle2Icon
-          aria-hidden="true"
-          className="mt-px size-3.5 shrink-0"
-        />
-        <span>{note}</span>
-      </output>
-    );
-  }
-  return null;
 }
 
 // ---------------------------------------------------------- identity (KYC)
@@ -649,11 +640,18 @@ const KYC_CHOICES: {
   },
 ];
 
+const KYC_VARIANT: Record<KycStatus, "neutral" | "verified" | "danger"> = {
+  NOT_STARTED: "neutral",
+  PENDING: "neutral",
+  APPROVED: "verified",
+  REJECTED: "danger",
+};
+
 /**
  * Recording an identity check that was done off-platform.
  *
  * Nothing here looks at a document — there is no upload flow yet — so the
- * panel says that plainly and asks what was checked. Without this control the
+ * card says that plainly and asks what was checked. Without this control the
  * status could never leave NOT_STARTED, and the public sellers directory,
  * which only lists approved sellers, was empty on every real database.
  */
@@ -693,146 +691,136 @@ export function KycControl({
     current.toLowerCase().replace(/_/g, " ");
 
   return (
-    <Panel padded={false} className="p-4">
-      <h2 className="font-display text-sm font-bold text-fg">Identity check</h2>
-      <p className="mt-1 text-xs leading-relaxed text-muted">
-        Currently{" "}
-        <strong className="font-semibold text-fg">
-          {currentLabel.toLowerCase()}
-        </strong>
-        . This records the outcome of a check you did yourself — a video call, a
-        document sent to support. Nothing here inspects a document.
-      </p>
+    <Card>
+      <CardHeader
+        title="Identity check"
+        description="Records the outcome of a check you did yourself — a video call, a document sent to support. Nothing here inspects a document."
+        actions={
+          <Badge variant={KYC_VARIANT[current]}>
+            <span className="sr-only">Currently </span>
+            {currentLabel.charAt(0).toUpperCase() + currentLabel.slice(1)}
+          </Badge>
+        }
+      />
+      <CardBody>
+        {!canSet ? (
+          <p className="flex items-start gap-2 text-[0.8125rem] leading-relaxed text-muted">
+            <LockIcon
+              aria-hidden="true"
+              className="mt-1 size-3.5 shrink-0 text-subtle"
+            />
+            <span>{blockedBecause ?? "You cannot change this."}</span>
+          </p>
+        ) : (
+          <>
+            <fieldset className="min-w-0" disabled={pending || armed}>
+              <legend className="sr-only">New identity status</legend>
+              <Choices>
+                {KYC_CHOICES.filter((choice) => choice.status !== current).map(
+                  (choice) => (
+                    <Choice
+                      key={choice.status}
+                      name={`kyc-${userId}`}
+                      value={choice.status}
+                      checked={status === choice.status}
+                      locked={pending || armed}
+                      onSelect={() => {
+                        setStatus(choice.status);
+                        setError(null);
+                        setNote(null);
+                      }}
+                      title={choice.label}
+                      detail={choice.meaning}
+                    />
+                  ),
+                )}
+              </Choices>
+            </fieldset>
 
-      {!canSet ? (
-        <p className="mt-2.5 text-xs leading-relaxed text-subtle">
-          {blockedBecause ?? "You cannot change this."}
-        </p>
-      ) : (
-        <>
-          <fieldset className="mt-3 grid gap-2" disabled={pending || armed}>
-            <legend className="sr-only">New identity status</legend>
-            {KYC_CHOICES.filter((choice) => choice.status !== current).map(
-              (choice) => (
-                <label
-                  key={choice.status}
-                  className={cn(
-                    "flex items-start gap-2.5 rounded-card border p-2.5 transition-colors",
-                    armed ? "cursor-default" : "cursor-pointer",
-                    status === choice.status
-                      ? "border-primary bg-primary-soft"
-                      : "border-line hover:bg-surface-2",
-                  )}
-                >
-                  <input
-                    type="radio"
-                    name={`kyc-${userId}`}
-                    value={choice.status}
-                    checked={status === choice.status}
-                    onChange={() => {
-                      setStatus(choice.status);
+            {armed ? (
+              <Well className="mt-3">
+                <p className="font-medium">
+                  Mark their identity{" "}
+                  <strong className="font-semibold">
+                    {chosen?.label.toLowerCase()}
+                  </strong>
+                  ? It is recorded against your name with the reason you gave.
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={pending}
+                    onClick={() => {
+                      setNote(null);
+                      setError(null);
+                      startTransition(async () => {
+                        const result = await setUserKyc(userId, status, reason);
+                        if (!result.ok) {
+                          setError(result.error);
+                          return;
+                        }
+                        setNote(result.message);
+                        setReason("");
+                        setArmed(false);
+                      });
+                    }}
+                  >
+                    <Swap
+                      busy={pending}
+                      idle={`Yes — mark ${chosen?.label.toLowerCase()}`}
+                      working="Saving…"
+                    />
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    disabled={pending}
+                    onClick={() => setArmed(false)}
+                  >
+                    Back
+                  </Button>
+                </div>
+              </Well>
+            ) : (
+              <>
+                <TextArea
+                  id={reasonId}
+                  name="kycReason"
+                  label="What you checked"
+                  hint="Kept in the audit trail. Not shown to them."
+                  rows={2}
+                  value={reason}
+                  onChange={(event) => setReason(event.target.value)}
+                  placeholder="Passport matched on a video call, 17 Oct"
+                  className="mt-4"
+                  required
+                />
+                <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={pending || !reasonReady}
+                    onClick={() => {
                       setError(null);
                       setNote(null);
+                      setArmed(true);
                     }}
-                    className="mt-0.5 size-4 shrink-0 accent-[var(--color-primary)]"
-                  />
-                  <span className="min-w-0">
-                    <span className="block text-sm font-medium text-fg">
-                      {choice.label}
-                    </span>
-                    <span className="mt-0.5 block text-xs leading-relaxed text-subtle">
-                      {choice.meaning}
-                    </span>
-                  </span>
-                </label>
-              ),
+                  >
+                    Continue
+                  </Button>
+                  <ReasonHint ready={reasonReady} />
+                </div>
+              </>
             )}
-          </fieldset>
+          </>
+        )}
 
-          {armed ? (
-            <div className="mt-3 rounded-card border border-primary/40 bg-primary-soft p-3">
-              <p className="text-xs leading-relaxed font-medium text-fg">
-                Mark their identity{" "}
-                <strong className="font-semibold">
-                  {chosen?.label.toLowerCase()}
-                </strong>
-                ? It is recorded against your name with the reason you gave.
-              </p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  size="sm"
-                  disabled={pending}
-                  onClick={() => {
-                    setNote(null);
-                    setError(null);
-                    startTransition(async () => {
-                      const result = await setUserKyc(userId, status, reason);
-                      if (!result.ok) {
-                        setError(result.error);
-                        return;
-                      }
-                      setNote(result.message);
-                      setReason("");
-                      setArmed(false);
-                    });
-                  }}
-                >
-                  {pending
-                    ? "Saving…"
-                    : `Yes — mark ${chosen?.label.toLowerCase()}`}
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  disabled={pending}
-                  onClick={() => setArmed(false)}
-                >
-                  Back
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <>
-              <TextArea
-                id={reasonId}
-                name="kycReason"
-                label="What you checked"
-                hint="Kept in the audit trail. Not shown to them."
-                rows={2}
-                value={reason}
-                onChange={(event) => setReason(event.target.value)}
-                placeholder="Passport matched on a video call, 17 Oct"
-                className="mt-2.5"
-                required
-              />
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                className="mt-2.5"
-                disabled={pending || !reasonReady}
-                onClick={() => {
-                  setError(null);
-                  setNote(null);
-                  setArmed(true);
-                }}
-              >
-                Continue
-              </Button>
-              {!reasonReady ? (
-                <p className="mt-2 text-xs text-subtle">
-                  A reason is required before this can go ahead.
-                </p>
-              ) : null}
-            </>
-          )}
-        </>
-      )}
-
-      <Outcome note={note} error={error} />
-    </Panel>
+        <Outcome note={note} error={error} />
+      </CardBody>
+    </Card>
   );
 }
 
@@ -844,41 +832,34 @@ export function KycControl({
  * Three ways people get stuck, and before this not one of them had a button:
  * the verification email never arrived (with no mail provider, it never
  * does, and an unverified account cannot make an offer); somebody might be in
- * their account; or the phone with their codes is gone.
+ * their account; or the phone with their codes is gone. The first two are
+ * here; the third — clearing a second factor — can turn a stolen password
+ * into a working sign-in, so it lives in the danger zone instead.
  */
 export function AccountRecovery({
   userId,
   emailVerified,
   sessions,
-  twoFactorEnabled,
   canVerifyEmail,
   canEndSessions,
-  canResetTwoFactor,
   endSessionsBlockedBecause,
 }: {
   userId: string;
   emailVerified: boolean;
   sessions: number;
-  twoFactorEnabled: boolean;
   /** Any staff, not on their own account. */
   canVerifyEmail: boolean;
   /** Any staff on a member; a superadmin on a colleague; never yourself. */
   canEndSessions: boolean;
-  /** Superadmin, not on their own account. */
-  canResetTwoFactor: boolean;
   endSessionsBlockedBecause?: string;
 }) {
   return (
-    <Panel padded={false} className="p-4">
-      <h2 className="font-display text-sm font-bold text-fg">
-        Help them back in
-      </h2>
-      <p className="mt-1 text-xs leading-relaxed text-muted">
-        For somebody who is locked out or worried. Each of these is recorded
-        against your name.
-      </p>
-
-      <div className="mt-3 grid gap-3 divide-y divide-line">
+    <Card>
+      <CardHeader
+        title="Help them back in"
+        description="For somebody who is locked out or worried. Each of these is recorded against your name."
+      />
+      <div className="divide-y divide-line">
         <RecoveryStep
           title="Email address"
           status={emailVerified ? "Verified" : "Not verified"}
@@ -908,7 +889,7 @@ export function AccountRecovery({
               ? "Signed out"
               : `${sessions} ${sessions === 1 ? "device" : "devices"}`
           }
-          body="Ends every session they have, on every device. Their password still works. This is for somebody worried that someone else is in their account, or who signed in on a shared computer — where suspending would be far too much."
+          body="Ends every session they have, on every device; their password still works. For somebody worried that someone else is in their account, or who signed in on a shared computer — where suspending would be far too much."
           blocked={
             sessions > 0 && !canEndSessions
               ? endSessionsBlockedBecause
@@ -925,14 +906,8 @@ export function AccountRecovery({
               : null
           }
         />
-
-        <TwoFactorReset
-          userId={userId}
-          enabled={twoFactorEnabled}
-          canReset={canResetTwoFactor}
-        />
       </div>
-    </Panel>
+    </Card>
   );
 }
 
@@ -963,34 +938,24 @@ function RecoveryStep({
   const [pending, startTransition] = useTransition();
 
   return (
-    <div className="pt-3 first:pt-0">
-      <p className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <span className="text-sm font-medium text-fg">{title}</span>
-        <span
-          className={cn(
-            "tnum text-xs font-semibold",
-            statusTone === "verified"
-              ? "text-verified"
-              : statusTone === "danger"
-                ? "text-danger"
-                : "text-muted",
-          )}
-        >
-          {status}
-        </span>
-      </p>
-      <p className="mt-1 text-xs leading-relaxed text-subtle">{body}</p>
+    <div className="px-4 py-4 sm:px-5">
+      <StepHead
+        title={title}
+        status={<Badge variant={statusTone}>{status}</Badge>}
+      />
+      <p className={BODY}>{body}</p>
       {blocked ? (
-        <p className="mt-1.5 text-xs leading-relaxed text-subtle">{blocked}</p>
+        <p className="mt-2 flex items-start gap-2 text-xs leading-relaxed text-subtle">
+          <LockIcon aria-hidden="true" className="mt-0.5 size-3 shrink-0" />
+          <span>{blocked}</span>
+        </p>
       ) : null}
 
       {action ? (
         armed ? (
-          <div className="mt-2.5 rounded-card border border-primary/40 bg-primary-soft p-3">
-            <p className="text-xs leading-relaxed font-medium text-fg">
-              {action.prompt}
-            </p>
-            <div className="mt-2.5 flex flex-wrap gap-2">
+          <Well className="mt-3">
+            <p className="font-medium">{action.prompt}</p>
+            <div className="mt-3 flex flex-wrap gap-2">
               <Button
                 type="button"
                 size="sm"
@@ -1009,7 +974,7 @@ function RecoveryStep({
                   });
                 }}
               >
-                {pending ? "Working…" : action.confirm}
+                <Swap busy={pending} idle={action.confirm} working="Working…" />
               </Button>
               <Button
                 type="button"
@@ -1021,13 +986,13 @@ function RecoveryStep({
                 Back
               </Button>
             </div>
-          </div>
+          </Well>
         ) : (
           <Button
             type="button"
             size="sm"
             variant="outline"
-            className="mt-2.5"
+            className="mt-3"
             disabled={pending}
             onClick={() => {
               setNote(null);
@@ -1045,12 +1010,209 @@ function RecoveryStep({
   );
 }
 
+// ------------------------------------------------------------- danger zone
+
+/**
+ * The two things on this page that are hard to take back: suspending the
+ * account, and clearing a lost second factor. Kept together, last, and
+ * outlined in red, so neither is ever the nearest button to something
+ * routine.
+ */
+export function DangerZone({
+  userId,
+  banned,
+  holds,
+  isSelf,
+  twoFactorEnabled,
+  canResetTwoFactor,
+}: {
+  userId: string;
+  banned: boolean;
+  /** Safest channels this person is holding right now. */
+  holds: number;
+  /** The server refuses a suspension of yourself; so does this card. */
+  isSelf: boolean;
+  twoFactorEnabled: boolean;
+  /** Superadmin, not on their own account. */
+  canResetTwoFactor: boolean;
+}) {
+  return (
+    <Card tone="danger" className="bg-surface">
+      <CardHeader title="Danger zone" />
+      <div className="divide-y divide-line">
+        {isSelf ? null : (
+          <Suspension userId={userId} banned={banned} holds={holds} />
+        )}
+        <TwoFactorReset
+          userId={userId}
+          enabled={twoFactorEnabled}
+          canReset={canResetTwoFactor}
+        />
+      </div>
+    </Card>
+  );
+}
+
+/** Taking the account away, or giving it back. */
+function Suspension({
+  userId,
+  banned,
+  holds,
+}: {
+  userId: string;
+  banned: boolean;
+  holds: number;
+}) {
+  const reasonId = useId();
+  const [reason, setReason] = useState("");
+  const [armed, setArmed] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  function run(
+    action: () => Promise<{ ok: boolean; message?: string; error?: string }>,
+  ) {
+    setNote(null);
+    setError(null);
+    startTransition(async () => {
+      const result = await action();
+      if (!result.ok) {
+        setError(result.error ?? "That did not work.");
+        return;
+      }
+      setNote(result.message ?? null);
+      setReason("");
+      setArmed(false);
+    });
+  }
+
+  const reasonReady = reason.trim().length >= MIN_REASON;
+
+  return (
+    <div className="px-4 py-4 sm:px-5">
+      <StepHead
+        title={banned ? "Suspension" : "Suspend this account"}
+        status={banned ? <Badge variant="danger">Suspended</Badge> : null}
+      />
+
+      {banned ? (
+        <>
+          <p className={BODY}>
+            They cannot sign in. Restoring lets them back in; their listings
+            stay paused until they relist them.
+          </p>
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            className="mt-3"
+            disabled={pending}
+            onClick={() => run(() => setUserBanned(userId, false, ""))}
+          >
+            <Swap busy={pending} idle="Restore access" working="Restoring…" />
+          </Button>
+        </>
+      ) : armed ? (
+        <Well tone="danger" className="mt-3">
+          <p className="flex items-start gap-2 font-medium">
+            <TriangleAlertIcon
+              aria-hidden="true"
+              className="mt-1 size-3.5 shrink-0 text-danger"
+            />
+            <span>
+              This signs them out of every session, blocks sign-in, and pauses
+              every live listing they have. They are shown the reason you typed.
+            </span>
+          </p>
+          {holds > 0 ? (
+            <p className="mt-2 flex items-start gap-2 font-medium text-danger">
+              <TriangleAlertIcon
+                aria-hidden="true"
+                className="mt-1 size-3.5 shrink-0"
+              />
+              <span>
+                They are holding {holds} {holds === 1 ? "channel" : "channels"}{" "}
+                as an agent. Suspending them does not return those: the channels
+                stay in this account&rsquo;s custody until a deal is reassigned
+                or returned to its seller.
+              </span>
+            </p>
+          ) : null}
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant="danger"
+              disabled={pending || !reasonReady}
+              onClick={() => run(() => setUserBanned(userId, true, reason))}
+            >
+              <Swap
+                busy={pending}
+                idle="Yes — suspend the account"
+                working="Suspending…"
+              />
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              disabled={pending}
+              onClick={() => setArmed(false)}
+            >
+              Back
+            </Button>
+          </div>
+        </Well>
+      ) : (
+        <>
+          <p className={BODY}>
+            Signs them out, blocks sign-in and pauses every live listing they
+            have. Deals already in flight are not ended by this.
+          </p>
+          <TextArea
+            id={reasonId}
+            name="reason"
+            label="Why"
+            hint="Shown to them, and kept in the audit trail."
+            rows={2}
+            value={reason}
+            onChange={(event) => setReason(event.target.value)}
+            placeholder="Repeatedly asked buyers to pay off-platform"
+            className="mt-3"
+            required
+          />
+          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className={DANGER_OUTLINE}
+              disabled={pending || !reasonReady}
+              onClick={() => {
+                setError(null);
+                setNote(null);
+                setArmed(true);
+              }}
+            >
+              Continue
+            </Button>
+            <ReasonHint ready={reasonReady} />
+          </div>
+        </>
+      )}
+
+      <Outcome note={note} error={error} />
+    </div>
+  );
+}
+
 /**
  * Clearing a lost second factor.
  *
- * Its own component because it is the one remedy here that asks for a
- * reason, and the one that is red: whoever can press it can turn a stolen
- * password into a working sign-in.
+ * Its own component because it is the one remedy that asks for a reason, and
+ * the one that is red: whoever can press it can turn a stolen password into a
+ * working sign-in.
  */
 function TwoFactorReset({
   userId,
@@ -1071,39 +1233,37 @@ function TwoFactorReset({
   const reasonReady = reason.trim().length >= MIN_REASON;
 
   return (
-    <div className="pt-3">
-      <p className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <span className="text-sm font-medium text-fg">
-          Two-step verification
-        </span>
-        <span
-          className={cn(
-            "text-xs font-semibold",
-            enabled ? "text-verified" : "text-muted",
-          )}
-        >
-          {enabled ? "On" : "Off"}
-        </span>
-      </p>
-      <p className="mt-1 text-xs leading-relaxed text-subtle">
+    <div className="px-4 py-4 sm:px-5">
+      <StepHead
+        title="Two-step verification"
+        status={
+          <Badge variant={enabled ? "verified" : "neutral"}>
+            {enabled ? "On" : "Off"}
+          </Badge>
+        }
+      />
+      <p className={BODY}>
         {enabled
           ? "If they have lost the device their codes are on, this turns it off so they can sign in with their password and set up a new one."
           : "Nothing to reset. Only they can turn it on, under Security."}
       </p>
 
       {enabled && !canReset ? (
-        <p className="mt-1.5 text-xs leading-relaxed text-subtle">
-          Only a superadmin can reset this, and nobody can reset their own.
+        <p className="mt-2 flex items-start gap-2 text-xs leading-relaxed text-subtle">
+          <LockIcon aria-hidden="true" className="mt-0.5 size-3 shrink-0" />
+          <span>
+            Only a superadmin can reset this, and nobody can reset their own.
+          </span>
         </p>
       ) : null}
 
       {enabled && canReset ? (
         armed ? (
-          <div className="mt-2.5 rounded-card border border-danger/40 bg-danger-soft p-3">
-            <p className="flex items-start gap-2 text-xs leading-relaxed font-medium text-fg">
+          <Well tone="danger" className="mt-3">
+            <p className="flex items-start gap-2 font-medium">
               <TriangleAlertIcon
                 aria-hidden="true"
-                className="mt-px size-3.5 shrink-0 text-danger"
+                className="mt-1 size-3.5 shrink-0 text-danger"
               />
               <span>
                 Anyone with their password can then sign in as them. Only do
@@ -1111,7 +1271,7 @@ function TwoFactorReset({
                 It also signs them out everywhere.
               </span>
             </p>
-            <div className="mt-2.5 flex flex-wrap gap-2">
+            <div className="mt-3 flex flex-wrap gap-2">
               <Button
                 type="button"
                 size="sm"
@@ -1132,7 +1292,11 @@ function TwoFactorReset({
                   });
                 }}
               >
-                {pending ? "Resetting…" : "Yes — reset two-step verification"}
+                <Swap
+                  busy={pending}
+                  idle="Yes — reset two-step verification"
+                  working="Resetting…"
+                />
               </Button>
               <Button
                 type="button"
@@ -1144,7 +1308,7 @@ function TwoFactorReset({
                 Back
               </Button>
             </div>
-          </div>
+          </Well>
         ) : (
           <>
             <TextArea
@@ -1156,28 +1320,26 @@ function TwoFactorReset({
               value={reason}
               onChange={(event) => setReason(event.target.value)}
               placeholder="Video call, matched the KYC photo; phone lost 15 Oct"
-              className="mt-2.5"
+              className="mt-3"
               required
             />
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              className="mt-2.5"
-              disabled={pending || !reasonReady}
-              onClick={() => {
-                setNote(null);
-                setError(null);
-                setArmed(true);
-              }}
-            >
-              Continue
-            </Button>
-            {!reasonReady ? (
-              <p className="mt-2 text-xs text-subtle">
-                A reason is required before this can go ahead.
-              </p>
-            ) : null}
+            <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className={DANGER_OUTLINE}
+                disabled={pending || !reasonReady}
+                onClick={() => {
+                  setNote(null);
+                  setError(null);
+                  setArmed(true);
+                }}
+              >
+                Continue
+              </Button>
+              <ReasonHint ready={reasonReady} />
+            </div>
           </>
         )
       ) : null}

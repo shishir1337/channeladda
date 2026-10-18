@@ -1,28 +1,18 @@
 import {
-  ArrowLeftIcon,
   ExternalLinkIcon,
   LockIcon,
+  ReceiptTextIcon,
   SlidersHorizontalIcon,
-  TriangleAlertIcon,
+  WalletIcon,
+  WorkflowIcon,
 } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 import {
-  Amount,
-  ConsoleSection,
-  Metric,
-  MetricGrid,
-  Nothing,
-  Panel,
-  Reference,
-  TableScroller,
-  Td,
-  Th,
-} from "@/components/admin/console";
-import {
   AccountRecovery,
+  DangerZone,
   KycControl,
   UserControls,
 } from "@/components/admin/user-controls";
@@ -31,9 +21,34 @@ import {
   OrderStatusBadge,
   ROLE_VARIANT,
 } from "@/components/admin/vocab";
+import {
+  Amount,
+  Callout,
+  Card,
+  CardHeader,
+  EmptyState,
+  Fact,
+  Facts,
+  PageHeader,
+  Reference,
+  Section,
+  Stat,
+  StatGrid,
+  TableCard,
+  Td,
+  Th,
+  Tr,
+} from "@/components/app/kit";
+import { Avatar } from "@/components/app/user-menu";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Price } from "@/components/ui/price";
-import type { UserRole, WithdrawalStatus } from "@/generated/prisma/enums";
+import type {
+  KycStatus,
+  UserRole,
+  WithdrawalStatus,
+} from "@/generated/prisma/enums";
+import { cn } from "@/lib/utils";
 import {
   getUserDetail,
   listUserDeals,
@@ -95,32 +110,72 @@ const SIDE: Record<"buyer" | "seller" | "agent", string> = {
   agent: "Agent",
 };
 
-function Fact({
+const KYC_VARIANT: Record<KycStatus, "neutral" | "verified" | "danger"> = {
+  NOT_STARTED: "neutral",
+  PENDING: "neutral",
+  APPROVED: "verified",
+  REJECTED: "danger",
+};
+
+/** "NOT_STARTED" → "Not started". */
+function sentence(value: string) {
+  const words = value.toLowerCase().replace(/_/g, " ");
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+/**
+ * The account's activity in one strip of figures. Hairlines between cells
+ * rather than six separate cards, so it reads as one record.
+ */
+function Figures({ children }: { children: ReactNode }) {
+  return (
+    <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-card border border-line bg-line shadow-xs sm:grid-cols-3">
+      {children}
+    </dl>
+  );
+}
+
+function Figure({
   label,
   value,
-  tone,
+  danger,
 }: {
   label: string;
-  value: ReactNode;
-  tone?: "danger" | "verified";
+  value: number;
+  /** Something worth a look: the dot and the number turn red. */
+  danger?: boolean;
 }) {
   return (
-    <div className="rounded-card border border-line bg-surface p-3">
-      <dt className="font-mono text-[0.625rem] font-semibold tracking-[0.1em] text-subtle uppercase">
+    <div className="bg-surface px-4 py-3.5 sm:px-5">
+      <dt className="flex items-center gap-1.5 text-[0.8125rem] leading-5 text-muted">
+        {danger ? (
+          <span
+            aria-hidden="true"
+            className="size-1.5 shrink-0 rounded-full bg-danger"
+          />
+        ) : null}
         {label}
       </dt>
       <dd
-        className={`mt-1.5 text-sm font-semibold tabular-nums ${
-          tone === "danger"
-            ? "text-danger"
-            : tone === "verified"
-              ? "text-verified"
-              : "text-fg"
-        }`}
+        className={cn(
+          "mt-1 text-lg leading-7 font-semibold tracking-[-0.01em] tabular-nums",
+          danger ? "text-danger" : value === 0 ? "text-subtle" : "text-fg",
+        )}
       >
-        {value}
+        {value.toLocaleString("en-US")}
       </dd>
     </div>
+  );
+}
+
+function When({ date }: { date: Date }) {
+  return (
+    <time
+      dateTime={date.toISOString()}
+      className="text-[0.8125rem] whitespace-nowrap text-muted tabular-nums"
+    >
+      {date.toLocaleDateString("en-GB", DATE)}
+    </time>
   );
 }
 
@@ -160,181 +215,104 @@ export default async function AdminUserPage({
 
   return (
     <>
-      <Link
-        href="/admin/users"
-        className="inline-flex min-h-11 items-center gap-1.5 text-sm text-muted transition-colors hover:text-fg"
-      >
-        <ArrowLeftIcon aria-hidden="true" className="size-4" />
-        All people
-      </Link>
-
-      <header className="mt-2 border-b border-line pb-5">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-          <h1 className="font-display text-[1.6rem] leading-[1.1] font-black tracking-tight text-fg sm:text-[1.9rem]">
-            {person.name}
-          </h1>
-          <Badge variant={ROLE_VARIANT[person.role]} size="md">
-            {ROLE_LABELS[person.role]}
-          </Badge>
-          {person.banned ? (
-            <Badge variant="danger" size="md">
-              Suspended
+      <PageHeader
+        back={{ href: "/admin/users", label: "All people" }}
+        title={
+          <span className="flex min-w-0 items-center gap-3">
+            <Avatar name={person.name} className="size-9 text-[0.8125rem]" />
+            <span className="min-w-0 break-words">{person.name}</span>
+          </span>
+        }
+        description={<span className="break-all">{person.email}</span>}
+        meta={
+          <span className="flex flex-wrap items-center gap-1.5">
+            <Badge variant={ROLE_VARIANT[person.role]}>
+              {ROLE_LABELS[person.role]}
             </Badge>
-          ) : null}
-        </div>
-        <p className="mt-1.5 text-sm break-all text-muted">{person.email}</p>
-      </header>
+            {person.banned ? <Badge variant="danger">Suspended</Badge> : null}
+          </span>
+        }
+        actions={
+          person.slug ? (
+            <Button asChild variant="secondary">
+              <Link href={`/seller/${person.slug}`}>
+                Their public seller page
+                <ExternalLinkIcon aria-hidden="true" />
+              </Link>
+            </Button>
+          ) : null
+        }
+      />
 
       {person.banned ? (
-        <Panel tone="danger" className="mt-5">
-          <p className="flex items-start gap-2 text-sm leading-relaxed text-fg">
-            <TriangleAlertIcon
-              aria-hidden="true"
-              className="mt-0.5 size-4 shrink-0 text-danger"
-            />
-            <span>
-              <strong className="font-semibold">
-                This account is suspended.
-              </strong>{" "}
-              They cannot sign in and their listings are paused.
-              {person.banReason ? ` Reason given: ${person.banReason}` : ""}
-            </span>
-          </p>
-        </Panel>
+        <Callout
+          tone="danger"
+          title="This account is suspended."
+          className="mb-6"
+        >
+          They cannot sign in and their listings are paused.
+          {person.banReason ? ` Reason given: ${person.banReason}` : ""}
+        </Callout>
       ) : null}
 
-      <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
         <div className="min-w-0">
-          <h2 className="font-mono text-[0.625rem] font-semibold tracking-[0.14em] text-subtle uppercase">
-            Account record
-          </h2>
-          <dl className="mt-2.5 grid grid-cols-2 gap-2.5 sm:grid-cols-3">
-            <Fact label="Listed" value={person.listings} />
-            <Fact label="Sold" value={person.sold} />
-            <Fact label="Bought" value={person.bought} />
-            <Fact label="Conversations open" value={person.openThreads} />
-            <Fact
-              label="Threads flagged"
-              value={person.flaggedThreads}
-              tone={person.flaggedThreads > 0 ? "danger" : undefined}
-            />
-            <Fact label="Active sessions" value={person.sessions} />
-            <Fact
-              label="Email"
-              value={person.emailVerified ? "Verified" : "Unverified"}
-              tone={person.emailVerified ? "verified" : "danger"}
-            />
-            {/* On a staff account this is not a nicety: it is the only thing
-                between a reused password and the payout screen. */}
-            <Fact
-              label="Two-factor"
-              value={person.twoFactorEnabled ? "On" : "Off"}
-              tone={
-                person.twoFactorEnabled
-                  ? "verified"
-                  : person.role === "USER"
-                    ? undefined
-                    : "danger"
-              }
-            />
-            {person.role === "AGENT" ? (
-              <Fact
-                label="Channels held"
-                value={`${person.holds} of ${person.maxHolds}`}
-                tone={
-                  person.holds >= person.maxHolds
-                    ? "danger"
-                    : person.holds > 0
-                      ? "verified"
-                      : undefined
-                }
+          <Section id="record" title="Activity">
+            <Figures>
+              <Figure label="Listed" value={person.listings} />
+              <Figure label="Sold" value={person.sold} />
+              <Figure label="Bought" value={person.bought} />
+              <Figure label="Conversations open" value={person.openThreads} />
+              <Figure
+                label="Threads flagged"
+                value={person.flaggedThreads}
+                danger={person.flaggedThreads > 0}
               />
-            ) : null}
-            <Fact
-              label="Identity"
-              value={person.kycStatus.toLowerCase().replace(/_/g, " ")}
-              tone={
-                person.kycStatus === "APPROVED"
-                  ? "verified"
-                  : person.kycStatus === "REJECTED"
-                    ? "danger"
-                    : undefined
-              }
-            />
-            <Fact
-              label="Joined"
-              value={person.createdAt.toLocaleDateString("en-GB", DATE)}
-            />
-          </dl>
-
-          {person.slug ? (
-            <Link
-              href={`/seller/${person.slug}`}
-              className="mt-4 inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-primary-text underline-offset-4 hover:underline"
-            >
-              Their public seller page
-              <ExternalLinkIcon aria-hidden="true" className="size-3.5" />
-            </Link>
-          ) : null}
+              <Figure label="Active sessions" value={person.sessions} />
+            </Figures>
+          </Section>
 
           {/* ---------------------------------------------------- money */}
           {wallet && withdrawals ? (
             <>
-              <ConsoleSection
+              <Section
                 id="money"
                 title="Money"
-                description="Their balance as the ledger has it, what is held against payouts finance has not settled, and every recent movement. Read-only: the ledger is never edited from here."
+                description="Their balance as the ledger has it, what is held for payouts not yet settled, and recent movements. Read-only: the ledger is never edited from here."
                 actions={
                   // The correction form refuses your own account, and a
                   // staff account unless you are superadmin; the link is
                   // drawn only where it leads somewhere that works.
                   person.id !== staff.id &&
                   (person.role === "USER" || staff.role === "SUPERADMIN") ? (
-                    <Link
-                      href={`/admin/money/adjust?member=${encodeURIComponent(person.id)}`}
-                      className="inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-primary-text underline-offset-4 hover:underline"
-                    >
-                      <SlidersHorizontalIcon
-                        aria-hidden="true"
-                        className="size-4"
-                      />
-                      Correct this balance
-                    </Link>
+                    <Button asChild variant="secondary" size="sm">
+                      <Link
+                        href={`/admin/money/adjust?member=${encodeURIComponent(person.id)}`}
+                      >
+                        <SlidersHorizontalIcon aria-hidden="true" />
+                        Correct this balance
+                      </Link>
+                    </Button>
                   ) : null
                 }
               >
-                <MetricGrid className="lg:grid-cols-3">
-                  <Metric
+                <StatGrid columns={3}>
+                  <Stat
                     label="Balance"
-                    value={
-                      <Price
-                        usd={wallet.balanceUsd / 100}
-                        className="text-[1.4rem]"
-                      />
-                    }
+                    value={<Price usd={wallet.balanceUsd / 100} />}
                     note="Every ledger row, summed."
                   />
-                  <Metric
+                  <Stat
                     label="Held for payouts"
-                    value={
-                      <Price
-                        usd={wallet.pendingWithdrawalUsd / 100}
-                        className="text-[1.4rem]"
-                      />
-                    }
+                    value={<Price usd={wallet.pendingWithdrawalUsd / 100} />}
                     tone={
                       wallet.pendingWithdrawalUsd > 0 ? "primary" : "neutral"
                     }
                     note="Requested or approved, not yet sent."
                   />
-                  <Metric
+                  <Stat
                     label="Available"
-                    value={
-                      <Price
-                        usd={wallet.availableUsd / 100}
-                        className="text-[1.4rem]"
-                      />
-                    }
+                    value={<Price usd={wallet.availableUsd / 100} />}
                     tone={wallet.availableUsd < 0 ? "danger" : "neutral"}
                     note={
                       wallet.availableUsd < 0
@@ -342,35 +320,37 @@ export default async function AdminUserPage({
                         : "What they could withdraw now."
                     }
                   />
-                </MetricGrid>
+                </StatGrid>
 
-                <dl className="mt-3 grid gap-2.5">
-                  <Fact
-                    label="Payout address"
-                    value={
-                      wallet.payoutAddress ? (
-                        <span className="block font-mono text-xs break-all">
+                <Card className="mt-3 px-4 sm:px-5">
+                  <Facts>
+                    <Fact label="Payout address">
+                      {wallet.payoutAddress ? (
+                        <span className="block font-mono text-xs leading-5 font-normal break-all text-fg">
                           {wallet.payoutAddress.address}
                           <span className="ml-1.5 font-sans text-subtle">
                             ({wallet.payoutAddress.network})
                           </span>
                         </span>
                       ) : (
-                        "None saved"
-                      )
-                    }
-                  />
-                </dl>
+                        <span className="font-normal text-subtle">
+                          None saved
+                        </span>
+                      )}
+                    </Fact>
+                  </Facts>
+                </Card>
 
                 <div className="mt-3">
                   {ledgerShown.length === 0 ? (
-                    <Nothing
+                    <EmptyState
+                      icon={WalletIcon}
                       title="No money has moved"
                       body="Nothing has been credited to or taken from this account."
                     />
                   ) : (
-                    <TableScroller>
-                      <table className="w-full min-w-[32rem] border-collapse text-sm">
+                    <TableCard>
+                      <table className="w-full min-w-[32rem] border-collapse">
                         <caption className="sr-only">
                           Latest ledger movements on this account, newest first.
                         </caption>
@@ -384,30 +364,15 @@ export default async function AdminUserPage({
                         </thead>
                         <tbody>
                           {ledgerShown.map((entry) => (
-                            <tr
-                              key={entry.id}
-                              className="border-t border-line first:border-t-0"
-                            >
+                            <Tr key={entry.id}>
                               <Td>
-                                <time
-                                  dateTime={entry.createdAt.toISOString()}
-                                  className="tnum text-xs whitespace-nowrap text-muted"
-                                >
-                                  {entry.createdAt.toLocaleDateString(
-                                    "en-GB",
-                                    DATE,
-                                  )}
-                                </time>
+                                <When date={entry.createdAt} />
                               </Td>
-                              <Td>
-                                <span className="text-sm whitespace-nowrap text-fg">
-                                  {LEDGER_KIND[entry.kind] ?? entry.kind}
-                                </span>
+                              <Td className="whitespace-nowrap text-fg">
+                                {LEDGER_KIND[entry.kind] ?? entry.kind}
                               </Td>
-                              <Td>
-                                <span className="text-xs text-subtle">
-                                  {entry.note ?? "—"}
-                                </span>
+                              <Td className="text-[0.8125rem] text-muted">
+                                {entry.note ?? "—"}
                               </Td>
                               <Td numeric>
                                 <Amount
@@ -419,11 +384,11 @@ export default async function AdminUserPage({
                                   caption={entry.amountUsd < 0 ? "out" : "in"}
                                 />
                               </Td>
-                            </tr>
+                            </Tr>
                           ))}
                         </tbody>
                       </table>
-                    </TableScroller>
+                    </TableCard>
                   )}
                   {wallet.entries.length > ledgerShown.length ? (
                     <p className="mt-2 text-xs text-subtle">
@@ -432,22 +397,23 @@ export default async function AdminUserPage({
                     </p>
                   ) : null}
                 </div>
-              </ConsoleSection>
+              </Section>
 
-              <ConsoleSection
+              <Section
                 id="withdrawals"
                 title="Payouts"
                 count={withdrawals.length}
-                description="Every withdrawal they have asked for, and what became of it. Compare the address on a new request against the ones that were paid before."
+                description="Every withdrawal they have asked for, and what became of it. Check a new request's address against those paid before."
               >
                 {withdrawals.length === 0 ? (
-                  <Nothing
+                  <EmptyState
+                    icon={ReceiptTextIcon}
                     title="No payouts requested"
                     body="They have never asked to withdraw."
                   />
                 ) : (
-                  <TableScroller>
-                    <table className="w-full min-w-[40rem] border-collapse text-sm">
+                  <TableCard>
+                    <table className="w-full min-w-[40rem] border-collapse">
                       <caption className="sr-only">
                         Withdrawal requests, newest first: when, where to,
                         status and amount.
@@ -464,26 +430,15 @@ export default async function AdminUserPage({
                         {withdrawals.map((payout) => {
                           const meta = WITHDRAWAL_STATUS[payout.status];
                           return (
-                            <tr
-                              key={payout.id}
-                              className="border-t border-line first:border-t-0"
-                            >
+                            <Tr key={payout.id}>
                               <Td>
-                                <time
-                                  dateTime={payout.requestedAt.toISOString()}
-                                  className="tnum text-xs whitespace-nowrap text-muted"
-                                >
-                                  {payout.requestedAt.toLocaleDateString(
-                                    "en-GB",
-                                    DATE,
-                                  )}
-                                </time>
+                                <When date={payout.requestedAt} />
                               </Td>
                               <Td>
-                                <span className="block max-w-[16rem] font-mono text-xs break-all text-fg">
+                                <span className="block max-w-[16rem] font-mono text-xs leading-5 break-all text-fg">
                                   {payout.address}
                                 </span>
-                                <span className="text-[0.6875rem] text-subtle">
+                                <span className="text-xs text-subtle">
                                   {payout.network}
                                   {payout.txHash ? " · has a transaction" : ""}
                                 </span>
@@ -493,7 +448,7 @@ export default async function AdminUserPage({
                                   {meta.label}
                                 </Badge>
                                 {payout.rejectNote ? (
-                                  <span className="mt-1 block text-[0.6875rem] text-subtle">
+                                  <span className="mt-1 block text-xs text-subtle">
                                     {payout.rejectNote}
                                   </span>
                                 ) : null}
@@ -501,20 +456,20 @@ export default async function AdminUserPage({
                               <Td numeric>
                                 <Amount cents={payout.amountUsd} size="sm" />
                               </Td>
-                            </tr>
+                            </Tr>
                           );
                         })}
                       </tbody>
                     </table>
-                  </TableScroller>
+                  </TableCard>
                 )}
-              </ConsoleSection>
+              </Section>
             </>
           ) : (
-            <p className="mt-6 flex items-start gap-1.5 text-xs leading-relaxed text-subtle">
+            <p className="mt-8 flex items-start gap-2 text-xs leading-relaxed text-subtle">
               <LockIcon
                 aria-hidden="true"
-                className="mt-px size-3.5 shrink-0"
+                className="mt-0.5 size-3.5 shrink-0"
               />
               <span>
                 Balance, ledger and payouts are shown to finance and superadmins
@@ -524,24 +479,25 @@ export default async function AdminUserPage({
           )}
 
           {/* ---------------------------------------------------- deals */}
-          <ConsoleSection
+          <Section
             id="deals"
             title="Deals"
             count={deals.total}
             description={
               deals.total > deals.deals.length
-                ? `The latest ${deals.deals.length} of ${deals.total} — as buyer, seller or agent. Open one for its full history.`
-                : "Every deal they are part of — as buyer, seller or agent. Open one for its full history."
+                ? `The latest ${deals.deals.length} of ${deals.total}, as buyer, seller or agent.`
+                : "Every deal they are part of, as buyer, seller or agent."
             }
           >
             {deals.deals.length === 0 ? (
-              <Nothing
+              <EmptyState
+                icon={WorkflowIcon}
                 title="No deals"
                 body="They have not bought, sold or handled a channel yet."
               />
             ) : (
-              <TableScroller>
-                <table className="w-full min-w-[40rem] border-collapse text-sm">
+              <TableCard>
+                <table className="w-full min-w-[40rem] border-collapse">
                   <caption className="sr-only">
                     Deals this person is part of, newest first.
                   </caption>
@@ -556,17 +512,16 @@ export default async function AdminUserPage({
                   </thead>
                   <tbody>
                     {deals.deals.map((deal) => (
-                      <tr
-                        key={deal.id}
-                        className="border-t border-line first:border-t-0"
-                      >
-                        <Td>
+                      <Tr key={deal.id}>
+                        {/* The deal cell is the link, stretched over the
+                            whole cell. */}
+                        <Td className="relative">
                           <Link
                             href={`/dashboard/deals/${deal.id}`}
-                            className="block min-w-0 underline-offset-4 hover:underline"
+                            className="group/deal block min-w-0 after:absolute after:inset-0"
                           >
                             <Reference>{deal.reference}</Reference>
-                            <span className="mt-1 block max-w-[18rem] truncate text-sm text-fg">
+                            <span className="mt-1 block max-w-[18rem] truncate text-sm text-fg underline-offset-4 group-hover/deal:underline">
                               {deal.listingTitle}
                             </span>
                           </Link>
@@ -583,32 +538,74 @@ export default async function AdminUserPage({
                           <OrderStatusBadge status={deal.status} />
                         </Td>
                         <Td>
-                          <time
-                            dateTime={deal.createdAt.toISOString()}
-                            className="tnum text-xs whitespace-nowrap text-muted"
-                          >
-                            {deal.createdAt.toLocaleDateString("en-GB", DATE)}
-                          </time>
+                          <When date={deal.createdAt} />
                         </Td>
                         {canSeeMoney ? (
                           <Td numeric>
                             <Amount cents={deal.totalUsd} size="sm" />
                           </Td>
                         ) : null}
-                      </tr>
+                      </Tr>
                     ))}
                   </tbody>
                 </table>
-              </TableScroller>
+              </TableCard>
             )}
-          </ConsoleSection>
+          </Section>
         </div>
 
-        <div className="grid min-w-0 gap-3.5">
+        <div className="grid min-w-0 gap-3">
+          <Card>
+            <CardHeader title="Account" />
+            <Facts className="px-4 sm:px-5">
+              <Fact label="Email">
+                <Badge variant={person.emailVerified ? "verified" : "danger"}>
+                  {person.emailVerified ? "Verified" : "Unverified"}
+                </Badge>
+              </Fact>
+              {/* On a staff account this is not a nicety: it is the only thing
+                  between a reused password and the payout screen. */}
+              <Fact label="Two-factor">
+                <Badge
+                  variant={
+                    person.twoFactorEnabled
+                      ? "verified"
+                      : person.role === "USER"
+                        ? "neutral"
+                        : "danger"
+                  }
+                >
+                  {person.twoFactorEnabled ? "On" : "Off"}
+                </Badge>
+              </Fact>
+              <Fact label="Identity">
+                <Badge variant={KYC_VARIANT[person.kycStatus]}>
+                  {sentence(person.kycStatus)}
+                </Badge>
+              </Fact>
+              {person.role === "AGENT" ? (
+                <Fact
+                  label="Channels held"
+                  tone={
+                    person.holds >= person.maxHolds
+                      ? "danger"
+                      : person.holds > 0
+                        ? "verified"
+                        : "neutral"
+                  }
+                >
+                  {person.holds} of {person.maxHolds}
+                </Fact>
+              ) : null}
+              <Fact label="Joined">
+                {person.createdAt.toLocaleDateString("en-GB", DATE)}
+              </Fact>
+            </Facts>
+          </Card>
+
           <UserControls
             userId={person.id}
             currentRole={person.role}
-            banned={person.banned}
             canSetRole={isSuperadmin}
             isSelf={isSelf}
             // From the server, so the picker cannot quietly stop offering a
@@ -623,9 +620,15 @@ export default async function AdminUserPage({
             agentBrand={person.agentBrand}
           />
           {isSuperadmin || isSelf ? null : (
-            <p className="text-xs leading-relaxed text-subtle">
-              Only a superadmin can change what someone can reach. You can still
-              suspend or restore the account.
+            <p className="flex items-start gap-2 px-1 text-xs leading-relaxed text-subtle">
+              <LockIcon
+                aria-hidden="true"
+                className="mt-0.5 size-3.5 shrink-0"
+              />
+              <span>
+                Only a superadmin can change what someone can reach. You can
+                still suspend or restore the account.
+              </span>
             </p>
           )}
 
@@ -640,15 +643,22 @@ export default async function AdminUserPage({
             userId={person.id}
             emailVerified={person.emailVerified}
             sessions={person.sessions}
-            twoFactorEnabled={person.twoFactorEnabled}
             canVerifyEmail={!isSelf}
             canEndSessions={canEndSessions}
-            canResetTwoFactor={isSuperadmin && !isSelf}
             endSessionsBlockedBecause={
               isSelf
                 ? "Sign yourself out from your own menu."
                 : "Only a superadmin can sign out a staff account."
             }
+          />
+
+          <DangerZone
+            userId={person.id}
+            banned={person.banned}
+            holds={person.holds}
+            isSelf={isSelf}
+            twoFactorEnabled={person.twoFactorEnabled}
+            canResetTwoFactor={isSuperadmin && !isSelf}
           />
         </div>
       </div>
