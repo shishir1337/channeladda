@@ -10,6 +10,14 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { type ReactNode, useId, useState, useTransition } from "react";
+import {
+  Card,
+  CardBody,
+  CardHeader,
+  hintClass,
+  inputClass,
+  labelClass,
+} from "@/components/app/kit";
 import { TextField } from "@/components/auth/fields";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -29,7 +37,7 @@ import {
 
 /** One panel, one job, with the job named at the top of it. */
 function Panel({
-  icon: Icon,
+  icon,
   title,
   blurb,
   children,
@@ -40,19 +48,49 @@ function Panel({
   children: ReactNode;
 }) {
   return (
-    <section className="flex flex-col rounded-panel border border-line bg-surface p-5 sm:p-6">
-      <div className="flex items-center gap-3">
-        <span
-          aria-hidden="true"
-          className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-surface-2 text-primary-text"
-        >
-          <Icon className="size-[1.15rem]" />
-        </span>
-        <h2 className="font-display text-lg font-bold text-fg">{title}</h2>
-      </div>
-      <p className="mt-3 text-sm leading-relaxed text-muted">{blurb}</p>
-      {children}
-    </section>
+    <Card className="flex flex-col">
+      <CardHeader icon={icon} title={title} description={blurb} />
+      {/* A column, so the action can sit at the foot of the card and two
+          panels side by side line their buttons up. */}
+      <CardBody className="flex flex-1 flex-col">{children}</CardBody>
+    </Card>
+  );
+}
+
+/**
+ * A note inside a panel: a fact to know before pressing the button. Tinted
+ * only when it is a warning about money that cannot come back.
+ */
+function Note({
+  tone = "neutral",
+  icon: Icon,
+  children,
+  className,
+}: {
+  tone?: "neutral" | "warning";
+  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex items-start gap-2.5 rounded-lg border px-3.5 py-3 text-[0.8125rem] leading-relaxed",
+        tone === "warning"
+          ? "border-primary/30 bg-primary-soft/70 text-fg"
+          : "border-line bg-surface-2/60 text-muted",
+        className,
+      )}
+    >
+      <Icon
+        aria-hidden="true"
+        className={cn(
+          "mt-0.5 size-4 shrink-0",
+          tone === "warning" ? "text-primary-text" : "text-subtle",
+        )}
+      />
+      <div className="min-w-0">{children}</div>
+    </div>
   );
 }
 
@@ -68,10 +106,10 @@ function Notice({ message, bad }: { message: string | null; bad?: boolean }) {
     <p
       role={bad ? "alert" : "status"}
       className={cn(
-        "mt-3 flex items-start gap-2.5 rounded-xl border px-3.5 py-3 text-xs leading-relaxed",
+        "mt-3 flex items-start gap-2.5 rounded-lg border px-3.5 py-2.5 text-[0.8125rem] leading-relaxed text-fg",
         bad
-          ? "border-danger/30 bg-danger-soft text-fg"
-          : "border-verified/30 bg-verified-soft text-fg",
+          ? "border-danger/25 bg-danger-soft/70"
+          : "border-verified/25 bg-verified-soft/70",
       )}
     >
       {bad ? (
@@ -90,10 +128,41 @@ function Notice({ message, bad }: { message: string | null; bad?: boolean }) {
   );
 }
 
-/** Shown on a button while the server is working, so a tap is never silent. */
-function Spinner() {
+/**
+ * Shown on a button while the server is working, so a tap is never silent.
+ *
+ * Both labels share one grid cell and only one is visible, so the button is
+ * as wide as the longer of the two and does not jump when it is pressed.
+ */
+function BusyLabel({
+  pending,
+  idle,
+  busy,
+}: {
+  pending: boolean;
+  idle: ReactNode;
+  busy: ReactNode;
+}) {
   return (
-    <Loader2Icon aria-hidden="true" className="size-4 shrink-0 animate-spin" />
+    <span className="grid">
+      <span
+        className={cn(
+          "col-start-1 row-start-1 inline-flex items-center justify-center gap-1.5",
+          pending && "invisible",
+        )}
+      >
+        {idle}
+      </span>
+      <span
+        className={cn(
+          "col-start-1 row-start-1 inline-flex items-center justify-center gap-1.5",
+          !pending && "invisible",
+        )}
+      >
+        <Loader2Icon aria-hidden="true" className="animate-spin" />
+        {busy}
+      </span>
+    </span>
   );
 }
 
@@ -111,17 +180,20 @@ export function TopUp() {
       title="Add funds"
       blurb="Top up once and pay for deals without raising a new invoice each time. You pay in crypto; your balance is held in US dollars."
     >
-      <fieldset className="mt-5 flex min-w-0 flex-wrap gap-2">
+      <fieldset className="flex min-w-0 flex-wrap gap-2">
         <legend className="sr-only">Common amounts</legend>
         {PRESETS.map((preset) => (
           <Button
             key={preset}
             type="button"
             size="sm"
-            variant={Number(amount) === preset ? "primary" : "secondary"}
+            variant="secondary"
             aria-pressed={Number(amount) === preset}
             disabled={pending}
             onClick={() => setAmount(String(preset))}
+            // Picked reads as a pressed key, not as a second gold button
+            // beside the one that actually takes the money.
+            className="tabular-nums aria-pressed:border-fg/70 aria-pressed:bg-surface-2 aria-pressed:text-fg"
           >
             ${preset.toLocaleString("en-US")}
           </Button>
@@ -158,10 +230,13 @@ export function TopUp() {
             });
           }}
         >
-          {pending ? <Spinner /> : null}
-          {pending ? "Opening the payment page…" : "Add funds"}
+          <BusyLabel
+            pending={pending}
+            idle="Add funds"
+            busy="Opening the payment page…"
+          />
         </Button>
-        <p className="mt-2.5 text-xs leading-relaxed text-subtle">
+        <p className="mt-2 text-xs leading-relaxed text-subtle">
           Nothing is charged until you confirm the payment on the next page.
         </p>
         <Notice message={error} bad />
@@ -194,83 +269,94 @@ export function PayoutAddressForm({
       title="Where your payouts go"
       blurb="Payouts are sent to this address and nowhere else. Check it against your own wallet, character by character, before you save it."
     >
-      {/* Stated before the change, not after it. Somebody who finds out
-          afterwards that their money is frozen for a day has been ambushed by
-          the interface. */}
-      <p className="mt-4 flex items-start gap-2.5 rounded-xl border border-primary/30 bg-primary-soft px-3.5 py-3 text-xs leading-relaxed text-fg">
-        <TriangleAlertIcon
-          aria-hidden="true"
-          className="mt-0.5 size-4 shrink-0 text-primary-text"
-        />
-        <span>
-          Two things to know before you save this.{" "}
-          <strong className="font-semibold">
-            Withdrawals are held for 24 hours after you set or change it
-          </strong>{" "}
-          — that delay is what stops somebody who gets into your account from
-          emptying it.{" "}
-          <strong className="font-semibold">
-            A payout sent to a wrong address is gone
-          </strong>{" "}
-          — not held, not reversible, and not something Channel Adda or anybody
-          else can get back.
-        </span>
-      </p>
+      <div className="max-w-2xl">
+        {/* Stated before the change, not after it. Somebody who finds out
+            afterwards that their money is frozen for a day has been ambushed
+            by the interface. */}
+        <Note tone="warning" icon={TriangleAlertIcon}>
+          <p className="font-medium">
+            Two things to know before you save this.
+          </p>
+          <ul className="mt-1.5 flex list-disc flex-col gap-1 pl-4 marker:text-primary-text">
+            <li>
+              <strong className="font-semibold">
+                Withdrawals are held for 24 hours after you set or change it
+              </strong>{" "}
+              — that delay is what stops somebody who gets into your account
+              from emptying it.
+            </li>
+            <li>
+              <strong className="font-semibold">
+                A payout sent to a wrong address is gone
+              </strong>{" "}
+              — not held, not reversible, and not something Channel Adda or
+              anybody else can get back.
+            </li>
+          </ul>
+        </Note>
 
-      <div className="mt-5 grid gap-4 sm:grid-cols-[1fr_11rem]">
-        <TextField
-          id={ids.address}
-          name="address"
-          label="Wallet address"
-          hint="Paste it. Typing it out by hand is how mistakes happen."
-          value={address}
-          onChange={(e) => setAddress(e.target.value)}
-          required
-        />
-        <div>
-          <label
-            htmlFor={ids.network}
-            className="block text-sm font-medium text-fg"
-          >
-            Network
-          </label>
-          <p className="mt-1 text-xs text-subtle">Must match the address.</p>
-          <select
-            id={ids.network}
-            value={network}
-            onChange={(e) => setNetwork(e.target.value)}
-            className="mt-2 h-12 w-full cursor-pointer rounded-xl border border-line bg-surface-2 px-3 text-base text-fg focus:border-primary/60 focus:outline-none sm:text-[0.9375rem]"
-          >
-            {NETWORKS.map((n) => (
-              <option key={n} value={n}>
-                {n}
-              </option>
-            ))}
-          </select>
+        {/* Bottom-aligned, so the two fields sit on one line even though
+            their hints are different lengths. */}
+        <div className="mt-5 grid gap-4 sm:grid-cols-[1fr_11rem] sm:items-end">
+          <TextField
+            id={ids.address}
+            name="address"
+            label="Wallet address"
+            hint="Paste it. Typing it out by hand is how mistakes happen."
+            value={address}
+            onChange={(e) => setAddress(e.target.value)}
+            // Monospaced, because this is checked character by character.
+            className="min-w-0 [&_input]:font-mono"
+            required
+          />
+          <div>
+            <label htmlFor={ids.network} className={labelClass}>
+              Network
+            </label>
+            <p id={`${ids.network}-hint`} className={hintClass}>
+              Must match the address.
+            </p>
+            <select
+              id={ids.network}
+              value={network}
+              onChange={(e) => setNetwork(e.target.value)}
+              aria-describedby={`${ids.network}-hint`}
+              className={cn(inputClass, "mt-1.5 cursor-pointer")}
+            >
+              {NETWORKS.map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
-      </div>
 
-      <div className="mt-5">
-        <Button
-          type="button"
-          size="md"
-          variant={changed ? "primary" : "secondary"}
-          className="w-full sm:w-auto"
-          disabled={pending || !address.trim()}
-          onClick={() => {
-            setMessage(null);
-            startTransition(async () => {
-              const result = await savePayoutAddress(address, network);
-              setBad(!result.ok);
-              setMessage(result.ok ? result.message : result.error);
-              if (result.ok) router.refresh();
-            });
-          }}
-        >
-          {pending ? <Spinner /> : null}
-          {pending ? "Saving…" : current ? "Update address" : "Save address"}
-        </Button>
-        <Notice message={message} bad={bad} />
+        <div className="mt-5">
+          <Button
+            type="button"
+            size="md"
+            variant={changed ? "primary" : "secondary"}
+            className="w-full sm:w-auto"
+            disabled={pending || !address.trim()}
+            onClick={() => {
+              setMessage(null);
+              startTransition(async () => {
+                const result = await savePayoutAddress(address, network);
+                setBad(!result.ok);
+                setMessage(result.ok ? result.message : result.error);
+                if (result.ok) router.refresh();
+              });
+            }}
+          >
+            <BusyLabel
+              pending={pending}
+              idle={current ? "Update address" : "Save address"}
+              busy="Saving…"
+            />
+          </Button>
+          <Notice message={message} bad={bad} />
+        </div>
       </div>
     </Panel>
   );
@@ -314,35 +400,23 @@ export function RequestPayout({
       blurb="Finance checks every payout, normally within one working day. The amount is held against your balance while they do, so it cannot be spent twice."
     >
       {hasAddress && belowMinimum && minimumUsd > 0 ? (
-        <p className="mt-4 flex items-start gap-2.5 rounded-xl border border-line bg-surface-2 px-3.5 py-3 text-xs leading-relaxed text-muted">
-          <LockIcon
-            aria-hidden="true"
-            className="mt-0.5 size-4 shrink-0 text-subtle"
-          />
-          <span>
-            The smallest payout we can send is {minLabel}, and you have{" "}
-            {maxLabel} available. A crypto transfer pays the network&rsquo;s fee
-            whatever its size, so below that figure it would cost you more to
-            receive the money than the money is worth.
-          </span>
-        </p>
+        <Note icon={LockIcon} className="mb-4">
+          The smallest payout we can send is {minLabel}, and you have {maxLabel}{" "}
+          available. A crypto transfer pays the network&rsquo;s fee whatever its
+          size, so below that figure it would cost you more to receive the money
+          than the money is worth.
+        </Note>
       ) : null}
 
       {!hasAddress ? (
-        <p className="mt-4 flex items-start gap-2.5 rounded-xl border border-line bg-surface-2 px-3.5 py-3 text-xs leading-relaxed text-muted">
-          <LockIcon
-            aria-hidden="true"
-            className="mt-0.5 size-4 shrink-0 text-subtle"
-          />
-          <span>
-            Set a payout address first — the panel below. We have nowhere to
-            send money to until you do, and withdrawals are held for 24 hours
-            after you set it.
-          </span>
-        </p>
+        <Note icon={LockIcon} className="mb-4">
+          Set a payout address first — the panel below. We have nowhere to send
+          money to until you do, and withdrawals are held for 24 hours after you
+          set it.
+        </Note>
       ) : null}
 
-      <div className="mt-5 flex flex-wrap items-end gap-3">
+      <div className="flex flex-wrap items-end gap-3">
         <TextField
           id={id}
           name="amount"
@@ -389,10 +463,13 @@ export function RequestPayout({
             });
           }}
         >
-          {pending ? <Spinner /> : null}
-          {pending ? "Sending the request…" : "Request a payout"}
+          <BusyLabel
+            pending={pending}
+            idle="Request a payout"
+            busy="Sending the request…"
+          />
         </Button>
-        <p className="mt-2.5 text-xs leading-relaxed text-subtle">
+        <p className="mt-2 text-xs leading-relaxed text-subtle">
           The blockchain takes its own network fee out of the amount sent. That
           fee is set by the network, not by Channel Adda.
         </p>

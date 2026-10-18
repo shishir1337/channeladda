@@ -10,10 +10,17 @@ import {
 } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
+import {
+  Dot,
+  EmptyState,
+  IconTile,
+  List,
+  ListItem,
+  PageHeader,
+  Section,
+} from "@/components/app/kit";
 import { MarkAllRead } from "@/components/dashboard/mark-all-read";
-import { PageHead, Section } from "@/components/dashboard/page-parts";
 import { Button } from "@/components/ui/button";
-import { EmptyState } from "@/components/ui/empty-state";
 import type { NotificationKind } from "@/generated/prisma/enums";
 import { cn } from "@/lib/utils";
 import { listNotifications, unreadCount } from "@/server/notifications";
@@ -59,7 +66,7 @@ export default async function NotificationsPage() {
 
   return (
     <>
-      <PageHead
+      <PageHeader
         title="Notifications"
         description={
           unread > 0
@@ -74,7 +81,7 @@ export default async function NotificationsPage() {
           <EmptyState
             icon={BellIcon}
             title="Nothing yet"
-            description="Offers on your listings, messages, and anything a deal needs from you will show up here — and by email, so you do not have to keep checking."
+            body="Offers on your listings, messages, and anything a deal needs from you will show up here — and by email, so you do not have to keep checking."
             action={
               <Button asChild size="md">
                 <Link href="/browse">Browse accounts</Link>
@@ -82,78 +89,59 @@ export default async function NotificationsPage() {
             }
           />
         ) : (
-          <ul className="flex flex-col divide-y divide-line rounded-card border border-line bg-surface">
+          <List>
             {items.map((item) => {
               const Icon = ICONS[item.kind] ?? BellIcon;
               const isUnread = item.readAt === null;
 
-              const inner = (
-                <>
-                  <span
-                    className={cn(
-                      "mt-0.5 inline-flex size-9 shrink-0 items-center justify-center rounded-xl",
-                      isUnread
-                        ? "bg-primary-soft text-primary-text"
-                        : "bg-surface-2 text-subtle",
-                    )}
-                  >
-                    <Icon aria-hidden="true" className="size-4" />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                      <span
-                        className={cn(
-                          "text-sm leading-snug",
-                          isUnread
-                            ? "font-semibold text-fg"
-                            : "font-medium text-muted",
-                        )}
-                      >
-                        {item.title}
-                      </span>
-                      <span className="text-[0.6875rem] tracking-wide text-subtle uppercase">
-                        {KINDS[item.kind] ?? item.kind}
-                      </span>
-                      {isUnread ? (
-                        <span className="text-[0.6875rem] font-semibold text-primary-text">
-                          New
-                        </span>
-                      ) : null}
-                    </span>
-                    <span className="mt-1 block text-sm leading-relaxed text-muted">
-                      {item.body}
-                    </span>
-                    <span className="mt-1.5 block text-xs text-subtle">
-                      {item.createdAt.toLocaleString("en-GB", {
-                        day: "numeric",
-                        month: "short",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </span>
-                  </span>
-                </>
-              );
-
-              const className = cn(
-                "flex gap-3.5 p-4 transition-colors sm:p-5",
-                isUnread ? "bg-primary/[0.03]" : null,
-                item.href ? "hover:bg-surface-2" : null,
-              );
-
               return (
-                <li key={item.id}>
-                  {item.href ? (
-                    <Link href={item.href} className={className}>
-                      {inner}
-                    </Link>
-                  ) : (
-                    <div className={className}>{inner}</div>
-                  )}
-                </li>
+                <ListItem key={item.id} href={item.href ?? undefined}>
+                  <div className="flex items-start gap-3">
+                    <IconTile icon={Icon} />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-3">
+                        <p className="min-w-0 text-sm leading-5">
+                          <span
+                            className={cn(
+                              "text-fg",
+                              isUnread ? "font-medium" : "font-normal",
+                            )}
+                          >
+                            {item.title}
+                          </span>
+                          <span className="ml-2 text-xs whitespace-nowrap text-subtle">
+                            {KINDS[item.kind] ?? item.kind}
+                          </span>
+                          {isUnread ? (
+                            <span className="sr-only"> New</span>
+                          ) : null}
+                        </p>
+                        {/* Unread is a gold dot beside the time — the one
+                            mark on the row that says it still wants you. */}
+                        <span className="flex shrink-0 items-center gap-2 pt-px text-xs leading-5 whitespace-nowrap text-subtle tabular-nums">
+                          <time dateTime={item.createdAt.toISOString()}>
+                            {item.createdAt.toLocaleString("en-GB", {
+                              day: "numeric",
+                              month: "short",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </time>
+                          <Dot
+                            tone="primary"
+                            className={cn(!isUnread && "invisible")}
+                          />
+                        </span>
+                      </div>
+                      <p className="mt-0.5 text-[0.8125rem] leading-relaxed text-muted">
+                        {item.body}
+                      </p>
+                    </div>
+                  </div>
+                </ListItem>
               );
             })}
-          </ul>
+          </List>
         )}
       </Section>
     </>

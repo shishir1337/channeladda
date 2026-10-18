@@ -1,7 +1,7 @@
 import {
   ArrowUpRightIcon,
   BanknoteIcon,
-  CheckCircle2Icon,
+  CircleCheckIcon,
   CoinsIcon,
   InfoIcon,
   LockIcon,
@@ -15,7 +15,15 @@ import {
 import type { Metadata } from "next";
 import Link from "next/link";
 import type { ComponentType, SVGProps } from "react";
-import { PageHead, Section } from "@/components/dashboard/page-parts";
+import {
+  Card,
+  EmptyState,
+  IconTile,
+  List,
+  ListItem,
+  PageHeader,
+  Section,
+} from "@/components/app/kit";
 import {
   PayoutAddressForm,
   RequestPayout,
@@ -23,6 +31,7 @@ import {
 } from "@/components/dashboard/wallet-panels";
 import { Badge } from "@/components/ui/badge";
 import { Price } from "@/components/ui/price";
+import { cn } from "@/lib/utils";
 import { requireUser } from "@/server/session";
 import { getSettings } from "@/server/settings";
 import { getWallet } from "@/server/wallet";
@@ -98,6 +107,13 @@ function longDate(date: Date) {
   });
 }
 
+/** The two headline figures share one size: neither is the small print. */
+const FIGURE =
+  "mt-2 text-[2rem] leading-10 font-semibold tracking-[-0.025em] text-fg tabular-nums sm:text-[2.5rem] sm:leading-[3rem]";
+
+const FIGURE_LABEL =
+  "flex items-center gap-2 text-[0.8125rem] leading-5 font-medium text-muted";
+
 /**
  * The wallet.
  *
@@ -125,111 +141,117 @@ export default async function WalletPage({
 
   return (
     <>
-      <PageHead
+      <PageHeader
         title="Wallet"
-        description="Your money on Channel Adda: what is here, what is spendable right now, and what every movement was for."
+        description="What is here, what is spendable right now, and what every movement was for."
       />
 
+      {/* The success Callout's look, built from spans: an <output> may only
+          hold phrasing content, and the kit's Callout is made of divs. */}
       {justPaid ? (
-        <output className="mb-5 flex items-start gap-3 rounded-card border border-verified/40 bg-verified/5 p-4 text-sm leading-relaxed">
-          <CheckCircle2Icon
+        <output className="mb-6 flex items-start gap-3 rounded-card border border-verified/20 bg-verified-soft/80 px-4 py-3.5">
+          <CircleCheckIcon
             aria-hidden="true"
-            className="mt-0.5 size-5 shrink-0 text-verified"
+            className="mt-0.5 size-4 shrink-0 text-verified"
           />
-          <span>
-            <strong className="font-semibold text-fg">
+          <span className="min-w-0 text-[0.8125rem] leading-relaxed text-muted">
+            <strong className="block text-sm leading-5 font-medium text-fg">
               Payment received by the processor.
-            </strong>{" "}
-            It reaches your balance as soon as the network confirms it — usually
-            a minute or two. Refresh this page if it is not here yet.
+            </strong>
+            <span className="mt-0.5 block">
+              It reaches your balance as soon as the network confirms it —
+              usually a minute or two. Refresh this page if it is not here yet.
+            </span>
           </span>
         </output>
       ) : null}
 
       {/* ---- the figures ------------------------------------------------- */}
       <Section>
-        <div className="overflow-hidden rounded-panel border border-line bg-surface shadow-soft">
-          <dl className="grid gap-6 border-b border-line p-5 sm:grid-cols-2 sm:p-6">
-            <div>
-              <dt className="flex items-center gap-2 font-mono text-[0.625rem] font-semibold tracking-[0.12em] text-subtle uppercase">
-                <WalletIcon aria-hidden="true" className="size-3.5" />
+        <Card>
+          <dl className="grid sm:grid-cols-2">
+            <div className="p-4 sm:p-6">
+              <dt className={FIGURE_LABEL}>
+                <WalletIcon
+                  aria-hidden="true"
+                  className="size-3.5 shrink-0 text-subtle"
+                />
                 Your balance
               </dt>
-              <dd className="mt-2.5 font-display text-[2rem] leading-none font-black text-fg sm:text-[2.5rem]">
+              <dd className={FIGURE}>
                 <Price usd={wallet.balanceUsd / 100} />
               </dd>
-              <dd className="mt-2.5 text-xs leading-relaxed text-subtle">
+              <dd className="mt-1.5 text-xs leading-relaxed text-subtle">
                 Everything credited to you, less everything already paid out.
               </dd>
             </div>
 
-            <div className="sm:border-l sm:border-line sm:pl-6">
-              <dt className="flex items-center gap-2 font-mono text-[0.625rem] font-semibold tracking-[0.12em] text-subtle uppercase">
-                <CoinsIcon aria-hidden="true" className="size-3.5" />
+            <div className="border-t border-line p-4 sm:border-t-0 sm:border-l sm:p-6">
+              <dt className={FIGURE_LABEL}>
+                <CoinsIcon
+                  aria-hidden="true"
+                  className="size-3.5 shrink-0 text-subtle"
+                />
                 Available to use now
               </dt>
-              <dd
-                className={`mt-2.5 font-display text-[2rem] leading-none font-black sm:text-[2.5rem] ${
-                  held ? "text-primary-text" : "text-fg"
-                }`}
-              >
+              <dd className={FIGURE}>
                 <Price usd={wallet.availableUsd / 100} />
               </dd>
               {held ? (
-                <dd className="mt-2.5 flex items-start gap-2 rounded-xl border border-primary/30 bg-primary-soft px-3 py-2.5 text-xs leading-relaxed text-fg">
+                <dd className="mt-1.5 flex items-start gap-1.5 text-xs leading-relaxed text-muted">
                   <TimerIcon
                     aria-hidden="true"
-                    className="mt-0.5 size-3.5 shrink-0 text-primary-text"
+                    className="mt-px size-3.5 shrink-0 text-primary-text"
                   />
                   <span>
                     <Price
                       usd={wallet.pendingWithdrawalUsd / 100}
-                      className="font-semibold"
+                      className="font-semibold text-fg"
                     />{" "}
                     is held while finance checks the payout you asked for. It is
                     still your money — it just cannot be spent twice.
                   </span>
                 </dd>
               ) : (
-                <dd className="mt-2.5 text-xs leading-relaxed text-subtle">
+                <dd className="mt-1.5 text-xs leading-relaxed text-subtle">
                   All of it. Nothing is being held against a payout.
                 </dd>
               )}
             </div>
           </dl>
 
-          <div className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+          <div className="flex flex-col gap-2 rounded-b-[inherit] border-t border-line bg-surface-2/50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:px-6">
             <div className="min-w-0">
-              <p className="font-mono text-[0.625rem] font-semibold tracking-[0.12em] text-subtle uppercase">
+              <p className="text-xs leading-5 font-medium text-muted">
                 Payouts go to
               </p>
               {wallet.payoutAddress ? (
-                <p className="mt-1.5 flex flex-wrap items-center gap-2">
-                  <span className="font-mono text-xs break-all text-fg">
+                <p className="mt-0.5 flex min-w-0 flex-wrap items-center gap-2">
+                  <span className="min-w-0 font-mono text-xs break-all text-fg">
                     {wallet.payoutAddress.address}
                   </span>
-                  <Badge variant="neutral">
+                  <Badge size="sm" variant="neutral">
                     {wallet.payoutAddress.network}
                   </Badge>
                 </p>
               ) : (
-                <p className="mt-1.5 text-sm text-muted">
+                <p className="mt-0.5 text-[0.8125rem] text-fg">
                   No address yet. Add one below before you withdraw.
                 </p>
               )}
             </div>
-            <p className="shrink-0 text-xs leading-relaxed text-subtle sm:max-w-[16rem] sm:text-right">
+            <p className="shrink-0 text-xs leading-relaxed text-subtle sm:max-w-[17rem] sm:text-right">
               {wallet.payoutAddress
                 ? "Changing this address holds withdrawals for 24 hours."
                 : "Setting an address holds withdrawals for the first 24 hours."}
             </p>
           </div>
-        </div>
+        </Card>
 
-        <p className="mt-3 flex items-start gap-2.5 rounded-card border border-line bg-surface-2 px-4 py-3.5 text-xs leading-relaxed text-muted">
+        <p className="mt-3 flex items-start gap-2 text-xs leading-relaxed text-muted">
           <InfoIcon
             aria-hidden="true"
-            className="mt-0.5 size-4 shrink-0 text-primary-text"
+            className="mt-px size-3.5 shrink-0 text-subtle"
           />
           <span>
             Only <strong className="font-semibold text-fg">Fastest</strong>{" "}
@@ -239,7 +261,7 @@ export default async function WalletPage({
             buyer pays you directly, so nothing for that sale ever appears here.{" "}
             <Link
               href="/fees"
-              className="font-medium text-primary-text underline-offset-4 hover:underline"
+              className="font-medium text-fg underline decoration-line-strong underline-offset-4 transition-colors duration-150 hover:decoration-fg"
             >
               How the two modes differ
             </Link>
@@ -258,95 +280,82 @@ export default async function WalletPage({
             minimumUsd={settings.minWithdrawalUsd}
           />
         </div>
-      </Section>
-
-      <Section>
-        <PayoutAddressForm current={wallet.payoutAddress} />
+        <div className="mt-4">
+          <PayoutAddressForm current={wallet.payoutAddress} />
+        </div>
       </Section>
 
       {/* ---- history ----------------------------------------------------- */}
       <Section
+        id="history"
         title="History"
         description="Every movement in and out of your balance, newest first."
       >
         {wallet.entries.length === 0 ? (
-          <div className="flex flex-col items-center rounded-panel border border-dashed border-line-strong bg-surface px-6 py-12 text-center">
-            <span
-              aria-hidden="true"
-              className="flex size-12 items-center justify-center rounded-2xl bg-surface-2 text-subtle"
-            >
-              <CoinsIcon className="size-5" />
-            </span>
-            <h3 className="mt-4 font-display text-base font-bold text-fg">
-              Nothing has moved yet
-            </h3>
-            <p className="mx-auto mt-2 max-w-[46ch] text-sm leading-relaxed text-muted">
-              When you add funds, complete a Fastest sale or take money out,
-              each movement is listed here with what it was for.
-            </p>
-          </div>
+          <EmptyState
+            icon={CoinsIcon}
+            title="Nothing has moved yet"
+            body="When you add funds, complete a Fastest sale or take money out, each movement is listed here with what it was for."
+          />
         ) : (
-          <ul className="overflow-hidden rounded-panel border border-line bg-surface">
+          <List>
             {wallet.entries.map((entry) => {
               const kind = KINDS[entry.kind];
               const out = entry.amountUsd < 0;
               const EntryIcon = kind?.icon ?? CoinsIcon;
 
               return (
-                <li
-                  key={entry.id}
-                  className="flex items-start gap-3.5 border-t border-line p-4 first:border-t-0 sm:px-5"
-                >
-                  <span
-                    aria-hidden="true"
-                    className={`flex size-9 shrink-0 items-center justify-center rounded-xl ${
-                      out
-                        ? "bg-surface-2 text-subtle"
-                        : "bg-verified-soft text-verified"
-                    }`}
-                  >
-                    <EntryIcon className="size-[1.1rem]" />
-                  </span>
+                <ListItem key={entry.id}>
+                  <div className="flex items-start gap-3">
+                    <IconTile icon={EntryIcon} />
 
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-fg">
-                      {kind?.title ?? entry.kind}
-                    </p>
-                    <p className="mt-0.5 text-xs leading-relaxed text-muted">
-                      {kind?.meaning ??
-                        "Ask support if this entry is not clear."}
-                    </p>
-                    <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-subtle">
-                      <span>{longDate(entry.createdAt)}</span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm leading-5 font-medium text-fg">
+                        {kind?.title ?? entry.kind}
+                      </p>
+                      <p className="mt-0.5 text-[0.8125rem] leading-relaxed text-muted">
+                        {kind?.meaning ??
+                          "Ask support if this entry is not clear."}
+                      </p>
                       {entry.note ? (
-                        <>
-                          <span aria-hidden="true">&middot;</span>
-                          <span className="min-w-0 font-mono text-[0.6875rem] break-all">
-                            {entry.note}
-                          </span>
-                        </>
+                        <p className="mt-1 text-xs leading-relaxed break-words text-subtle">
+                          {entry.note}
+                        </p>
                       ) : null}
-                    </p>
-                  </div>
+                    </div>
 
-                  <p
-                    className={`tnum shrink-0 text-right text-sm font-bold ${
-                      out ? "text-muted" : "text-verified"
-                    }`}
-                  >
-                    <span className="sr-only">
-                      {out ? "Out of your balance: " : "Into your balance: "}
-                    </span>
-                    <span aria-hidden="true">{out ? "−" : "+"}</span>
-                    <Price
-                      usd={Math.abs(entry.amountUsd) / 100}
-                      className="inline"
-                    />
-                  </p>
-                </li>
+                    {/* Signed, with the sign spoken: a credit is green, a
+                        debit stays neutral, because money leaving for a
+                        reason you chose is not an alarm. */}
+                    <div className="shrink-0 text-right">
+                      <p
+                        className={cn(
+                          "text-sm leading-5 font-semibold tabular-nums",
+                          out ? "text-fg" : "text-verified",
+                        )}
+                      >
+                        <span className="sr-only">
+                          {out
+                            ? "Out of your balance: "
+                            : "Into your balance: "}
+                        </span>
+                        <span aria-hidden="true">{out ? "−" : "+"}</span>
+                        <Price
+                          usd={Math.abs(entry.amountUsd) / 100}
+                          className="inline"
+                        />
+                      </p>
+                      <p className="mt-0.5 text-xs leading-5 whitespace-nowrap text-subtle">
+                        <time dateTime={entry.createdAt.toISOString()}>
+                          {longDate(entry.createdAt)}
+                        </time>
+                      </p>
+                    </div>
+                  </div>
+                </ListItem>
               );
             })}
-          </ul>
+          </List>
         )}
       </Section>
     </>

@@ -1,10 +1,9 @@
 import {
-  ArrowRightIcon,
-  CheckCircle2Icon,
-  ClockIcon,
+  ArrowUpRightIcon,
   CompassIcon,
   FingerprintIcon,
   HandshakeIcon,
+  InfoIcon,
   MailWarningIcon,
   PlusIcon,
   StoreIcon,
@@ -15,8 +14,26 @@ import {
 import type { Metadata } from "next";
 import Link from "next/link";
 import type { ComponentType, ReactNode, SVGProps } from "react";
+import {
+  AllClear,
+  Callout,
+  Card,
+  CardHeader,
+  Dot,
+  EmptyState,
+  IconTile,
+  List,
+  ListItem,
+  ListRow,
+  PageHeader,
+  Section,
+  SeeAll,
+  Sep,
+  Stat,
+  StatGrid,
+  type Tone,
+} from "@/components/app/kit";
 import { statusMeta } from "@/components/dashboard/listing-status";
-import { PageHead, Section } from "@/components/dashboard/page-parts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Price } from "@/components/ui/price";
@@ -255,10 +272,16 @@ export default async function DashboardPage() {
   const neverBought = made.length === 0 && buying.bought === 0;
   const brandNew = neverSold && neverBought && tasks.length === 0;
 
-  const listButton = (
-    <Button asChild size="md">
+  // One gold button per screen, on whatever is actually next. An unconfirmed
+  // email outranks everything (nothing can be bought or sold until it is
+  // done), then the first-visit card, then anything waiting in the list —
+  // and only when none of those is on the page is listing the next move.
+  const listIsNext = user.emailVerified && tasks.length === 0 && !brandNew;
+
+  const listButton = (variant: "primary" | "secondary") => (
+    <Button asChild size="md" variant={variant}>
       <Link href="/dashboard/listings/new">
-        <PlusIcon aria-hidden="true" className="size-4" />
+        <PlusIcon aria-hidden="true" />
         List an account
       </Link>
     </Button>
@@ -266,7 +289,7 @@ export default async function DashboardPage() {
 
   return (
     <>
-      <PageHead
+      <PageHeader
         title={`Hello, ${firstNameOf(user.name)}`}
         description={
           tasks.length > 0
@@ -275,130 +298,88 @@ export default async function DashboardPage() {
               ? `${selling.live} listing${selling.live === 1 ? "" : "s"} live, ${selling.watching.toLocaleString("en-US")} ${selling.watching === 1 ? "person" : "people"} watching.`
               : "Nothing needs you. Here is where everything stands."
         }
-        actions={listButton}
+        actions={listButton(listIsNext ? "primary" : "secondary")}
       />
 
       {!user.emailVerified ? (
         <Section>
-          <div className="flex flex-col gap-4 rounded-panel border border-primary/35 bg-primary-soft p-4 sm:flex-row sm:items-center sm:p-5">
-            <MailWarningIcon
-              aria-hidden="true"
-              className="size-6 shrink-0 text-primary-text"
-            />
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-fg">
-                Confirm your email address
-              </p>
-              <p className="mt-1 text-sm leading-relaxed text-muted">
-                You can look around without it, but buying and selling stay
-                locked until the address is confirmed.
-              </p>
-            </div>
-            <Button asChild size="sm" className="shrink-0">
-              <Link href="/verify-email">Confirm email</Link>
-            </Button>
-          </div>
+          <Callout
+            tone="warning"
+            icon={MailWarningIcon}
+            title="Confirm your email address"
+            action={
+              <Button asChild size="sm">
+                <Link href="/verify-email">Confirm email</Link>
+              </Button>
+            }
+          >
+            You can look around without it, but buying and selling stay locked
+            until the address is confirmed.
+          </Callout>
         </Section>
       ) : null}
 
       {/* ---- whose turn it is -------------------------------------------- */}
       {tasks.length === 0 ? (
         <Section>
-          <div className="flex flex-col gap-4 rounded-panel border border-verified/30 bg-verified-soft p-5 sm:flex-row sm:items-center sm:p-6">
-            <CheckCircle2Icon
-              aria-hidden="true"
-              className="size-7 shrink-0 text-verified"
-            />
-            <div className="min-w-0 flex-1">
-              <h2 className="font-display text-base font-bold text-fg">
-                You are all caught up
-              </h2>
-              <p className="mt-1 text-sm leading-relaxed text-muted">
-                Nothing is waiting on you right now. The moment something is, it
-                appears here and in the menu.
-              </p>
-            </div>
-          </div>
+          <AllClear
+            title="You are all caught up"
+            body="Nothing is waiting on you right now. The moment something is, it appears here and in the menu."
+          />
         </Section>
       ) : (
-        <Section>
-          <div className="overflow-hidden rounded-panel border border-primary/40 bg-surface shadow-soft">
-            <div className="flex items-center gap-3 border-b border-primary/25 bg-primary-soft px-4 py-3.5 sm:px-5">
-              <span
-                aria-hidden="true"
-                className="size-2 shrink-0 animate-pulse-dot rounded-full bg-primary"
-              />
-              <h2 className="font-display text-base font-bold text-fg">
-                Waiting on you
-              </h2>
-              <span className="tnum ml-auto shrink-0 rounded-full border border-primary/30 bg-surface px-2.5 py-1 text-xs font-bold text-primary-text">
-                {tasks.length}
-                <span className="sr-only"> things</span>
-              </span>
-            </div>
-
-            <ul>
-              {tasks.slice(0, 5).map((task) => (
-                <li
-                  key={task.id}
-                  className="border-t border-line first:border-t-0"
-                >
-                  <Link
-                    href={task.href}
-                    className="flex items-start gap-3.5 p-4 transition-colors hover:bg-surface-2 sm:px-5"
-                  >
-                    <span
-                      aria-hidden="true"
-                      className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary-soft text-primary-text"
-                    >
-                      <task.icon className="size-[1.1rem]" />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-sm font-semibold text-fg sm:text-[0.9375rem]">
-                        {task.what}
+        <Section
+          id="waiting-on-you"
+          title="Waiting on you"
+          count={tasks.length}
+          tone="primary"
+        >
+          <List>
+            {tasks.slice(0, 5).map((task) => (
+              <ListItem key={task.id} href={task.href}>
+                <ListRow
+                  leading={<IconTile icon={task.icon} />}
+                  // The title wraps rather than truncating: it carries the
+                  // amount, and an offer cut off before its price is no use.
+                  title={<span className="whitespace-normal">{task.what}</span>}
+                  meta={
+                    <>
+                      <span className="min-w-0 truncate">{task.detail}</span>
+                      <Sep />
+                      <span className="shrink-0 tabular-nums">
+                        {howLong(task.since, now)}
                       </span>
-                      <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-subtle">
-                        <span className="min-w-0 truncate">{task.detail}</span>
-                        <span aria-hidden="true">&middot;</span>
-                        <span className="inline-flex shrink-0 items-center gap-1">
-                          <ClockIcon aria-hidden="true" className="size-3" />
-                          {howLong(task.since, now)}
-                        </span>
-                      </span>
-                    </span>
-                    <span className="hidden shrink-0 items-center gap-1.5 self-center text-xs font-semibold text-primary-text sm:inline-flex">
+                    </>
+                  }
+                  trailing={
+                    <span className="hidden text-[0.8125rem] font-medium text-muted transition-colors duration-150 group-hover:text-fg sm:inline">
                       {task.cta}
-                      <ArrowRightIcon aria-hidden="true" className="size-3.5" />
                     </span>
-                    <ArrowRightIcon
-                      aria-hidden="true"
-                      className="mt-2 size-4 shrink-0 text-subtle sm:hidden"
-                    />
-                  </Link>
-                </li>
-              ))}
-            </ul>
-
+                  }
+                  chevron
+                />
+              </ListItem>
+            ))}
             {tasks.length > 5 ? (
-              <p className="border-t border-line bg-surface-2 px-4 py-3 text-xs text-muted sm:px-5">
+              <ListItem className="bg-surface-2/50 py-2.5 text-[0.8125rem] text-muted">
                 And {tasks.length - 5} more, over in{" "}
                 <Link
                   href="/dashboard/offers"
-                  className="font-medium text-primary-text underline-offset-4 hover:underline"
+                  className="font-medium text-fg underline decoration-line-strong underline-offset-4 transition-colors duration-150 hover:decoration-fg"
                 >
                   Offers
                 </Link>{" "}
                 and{" "}
                 <Link
                   href="/dashboard/listings"
-                  className="font-medium text-primary-text underline-offset-4 hover:underline"
+                  className="font-medium text-fg underline decoration-line-strong underline-offset-4 transition-colors duration-150 hover:decoration-fg"
                 >
                   Your listings
                 </Link>
                 .
-              </p>
+              </ListItem>
             ) : null}
-          </div>
+          </List>
         </Section>
       )}
 
@@ -407,8 +388,10 @@ export default async function DashboardPage() {
         title="Your money"
         description="Lifetime totals. Your spendable balance lives in the wallet."
       >
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <MoneyCard
+        {/* One per row on a phone: these are lifetime money figures, and in
+            a wide currency a large one does not fit a half-width card. */}
+        <StatGrid columns={3} className="grid-cols-1 sm:grid-cols-2">
+          <Stat
             label="Earned from sales"
             value={<Price usd={selling.earned} />}
             note={
@@ -418,7 +401,7 @@ export default async function DashboardPage() {
             }
             tone={selling.earned > 0 ? "verified" : "neutral"}
           />
-          <MoneyCard
+          <Stat
             label="Spent on purchases"
             value={<Price usd={buying.spent} />}
             note={
@@ -427,59 +410,42 @@ export default async function DashboardPage() {
                 : "Nothing bought yet."
             }
           />
-          <Link
-            href="/dashboard/wallet"
-            className="group flex items-center gap-4 rounded-panel border border-line bg-surface p-4 transition-colors hover:border-line-strong hover:bg-surface-2 sm:p-5"
-          >
-            <span
-              aria-hidden="true"
-              className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-surface-2 text-primary-text group-hover:bg-surface-3"
-            >
-              <WalletIcon className="size-5" />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-sm font-semibold text-fg">
-                Open your wallet
-              </span>
-              <span className="mt-1 block text-xs leading-relaxed text-subtle">
-                Balance, adding funds, withdrawing, and every movement
-                explained.
-              </span>
-            </span>
-            <ArrowRightIcon
-              aria-hidden="true"
-              className="size-4 shrink-0 text-subtle"
-            />
-          </Link>
-        </div>
-        <p className="mt-3 text-xs leading-relaxed text-subtle">
-          On a Safest deal the buyer pays you directly, so that money is counted
-          above but never passes through Channel Adda. Only Fastest sales reach
-          your balance.
+          <WalletDoor />
+        </StatGrid>
+        <p className="mt-3 flex items-start gap-2 text-xs leading-relaxed text-subtle">
+          <InfoIcon aria-hidden="true" className="mt-px size-3.5 shrink-0" />
+          <span>
+            On a Safest deal the buyer pays you directly, so that money is
+            counted above but never passes through Channel Adda. Only Fastest
+            sales reach your balance.
+          </span>
         </p>
       </Section>
 
       {/* ---- the two sides of the desk ----------------------------------- */}
       <Section>
         <div className="grid gap-4 lg:grid-cols-2">
-          <SidePanel
-            icon={StoreIcon}
-            title="Selling"
-            href="/dashboard/listings"
-            hrefLabel="All listings"
-          >
+          <Card>
+            <CardHeader
+              icon={StoreIcon}
+              title="Selling"
+              actions={<SeeAll href="/dashboard/listings">All listings</SeeAll>}
+            />
             {neverSold ? (
-              <InlineEmpty
+              <EmptyState
+                bare
                 icon={StoreIcon}
-                body="You have not listed an account yet. It is free to list, and nothing goes in front of buyers until we have checked it."
+                title="No listings yet"
+                body="It is free to list, and nothing goes in front of buyers until we have checked it."
                 action={
                   <Button asChild size="sm" variant="secondary">
                     <Link href="/dashboard/listings/new">List an account</Link>
                   </Button>
                 }
+                className="py-8"
               />
             ) : (
-              <StatRows
+              <Figures
                 rows={[
                   {
                     label: "Live for buyers to see",
@@ -504,26 +470,29 @@ export default async function DashboardPage() {
                 ]}
               />
             )}
-          </SidePanel>
+          </Card>
 
-          <SidePanel
-            icon={HandshakeIcon}
-            title="Buying"
-            href="/dashboard/offers"
-            hrefLabel="All offers"
-          >
+          <Card>
+            <CardHeader
+              icon={HandshakeIcon}
+              title="Buying"
+              actions={<SeeAll href="/dashboard/offers">All offers</SeeAll>}
+            />
             {neverBought ? (
-              <InlineEmpty
+              <EmptyState
+                bare
                 icon={CompassIcon}
-                body="You have not made an offer yet. Offers cost nothing, and the seller has two days to answer."
+                title="No offers yet"
+                body="Offers cost nothing, and the seller has two days to answer."
                 action={
                   <Button asChild size="sm" variant="secondary">
                     <Link href="/browse">Browse accounts</Link>
                   </Button>
                 }
+                className="py-8"
               />
             ) : (
-              <StatRows
+              <Figures
                 rows={[
                   {
                     label: "Offers still open",
@@ -544,7 +513,7 @@ export default async function DashboardPage() {
                 ]}
               />
             )}
-          </SidePanel>
+          </Card>
         </div>
       </Section>
 
@@ -555,48 +524,42 @@ export default async function DashboardPage() {
       {brandNew ? null : (
         <Section title="Recent activity">
           {events.length === 0 ? (
-            <InlineEmpty
+            <EmptyState
               icon={TimerIcon}
-              body="Nothing recent. Offers, reviews and transfers all appear here as they happen."
+              title="Nothing recent"
+              body="Offers, reviews and transfers all appear here as they happen."
               action={
                 <Button asChild size="sm" variant="secondary">
                   <Link href="/browse">Browse accounts</Link>
                 </Button>
               }
-              boxed
             />
           ) : (
-            <ul className="overflow-hidden rounded-panel border border-line bg-surface">
+            <List>
               {events.map((event) => (
-                <li
-                  key={event.id}
-                  className="border-t border-line first:border-t-0"
-                >
-                  <Link
-                    href={event.href}
-                    className="flex items-start gap-3.5 p-4 transition-colors hover:bg-surface-2 sm:px-5"
-                  >
-                    <span
-                      aria-hidden="true"
-                      className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-surface-2 text-subtle"
-                    >
-                      <event.icon className="size-4" />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-sm text-fg">
-                        {event.what}
-                      </span>
-                      <span className="mt-0.5 block truncate text-xs text-subtle">
-                        {event.detail} &middot; {ago(event.at, now)}
-                      </span>
-                    </span>
-                    {event.outcome ? (
-                      <Badge className="mt-0.5 shrink-0">{event.outcome}</Badge>
-                    ) : null}
-                  </Link>
-                </li>
+                <ListItem key={event.id} href={event.href}>
+                  <ListRow
+                    leading={<IconTile icon={event.icon} />}
+                    title={
+                      <span className="whitespace-normal">{event.what}</span>
+                    }
+                    meta={
+                      <>
+                        <span className="min-w-0 truncate">{event.detail}</span>
+                        <Sep />
+                        <span className="shrink-0">{ago(event.at, now)}</span>
+                      </>
+                    }
+                    trailing={
+                      event.outcome ? (
+                        <Badge size="sm">{event.outcome}</Badge>
+                      ) : null
+                    }
+                    chevron
+                  />
+                </ListItem>
               ))}
-            </ul>
+            </List>
           )}
         </Section>
       )}
@@ -604,28 +567,20 @@ export default async function DashboardPage() {
       {/* ---- the very first visit ---------------------------------------- */}
       {brandNew ? (
         <Section>
-          <div className="rounded-panel border border-line bg-surface p-6 text-center sm:p-8">
-            <span
-              aria-hidden="true"
-              className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-primary-soft text-primary-text"
-            >
-              <CompassIcon className="size-6" />
-            </span>
-            <h2 className="mt-5 font-display text-lg font-bold text-fg sm:text-xl">
-              Two ways to start
-            </h2>
-            <p className="mx-auto mt-2.5 max-w-[52ch] text-sm leading-relaxed text-muted">
-              List an account you own, or make an offer on one you want. An
-              agent from Channel Adda sits in the middle of every deal, so
-              neither side has to trust a stranger.
-            </p>
-            <div className="mt-6 flex flex-wrap justify-center gap-3">
-              {listButton}
-              <Button asChild variant="secondary" size="md">
-                <Link href="/browse">Browse accounts</Link>
-              </Button>
-            </div>
-          </div>
+          <EmptyState
+            icon={CompassIcon}
+            title="Two ways to start"
+            body="List an account you own, or make an offer on one you want. An agent from Channel Adda sits in the middle of every deal, so neither side has to trust a stranger."
+            action={
+              <>
+                {listButton(user.emailVerified ? "primary" : "secondary")}
+                <Button asChild variant="secondary" size="md">
+                  <Link href="/browse">Browse accounts</Link>
+                </Button>
+              </>
+            }
+            className="py-14"
+          />
         </Section>
       ) : null}
     </>
@@ -636,141 +591,84 @@ export default async function DashboardPage() {
  * Pieces of this page only
  * ------------------------------------------------------------------ */
 
-function MoneyCard({
-  label,
-  value,
-  note,
-  tone = "neutral",
-}: {
-  label: string;
-  value: ReactNode;
-  note: string;
-  tone?: "neutral" | "verified";
-}) {
+/**
+ * The wallet, as a door rather than a figure.
+ *
+ * The balance is not loaded on this page, so this card does not pretend to
+ * show one; it matches the stats beside it so the row reads as one band, and
+ * where the stats sit two-up it takes the whole row instead of sitting alone
+ * at half width.
+ */
+function WalletDoor() {
   return (
-    <div className="rounded-panel border border-line bg-surface p-4 sm:p-5">
-      <p className="font-mono text-[0.625rem] font-semibold tracking-[0.12em] text-subtle uppercase">
-        {label}
-      </p>
-      <p
-        className={cn(
-          "mt-2 font-display text-[1.75rem] leading-none font-black",
-          tone === "verified" ? "text-verified" : "text-fg",
-        )}
-      >
-        {value}
-      </p>
-      <p className="mt-2 text-xs leading-relaxed text-subtle">{note}</p>
-    </div>
+    <Link
+      href="/dashboard/wallet"
+      className="group flex min-w-0 flex-col rounded-card border border-line bg-surface p-4 shadow-xs transition-[border-color,background-color] duration-150 hover:border-line-strong hover:bg-surface-2/40 sm:col-span-2 lg:col-span-1"
+    >
+      <span className="flex items-center gap-2 text-[0.8125rem] leading-5 font-medium text-muted">
+        <WalletIcon
+          aria-hidden="true"
+          className="size-3.5 shrink-0 text-subtle"
+        />
+        Wallet
+        <ArrowUpRightIcon
+          aria-hidden="true"
+          className="ml-auto size-3.5 shrink-0 text-subtle opacity-60 transition duration-150 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-fg group-hover:opacity-100"
+        />
+      </span>
+      <span className="mt-2 text-[0.9375rem] leading-6 font-semibold text-fg">
+        Open your wallet
+      </span>
+      <span className="mt-1 text-xs leading-snug text-subtle">
+        Balance, adding funds, withdrawing, and every movement explained.
+      </span>
+    </Link>
   );
 }
 
-function SidePanel({
-  icon: Icon,
-  title,
-  href,
-  hrefLabel,
-  children,
-}: {
-  icon: Icon;
-  title: string;
-  href: string;
-  hrefLabel: string;
-  children: ReactNode;
-}) {
-  return (
-    <section className="flex flex-col overflow-hidden rounded-panel border border-line bg-surface">
-      <div className="flex items-center gap-2.5 border-b border-line px-4 py-3.5 sm:px-5">
-        <Icon aria-hidden="true" className="size-4 shrink-0 text-subtle" />
-        <h2 className="font-display text-base font-bold text-fg">{title}</h2>
-        <Link
-          href={href}
-          className="ml-auto inline-flex shrink-0 items-center gap-1 text-xs font-medium text-primary-text underline-offset-4 hover:underline"
-        >
-          {hrefLabel}
-          <ArrowRightIcon aria-hidden="true" className="size-3.5" />
-        </Link>
-      </div>
-      <div className="flex-1">{children}</div>
-    </section>
-  );
-}
-
-function StatRows({
+/**
+ * A side's figures as plain label-and-number rows. A zero is greyed so the
+ * rows that hold something stand out without colouring every number; the
+ * dot says what kind of something it is.
+ */
+function Figures({
   rows,
 }: {
   rows: {
     label: string;
     value: number;
     note?: string;
-    tone?: "neutral" | "verified" | "info";
+    tone?: Tone;
   }[];
 }) {
   return (
-    <dl>
+    <dl className="divide-y divide-line">
       {rows.map((row) => (
         <div
           key={row.label}
-          className="flex items-center gap-4 border-t border-line px-4 py-3.5 first:border-t-0 sm:px-5"
+          className="flex items-center gap-4 px-4 py-3 sm:px-5"
         >
-          <div className="min-w-0 flex-1">
-            <dt className="text-sm font-medium text-fg">{row.label}</dt>
+          <dt className="min-w-0 flex-1">
+            <span className="block text-sm leading-5 text-fg">{row.label}</span>
             {row.note ? (
-              <dd className="mt-0.5 truncate text-xs text-subtle">
+              <span className="mt-0.5 block truncate text-[0.8125rem] leading-5 text-muted">
                 {row.note}
-              </dd>
+              </span>
             ) : null}
-          </div>
+          </dt>
           <dd
             className={cn(
-              "tnum shrink-0 font-display text-xl font-black",
+              "flex shrink-0 items-center gap-2 text-[0.9375rem] tabular-nums",
               row.value === 0
-                ? "text-subtle"
-                : row.tone === "verified"
-                  ? "text-verified"
-                  : row.tone === "info"
-                    ? "text-info"
-                    : "text-fg",
+                ? "font-medium text-subtle"
+                : "font-semibold text-fg",
             )}
           >
+            {row.tone && row.value > 0 ? <Dot tone={row.tone} /> : null}
             {row.value.toLocaleString("en-US")}
           </dd>
         </div>
       ))}
     </dl>
-  );
-}
-
-/** An empty list inside a panel: an icon, a sentence, and the next move. */
-function InlineEmpty({
-  icon: Icon,
-  body,
-  action,
-  boxed,
-}: {
-  icon: Icon;
-  body: string;
-  action: ReactNode;
-  boxed?: boolean;
-}) {
-  return (
-    <div
-      className={cn(
-        "flex flex-col items-center px-5 py-9 text-center",
-        boxed &&
-          "rounded-panel border border-dashed border-line-strong bg-surface",
-      )}
-    >
-      <span
-        aria-hidden="true"
-        className="flex size-11 items-center justify-center rounded-xl bg-surface-2 text-subtle"
-      >
-        <Icon className="size-5" />
-      </span>
-      <p className="mt-4 max-w-[44ch] text-sm leading-relaxed text-muted">
-        {body}
-      </p>
-      <div className="mt-5">{action}</div>
-    </div>
   );
 }
