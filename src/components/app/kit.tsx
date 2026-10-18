@@ -322,12 +322,18 @@ export function CardHeader({
   description,
   icon: IconCmp,
   actions,
+  as: Heading = "h3",
+  id,
   className,
 }: {
   title: ReactNode;
   description?: ReactNode;
   icon?: Icon;
   actions?: ReactNode;
+  /** h2 when the card is a page section of its own, with no Section above. */
+  as?: "h2" | "h3";
+  /** On the heading, for a surrounding `aria-labelledby`. */
+  id?: string;
   className?: string;
 }) {
   return (
@@ -345,7 +351,9 @@ export function CardHeader({
           />
         ) : null}
         <div className="min-w-0">
-          <h3 className="text-sm leading-6 font-semibold text-fg">{title}</h3>
+          <Heading id={id} className="text-sm leading-6 font-semibold text-fg">
+            {title}
+          </Heading>
           {description ? (
             <p className="text-[0.8125rem] leading-relaxed text-muted">
               {description}
@@ -461,6 +469,7 @@ export function Callout({
   title,
   children,
   action,
+  role,
   className,
 }: {
   tone?: CalloutTone;
@@ -468,12 +477,15 @@ export function Callout({
   title: ReactNode;
   children?: ReactNode;
   action?: ReactNode;
+  /** "alert" for a failure that has just happened, "status" for news. */
+  role?: "alert" | "status";
   className?: string;
 }) {
   const style = CALLOUT[tone];
   const IconCmp = icon ?? style.Icon;
   return (
     <div
+      role={role}
       className={cn(
         "flex flex-col gap-3 rounded-card border px-4 py-3.5 sm:flex-row sm:items-center",
         style.box,
@@ -605,7 +617,7 @@ export function StatGrid({
   className,
 }: {
   children: ReactNode;
-  columns?: 2 | 3 | 4;
+  columns?: 2 | 3 | 4 | 5;
   className?: string;
 }) {
   return (
@@ -614,6 +626,7 @@ export function StatGrid({
         "grid grid-cols-2 gap-3",
         columns === 3 && "lg:grid-cols-3",
         columns === 4 && "lg:grid-cols-4",
+        columns === 5 && "lg:grid-cols-3 xl:grid-cols-5",
         className,
       )}
     >
@@ -997,7 +1010,9 @@ export function Facts({
     <dl
       className={cn(
         "grid gap-x-8",
-        columns === 2 && "sm:grid-cols-2",
+        // In two columns the last row has two cells; neither wants a rule.
+        columns === 2 &&
+          "sm:grid-cols-2 sm:[&>*:nth-last-child(2):nth-child(odd)]:border-b-0",
         columns === 3 && "sm:grid-cols-2 lg:grid-cols-3",
         className,
       )}

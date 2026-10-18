@@ -102,7 +102,7 @@ export function StaffControls({
         <Button
           type="button"
           size="sm"
-          variant={closed ? "secondary" : "danger"}
+          variant={closed ? "secondary" : "danger-outline"}
           className={claimedBy && !flagged ? "w-full" : "mt-2 w-full"}
           disabled={pending}
           onClick={() => run(() => setThreadClosed(conversationId, !closed))}

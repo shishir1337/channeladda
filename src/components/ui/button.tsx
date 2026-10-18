@@ -26,6 +26,10 @@ const buttonVariants = cva(
         // colour, so nothing decorative can be mistaken for it.
         danger:
           "bg-danger text-white hover:opacity-90 shadow-soft hover:shadow-lift app:shadow-xs app:hover:shadow-xs",
+        // For a destructive step that can be undone, or the first press of
+        // one that asks again: red words, not a red block.
+        "danger-outline":
+          "border border-line bg-surface text-danger hover:border-danger/40 hover:bg-danger-soft app:shadow-xs app:dark:bg-surface-2 app:dark:hover:bg-danger-soft",
       },
       size: {
         // 44px min height everywhere a finger might be the pointer.
