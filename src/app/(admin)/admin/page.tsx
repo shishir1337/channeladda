@@ -6,9 +6,6 @@ import {
   HistoryIcon,
   LifeBuoyIcon,
   MessageSquareIcon,
-  StoreIcon,
-  TagIcon,
-  Undo2Icon,
 } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -17,22 +14,26 @@ import {
   auditLabel,
   elapsed,
   ListingStatusTag,
+  TitleWithInfo,
   Waited,
 } from "@/components/admin/vocab";
+import { InfoTip } from "@/components/app/info-tip";
 import {
   AllClear,
   Amount,
   Callout,
+  Card,
+  Disclosure,
   Dot,
   EmptyState,
   List,
   ListItem,
   ListRow,
-  MetaItem,
   PageHeader,
   Section,
   SeeAll,
   Sep,
+  SplitBar,
   Stat,
   StatGrid,
   TableCard,
@@ -41,7 +42,11 @@ import {
   Tr,
 } from "@/components/app/kit";
 import { Button } from "@/components/ui/button";
-import { getQueueCounts, getReviewQueue } from "@/server/admin-listings";
+import {
+  getQueueCounts,
+  getReviewQueue,
+  type QueueCounts,
+} from "@/server/admin-listings";
 import { getAuditTrail } from "@/server/audit";
 import { countFlaggedThreads } from "@/server/messages";
 import { getOpenReports } from "@/server/reports";
@@ -102,6 +107,9 @@ const SWEEP_JOBS: Record<
  * listings reserved for ever and paid invoices never applied — so a stale or
  * failing sweep is the loudest thing on this page, and a healthy one is a
  * single quiet line.
+ *
+ * Loud, but short: the alarm says what is wrong and who has to hear about it,
+ * and what stops and how to fix it are one click away under it.
  */
 function SweepHeartbeat({
   at,
@@ -134,7 +142,7 @@ function SweepHeartbeat({
         <Dot tone="verified" pulse />
         <span className="font-medium text-fg">Scheduled sweep</span>
         <span>ran {when}, every job fine.</span>
-        <span className="text-subtle">
+        <InfoTip label="What the last sweep did">
           {jobs
             .flatMap(([name, value]) =>
               typeof value === "number" && value > 0
@@ -142,7 +150,7 @@ function SweepHeartbeat({
                 : [],
             )
             .join(" · ") || "Nothing needed doing."}
-        </span>
+        </InfoTip>
       </p>
     );
   }
@@ -160,32 +168,10 @@ function SweepHeartbeat({
         }
       >
         {stale ? (
-          <>
-            <p className="max-w-[72ch] text-fg">
-              It should run every ten minutes. Until it does, unpaid deals never
-              expire — so their listings stay reserved for ever — payments whose
-              callback went missing are never applied, old offers stay open and
-              expired chat files are not deleted.
-            </p>
-            <p className="mt-2 max-w-[72ch] text-xs">
-              The server&rsquo;s crontab calls{" "}
-              <code className="rounded bg-surface px-1 py-0.5 font-mono text-[0.6875rem] text-fg ring-1 ring-line">
-                POST /api/cron
-              </code>{" "}
-              with the cron secret; the setup is in the deployment guide.
-              Whoever looks after the server needs to know about this today.
-              {at ? (
-                <>
-                  {" "}
-                  Last run:{" "}
-                  <time dateTime={at.toISOString()} className="tnum">
-                    {at.toLocaleString("en-GB")}
-                  </time>
-                  .
-                </>
-              ) : null}
-            </p>
-          </>
+          <p className="max-w-[72ch] text-fg">
+            It should run every ten minutes. Whoever looks after the server
+            needs to know about this today.
+          </p>
         ) : null}
 
         {failed.length > 0 ? (
@@ -203,17 +189,86 @@ function SweepHeartbeat({
             ))}
           </ul>
         ) : null}
-        {failed.length > 0 ? (
-          <p className="mt-2 max-w-[72ch] text-xs">
-            The other jobs still ran. A failing job is retried on the next run,
-            so one failure can be a blip; the same one twice in a row needs
-            somebody to look at the server logs.
-          </p>
-        ) : null}
+
+        <Disclosure
+          bare
+          title={stale ? "What stops, and how to fix it" : "What this means"}
+          className="mt-1"
+        >
+          {stale ? (
+            <>
+              <p className="max-w-[72ch]">
+                Until it does, unpaid deals never expire — so their listings
+                stay reserved for ever — payments whose callback went missing
+                are never applied, old offers stay open and expired chat files
+                are not deleted.
+              </p>
+              <p className="mt-2 max-w-[72ch] text-xs">
+                The server&rsquo;s crontab calls{" "}
+                <code className="rounded bg-surface px-1 py-0.5 font-mono text-[0.6875rem] text-fg ring-1 ring-line">
+                  POST /api/cron
+                </code>{" "}
+                with the cron secret; the setup is in the deployment guide.
+                {at ? (
+                  <>
+                    {" "}
+                    Last run:{" "}
+                    <time dateTime={at.toISOString()} className="tnum">
+                      {at.toLocaleString("en-GB")}
+                    </time>
+                    .
+                  </>
+                ) : null}
+              </p>
+            </>
+          ) : null}
+          {failed.length > 0 ? (
+            <p className={stale ? "mt-2 max-w-[72ch] text-xs" : "max-w-[72ch]"}>
+              The other jobs still ran. A failing job is retried on the next
+              run, so one failure can be a blip; the same one twice in a row
+              needs somebody to look at the server logs.
+            </p>
+          ) : null}
+        </Disclosure>
       </Callout>
     </div>
   );
 }
+
+/**
+ * The listing stages that are not waiting on staff, in the order a listing
+ * moves through them. Colours follow the status badges: live is green, sent
+ * back is red, placing a code is the seller's quiet grey.
+ */
+const PIPELINE: readonly {
+  status: "CODE_CHECK" | "LIVE" | "REJECTED";
+  count: keyof QueueCounts;
+  label: string;
+  note: string;
+  tone: "muted" | "verified" | "danger";
+}[] = [
+  {
+    status: "CODE_CHECK",
+    count: "awaitingCode",
+    label: "Placing their code",
+    note: "With the seller, nothing to do.",
+    tone: "muted",
+  },
+  {
+    status: "LIVE",
+    count: "live",
+    label: "Live",
+    note: "Visible to buyers right now.",
+    tone: "verified",
+  },
+  {
+    status: "REJECTED",
+    count: "rejected",
+    label: "Sent back",
+    note: "Waiting on the seller to fix something.",
+    tone: "danger",
+  },
+];
 
 /** The oldest of a set of timestamps, or null when the set is empty. */
 function oldestOf(dates: readonly Date[]): Date | null {
@@ -288,10 +343,15 @@ export default async function AdminOverviewPage() {
             : `${waiting.toLocaleString("en-US")} ${waiting === 1 ? "thing" : "things"} waiting on staff`
         }
         description={
+          waiting > 0 && oldest
+            ? `The oldest thing here has waited ${elapsed(oldest).label}.`
+            : undefined
+        }
+        info={
           waiting === 0
             ? "Nothing is queued for a human. New work shows up here the moment it arrives."
             : oldest
-              ? `Queues are worked oldest first. The oldest thing here has waited ${elapsed(oldest).label}.`
+              ? "Queues are worked oldest first."
               : "Queues are worked oldest first, so start at the top of whichever one is loudest."
         }
         actions={
@@ -304,17 +364,6 @@ export default async function AdminOverviewPage() {
             </Button>
           ) : null
         }
-        meta={
-          <>
-            <MetaItem label="Signed in as">{staff.name}</MetaItem>
-            <MetaItem label="Desk">
-              {staff.role.toLowerCase().replace("_", " ")}
-            </MetaItem>
-            <MetaItem label="Read">
-              {new Date().toLocaleString("en-GB")}
-            </MetaItem>
-          </>
-        }
       />
 
       <SweepHeartbeat
@@ -325,7 +374,7 @@ export default async function AdminOverviewPage() {
       <Section
         id="waiting"
         title="Waiting on a human"
-        description="Each of these is somebody on the other side of the product waiting for an answer."
+        info="Each of these is somebody on the other side of the product waiting for an answer."
       >
         <StatGrid
           columns={isFinance ? 3 : 4}
@@ -342,7 +391,7 @@ export default async function AdminOverviewPage() {
                 <Waited since={review[0].waitingSince} prefix="oldest" />
               ) : null
             }
-            note="Sellers waiting on a decision."
+            info="Sellers waiting on a decision."
           />
           <Stat
             label="Reported by users"
@@ -355,7 +404,7 @@ export default async function AdminOverviewPage() {
                 <Waited since={reports[0].createdAt} prefix="oldest" />
               ) : null
             }
-            note="Open reports against live listings."
+            info="Open reports against live listings."
           />
           <Stat
             label="Flagged threads"
@@ -363,7 +412,7 @@ export default async function AdminOverviewPage() {
             icon={MessageSquareIcon}
             href="/admin/messages?filter=flagged"
             tone={flagged > 0 ? "danger" : "neutral"}
-            note="Someone tried to take a deal off-platform."
+            info="Someone tried to take a deal off-platform."
           />
           <Stat
             label="Open support"
@@ -371,7 +420,7 @@ export default async function AdminOverviewPage() {
             icon={LifeBuoyIcon}
             href="/admin/support?status=OPEN"
             tone={openTickets > 0 ? "primary" : "neutral"}
-            note="Including people who cannot sign in."
+            info="Including people who cannot sign in."
           />
           {isFinance ? (
             <Stat
@@ -401,7 +450,7 @@ export default async function AdminOverviewPage() {
         title="Reported by users"
         count={reports.length}
         tone={reports.length > 0 ? "danger" : "neutral"}
-        description="Oldest first. A report is a person telling us something on the marketplace is wrong, so these are read before the review queue."
+        info="Oldest first. A report is a person telling us something on the marketplace is wrong, so these are read before the review queue."
       >
         {reports.length === 0 ? (
           <AllClear
@@ -430,7 +479,7 @@ export default async function AdminOverviewPage() {
           title="Next up for review"
           count={review.length}
           tone="primary"
-          description="The oldest five in the listing queue. Whoever takes the shift starts here."
+          info="The oldest five in the listing queue. Whoever takes the shift starts here."
           actions={<SeeAll href="/admin/listings">Open the queue</SeeAll>}
         >
           <List>
@@ -471,46 +520,65 @@ export default async function AdminOverviewPage() {
         </Section>
       ) : null}
 
+      {/* One bar rather than three cards: the pipeline is context, and the
+          proportion — how much of the marketplace is live — is the point.
+          Each stage still links to its filtered queue. */}
       <Section
         id="pipeline"
         title="Pipeline"
-        description="Not waiting on us. Here so a quiet queue can be told apart from an empty marketplace."
+        info={
+          <>
+            <p>
+              Not waiting on us. Here so a quiet queue can be told apart from an
+              empty marketplace.
+            </p>
+            <ul className="mt-2 grid gap-1">
+              {PIPELINE.map((stage) => (
+                <li key={stage.status}>
+                  <span className="font-medium text-fg">{stage.label}</span> —{" "}
+                  {stage.note}
+                </li>
+              ))}
+            </ul>
+          </>
+        }
       >
-        <StatGrid columns={3}>
-          <Stat
-            label="Placing their code"
-            value={counts.awaitingCode}
-            icon={TagIcon}
-            href="/admin/listings?status=CODE_CHECK"
-            note="With the seller, nothing to do."
+        <Card padded>
+          <SplitBar
+            label="Listings outside the review queue, by stage"
+            parts={PIPELINE.map((stage) => ({
+              label: (
+                <Link
+                  href={`/admin/listings?status=${stage.status}`}
+                  className="inline-flex min-h-11 items-center rounded-sm underline-offset-4 transition-colors duration-150 hover:text-fg hover:underline pointer-fine:min-h-6"
+                >
+                  {stage.label}
+                </Link>
+              ),
+              value: counts[stage.count],
+              tone: stage.tone,
+            }))}
           />
-          <Stat
-            label="Live"
-            value={counts.live}
-            icon={StoreIcon}
-            href="/admin/listings?status=LIVE"
-            note="Visible to buyers right now."
-          />
-          <Stat
-            label="Sent back"
-            value={counts.rejected}
-            icon={Undo2Icon}
-            href="/admin/listings?status=REJECTED"
-            note="Waiting on the seller to fix something."
-          />
-        </StatGrid>
+        </Card>
       </Section>
 
       <Section
         id="done"
         title="What has been done"
-        description="The last twelve privileged actions from the audit trail: what the previous shift decided, and who decided it."
+        info="The last twelve privileged actions from the audit trail: what the previous shift decided, and who decided it."
       >
         {trail.length === 0 ? (
           <EmptyState
             icon={HistoryIcon}
-            title="No staff actions recorded yet"
-            body="Every approval, rejection, removal and settings change is written here as it happens, under the name of whoever did it."
+            title={
+              <TitleWithInfo
+                title="No staff actions recorded yet"
+                label="About the audit trail"
+              >
+                Every approval, rejection, removal and settings change is
+                written here as it happens, under the name of whoever did it.
+              </TitleWithInfo>
+            }
           />
         ) : (
           <TableCard>

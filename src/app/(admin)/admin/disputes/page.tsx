@@ -10,10 +10,11 @@ import {
   DisputeCase,
   FIRST_RESPONSE_HOURS,
 } from "@/components/admin/dispute-case";
-import { elapsed, Waited } from "@/components/admin/vocab";
+import { elapsed, TitleWithInfo, Waited } from "@/components/admin/vocab";
 import {
   AllClear,
   MetaItem,
+  Meter,
   PageHeader,
   Stat,
   StatGrid,
@@ -59,17 +60,11 @@ export default async function DisputesPage() {
     <>
       <PageHeader
         title="Dispute desk"
-        description="Every frozen deal, longest wait first. The decision and its reason go on the record under your name."
+        info="Every frozen deal, longest wait first. The decision and its reason go on the record under your name."
+        // Only the read time: the two deadline figures below are counted
+        // against it, so a tab left open says how old they are.
         meta={
-          <>
-            <MetaItem label="Signed in as">{staff.name}</MetaItem>
-            <MetaItem label="Desk">
-              {staff.role.toLowerCase().replace("_", " ")}
-            </MetaItem>
-            <MetaItem label="Read">
-              {new Date().toLocaleString("en-GB")}
-            </MetaItem>
-          </>
+          <MetaItem label="Read">{new Date().toLocaleString("en-GB")}</MetaItem>
         }
       />
 
@@ -89,21 +84,43 @@ export default async function DisputesPage() {
               />
             ) : null
           }
-          note="Nothing on these moves until somebody decides it."
+          info="Nothing on these moves until somebody decides it."
         />
+        {/* Each deadline figure carries a bar of how much of the desk it
+            is, so a bad day reads before the number does. */}
         <Stat
           label="Over 48 hours"
           value={unanswered}
           icon={HourglassIcon}
           tone={unanswered > 0 ? "primary" : "neutral"}
-          note="The Terms promise a first response within 48 hours."
+          chip={
+            disputes.length > 0 ? (
+              <Meter
+                value={unanswered}
+                max={disputes.length}
+                tone="primary"
+                label={`${unanswered} of ${disputes.length} frozen deals over 48 hours`}
+              />
+            ) : null
+          }
+          info="The Terms promise a first response within 48 hours."
         />
         <Stat
           label="Past seven days"
           value={overdue}
           icon={CalendarClockIcon}
           tone={overdue > 0 ? "danger" : "neutral"}
-          note="The Terms promise a decision within seven days."
+          chip={
+            disputes.length > 0 ? (
+              <Meter
+                value={overdue}
+                max={disputes.length}
+                tone="danger"
+                label={`${overdue} of ${disputes.length} frozen deals past seven days`}
+              />
+            ) : null
+          }
+          info="The Terms promise a decision within seven days."
         />
         {/* A money total is finance's figure, as everywhere else in the
             staff area. Each case still shows its own, because nobody can
@@ -115,7 +132,7 @@ export default async function DisputesPage() {
             label="We hold"
             value={<Price usd={held / 100} />}
             icon={WalletIcon}
-            note="On our books across every frozen deal."
+            info="On our books across every frozen deal."
           />
         ) : null}
       </StatGrid>
@@ -123,8 +140,15 @@ export default async function DisputesPage() {
       <div className="mt-8">
         {disputes.length === 0 ? (
           <AllClear
-            title="No deal is frozen"
-            body="A deal lands here the moment either side raises a dispute, or the payment processor sends a payment back."
+            title={
+              <TitleWithInfo
+                title="No deal is frozen"
+                label="How a deal gets here"
+              >
+                A deal lands here the moment either side raises a dispute, or
+                the payment processor sends a payment back.
+              </TitleWithInfo>
+            }
           />
         ) : (
           <ol

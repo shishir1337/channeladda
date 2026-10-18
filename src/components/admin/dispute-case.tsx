@@ -19,7 +19,8 @@ import {
   OrderStatusBadge,
   Waited,
 } from "@/components/admin/vocab";
-import { Amount, Callout, Facts, Reference } from "@/components/app/kit";
+import { InfoTip } from "@/components/app/info-tip";
+import { Amount, Callout, Facts, Reference, Ring } from "@/components/app/kit";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -143,11 +144,38 @@ function Entry({ entry, raising }: { entry: RecordEntry; raising?: boolean }) {
   );
 }
 
-function Heading({ id, children }: { id: string; children: ReactNode }) {
-  return (
+/**
+ * A part of the case. `info` puts the longer explanation behind an (i)
+ * beside the heading — outside the h3, so the part's accessible name stays
+ * just its title — and `leading` is a small visual ahead of it.
+ */
+function Heading({
+  id,
+  children,
+  info,
+  infoLabel,
+  leading,
+}: {
+  id: string;
+  children: ReactNode;
+  info?: ReactNode;
+  infoLabel?: string;
+  leading?: ReactNode;
+}) {
+  const heading = (
     <h3 id={id} className="text-[0.8125rem] leading-5 font-semibold text-fg">
       {children}
     </h3>
+  );
+  if (!info && !leading) return heading;
+  return (
+    <div className="flex items-center gap-2">
+      {leading}
+      {heading}
+      {info ? (
+        <InfoTip label={infoLabel ?? "More about this"}>{info}</InfoTip>
+      ) : null}
+    </div>
   );
 }
 
@@ -401,7 +429,24 @@ export function DisputeCase({
           </section>
 
           <section aria-labelledby={`${headingId}-steps`}>
-            <Heading id={`${headingId}-steps`}>
+            <Heading
+              id={`${headingId}-steps`}
+              // The heading already says the figure aloud; the ring is only
+              // its picture, so a screen reader hears it once.
+              leading={
+                dispute.steps.length > 0 ? (
+                  <span aria-hidden="true" className="inline-flex">
+                    <Ring
+                      value={done}
+                      max={dispute.steps.length}
+                      tone="verified"
+                      size={18}
+                      label={`${done} of ${dispute.steps.length} steps done`}
+                    />
+                  </span>
+                ) : null
+              }
+            >
               How far it got{" "}
               <span className="font-normal text-subtle tabular-nums">
                 · {done} of {dispute.steps.length} steps
@@ -523,12 +568,18 @@ export function DisputeCase({
         aria-labelledby={`${headingId}-decide`}
         className="border-t border-line bg-surface-2/40 px-4 py-4 sm:px-5"
       >
-        <Heading id={`${headingId}-decide`}>Decide it</Heading>
+        <Heading
+          id={`${headingId}-decide`}
+          info="Your note below is the decision’s reason in the audit trail."
+          infoLabel="About deciding it"
+        >
+          Decide it
+        </Heading>
+        {/* Where the money goes is never behind the (i). */}
         <p className="mt-0.5 max-w-[72ch] text-xs leading-relaxed text-muted">
           {dispute.mode === "SAFEST"
             ? "Safest: we never held the price, so there is none to refund. If the agent holds the channel it goes back to the seller or on to the buyer."
-            : "Fastest: we hold the money, so deciding it either way moves money — the buyer back, or the seller paid."}{" "}
-          Your note below is the decision’s reason in the audit trail.
+            : "Fastest: we hold the money, so deciding it either way moves money — the buyer back, or the seller paid."}
         </p>
         {financesCall && !canMoveMoney ? (
           <Callout

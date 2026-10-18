@@ -86,7 +86,7 @@ export async function StuckDeals({
       title="Deals in flight"
       count={deals.length}
       tone={disputed > 0 || stale > 0 ? "danger" : "neutral"}
-      description="Every live deal, oldest first. Nothing here times out on its own, so a deal that has sat for days is waiting on somebody reading this list."
+      info="Every live deal, oldest first. Nothing here times out on its own, so a deal that has sat for days is waiting on somebody reading this list."
       actions={
         deals.length > 0 ? (
           <p className="flex items-center gap-1.5 text-xs text-subtle tabular-nums">

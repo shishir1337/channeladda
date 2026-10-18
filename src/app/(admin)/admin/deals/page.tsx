@@ -31,21 +31,20 @@ import {
   ORDER_STATUS,
   OrderStatusBadge,
   orderStatusLabel,
+  TitleWithInfo,
   Waited,
 } from "@/components/admin/vocab";
+import { InfoTip } from "@/components/app/info-tip";
 import {
   AllClear,
   Amount,
-  Card,
+  Disclosure,
   EmptyState,
   FilterBar,
   FilterLink,
-  hintClass,
-  IconTile,
   inputClass,
   List,
   ListItem,
-  MetaItem,
   PageHeader,
   Section,
   Sep,
@@ -222,8 +221,6 @@ export default async function AdminDealsPage({
     });
     return (
       <FinishedView
-        viewerName={viewer.name}
-        viewerRole={viewer.role}
         query={query}
         search={search}
         status={finishedStatus}
@@ -287,21 +284,10 @@ export default async function AdminDealsPage({
     <>
       <PageHeader
         title="Deal desk"
-        description={
+        info={
           isStaff
             ? "Every transfer in flight, and the controls to move or end one. Only an unpaid deal lapses on its own; anything else that has sat is waiting on you."
             : "The deals you are holding, and the ones nobody has taken yet. Open a deal to work its steps."
-        }
-        meta={
-          <>
-            <MetaItem label="Signed in as">{viewer.name}</MetaItem>
-            <MetaItem label="Desk">
-              {viewer.role.toLowerCase().replace("_", " ")}
-            </MetaItem>
-            <MetaItem label="Read">
-              {new Date().toLocaleString("en-GB")}
-            </MetaItem>
-          </>
         }
       />
 
@@ -329,7 +315,7 @@ export default async function AdminDealsPage({
               <Waited since={oldestUnheld} prefix="oldest" lateAfter={48} />
             ) : null
           }
-          note="Live deals with nobody holding them."
+          info="Live deals with nobody holding them."
         />
         <Stat
           label="Agent can no longer act"
@@ -337,7 +323,7 @@ export default async function AdminDealsPage({
           icon={ShieldAlertIcon}
           href={needingReassignment.length > 0 ? "#reassign" : undefined}
           tone={needingReassignment.length > 0 ? "danger" : "neutral"}
-          note="Channels held by an account that can no longer act."
+          info="Channels held by an account that can no longer act."
         />
         {isFinance ? (
           <Stat
@@ -351,7 +337,7 @@ export default async function AdminDealsPage({
                 <Waited since={oldestUnpaid} prefix="oldest" lateAfter={48} />
               ) : null
             }
-            note="Opening payments not yet cleared."
+            info="Opening payments not yet cleared."
           />
         ) : null}
         {mineOnly ? (
@@ -360,34 +346,37 @@ export default async function AdminDealsPage({
             value={mine.length}
             icon={ArrowLeftRightIcon}
             href="#mine"
-            note="Deals you are the agent of record on."
+            info="Deals you are the agent of record on."
           />
         ) : null}
       </StatGrid>
 
       {/* The two modes are mirror images and staff get the asymmetry wrong
-          under pressure, so the difference stays on the page rather than in
-          somebody's memory. */}
-      <div className="mt-3 grid gap-3 sm:grid-cols-2">
-        <Card className="flex items-start gap-3 p-3.5">
-          <IconTile icon={ShieldCheckIcon} size="sm" />
-          <p className="min-w-0 text-xs leading-relaxed text-muted">
-            <span className="font-medium text-fg">
-              {DEAL_MODE.SAFEST.label}
-            </span>{" "}
-            — {DEAL_MODE.SAFEST.blurb}
-          </p>
-        </Card>
-        <Card className="flex items-start gap-3 p-3.5">
-          <IconTile icon={ZapIcon} size="sm" />
-          <p className="min-w-0 text-xs leading-relaxed text-muted">
-            <span className="font-medium text-fg">
-              {DEAL_MODE.FASTEST.label}
-            </span>{" "}
-            — {DEAL_MODE.FASTEST.blurb}
-          </p>
-        </Card>
-      </div>
+          under pressure, so the difference stays on the page — folded, one
+          click away — rather than in somebody's memory. */}
+      <Disclosure title="How the two modes work" className="mt-3">
+        <ul className="grid gap-3 sm:grid-cols-2 sm:gap-6">
+          {(
+            [
+              ["SAFEST", ShieldCheckIcon],
+              ["FASTEST", ZapIcon],
+            ] as const
+          ).map(([mode, Icon]) => (
+            <li key={mode} className="flex items-start gap-2.5">
+              <Icon
+                aria-hidden="true"
+                className="mt-0.5 size-3.5 shrink-0 text-subtle"
+              />
+              <p className="min-w-0">
+                <span className="font-medium text-fg">
+                  {DEAL_MODE[mode].label}
+                </span>{" "}
+                — {DEAL_MODE[mode].blurb}
+              </p>
+            </li>
+          ))}
+        </ul>
+      </Disclosure>
 
       {needingReassignment.length > 0 ? (
         <Section
@@ -395,7 +384,7 @@ export default async function AdminDealsPage({
           title="Held by an agent who can no longer act"
           count={needingReassignment.length}
           tone="danger"
-          description="Still owned by an agent who was suspended or moved to another role. Nothing moves until somebody else takes them on, or they go back to the seller."
+          info="Still owned by an agent who was suspended or moved to another role. Nothing moves until somebody else takes them on, or they go back to the seller."
         >
           <List>
             {needingReassignment.map((order) => (
@@ -439,7 +428,9 @@ export default async function AdminDealsPage({
           title="Waiting on payment"
           count={awaitingPayment.length}
           tone={awaitingPayment.length > 0 ? "primary" : "neutral"}
-          description="Cryptomus tells us when one of these clears, and the sweep picks up anything that callback misses. Record one by hand only when the money reached us some other way — every later step of the deal unlocks behind it, and it cannot be undone."
+          info="Cryptomus tells us when one of these clears, and the sweep picks up anything that callback misses."
+          // Irreversible, so it stays on the page rather than behind the (i).
+          description="Record one by hand only when the money reached us some other way — every later step of the deal unlocks behind it, and it cannot be undone."
           actions={
             awaitingPayment.length > 0 ? (
               <Amount cents={owed} caption="owed in total" size="sm" />
@@ -530,7 +521,7 @@ export default async function AdminDealsPage({
           id="mine"
           title="Your deals"
           count={mine.length}
-          description="You are the agent of record on these. Open one to work its steps in order."
+          info="You are the agent of record on these. Open one to work its steps in order."
         >
           {mine.length === 0 ? (
             <AllClear
@@ -609,7 +600,22 @@ export default async function AdminDealsPage({
         title="Needs an agent"
         count={needingAgent.length}
         tone={needingAgent.length > 0 ? "primary" : "neutral"}
-        description="Live deals nobody is holding, oldest first. Until one is claimed, neither side can do anything."
+        info={
+          <>
+            <p>
+              Live deals nobody is holding, oldest first. Until one is claimed,
+              neither side can do anything.
+            </p>
+            {/* Said once here rather than under every row: staff see no
+                claim form on these, and this is why. */}
+            {isAgent ? null : (
+              <p className="mt-2">
+                An agent claims this from their own queue. You can still end it
+                below.
+              </p>
+            )}
+          </>
+        }
       >
         {needingAgent.length === 0 ? (
           <AllClear
@@ -650,12 +656,7 @@ export default async function AdminDealsPage({
                       defaultBrand={identity?.brand ?? "Channel Adda Transfers"}
                       locked={identity !== null}
                     />
-                  ) : (
-                    <p className="mt-2 text-xs text-subtle">
-                      An agent claims this from their own queue. You can still
-                      end it below.
-                    </p>
-                  )}
+                  ) : null}
                   <EndDeal
                     orderId={order.id}
                     mode={order.mode}
@@ -679,13 +680,20 @@ export default async function AdminDealsPage({
           id="activity"
           title="Everything that has happened"
           count={activity.length}
-          description="The fifty most recent events, read from the audit trail — the same record a dispute is settled from."
+          info="The fifty most recent events, read from the audit trail — the same record a dispute is settled from."
         >
           {activity.length === 0 ? (
             <EmptyState
               icon={HistoryIcon}
-              title="No deal activity yet"
-              body="Every deal event — opened, paid, assigned, stepped, ended — lands here as it happens."
+              title={
+                <TitleWithInfo
+                  title="No deal activity yet"
+                  label="About deal activity"
+                >
+                  Every deal event — opened, paid, assigned, stepped, ended —
+                  lands here as it happens.
+                </TitleWithInfo>
+              }
             />
           ) : (
             <TableCard>
@@ -751,6 +759,9 @@ export default async function AdminDealsPage({
 
 // ----------------------------------------------------------------- lookup
 
+const SEARCH_HINT =
+  "A deal reference opens that deal. Anything else lists every deal it matches, in any status, finished ones included.";
+
 /**
  * Finding a deal from what a customer wrote.
  *
@@ -766,7 +777,11 @@ function DealSearchForm({
 }) {
   return (
     <search className="block max-w-2xl">
-      <form method="get" action="/admin/deals" className="flex gap-2">
+      <form
+        method="get"
+        action="/admin/deals"
+        className="flex items-center gap-2"
+      >
         <div className="relative min-w-0 flex-1">
           <SearchIcon
             aria-hidden="true"
@@ -792,10 +807,12 @@ function DealSearchForm({
         <Button type="submit" size="md" variant="secondary">
           Find
         </Button>
+        <InfoTip label="How finding a deal works">{SEARCH_HINT}</InfoTip>
       </form>
-      <p id="deal-q-hint" className={hintClass}>
-        A deal reference opens that deal. Anything else lists every deal it
-        matches, in any status, finished ones included.
+      {/* Still the field's description for a screen reader; on screen the
+          same words are behind the (i) beside the button. */}
+      <p id="deal-q-hint" className="sr-only">
+        {SEARCH_HINT}
       </p>
     </search>
   );
@@ -832,17 +849,32 @@ function SearchResults({
       title="Matching deals"
       count={search.total}
       tone={search.total > 0 ? "primary" : "neutral"}
+      // A cut-off list says so on the page: the deal being looked for may be
+      // one of the rows not drawn.
       description={
         search.total > search.rows.length
-          ? `The newest ${search.rows.length} of ${search.total.toLocaleString("en-US")} deals matching “${query}”. Add more of the email or handle to narrow it.`
+          ? `The newest ${search.rows.length} of ${search.total.toLocaleString("en-US")} deals matching “${query}”.`
+          : undefined
+      }
+      info={
+        search.total > search.rows.length
+          ? "Add more of the email or handle to narrow it."
           : `Every deal matching “${query}”, newest first.`
       }
     >
       {search.rows.length === 0 ? (
         <EmptyState
           icon={SearchXIcon}
-          title="No deal matches that"
-          body="Try the reference exactly as the customer wrote it, the channel's handle, or the buyer's or seller's email address."
+          title={
+            <TitleWithInfo
+              title="No deal matches that"
+              label="What to search for"
+            >
+              Try the reference exactly as the customer wrote it, the
+              channel&apos;s handle, or the buyer&apos;s or seller&apos;s email
+              address.
+            </TitleWithInfo>
+          }
           action={
             <Button asChild size="sm" variant="secondary">
               <Link href="/admin/deals">Clear the search</Link>
@@ -869,15 +901,11 @@ function SearchResults({
  * is never drawn for them.
  */
 function FinishedView({
-  viewerName,
-  viewerRole,
   query,
   search,
   status,
   finished,
 }: {
-  viewerName: string;
-  viewerRole: string;
   query: string;
   search: DealSearch | null;
   status: OrderStatus | null;
@@ -896,22 +924,11 @@ function FinishedView({
 
   return (
     <>
+      {/* No meta row: the finished total is the "All" count in the filter
+          bar just below. */}
       <PageHeader
         title="Finished deals"
-        description="Every deal that has stopped, most recent first. Open one for its whole record — the steps, the proof and who did what."
-        meta={
-          <>
-            <MetaItem label="Signed in as">{viewerName}</MetaItem>
-            <MetaItem label="Desk">
-              {viewerRole.toLowerCase().replace("_", " ")}
-            </MetaItem>
-            <MetaItem label="Finished">
-              <span className="tabular-nums">
-                {all.toLocaleString("en-US")}
-              </span>
-            </MetaItem>
-          </>
-        }
+        info="Every deal that has stopped, most recent first. Open one for its whole record — the steps, the proof and who did what."
       />
 
       <DealSearchForm query={query} view="finished" />
@@ -943,7 +960,7 @@ function FinishedView({
         className="mt-6"
         title={status ? orderStatusLabel(status) : "All finished deals"}
         count={finished.total}
-        description={
+        info={
           finished.pages > 1
             ? `Page ${finished.page} of ${finished.pages}, most recent first.`
             : "Most recent first."
@@ -951,8 +968,15 @@ function FinishedView({
       >
         {finished.rows.length === 0 ? (
           <EmptyState
-            title="No deal has ended this way"
-            body="Deals land here the moment they complete, are refunded, cancelled, returned or lapse."
+            title={
+              <TitleWithInfo
+                title="No deal has ended this way"
+                label="About finished deals"
+              >
+                Deals land here the moment they complete, are refunded,
+                cancelled, returned or lapse.
+              </TitleWithInfo>
+            }
           />
         ) : (
           <>

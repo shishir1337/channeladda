@@ -9,6 +9,7 @@ import {
 import { useRouter } from "next/navigation";
 import { type ComponentProps, useId, useState, useTransition } from "react";
 import { custodyFacts } from "@/components/admin/vocab";
+import { InfoTip } from "@/components/app/info-tip";
 import { inputClass, labelClass } from "@/components/app/kit";
 import { TextArea, TextField } from "@/components/auth/fields";
 import { Badge } from "@/components/ui/badge";
@@ -661,13 +662,20 @@ export function EndDeal({
             className="mt-0.5 size-4 shrink-0 text-danger"
           />
           <div className="min-w-0">
-            <p className="text-sm leading-5 font-semibold text-fg">
-              End or pause this deal
-            </p>
+            <div className="flex items-center gap-1.5">
+              <p className="text-sm leading-5 font-semibold text-fg">
+                End or pause this deal
+              </p>
+              <InfoTip label="About ending a deal">
+                Whether one is legal from where this deal stands is decided by
+                the transition table, so an outcome that is not reachable comes
+                back as a refusal.
+              </InfoTip>
+            </div>
+            {/* What cannot be undone stays on the panel; only the why of a
+                refusal is behind the (i). */}
             <p className="mt-0.5 max-w-[72ch] text-xs leading-relaxed text-muted">
-              Four of these five cannot be undone. Whether one is legal from
-              where this deal stands is decided by the transition table, so an
-              outcome that is not reachable comes back as a refusal.
+              Four of these five cannot be undone.
             </p>
           </div>
         </div>

@@ -5,6 +5,7 @@ import {
   ZapIcon,
 } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";
+import { InfoTip } from "@/components/app/info-tip";
 import { Reference } from "@/components/app/kit";
 import { Badge } from "@/components/ui/badge";
 import type {
@@ -475,6 +476,34 @@ export const AUDIT_LABEL: Record<string, string> = {
 /** Falls back to a readable form of the key rather than printing the key. */
 export function auditLabel(action: string): string {
   return AUDIT_LABEL[action] ?? action.replace(/[._]/g, " ");
+}
+
+// ------------------------------------------------------------ empty states
+
+/**
+ * A heading with its explanation behind an (i).
+ *
+ * For an empty state or a cleared queue on a staff desk: the empty screen is
+ * a title and an icon, and the sentence about where work comes from is one
+ * tap away instead of a paragraph under it. The kit's `EmptyState` and
+ * `AllClear` take a node for a title, so this drops straight in.
+ */
+export function TitleWithInfo({
+  title,
+  label,
+  children,
+}: {
+  title: string;
+  /** What the (i) is called to a screen reader. */
+  label: string;
+  children: ReactNode;
+}) {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      {title}
+      <InfoTip label={label}>{children}</InfoTip>
+    </span>
+  );
 }
 
 // ------------------------------------------------------------------ ageing
