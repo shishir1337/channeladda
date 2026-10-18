@@ -1,4 +1,5 @@
 import { ChevronRightIcon, FlagIcon, MessageSquareIcon } from "lucide-react";
+import { InfoTip } from "@/components/app/info-tip";
 import { EmptyState, List, ListItem } from "@/components/app/kit";
 import { Initials } from "@/components/messages/chat-parts";
 import { Badge } from "@/components/ui/badge";
@@ -48,8 +49,16 @@ export function ThreadList({
     return (
       <EmptyState
         icon={MessageSquareIcon}
-        title={empty}
-        body="A thread appears the moment a buyer asks a seller a question, and stays readable here for as long as the deal behind it lasts."
+        // The title alone, with how threads arrive behind the (i).
+        title={
+          <span className="inline-flex items-center gap-1.5">
+            {empty}
+            <InfoTip label="About conversations">
+              A thread appears the moment a buyer asks a seller a question, and
+              stays readable here for as long as the deal behind it lasts.
+            </InfoTip>
+          </span>
+        }
       />
     );
   }

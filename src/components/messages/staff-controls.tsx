@@ -2,7 +2,7 @@
 
 import { LoaderCircleIcon, ShieldCheckIcon } from "lucide-react";
 import { useState, useTransition } from "react";
-import { Card, CardBody, CardFooter, CardHeader } from "@/components/app/kit";
+import { Card, CardBody, CardHeader } from "@/components/app/kit";
 import { Button } from "@/components/ui/button";
 import {
   claimThread,
@@ -65,6 +65,15 @@ export function StaffControls({
             ? `${claimedBy} is handling this conversation.`
             : "Nobody has picked this up yet."
         }
+        // Behind the (i) because the thread page says the same thing in plain
+        // sight, under the message box where it matters: sent as Channel
+        // Adda, not as you. Said once on screen, it is not lost.
+        info={
+          <>
+            Anything you send here is signed &ldquo;Channel Adda&rdquo; and both
+            sides can read it. Your name is never shown to them.
+          </>
+        }
       />
 
       <CardBody className="flex flex-col gap-2">
@@ -124,11 +133,6 @@ export function StaffControls({
           </output>
         ) : null}
       </CardBody>
-
-      <CardFooter className="text-xs leading-relaxed text-subtle">
-        Anything you send here is signed &ldquo;Channel Adda&rdquo; and both
-        sides can read it. Your name is never shown to them.
-      </CardFooter>
     </Card>
   );
 }

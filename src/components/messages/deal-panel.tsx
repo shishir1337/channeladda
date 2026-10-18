@@ -1,9 +1,10 @@
 "use client";
 
-import { ArrowUpRightIcon, ChevronDownIcon } from "lucide-react";
+import { ArrowUpRightIcon, ChevronDownIcon, ClockIcon } from "lucide-react";
 import Link from "next/link";
 import { type ReactNode, useState } from "react";
-import { Dot, Reference, TurnFlag } from "@/components/app/kit";
+import { InfoTip } from "@/components/app/info-tip";
+import { Dot, Reference, Ring, TurnFlag } from "@/components/app/kit";
 import { OfferActions } from "@/components/offers/offer-actions";
 import { Price } from "@/components/ui/price";
 import type {
@@ -67,6 +68,7 @@ export function DealPanel({
   otherName,
   listingSlug,
   dealReference,
+  progress = null,
   children,
 }: {
   state: PanelStateView;
@@ -75,6 +77,12 @@ export function DealPanel({
   otherName: string;
   listingSlug: string;
   dealReference: string | null;
+  /**
+   * Steps done out of all of them, counted by the page from the deal it has
+   * already loaded. Drawn as a ring beside the heading of the panel's own
+   * card; the deal's step card says "Step 3 of 9" itself, so not there.
+   */
+  progress?: { done: number; total: number } | null;
   /**
    * The deal's own card for the states that need one — paying, a step —
    * drawn by the page from the deal it has already loaded.
@@ -92,6 +100,10 @@ export function DealPanel({
   // card of its own too. It goes under the panel's card, not inside it, so
   // the column never draws a box in a box.
   const childBelow = Boolean(children) && state.kind === "waiting-for-payment";
+  const ring =
+    progress && progress.total > 0 && "dealId" in state && state.dealId
+      ? progress
+      : null;
 
   const toggle = (
     <button
@@ -161,23 +173,52 @@ export function DealPanel({
             open ? "block" : "hidden",
           )}
         >
-          <div className="mb-2 hidden min-h-5 items-center lg:flex">
-            {view.yourMove ? (
-              <TurnFlag mine />
-            ) : (
-              <span className="text-xs font-medium text-subtle">
-                What happens next
-              </span>
-            )}
+          {/* The headline, whose move it is and how long is left; anything
+              longer about what happens next is behind the (i). */}
+          <div className="flex items-start gap-3">
+            <div className="min-w-0 flex-1">
+              <div className="mb-2 hidden min-h-5 items-center lg:flex">
+                {view.yourMove ? (
+                  <TurnFlag mine />
+                ) : (
+                  <span className="text-xs font-medium text-subtle">
+                    What happens next
+                  </span>
+                )}
+              </div>
+              <div className="flex items-start gap-1.5">
+                <h2 className="min-w-0 text-[0.9375rem] leading-6 font-semibold text-fg">
+                  {view.title}
+                </h2>
+                {view.info ? (
+                  <InfoTip label="More about this" className="mt-0.5">
+                    {view.info}
+                  </InfoTip>
+                ) : null}
+              </div>
+              {view.until ? (
+                <p className="mt-1 flex items-center gap-1.5 text-xs text-subtle tabular-nums">
+                  <ClockIcon aria-hidden="true" className="size-3.5 shrink-0" />
+                  {timeLeft(view.until)}
+                </p>
+              ) : null}
+              {view.detail ? (
+                <p className="mt-1 max-w-[62ch] text-[0.8125rem] leading-relaxed text-muted">
+                  {view.detail}
+                </p>
+              ) : null}
+            </div>
+            {ring ? (
+              <Ring
+                value={ring.done}
+                max={ring.total}
+                label={`${ring.done} of ${ring.total} steps done`}
+                tone={ring.done >= ring.total ? "verified" : "neutral"}
+              >
+                {ring.done}/{ring.total}
+              </Ring>
+            ) : null}
           </div>
-          <h2 className="text-[0.9375rem] leading-6 font-semibold text-fg">
-            {view.title}
-          </h2>
-          {view.detail ? (
-            <p className="mt-1 max-w-[62ch] text-[0.8125rem] leading-relaxed text-muted">
-              {view.detail}
-            </p>
-          ) : null}
 
           <Body
             state={state}
@@ -206,7 +247,12 @@ export function DealPanel({
   );
 }
 
-/** The words for each state: the folded line, the heading, one sentence. */
+/**
+ * The words for each state: the folded line, the heading, how long is left,
+ * and — behind an (i) — what happens next. A sentence that only names the
+ * buttons right under it ("Accept it, counter, or turn it down") is left to
+ * the buttons.
+ */
 function describe(
   state: PanelStateView,
   viewerRole: "buyer" | "seller" | "agent" | "staff",
@@ -214,7 +260,12 @@ function describe(
 ): {
   summary: string;
   title: ReactNode;
+  /** One short line that stays on screen. */
   detail?: ReactNode;
+  /** The longer explanation, behind an (i) beside the heading. */
+  info?: ReactNode;
+  /** When an offer or a hold runs out, shown as the time left. */
+  until?: string;
   yourMove: boolean;
 } {
   switch (state.kind) {
@@ -231,15 +282,14 @@ function describe(
             />
           </>
         ),
-        detail:
-          "Buy at the asking price, or make an offer from the message box below.",
+        info: "Buy at the asking price, or make an offer from the message box below.",
         yourMove: false,
       };
     case "propose":
       return {
         summary: `Offer ${otherName} a price`,
         title: `Offer ${otherName} a price`,
-        detail: (
+        info: (
           <>
             Use “Offer a price” in the message box. It has to be below your
             asking price of <Price usd={dollars(state.askingCents)} exact />.
@@ -262,7 +312,7 @@ function describe(
             />
           </>
         ),
-        detail: `Accept it, counter, or turn it down · ${timeLeft(state.offer.expiresAt)}`,
+        until: state.offer.expiresAt,
         yourMove: true,
       };
     case "offer-waiting-on-them":
@@ -279,7 +329,8 @@ function describe(
             is with {otherName}
           </>
         ),
-        detail: `${timeLeft(state.offer.expiresAt)}. You can withdraw it until they answer.`,
+        until: state.offer.expiresAt,
+        info: "You can withdraw it until they answer.",
         yourMove: false,
       };
     case "start-deal":
@@ -295,14 +346,17 @@ function describe(
             is held for you
           </>
         ),
-        detail: `Choose Safest or Fastest and start the deal · ${timeLeft(state.heldUntil)}`,
+        // "Choose Safest or Fastest and start the deal" is what the card
+        // under the heading is: the two modes and the start button.
+        until: state.heldUntil,
         yourMove: true,
       };
     case "waiting-to-start":
       return {
         summary: `Waiting for ${otherName} to start the deal`,
         title: `Waiting for ${otherName} to start the deal`,
-        detail: `The listing is held for them · ${timeLeft(state.heldUntil)}. If they do not, it comes back on sale on its own.`,
+        until: state.heldUntil,
+        info: "The listing is held for them. If they do not, it comes back on sale on its own.",
         yourMove: false,
       };
     case "pay":
@@ -315,7 +369,7 @@ function describe(
       return {
         summary: `Waiting for ${viewerRole === "seller" ? otherName : "the buyer"} to pay`,
         title: `Waiting for ${viewerRole === "seller" ? otherName : "the buyer"} to pay`,
-        detail: "Nothing is needed from you until the payment clears.",
+        info: "Nothing is needed from you until the payment clears.",
         yourMove: false,
       };
     case "step":

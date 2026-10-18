@@ -80,6 +80,14 @@ export default async function ThreadPage({
   const deal = dealId ? await getDealFor(user.id, dealId) : null;
   const wallet =
     panel?.kind === "pay" && deal ? await getWallet(user.id) : null;
+  // How far the deal has got, for the ring on the panel — counted from the
+  // deal just loaded, not asked for again.
+  const progress = deal
+    ? {
+        done: deal.steps.filter((step) => step.completedAt !== null).length,
+        total: deal.steps.length,
+      }
+    : null;
   // As the deal page does it: only the agent is ever asked to name a second
   // approver, only on their own step, and nobody else is shown the list.
   const staffIds =
@@ -188,6 +196,7 @@ export default async function ThreadPage({
               otherName={otherSide.split(/\s+/)[0] || otherSide}
               listingSlug={thread.listingSlug}
               dealReference={panelInput?.deal?.reference ?? null}
+              progress={progress}
             >
               {panel.kind === "buy" || panel.kind === "start-deal" ? (
                 <StartDeal

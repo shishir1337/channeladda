@@ -405,7 +405,10 @@ export function ThreadView({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <p className="mx-auto flex max-w-[66ch] items-start gap-2 rounded-card border border-line bg-surface-2/60 px-3.5 py-2.5 text-xs leading-relaxed text-muted">
+      {/* A quiet line rather than a box: it is read once, before the first
+          message, and should not compete with the conversation after that.
+          The words stay exactly as they are — this is the rule itself. */}
+      <p className="mx-auto flex max-w-[66ch] items-start gap-2 px-1 text-xs leading-relaxed text-muted">
         <EyeIcon
           aria-hidden="true"
           className="mt-0.5 size-3.5 shrink-0 text-subtle"

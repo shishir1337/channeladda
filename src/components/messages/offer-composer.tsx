@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useId, useState, useTransition } from "react";
+import { InfoTip } from "@/components/app/info-tip";
 import {
   hintClass,
   inputClass,
@@ -84,16 +85,22 @@ export function OfferComposerForm({
     >
       {error ? <FormNotice>{error}</FormNotice> : null}
 
-      <label htmlFor={amountId} className={labelClass}>
-        {seller ? "Your price (USD)" : "Your offer (USD)"}
-      </label>
+      <div className="flex items-center gap-1.5">
+        <label htmlFor={amountId} className={labelClass}>
+          {seller ? "Your price (USD)" : "Your offer (USD)"}
+        </label>
+        <InfoTip label="What happens to it">
+          {seller
+            ? "The buyer can accept it, counter, or turn it down."
+            : "The seller can accept it, counter, or turn it down."}
+        </InfoTip>
+      </div>
+      {/* The two figures that stop a mistake stay in sight: what is being
+          asked, and when an unanswered number lapses. */}
       <p className={hintClass}>
         Asking price is{" "}
-        <span className="tabular-nums">{usd(config.askingPrice)}</span>.{" "}
-        {seller
-          ? "The buyer can accept it, counter, or turn it down."
-          : "The seller can accept it, counter, or turn it down."}{" "}
-        It lapses after {config.expiryHours} hours.
+        <span className="tabular-nums">{usd(config.askingPrice)}</span>. It
+        lapses after {config.expiryHours} hours.
       </p>
       <div className="relative mt-2 max-w-48">
         <span

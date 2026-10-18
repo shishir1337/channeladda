@@ -64,8 +64,16 @@ export default async function AdminThreadPage({
       />
 
       {flagged ? (
-        <Callout tone="danger" icon={FlagIcon} title="Flagged" className="mt-5">
-          {thread.flagReason ?? "Someone tried to move this off the platform."}{" "}
+        // The reason is the headline: "Flagged" is already the badge in the
+        // header above, and the flag icon says it again.
+        <Callout
+          tone="danger"
+          icon={FlagIcon}
+          title={
+            thread.flagReason ?? "Someone tried to move this off the platform."
+          }
+          className="mt-5"
+        >
           Taking a deal off Channel Adda is how both sides lose their
           protection, so read the whole thread before deciding.
         </Callout>

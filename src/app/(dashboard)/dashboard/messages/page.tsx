@@ -75,8 +75,8 @@ export default async function MessagesPage() {
       // The list is right above it on a phone; this would only repeat it.
       className={`${PANE} max-lg:hidden`}
       icon={MessagesSquareIcon}
+      // The title says it all; the list it points to is right beside it.
       title="Pick a conversation"
-      body="Choose one to read it and reply."
     />
   );
 }

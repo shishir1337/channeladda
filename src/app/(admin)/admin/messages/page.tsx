@@ -1,10 +1,8 @@
 import type { Metadata } from "next";
 import {
   AllClear,
-  Dot,
   FilterBar,
   FilterLink,
-  MetaItem,
   PageHeader,
   Section,
 } from "@/components/app/kit";
@@ -28,7 +26,7 @@ export const metadata: Metadata = {
 export default async function AdminMessagesPage({
   searchParams,
 }: PageProps<"/admin/messages">) {
-  const staff = await requireStaff();
+  await requireStaff();
   const { filter } = await searchParams;
   const flaggedOnly = filter === "flagged";
 
@@ -55,31 +53,11 @@ export default async function AdminMessagesPage({
 
   return (
     <>
+      {/* No meta row: the thread count is on the section heading and the
+          flagged count, in red when there are any, is on its filter. */}
       <PageHeader
         title="Conversations"
-        description="Every buyer–seller thread. Read any of them, and write into any as Channel Adda."
-        meta={
-          <>
-            <MetaItem label="Signed in as">{staff.name}</MetaItem>
-            <MetaItem label="Showing">
-              <span className="tabular-nums">
-                {rows.length.toLocaleString("en-US")}
-              </span>{" "}
-              {rows.length === 1 ? "thread" : "threads"}
-            </MetaItem>
-            {flaggedCount > 0 ? (
-              <span className="inline-flex items-center gap-1.5 font-medium text-danger tabular-nums">
-                <Dot tone="danger" />
-                {flaggedCount} flagged
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1.5 text-muted">
-                <Dot tone="verified" />
-                Nothing flagged
-              </span>
-            )}
-          </>
-        }
+        info="Every buyer–seller thread. Read any of them, and write into any as Channel Adda."
       />
 
       <FilterBar label="Filter conversations">
@@ -102,7 +80,7 @@ export default async function AdminMessagesPage({
         title={flaggedOnly ? "Flagged threads" : "All conversations"}
         count={rows.length}
         tone={flaggedOnly && rows.length > 0 ? "danger" : "neutral"}
-        description={
+        info={
           flaggedOnly
             ? "Each of these contains an attempt to swap contact details or settle off-platform. Read it, then warn or suspend."
             : "Newest activity first, with flagged threads above the rest."
