@@ -31,9 +31,14 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ImageUpload } from "@/components/upload/image-upload";
-import { parseChannelUrl, suggestHandle } from "@/lib/channel-url";
 import { type FeeSettings, formatRate, quote } from "@/lib/fees";
 import type { ListingDraftInput, PLATFORM_IDS } from "@/lib/listing-form";
+import {
+  handleForLink as handleFor,
+  type ImportKey,
+  mergeImport,
+  undoImport,
+} from "@/lib/listing-import";
 import { cn } from "@/lib/utils";
 import { saveListing } from "@/server/actions/listings";
 
@@ -47,22 +52,6 @@ export type PlatformChoice = {
   /** The platform's brand colour token, e.g. `var(--brand-youtube)`. */
   tint: string;
 };
-
-/**
- * The handle a link gives, for the form: the @name on a social link, the
- * domain for a website, nothing otherwise. Only ever a suggestion — the
- * seller can change it, and the ownership check overwrites it with the
- * verified channel's own.
- */
-function handleFor(link: string, platform: string): string {
-  const fromLink = suggestHandle(link);
-  if (fromLink) return fromLink;
-  if (platform === "website") {
-    const parsed = parseChannelUrl(link);
-    if (parsed?.kind === "domain") return parsed.value;
-  }
-  return "";
-}
 
 type Draft = {
   platform: string;
@@ -451,113 +440,49 @@ export function ListingForm({
       };
     });
 
-  /** Fills the form from a confirmed channel; returns how many fields changed. */
-  const applyImport = (channel: ImportedChannel): number => {
-    const previous = lastImport;
+  /**
+   * The form as it last rendered, for code that runs after an await.
+   *
+   * A lookup takes a few seconds, and the seller may type in the meantime;
+   * filling from the draft as it was when the fetch began would throw those
+   * keystrokes away.
+   */
+  const latest = useRef({ draft, lastImport });
+  useEffect(() => {
+    latest.current = { draft, lastImport };
+  });
+
+  /** What the last fill changed, so "Not my channel" can take it back out. */
+  const [lastFill, setLastFill] = useState<{
+    before: Draft;
+    after: Draft;
+    previous: ImportedChannel | null;
+  } | null>(null);
+
+  /** Fills the form from a fetched channel; returns the fields it changed. */
+  const applyImport = (channel: ImportedChannel): ImportKey[] => {
+    const { draft: current, lastImport: previous } = latest.current;
+    const platformName =
+      platforms.find((p) => p.id === channel.platform.toLowerCase())?.name ??
+      "the";
+    const { next, filled } = mergeImport(
+      current,
+      channel,
+      previous,
+      platformName,
+    );
     setLastImport(channel);
     setEditingHandle(false);
-
-    /**
-     * What one field becomes after a lookup.
-     *
-     * Blanks are filled, and so is anything the *previous* lookup put there —
-     * which is what makes pasting the wrong link first recoverable. Anything
-     * the seller typed themselves is left exactly as they typed it.
-     *
-     * A saved listing hands its blank figures back as "0" — the columns are
-     * not nullable — so on the edit page a zero counts as blank wherever the
-     * channel has a real figure to offer. Without that, an import there
-     * filled nothing and said it had.
-     */
-    const take = (
-      current: string,
-      wasImported: string,
-      next: string,
-      zeroIsBlank = false,
-    ) =>
-      current.trim() === "" ||
-      current === wasImported ||
-      (zeroIsBlank && next !== "" && Number(current) === 0)
-        ? next
-        : current;
-
-    const subs = (c: ImportedChannel | null) =>
-      c && c.subscribers > 0 ? String(c.subscribers) : "";
-    const years = (c: ImportedChannel | null) =>
-      c && c.ageYears > 0 ? String(c.ageYears) : "";
-    const rate = (c: ImportedChannel | null) =>
-      c && c.engagement !== null ? String(c.engagement) : "";
-    // The title needs ten characters, and a channel name often has fewer;
-    // it allows 120, and a Telegram title can run to 128.
-    const titleOf = (c: ImportedChannel | null) => {
-      if (!c?.title) return "";
-      const name = platforms.find((p) => p.id === c.platform.toLowerCase());
-      const title =
-        c.title.trim().length >= 10
-          ? c.title.trim()
-          : `${c.title.trim()} — ${name?.name ?? "the"} channel`;
-      return title.length > 120 ? `${title.slice(0, 119).trimEnd()}…` : title;
-    };
-    /**
-     * A picture the lookup stored, unless the seller has their own. A saved
-     * listing with no picture hands back "", not null.
-     */
-    const picture = (
-      current: string | null,
-      wasImported: string | null | undefined,
-      next: string | null,
-    ) => (!current || current === wasImported ? (next ?? current) : current);
-
-    // Worked out from this render's draft rather than inside a state
-    // updater, so the count of what changed can be returned.
-    const current = draft;
-    const next: Draft = {
-      ...current,
-      platform: (channel.platform.toLowerCase() ||
-        current.platform) as Draft["platform"],
-      sourceUrl: channel.canonicalUrl || current.sourceUrl,
-      title: take(current.title, titleOf(previous), titleOf(channel)),
-      // The handle, not the display title: "Daily Tech Brief" is not
-      // @dailytechbrief, and the slug and the public URL are built from this.
-      // One the link suggested gives way to the channel's own.
-      handle:
-        current.handle === handleFor(current.sourceUrl, current.platform)
-          ? channel.handle || current.handle
-          : take(current.handle, previous?.handle ?? "", channel.handle ?? ""),
-      // The description is deliberately not taken. A channel's about text is
-      // written for viewers and routinely carries a business email — on a
-      // listing that is an invitation to deal off the platform.
-      avatarUrl: picture(
-        current.avatarUrl,
-        previous?.avatarUrl,
-        channel.avatarUrl,
-      ),
-      coverUrl: picture(current.coverUrl, previous?.coverUrl, channel.coverUrl),
-      audience: take(current.audience, subs(previous), subs(channel), true),
-      ageYears: take(current.ageYears, years(previous), years(channel), true),
-      country: take(
-        current.country,
-        previous?.country ?? "",
-        channel.country ?? "",
-      ),
-      niche: take(current.niche, previous?.niche ?? "", channel.niche ?? ""),
-      engagement: take(current.engagement, rate(previous), rate(channel), true),
-    };
+    setLastFill({ before: current, after: next, previous });
     edit(() => next);
+    return filled;
+  };
 
-    const FILLED = [
-      "title",
-      "handle",
-      "avatarUrl",
-      "coverUrl",
-      "audience",
-      "ageYears",
-      "country",
-      "niche",
-      "engagement",
-    ] as const;
-    return FILLED.filter((key) => next[key] && next[key] !== current[key])
-      .length;
+  const undoLastFill = () => {
+    if (!lastFill) return;
+    edit((current) => undoImport(current, lastFill.before, lastFill.after));
+    setLastImport(lastFill.previous);
+    setLastFill(null);
   };
 
   const platform =
@@ -746,8 +671,10 @@ export function ListingForm({
       country: draft.country,
       audience: num(draft.audience),
       monetized: draft.monetized,
-      monthlyRevenue: num(draft.monthlyRevenue),
-      yearlyRevenue: num(draft.yearlyRevenue),
+      // Hidden unless monetized, so never sent from a field nobody can see:
+      // a figure typed before unticking would otherwise ride along.
+      monthlyRevenue: draft.monetized ? num(draft.monthlyRevenue) : 0,
+      yearlyRevenue: draft.monetized ? num(draft.yearlyRevenue) : 0,
       engagement: num(draft.engagement),
       ageYears: num(draft.ageYears),
       price: priceNumber,
@@ -1007,7 +934,8 @@ export function ListingForm({
             value={draft.sourceUrl}
             onChange={setLink}
             onPlatform={(id) => set("platform", id)}
-            onConfirm={applyImport}
+            onFill={applyImport}
+            onUndo={undoLastFill}
             error={errors.sourceUrl}
             savedUrl={initial?.sourceUrl || undefined}
           />
@@ -1157,61 +1085,105 @@ export function ListingForm({
               placeholder="4"
               required
             />
-            <TextField
-              id={ids.revenue}
-              name="monthlyRevenue"
-              label="Monthly revenue (USD)"
-              hint="Zero if it does not earn yet."
-              inputMode="decimal"
-              value={draft.monthlyRevenue}
-              onChange={(e) => set("monthlyRevenue", e.target.value)}
-              error={errors.monthlyRevenue}
-              placeholder="0"
-            />
-            <FieldInfo
-              label="Last 12 months (USD)"
-              info="Asked separately because twelve times a good month is a number buyers do not believe."
-            >
-              <TextField
-                id={ids.yearly}
-                name="yearlyRevenue"
-                label="Last 12 months (USD)"
-                inputMode="decimal"
-                value={draft.yearlyRevenue}
-                onChange={(e) => set("yearlyRevenue", e.target.value)}
-                error={errors.yearlyRevenue}
-                placeholder="0"
-              />
-            </FieldInfo>
           </div>
 
+          {/* Revenue belongs to the monetized answer, so it opens inside it.
+              Asking a channel that earns nothing what it earns a month was a
+              question with only one answer; unticked, both are saved as 0. */}
           <div>
-            <label
-              htmlFor={ids.monetized}
+            <div
               className={cn(
-                "flex cursor-pointer items-start gap-3 rounded-lg border bg-surface px-3.5 py-3 text-sm text-muted shadow-xs transition-[border-color,background-color,box-shadow] duration-150 has-[:checked]:border-fg has-[:checked]:ring-1 has-[:checked]:ring-fg dark:bg-surface-2",
+                "overflow-hidden rounded-lg border bg-surface shadow-xs transition-[border-color,box-shadow] duration-200 dark:bg-surface-2",
                 errors.monetized
                   ? "border-danger"
-                  : "border-line hover:border-line-strong hover:bg-surface-2/60",
+                  : draft.monetized
+                    ? "border-fg ring-1 ring-fg"
+                    : "border-line hover:border-line-strong",
               )}
             >
-              <input
-                id={ids.monetized}
-                type="checkbox"
-                checked={draft.monetized}
-                onChange={(e) => set("monetized", e.target.checked)}
-                className="mt-0.5 size-4 shrink-0 cursor-pointer accent-fg"
-              />
-              <span>
-                <span className="font-medium text-fg">
-                  This account is monetized.
+              <label
+                htmlFor={ids.monetized}
+                className={cn(
+                  "flex cursor-pointer items-start gap-3 px-3.5 py-3 text-sm text-muted transition-colors duration-150",
+                  !draft.monetized && "hover:bg-surface-2/60",
+                )}
+              >
+                <input
+                  id={ids.monetized}
+                  type="checkbox"
+                  checked={draft.monetized}
+                  onChange={(e) => {
+                    const monetized = e.target.checked;
+                    // The fields open on the examples, not on a "0" that
+                    // reads as an answer already given.
+                    const blankIfZero = (value: string) =>
+                      monetized && value.trim() === "0" ? "" : value;
+                    edit((d) => ({
+                      ...d,
+                      monetized,
+                      monthlyRevenue: blankIfZero(d.monthlyRevenue),
+                      yearlyRevenue: blankIfZero(d.yearlyRevenue),
+                    }));
+                  }}
+                  aria-controls={`${ids.monetized}-revenue`}
+                  className="mt-0.5 size-4 shrink-0 cursor-pointer accent-fg"
+                />
+                <span>
+                  <span className="font-medium text-fg">
+                    This account is monetized.
+                  </span>
+                  <span className="mt-0.5 block text-xs leading-relaxed text-subtle">
+                    Claiming this when it is not is the fastest way to have a
+                    listing rejected.
+                  </span>
                 </span>
-                <span className="mt-0.5 block text-xs leading-relaxed text-subtle">
-                  Claiming this when it is not is the fastest way to have a
-                  listing rejected.
-                </span>
-              </span>
-            </label>
+              </label>
+
+              {/* Height eased open with the grid-rows trick; inert while shut,
+                  so a keyboard never lands in a field nobody can see. */}
+              <div
+                id={`${ids.monetized}-revenue`}
+                inert={!draft.monetized}
+                className={cn(
+                  "grid transition-[grid-template-rows,opacity] duration-300 ease-in-out",
+                  draft.monetized
+                    ? "grid-rows-[1fr] opacity-100"
+                    : "grid-rows-[0fr] opacity-0",
+                )}
+              >
+                <div className="min-h-0 overflow-hidden">
+                  <div className="grid gap-x-4 gap-y-5 border-t border-line px-3.5 pt-3.5 pb-4 sm:grid-cols-2">
+                    <TextField
+                      id={ids.revenue}
+                      name="monthlyRevenue"
+                      label="Monthly revenue (USD)"
+                      hint="An average recent month."
+                      inputMode="decimal"
+                      value={draft.monthlyRevenue}
+                      onChange={(e) => set("monthlyRevenue", e.target.value)}
+                      error={errors.monthlyRevenue}
+                      placeholder="850"
+                    />
+                    <FieldInfo
+                      label="Last 12 months (USD)"
+                      info="Asked separately because twelve times a good month is a number buyers do not believe."
+                    >
+                      <TextField
+                        id={ids.yearly}
+                        name="yearlyRevenue"
+                        label="Last 12 months (USD)"
+                        hint="The actual total, not twelve months."
+                        inputMode="decimal"
+                        value={draft.yearlyRevenue}
+                        onChange={(e) => set("yearlyRevenue", e.target.value)}
+                        error={errors.yearlyRevenue}
+                        placeholder="9600"
+                      />
+                    </FieldInfo>
+                  </div>
+                </div>
+              </div>
+            </div>
             {errors.monetized ? (
               <p role="alert" className="mt-1.5 text-[0.8125rem] text-danger">
                 {errors.monetized}

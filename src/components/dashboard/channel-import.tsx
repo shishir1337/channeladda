@@ -6,6 +6,7 @@ import {
   LinkIcon,
   Loader2Icon,
   SearchIcon,
+  Undo2Icon,
 } from "lucide-react";
 import {
   type CSSProperties,
@@ -31,6 +32,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { normaliseChannelUrl, parseChannelUrl } from "@/lib/channel-url";
 import type { PLATFORM_IDS } from "@/lib/listing-form";
+import type { ImportKey } from "@/lib/listing-import";
 import { cn } from "@/lib/utils";
 import {
   type LookupResult,
@@ -138,8 +140,8 @@ const compact = new Intl.NumberFormat("en-US", {
 
 type Lookup =
   | { kind: "idle" }
-  | { kind: "found"; channel: ImportedChannel }
-  | { kind: "confirmed"; channel: ImportedChannel; filled: number }
+  /** Fetched and already in the form; `filled` is what it changed. */
+  | { kind: "filled"; channel: ImportedChannel; filled: ImportKey[] }
   | { kind: "error"; message: string; for: PlatformId };
 
 type PlatformInfo = {
@@ -149,19 +151,19 @@ type PlatformInfo = {
   tint: string;
 };
 
-/** Every field a lookup would fill, in the form's own words. */
-export function fieldsFrom(channel: ImportedChannel, metricLabel: string) {
-  const fields: string[] = [];
-  if (channel.title) fields.push("Title");
-  if (channel.handle) fields.push("Handle");
-  if (channel.subscribers > 0) fields.push(metricLabel);
-  if (channel.ageYears > 0) fields.push("Account age");
-  if (channel.country) fields.push("Country");
-  if (channel.niche) fields.push("Niche");
-  if (channel.engagement !== null) fields.push("Engagement");
-  if (channel.avatarUrl) fields.push("Profile picture");
-  if (channel.coverUrl) fields.push("Cover image");
-  return fields;
+/** A filled field, in the form's own words. */
+function labelFor(key: ImportKey, metricLabel: string) {
+  return {
+    title: "Title",
+    handle: "Handle",
+    avatarUrl: "Profile picture",
+    coverUrl: "Cover image",
+    audience: metricLabel,
+    ageYears: "Account age",
+    country: "Country",
+    niche: "Niche",
+    engagement: "Engagement",
+  }[key];
 }
 
 export function ChannelLinkField({
@@ -171,7 +173,8 @@ export function ChannelLinkField({
   value,
   onChange,
   onPlatform,
-  onConfirm,
+  onFill,
+  onUndo,
   error,
   savedUrl,
 }: {
@@ -184,8 +187,10 @@ export function ChannelLinkField({
   onChange: (url: string) => void;
   /** A link from another platform was pasted; the form follows it. */
   onPlatform: (platform: PlatformId) => void;
-  /** The seller said the channel is theirs. Returns how many fields it filled. */
-  onConfirm: (channel: ImportedChannel) => number;
+  /** Puts a fetched channel into the form; returns the fields it changed. */
+  onFill: (channel: ImportedChannel) => ImportKey[];
+  /** Takes the last fill back out. */
+  onUndo: () => void;
   error?: string;
   /** The link already saved on this listing, when one is being edited. */
   savedUrl?: string;
@@ -239,7 +244,16 @@ export function ChannelLinkField({
         return;
       }
       const { ok: _ok, ...channel } = result;
-      setLookup(channel.manual ? { kind: "idle" } : { kind: "found", channel });
+      if (channel.manual) {
+        setLookup({ kind: "idle" });
+        return;
+      }
+      // Straight into the form. A confirmation step in between was easy to
+      // walk past — sellers fetched, scrolled on, and saved an empty form.
+      // The card below still shows whose channel it was, with an undo, and
+      // the ownership check is what actually stops a listing for somebody
+      // else's channel going live.
+      setLookup({ kind: "filled", channel, filled: onFill(channel) });
     });
   }
 
@@ -270,15 +284,8 @@ export function ChannelLinkField({
     if (andLookUp) run(link, target);
   }
 
-  const confirm = () => {
-    if (lookup.kind !== "found") return;
-    // What the form actually changed, not what the channel offered: on a
-    // listing that already has its pictures and figures, fewer go in.
-    const filled = onConfirm(lookup.channel);
-    setLookup({ kind: "confirmed", channel: lookup.channel, filled });
-  };
-
   const notMine = () => {
+    onUndo();
     setLookup({ kind: "idle" });
     inputRef.current?.focus();
     inputRef.current?.select();
@@ -440,11 +447,9 @@ export function ChannelLinkField({
           note,
           pending
             ? "Looking up that link."
-            : lookup.kind === "found"
-              ? `Found ${lookup.channel.title || "the channel"}. Check it is yours.`
-              : lookup.kind === "confirmed"
-                ? "Filled in from the channel."
-                : null,
+            : lookup.kind === "filled"
+              ? `Filled in ${lookup.filled.length} ${lookup.filled.length === 1 ? "field" : "fields"} from ${lookup.channel.title || "the channel"}. Check it is yours.`
+              : null,
         ]
           .filter(Boolean)
           .join(" ")}
@@ -465,32 +470,15 @@ export function ChannelLinkField({
         </p>
       ) : null}
 
-      {lookup.kind === "found" && !pending ? (
+      {lookup.kind === "filled" && !pending ? (
         <ChannelPreview
           channel={lookup.channel}
           platform={platform}
-          onConfirm={confirm}
-          onReject={notMine}
+          filled={lookup.filled.map((key) =>
+            labelFor(key, platform.metricLabel),
+          )}
+          onUndo={notMine}
         />
-      ) : null}
-
-      {lookup.kind === "confirmed" ? (
-        <div className="mt-3 flex items-center gap-2.5 rounded-lg border border-line bg-surface-2/50 px-3 py-2 animate-rise">
-          <Avatar channel={lookup.channel} platform={platform} size="sm" />
-          <p className="min-w-0 flex-1 text-[0.8125rem] leading-5 text-muted">
-            <span className="font-medium text-fg">
-              {lookup.channel.title || "Channel"}
-            </span>{" "}
-            — filled in <span className="tabular-nums">{lookup.filled}</span>{" "}
-            {lookup.filled === 1 ? "field" : "fields"}. Check them below.
-          </p>
-          <span
-            aria-hidden="true"
-            className="inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-verified-soft text-verified ring-1 ring-verified/20 ring-inset"
-          >
-            <CheckIcon className="size-3" strokeWidth={3} />
-          </span>
-        </div>
       ) : null}
     </div>
   );
@@ -567,16 +555,16 @@ function PreviewSkeleton() {
 function ChannelPreview({
   channel,
   platform,
-  onConfirm,
-  onReject,
+  filled,
+  onUndo,
 }: {
   channel: ImportedChannel;
   platform: PlatformInfo;
-  onConfirm: () => void;
-  onReject: () => void;
+  /** What the fill actually changed, in the form's words. */
+  filled: string[];
+  onUndo: () => void;
 }) {
   const Mark = PLATFORM_MARK[platform.id];
-  const fields = fieldsFrom(channel, platform.metricLabel);
   const reach = platform.id === "telegram";
 
   const stats = [
@@ -662,10 +650,15 @@ function ChannelPreview({
           </dl>
         ) : null}
 
-        {fields.length > 0 ? (
+        {filled.length > 0 ? (
           <div className="mt-3.5">
-            <p className="flex items-center gap-1.5 text-xs text-muted">
-              Fills in
+            <p className="flex items-center gap-1.5 text-xs font-medium text-verified">
+              <CheckIcon
+                aria-hidden="true"
+                className="size-3.5"
+                strokeWidth={2.5}
+              />
+              Filled in for you
               {channel.engagementBasis ? (
                 <InfoTip label="About the engagement estimate">
                   Engagement is an estimate from {channel.engagementBasis}.
@@ -674,7 +667,7 @@ function ChannelPreview({
               ) : null}
             </p>
             <ul className="mt-1.5 flex flex-wrap gap-1.5">
-              {fields.map((field) => (
+              {filled.map((field) => (
                 <li
                   key={field}
                   className="inline-flex h-6 items-center gap-1 rounded-md border border-line bg-surface px-2 text-xs font-medium text-fg dark:bg-surface-2"
@@ -689,33 +682,28 @@ function ChannelPreview({
               ))}
             </ul>
           </div>
-        ) : null}
+        ) : (
+          <p className="mt-3.5 text-xs text-muted">
+            Everything this channel can tell us was already filled in.
+          </p>
+        )}
 
-        <p className="mt-3 text-xs leading-relaxed text-subtle">
-          {channel.subscribersHidden
-            ? "This channel hides its subscriber count, so enter the audience yourself below. "
-            : ""}
-          Anything you have already typed is kept — change any of it by hand.
-        </p>
-
-        <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+        <div className="mt-3.5 flex flex-col gap-3 border-t border-line pt-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-xs leading-relaxed text-subtle">
+            {channel.subscribersHidden
+              ? "This channel hides its subscriber count, so enter the audience yourself below. "
+              : ""}
+            Anything you had already typed was kept — change any of it below.
+          </p>
           <Button
             type="button"
-            size="md"
-            className="w-full sm:w-auto"
-            onClick={onConfirm}
+            variant="secondary"
+            size="sm"
+            className="w-full shrink-0 sm:w-auto"
+            onClick={onUndo}
           >
-            <CheckIcon aria-hidden="true" />
-            Yes, this is my account
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="md"
-            className="w-full sm:w-auto"
-            onClick={onReject}
-          >
-            No — paste another link
+            <Undo2Icon aria-hidden="true" />
+            Not my channel — undo
           </Button>
         </div>
       </div>
