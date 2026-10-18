@@ -63,6 +63,7 @@ export default async function AdminPayoutsPage() {
     <>
       <PageHeader
         title="Payouts"
+        description="Every decision here is written to the audit trail under your name."
         info="Every decision here is written to the audit trail under your name, with the hash or the refusal reason attached. Amounts are stored as integer cents and shown in whichever currency the header is set to."
         meta={
           <MetaItem label="Read">{new Date().toLocaleString("en-GB")}</MetaItem>

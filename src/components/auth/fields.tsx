@@ -89,19 +89,14 @@ export function PasswordField({
   const [shown, setShown] = useState(false);
 
   return (
-    <div>
-      <div className="flex items-baseline justify-between gap-3">
-        <label
-          htmlFor={id}
-          className="block text-sm font-medium text-fg app:text-[0.8125rem]"
-        >
-          {label}
-          {props.required ? (
-            <span className="ml-0.5 text-danger">*</span>
-          ) : null}
-        </label>
-        {aside}
-      </div>
+    <div className={aside ? "relative" : undefined}>
+      <label
+        htmlFor={id}
+        className="block text-sm font-medium text-fg app:text-[0.8125rem]"
+      >
+        {label}
+        {props.required ? <span className="ml-0.5 text-danger">*</span> : null}
+      </label>
       {hint ? (
         <p
           id={`${id}-hint`}
@@ -144,6 +139,9 @@ export function PasswordField({
           )}
         </button>
       </div>
+      {/* After the input in the page, so Tab goes from the email straight
+          to the password; drawn up beside the label. */}
+      {aside ? <div className="absolute top-0 right-0">{aside}</div> : null}
       {error ? (
         <p
           id={`${id}-error`}

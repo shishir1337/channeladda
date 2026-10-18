@@ -253,18 +253,26 @@ type StatusRowProps = {
 };
 
 /**
- * One line of the account's standing: what it is and where it stands, with
- * the why behind the (i) beside its name.
+ * One line of the account's standing: what it is and where it stands. When
+ * it is fine the why sits behind the (i); when it is not, the why is the
+ * warning, so it is in sight.
  */
 function StatusRow({ icon, label, state, good, body, action }: StatusRowProps) {
   return (
     <li className="flex items-center gap-3 px-4 py-3 sm:px-5">
       <IconTile icon={icon} />
-      <div className="flex min-w-0 flex-1 items-center gap-1.5">
-        <h3 className="min-w-0 text-sm leading-5 font-medium text-fg">
-          {label}
-        </h3>
-        <InfoTip label={`About ${label}`}>{body}</InfoTip>
+      <div className="min-w-0 flex-1">
+        <div className="flex min-w-0 items-center gap-1.5">
+          <h3 className="min-w-0 text-sm leading-5 font-medium text-fg">
+            {label}
+          </h3>
+          {good ? <InfoTip label={`About ${label}`}>{body}</InfoTip> : null}
+        </div>
+        {good ? null : (
+          <p className="mt-0.5 text-[0.8125rem] leading-relaxed text-muted">
+            {body}
+          </p>
+        )}
       </div>
       <div className="flex shrink-0 items-center gap-3">
         <Badge size="sm" variant={good ? "verified" : "primary"}>

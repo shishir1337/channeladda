@@ -158,7 +158,10 @@ export async function AuthShell({
             stranger.
           </p>
 
-          <div className="mt-10 max-w-sm rounded-xl border border-white/10 bg-white/[0.04] p-5 shadow-[0_24px_60px_-24px_rgb(0_0_0/0.8)] backdrop-blur-sm">
+          <div
+            aria-hidden="true"
+            className="mt-10 max-w-sm rounded-xl border border-white/10 bg-white/[0.04] p-5 shadow-[0_24px_60px_-24px_rgb(0_0_0/0.8)] backdrop-blur-sm"
+          >
             <div className="flex items-center justify-between text-xs">
               <span className="font-medium text-white/80">Safest deal</span>
               <span className="text-white/45 tabular-nums">Step 3 of 4</span>

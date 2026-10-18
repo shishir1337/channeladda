@@ -39,6 +39,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Price } from "@/components/ui/price";
 import type { ListingStatus, OfferStatus } from "@/generated/prisma/enums";
+import { cn } from "@/lib/utils";
 import { getBuyerSummary, getSellerSummary } from "@/server/dashboard";
 import { getOffersForBuyer, getOffersForSeller } from "@/server/offers";
 import { getMyListings } from "@/server/seller-listings";
@@ -529,18 +530,31 @@ export default async function DashboardPage() {
               />
             ) : (
               <CardBody>
-                <SplitBar
-                  label="Your offers: open, accepted and bought"
-                  parts={[
-                    { label: "Open", value: buying.openOffers, tone: "info" },
-                    {
-                      label: "Accepted",
-                      value: buying.accepted,
-                      tone: "verified",
-                    },
+                {/* Three figures, not one bar: they overlap — an accepted
+                    offer that went through is counted again as bought — so
+                    they are not parts of one whole. */}
+                <dl className="grid grid-cols-3 divide-x divide-line">
+                  {[
+                    { label: "Open", value: buying.openOffers },
+                    { label: "Accepted", value: buying.accepted },
                     { label: "Bought", value: buying.bought },
-                  ]}
-                />
+                  ].map((figure) => (
+                    <div
+                      key={figure.label}
+                      className="px-3 first:pl-0 last:pr-0"
+                    >
+                      <dt className="text-xs text-muted">{figure.label}</dt>
+                      <dd
+                        className={cn(
+                          "mt-1 text-xl font-semibold tracking-[-0.02em] tabular-nums",
+                          figure.value === 0 ? "text-subtle" : "text-fg",
+                        )}
+                      >
+                        {figure.value.toLocaleString("en-US")}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
               </CardBody>
             )}
           </Card>

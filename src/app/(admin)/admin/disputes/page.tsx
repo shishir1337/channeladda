@@ -103,7 +103,7 @@ export default async function DisputesPage() {
               />
             ) : null
           }
-          info="The Terms promise a first response within 48 hours."
+          note="The Terms promise a first response within 48 hours."
         />
         <Stat
           label="Past seven days"
@@ -120,7 +120,7 @@ export default async function DisputesPage() {
               />
             ) : null
           }
-          info="The Terms promise a decision within seven days."
+          note="The Terms promise a decision within seven days."
         />
         {/* A money total is finance's figure, as everywhere else in the
             staff area. Each case still shows its own, because nobody can

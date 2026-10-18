@@ -661,8 +661,8 @@ function AgentIdentity({
 // ---------------------------------------------------------- identity (KYC)
 
 /**
- * Each status in one line, and what follows from it behind the (i). The two
- * halves are one explanation split at a sentence, so neither is reworded.
+ * Each status, and what follows from it. Kept as two halves of one
+ * explanation so the confirmation can repeat the consequence on its own.
  */
 const KYC_CHOICES: {
   status: KycStatus;
@@ -781,8 +781,10 @@ export function KycControl({
                         setNote(null);
                       }}
                       title={choice.label}
-                      detail={choice.meaning}
-                      more={choice.more}
+                      // Both halves in sight: what follows from a status —
+                      // who sees their page, what it does not touch — is a
+                      // consequence, not background.
+                      detail={`${choice.meaning} ${choice.more}`}
                     />
                   ),
                 )}
@@ -798,6 +800,11 @@ export function KycControl({
                   </strong>
                   ? It is recorded against your name with the reason you gave.
                 </p>
+                {chosen ? (
+                  <p className="mt-1 text-[0.8125rem] leading-relaxed text-muted">
+                    {chosen.more}
+                  </p>
+                ) : null}
                 <div className="mt-3 flex flex-wrap gap-2">
                   <Button
                     type="button"

@@ -410,7 +410,7 @@ export default async function AdminUserPage({
                   {wallet.entries.length > ledgerShown.length ? (
                     <p className="mt-2 text-xs text-subtle">
                       The latest {ledgerShown.length} of {wallet.entries.length}{" "}
-                      loaded.
+                      loaded. The balance above counts every row.
                     </p>
                   ) : null}
                 </div>
@@ -500,9 +500,16 @@ export default async function AdminUserPage({
             id="deals"
             title="Deals"
             count={deals.total}
-            info={
+            // Cut off, it says so in sight — the count beside the heading
+            // is the whole total, more than the rows below.
+            description={
               deals.total > deals.deals.length
                 ? `The latest ${deals.deals.length} of ${deals.total}, as buyer, seller or agent.`
+                : undefined
+            }
+            info={
+              deals.total > deals.deals.length
+                ? undefined
                 : "Every deal they are part of, as buyer, seller or agent."
             }
           >
@@ -616,11 +623,13 @@ export default async function AdminUserPage({
                       value={person.holds}
                       max={person.maxHolds}
                       label="Channels held against the cap"
+                      // The team page's colours for the same measure: red
+                      // at the cap, gold with one left, neutral otherwise.
                       tone={
                         person.holds >= person.maxHolds
                           ? "danger"
-                          : person.holds > 0
-                            ? "verified"
+                          : person.holds === person.maxHolds - 1
+                            ? "primary"
                             : "neutral"
                       }
                       className="w-14"

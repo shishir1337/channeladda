@@ -2,7 +2,6 @@ import { HandCoinsIcon, InboxIcon, TagIcon } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { InfoTip } from "@/components/app/info-tip";
 import {
   Dot,
   EmptyState,
@@ -44,27 +43,6 @@ function toCard(offer: OfferView): OfferCardData {
     counterOf: offer.counterOf,
     conversationId: offer.conversationId,
   };
-}
-
-/**
- * An empty group's title, with what offers are for behind the (i): a
- * newcomer needs that once, and the empty card stays a title and a button.
- */
-function EmptyTitle({
-  children,
-  label,
-  info,
-}: {
-  children: ReactNode;
-  label: string;
-  info: ReactNode;
-}) {
-  return (
-    <span className="inline-flex items-center gap-1.5">
-      {children}
-      <InfoTip label={label}>{info}</InfoTip>
-    </span>
-  );
 }
 
 function Group({
@@ -153,14 +131,8 @@ export default async function OffersPage() {
           <EmptyState
             as="h3"
             icon={InboxIcon}
-            title={
-              <EmptyTitle
-                label="About offers on your listings"
-                info="Buyers can offer below your asking price on any live listing of yours, and you can counter without losing the buyer."
-              >
-                Nobody has made you an offer yet
-              </EmptyTitle>
-            }
+            title="Nobody has made you an offer yet"
+            info="Buyers can offer below your asking price on any live listing of yours, and you can counter without losing the buyer."
             action={
               <Button asChild variant="secondary" size="sm">
                 <Link href="/dashboard/listings">See your listings</Link>
@@ -181,14 +153,8 @@ export default async function OffersPage() {
           <EmptyState
             as="h3"
             icon={TagIcon}
-            title={
-              <EmptyTitle
-                label="About making offers"
-                info="Make an offer on any listing for less than its asking price — the seller can accept it, counter it, or let it lapse."
-              >
-                You have not made any offers
-              </EmptyTitle>
-            }
+            title="You have not made any offers"
+            info="Make an offer on any listing for less than its asking price — the seller can accept it, counter it, or let it lapse."
             action={
               <Button asChild size="sm">
                 <Link href="/browse">Find an account</Link>

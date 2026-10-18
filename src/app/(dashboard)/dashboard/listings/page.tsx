@@ -178,7 +178,9 @@ export default async function MyListingsPage() {
                   <h2 className="text-sm leading-5 font-semibold text-fg">
                     {step.title}
                   </h2>
-                  <InfoTip label={`About step ${i + 1}`}>{step.body}</InfoTip>
+                  <InfoTip label={`About step ${i + 1}: ${step.title}`}>
+                    {step.body}
+                  </InfoTip>
                 </div>
               </li>
             ))}

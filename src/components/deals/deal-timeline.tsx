@@ -205,7 +205,7 @@ function StepInfo({
   if (parts.length === 0) return null;
 
   return (
-    <InfoTip label="About this step" className={className}>
+    <InfoTip label={`About this step: ${step.label}`} className={className}>
       {parts.map((text, index) => (
         <p key={text} className={index > 0 ? "mt-2" : undefined}>
           {text}

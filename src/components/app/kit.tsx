@@ -135,7 +135,13 @@ export function PageHeader({
           <h1 className="text-xl leading-7 font-semibold tracking-[-0.018em] text-fg sm:text-[1.375rem]">
             {title}
           </h1>
-          {info ? <InfoTip label="About this page">{info}</InfoTip> : null}
+          {info ? (
+            <InfoTip
+              label={`About ${typeof title === "string" ? title : "this page"}`}
+            >
+              {info}
+            </InfoTip>
+          ) : null}
         </div>
         {description ? (
           <p className="mt-1 max-w-[72ch] text-sm leading-relaxed text-muted">
@@ -237,14 +243,18 @@ export function Section({
         <div className="mb-3 flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
           <div className="min-w-0">
             {title ? (
-              <h2
-                id={headingId}
-                className="flex flex-wrap items-center gap-2 text-[0.9375rem] leading-6 font-semibold text-fg"
-              >
-                {title}
-                {typeof count === "number" ? (
-                  <Count value={count} tone={tone} />
-                ) : null}
+              // The tip sits beside the heading rather than inside it, so
+              // the heading — and the region it names — is just the title.
+              <div className="flex flex-wrap items-center gap-2">
+                <h2
+                  id={headingId}
+                  className="flex flex-wrap items-center gap-2 text-[0.9375rem] leading-6 font-semibold text-fg"
+                >
+                  {title}
+                  {typeof count === "number" ? (
+                    <Count value={count} tone={tone} />
+                  ) : null}
+                </h2>
                 {info ? (
                   <InfoTip
                     label={`About ${typeof title === "string" ? title : "this section"}`}
@@ -252,7 +262,7 @@ export function Section({
                     {info}
                   </InfoTip>
                 ) : null}
-              </h2>
+              </div>
             ) : null}
             {description ? (
               <p className="mt-0.5 max-w-[80ch] text-[0.8125rem] leading-relaxed text-muted">
@@ -561,10 +571,13 @@ export function EmptyState({
   tone = "neutral",
   bare,
   as: Title = "p",
+  info,
   className,
 }: {
   icon?: Icon;
   title: ReactNode;
+  /** The longer explanation, behind an (i) beside the title. */
+  info?: ReactNode;
   body?: ReactNode;
   action?: ReactNode;
   tone?: "neutral" | "success";
@@ -587,9 +600,18 @@ export function EmptyState({
         size="lg"
         tone={tone === "success" ? "verified" : "neutral"}
       />
-      <Title className="mt-4 text-sm font-semibold tracking-normal text-fg">
-        {title}
-      </Title>
+      <div className="mt-4 flex items-center justify-center gap-1.5">
+        <Title className="text-sm font-semibold tracking-normal text-fg">
+          {title}
+        </Title>
+        {info ? (
+          <InfoTip
+            label={`About ${typeof title === "string" ? title : "this"}`}
+          >
+            {info}
+          </InfoTip>
+        ) : null}
+      </div>
       {body ? (
         <p className="mt-1 max-w-[46ch] text-[0.8125rem] leading-relaxed text-muted">
           {body}
@@ -705,8 +727,18 @@ export function Stat({
   icon?: Icon;
   className?: string;
 }) {
-  const body = (
-    <>
+  // A linked figure is a box with a stretched link rather than a link
+  // wrapping everything: the whole card still opens the page, and the info
+  // tip — a button, which cannot sit inside a link — stays in the label row.
+  return (
+    <div
+      className={cn(
+        "group relative flex min-w-0 flex-col rounded-card border border-line bg-surface p-4 shadow-xs",
+        href &&
+          "transition-[border-color,background-color] duration-150 hover:border-line-strong hover:bg-surface-2/40 has-[a:focus-visible]:outline-2 has-[a:focus-visible]:outline-offset-2 has-[a:focus-visible]:outline-ring",
+        className,
+      )}
+    >
       <div className="flex items-center gap-2 text-[0.8125rem] leading-5 font-medium text-muted">
         {tone !== "neutral" ? <Dot tone={tone} /> : null}
         {IconCmp ? (
@@ -715,19 +747,20 @@ export function Stat({
             className="size-3.5 shrink-0 text-subtle"
           />
         ) : null}
-        <span
-          className={cn(
-            "min-w-0",
-            // Room for the tip that floats over a linked card, between the
-            // label and the arrow, so a long label wraps before it.
-            info && href && "mr-6",
-          )}
-        >
-          {label}
-        </span>
-        {info && !href ? (
+        {href ? (
+          <Link
+            href={href}
+            className="min-w-0 [overflow-wrap:anywhere] outline-none after:absolute after:inset-0 after:rounded-[inherit] after:content-['']"
+          >
+            {label}
+          </Link>
+        ) : (
+          <span className="min-w-0 [overflow-wrap:anywhere]">{label}</span>
+        )}
+        {info ? (
           <InfoTip
             label={`About ${typeof label === "string" ? label : "this figure"}`}
+            className="relative z-[1]"
           >
             {info}
           </InfoTip>
@@ -749,40 +782,10 @@ export function Stat({
       >
         {typeof value === "number" ? value.toLocaleString("en-US") : value}
       </p>
-      {chip ? <div className="mt-2">{chip}</div> : null}
+      {chip ? <div className="relative mt-2">{chip}</div> : null}
       {note ? (
         <p className="mt-1 text-xs leading-snug text-subtle">{note}</p>
       ) : null}
-    </>
-  );
-
-  const shell = cn(
-    "group flex min-w-0 flex-col rounded-card border border-line bg-surface p-4 shadow-xs",
-    href &&
-      "transition-[border-color,background-color] duration-150 hover:border-line-strong hover:bg-surface-2/40",
-    className,
-  );
-
-  if (!href) return <div className={shell}>{body}</div>;
-
-  const link = (
-    <Link href={href} className={cn(shell, info && "h-full")}>
-      {body}
-    </Link>
-  );
-  if (!info) return link;
-
-  // A button cannot sit inside a link, so with both the tip floats over the
-  // card, just left of its arrow.
-  return (
-    <div className="relative min-w-0">
-      {link}
-      <InfoTip
-        label={`About ${typeof label === "string" ? label : "this figure"}`}
-        className="absolute top-4 right-9"
-      >
-        {info}
-      </InfoTip>
     </div>
   );
 }
@@ -1243,7 +1246,9 @@ const BAR: Record<Tone | "muted", string> = {
   verified: "bg-verified",
   danger: "bg-danger",
   info: "bg-info",
-  muted: "bg-line-strong",
+  // Solid grey, darker than the track, so a grey part never reads as the
+  // empty end of a half-full bar.
+  muted: "bg-muted/55",
 };
 
 const STROKE: Record<Tone, string> = {
@@ -1276,9 +1281,11 @@ export function Meter({
         className="sr-only"
         aria-label={label}
         min={0}
-        max={max > 0 ? max : 1}
-        value={value}
-      />
+        max={100}
+        value={Math.round(share * 100)}
+      >
+        {Math.round(share * 100)}%
+      </meter>
       <div
         aria-hidden="true"
         className="h-1.5 w-full overflow-hidden rounded-full bg-surface-3"

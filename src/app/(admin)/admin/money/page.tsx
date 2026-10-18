@@ -485,8 +485,7 @@ export default async function AdminMoneyPage({
             className="sm:col-span-2"
             // The warning stays in sight: it is the one line on this desk
             // that says money may be missing.
-            note="What our crypto accounts should hold. If they hold much less, stop and find out why."
-            info="The three above added up: what our crypto accounts should hold, before processor and network fees. If they hold much less, stop and find out why."
+            note="The three above added up: what our crypto accounts should hold, before processor and network fees. If they hold much less, stop and find out why."
             visual={
               <>
                 <SplitBar
@@ -585,23 +584,27 @@ export default async function AdminMoneyPage({
       >
         <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
           <div className="min-w-0">
-            <h2
-              id="month-heading"
-              className="flex flex-wrap items-baseline gap-x-2 text-lg leading-7 font-semibold tracking-[-0.012em] text-fg"
-            >
-              <span className="font-medium text-muted">Monthly report</span>
-              <Sep />
-              <span>{month.label}</span>
-              {isCurrent ? (
-                <span className="text-sm font-normal text-subtle">so far</span>
-              ) : null}
-              <InfoTip label="About the monthly report" className="self-center">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2
+                id="month-heading"
+                className="flex flex-wrap items-baseline gap-x-2 text-lg leading-7 font-semibold tracking-[-0.012em] text-fg"
+              >
+                <span className="font-medium text-muted">Monthly report</span>
+                <Sep />
+                <span>{month.label}</span>
+                {isCurrent ? (
+                  <span className="text-sm font-normal text-subtle">
+                    so far
+                  </span>
+                ) : null}
+              </h2>
+              <InfoTip label="About the monthly report">
                 Months run from midnight to midnight UTC.
                 {isCurrent
                   ? " This month is not over, so these figures will still grow."
                   : ""}
               </InfoTip>
-            </h2>
+            </div>
             {/* Said in sight, because otherwise a page of zeroes reads as a
                 month in which nothing happened. */}
             {later ? (
@@ -823,7 +826,8 @@ export default async function AdminMoneyPage({
         <Section
           id="exports"
           title="For the accountant"
-          info={`Spreadsheet files for ${month.label}, in exact US dollars and cents. Each download is written to the audit trail under your name.`}
+          description="Each download is written to the audit trail under your name."
+          info={`Spreadsheet files for ${month.label}, in exact US dollars and cents.`}
         >
           <List>
             <ListItem>

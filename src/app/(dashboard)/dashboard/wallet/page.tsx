@@ -3,6 +3,7 @@ import {
   BanknoteIcon,
   CircleCheckIcon,
   CoinsIcon,
+  InfoIcon,
   LockIcon,
   PlusIcon,
   RotateCcwIcon,
@@ -16,7 +17,6 @@ import type { ComponentType, SVGProps } from "react";
 import { InfoTip } from "@/components/app/info-tip";
 import {
   Card,
-  Disclosure,
   EmptyState,
   IconTile,
   List,
@@ -269,13 +269,13 @@ export default async function WalletPage({
           </div>
         </Card>
 
-        {/* Folded rather than put behind an (i): it carries a link, and a
-            tooltip's contents cannot be reached from the keyboard. */}
-        <Disclosure
-          bare
-          title="Which sales reach this balance"
-          className="mt-2"
-        >
+        {/* In sight, as one quiet line: a Safest seller looking for their
+            money needs to see at once that it was never coming here. */}
+        <div className="mt-3 flex items-start gap-2 text-[0.8125rem] leading-relaxed text-muted">
+          <InfoIcon
+            aria-hidden="true"
+            className="mt-[0.1875rem] size-3.5 shrink-0 text-subtle"
+          />
           <p className="max-w-[72ch]">
             Only <strong className="font-semibold text-fg">Fastest</strong>{" "}
             sales reach this balance, because that is the mode where the buyer
@@ -290,7 +290,7 @@ export default async function WalletPage({
             </Link>
             .
           </p>
-        </Disclosure>
+        </div>
       </Section>
 
       {/* ---- putting money in, taking it out ----------------------------- */}

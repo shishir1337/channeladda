@@ -194,7 +194,7 @@ export default async function ReviewListingPage({
               as="h2"
               icon={FingerprintIcon}
               title="Ownership check"
-              info="Open the account and look for this code. If it is not there, send the listing back — a seller who cannot post to the profile does not control it."
+              description="Open the account and look for this code. If it is not there, send the listing back — a seller who cannot post to the profile does not control it."
             />
             <CardBody className="flex flex-wrap items-center gap-3">
               <code className="rounded-lg border border-line bg-surface-2 px-3 py-2 font-mono text-[0.9375rem] leading-6 font-medium tracking-wider text-fg select-all">
@@ -215,7 +215,8 @@ export default async function ReviewListingPage({
             <CardHeader
               as="h2"
               title="What the seller claims"
-              info="Unverified until the proof below backs it up. Money is shown in whichever currency the header is set to."
+              description="Unverified until the proof below backs it up."
+              info="Money is shown in whichever currency the header is set to."
             />
             <CardBody className="py-1.5 sm:py-1.5">
               <Facts columns={2} className={pairedFacts}>

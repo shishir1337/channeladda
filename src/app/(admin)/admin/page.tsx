@@ -169,7 +169,10 @@ function SweepHeartbeat({
       >
         {stale ? (
           <p className="max-w-[72ch] text-fg">
-            It should run every ten minutes. Whoever looks after the server
+            It should run every ten minutes. Until it does, unpaid deals never
+            expire — so their listings stay reserved for ever — payments whose
+            callback went missing are never applied, old offers stay open and
+            expired chat files are not deleted. Whoever looks after the server
             needs to know about this today.
           </p>
         ) : null}
@@ -192,35 +195,27 @@ function SweepHeartbeat({
 
         <Disclosure
           bare
-          title={stale ? "What stops, and how to fix it" : "What this means"}
+          title={stale ? "How to fix it" : "What this means"}
           className="mt-1"
         >
           {stale ? (
-            <>
-              <p className="max-w-[72ch]">
-                Until it does, unpaid deals never expire — so their listings
-                stay reserved for ever — payments whose callback went missing
-                are never applied, old offers stay open and expired chat files
-                are not deleted.
-              </p>
-              <p className="mt-2 max-w-[72ch] text-xs">
-                The server&rsquo;s crontab calls{" "}
-                <code className="rounded bg-surface px-1 py-0.5 font-mono text-[0.6875rem] text-fg ring-1 ring-line">
-                  POST /api/cron
-                </code>{" "}
-                with the cron secret; the setup is in the deployment guide.
-                {at ? (
-                  <>
-                    {" "}
-                    Last run:{" "}
-                    <time dateTime={at.toISOString()} className="tnum">
-                      {at.toLocaleString("en-GB")}
-                    </time>
-                    .
-                  </>
-                ) : null}
-              </p>
-            </>
+            <p className="max-w-[72ch] text-xs">
+              The server&rsquo;s crontab calls{" "}
+              <code className="rounded bg-surface px-1 py-0.5 font-mono text-[0.6875rem] text-fg ring-1 ring-line">
+                POST /api/cron
+              </code>{" "}
+              with the cron secret; the setup is in the deployment guide.
+              {at ? (
+                <>
+                  {" "}
+                  Last run:{" "}
+                  <time dateTime={at.toISOString()} className="tnum">
+                    {at.toLocaleString("en-GB")}
+                  </time>
+                  .
+                </>
+              ) : null}
+            </p>
           ) : null}
           {failed.length > 0 ? (
             <p className={stale ? "mt-2 max-w-[72ch] text-xs" : "max-w-[72ch]"}>

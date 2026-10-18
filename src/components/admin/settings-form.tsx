@@ -332,7 +332,7 @@ export function SettingsForm({
           name="buyerFeeBpSafest"
           label="Buyer fee, Safest"
           unit="%"
-          tip="The only thing a Safest buyer pays us."
+          hint="The only thing a Safest buyer pays us."
           inputMode="decimal"
           value={safest}
           onChange={setSafest}
@@ -343,7 +343,7 @@ export function SettingsForm({
           name="buyerFeeBpFastest"
           label="Buyer fee, Fastest"
           unit="%"
-          tip="On top of the price, which we also hold."
+          hint="On top of the price, which we also hold."
           inputMode="decimal"
           value={fastest}
           onChange={setFastest}

@@ -1203,7 +1203,7 @@ export function ListingForm({
           state={stepState(steps[4])}
           statusLabel={stepStatus(steps[4])}
           title="Proof the account is yours"
-          description="Screenshots from inside the account — analytics, revenue, the account settings page."
+          description="Screenshots from inside the account — analytics, revenue, the account settings page. Never shown to buyers in full."
           info="Screenshots from inside the account — analytics, revenue, the account settings page. This is what a moderator checks your numbers against, and it is never shown to buyers in full. At least one is needed, up to eight."
         >
           <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">

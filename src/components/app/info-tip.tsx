@@ -2,7 +2,7 @@
 
 import * as Tooltip from "@radix-ui/react-tooltip";
 import { InfoIcon } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
 /**
@@ -26,6 +26,10 @@ export function InfoTip({
   className?: string;
 }) {
   const [open, setOpen] = useState(false);
+  // Radix closes the tip on pointerdown, before the click arrives, so the
+  // click has to know what the state was when the press began.
+  const wasOpen = useRef(false);
+  const byMouse = useRef(false);
 
   return (
     <Tooltip.Provider delayDuration={150} skipDelayDuration={100}>
@@ -34,11 +38,25 @@ export function InfoTip({
           <button
             type="button"
             aria-label={label}
+            onPointerDown={(event) => {
+              wasOpen.current = open;
+              byMouse.current = event.pointerType === "mouse";
+            }}
             onClick={(event) => {
               // Radix closes a tooltip on click; here a click is how a
-              // touch screen opens it, so it toggles instead.
+              // touch screen opens it, so it toggles instead. A mouse has
+              // already opened it by hovering, so its click keeps it open.
               event.preventDefault();
-              setOpen((was) => !was);
+              setOpen(byMouse.current ? true : !wasOpen.current);
+              wasOpen.current = false;
+              byMouse.current = false;
+            }}
+            onKeyDown={(event) => {
+              // Enter and Space click without a pointerdown first.
+              if (event.key === "Enter" || event.key === " ") {
+                wasOpen.current = open;
+                byMouse.current = false;
+              }
             }}
             className={cn(
               "relative inline-flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-full align-middle text-subtle transition-colors duration-150 hover:text-fg focus-visible:text-fg data-[state=delayed-open]:text-fg data-[state=instant-open]:text-fg",

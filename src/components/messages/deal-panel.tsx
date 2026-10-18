@@ -191,7 +191,14 @@ export function DealPanel({
                   {view.title}
                 </h2>
                 {view.info ? (
-                  <InfoTip label="More about this" className="mt-0.5">
+                  <InfoTip
+                    label={
+                      typeof view.title === "string"
+                        ? `About: ${view.title}`
+                        : "About this step"
+                    }
+                    className="mt-0.5"
+                  >
                     {view.info}
                   </InfoTip>
                 ) : null}
