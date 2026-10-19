@@ -1,26 +1,33 @@
-import {
-  BadgeCheckIcon,
-  CircleDollarSignIcon,
-  EyeIcon,
-  MapPinIcon,
-  StarIcon,
-} from "lucide-react";
+import { BadgeCheckIcon, StarIcon } from "lucide-react";
 import Link from "next/link";
 import { FavoriteButton } from "@/components/home/favorite-button";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Price } from "@/components/ui/price";
 import type { Listing } from "@/data/listings";
 import { platformMap } from "@/data/platforms";
-import { cn, formatCompact, ratingLabel } from "@/lib/utils";
+import { countOf } from "@/lib/plural";
+import { cn, formatCompact } from "@/lib/utils";
 
+/**
+ * Tags in the one colour that means something for each: gold for what we
+ * promote, blue for news. "Hot" and a price drop are facts, not alarms or
+ * verifications, so they are neutral.
+ */
 const tagStyles = {
   featured: { label: "Featured", variant: "primary" as const },
-  hot: { label: "Hot", variant: "danger" as const },
+  hot: { label: "Popular", variant: "neutral" as const },
   new: { label: "New", variant: "info" as const },
-  ending: { label: "Price drop", variant: "verified" as const },
+  ending: { label: "Price drop", variant: "neutral" as const },
 };
 
+/**
+ * One listing in a grid.
+ *
+ * Cover, the account, one line on what it is, three facts, and the price —
+ * the whole card is the link. It used to stack five boxes (a bordered metric
+ * grid, a chip row and a price row with its own rule) and a "View" button
+ * that did what the card already did.
+ */
 export function ListingCard({
   listing,
   priority,
@@ -38,16 +45,13 @@ export function ListingCard({
   return (
     <article
       className={cn(
-        // @container: the metric strip keys off the card width, not the viewport,
-        // so a narrow card next to the browse filter rail still reads correctly.
-        "lift-card group @container flex h-full flex-col rounded-card border border-line bg-surface hover:border-primary/45",
+        "lift-card group relative flex h-full flex-col rounded-card border border-line bg-surface hover:border-line-strong",
         className,
       )}
     >
-      {/* Cover art. Its own wrapper handles the rounding + clipping so the
-          card itself can keep its hover shadow. */}
       <div className="relative">
-        <div className="relative overflow-hidden rounded-t-[calc(1rem-1px)]">
+        {/* Clipped on its own wrapper so the card keeps its hover shadow. */}
+        <div className="overflow-hidden rounded-t-[calc(var(--radius-card)-1px)] bg-surface-2">
           {/* biome-ignore lint/performance/noImgElement: static SVG artwork —
               next/image cannot optimise vectors and would need the global
               dangerouslyAllowSVG flag, which is unsafe once sellers upload
@@ -56,49 +60,60 @@ export function ListingCard({
             src={listing.coverUrl}
             alt=""
             width={480}
-            height={210}
+            height={240}
             loading={priority ? "eager" : "lazy"}
             decoding="async"
-            className="aspect-[16/7] w-full object-cover transition-transform duration-500 ease-[var(--ease-out-soft)] group-hover:scale-[1.04]"
-          />
-          <span
-            aria-hidden="true"
-            className="absolute inset-0 bg-gradient-to-t from-surface via-surface/10 to-transparent"
+            className="aspect-[2/1] w-full object-cover"
           />
         </div>
 
-        <div className="absolute top-3 left-3 flex items-center gap-2">
+        <div className="absolute top-3 left-3 flex items-center gap-1.5">
           <span
-            className="flex size-8 items-center justify-center rounded-lg bg-black/55 backdrop-blur-sm"
+            className="flex size-7 items-center justify-center rounded-md bg-black/55 backdrop-blur-sm"
             style={{ color: platform.tint }}
           >
-            <PlatformIcon className="size-4" />
+            <PlatformIcon className="size-3.5" />
             <span className="sr-only">{platform.name}</span>
           </span>
-          {tag ? <Badge variant={tag.variant}>{tag.label}</Badge> : null}
+          {tag ? (
+            <Badge
+              variant={tag.variant}
+              className={cn(
+                tag.variant === "neutral" &&
+                  "border-transparent bg-black/55 text-white backdrop-blur-sm",
+              )}
+            >
+              {tag.label}
+            </Badge>
+          ) : null}
         </div>
 
         <div className="absolute top-1.5 right-1.5">
           <FavoriteButton listingId={listing.id} handle={listing.handle} />
         </div>
 
-        {/* Channel avatar straddling the cover and the body. */}
+        {/* The account's own picture, straddling the cover and the body. */}
         {/* biome-ignore lint/performance/noImgElement: static SVG avatar, see above. */}
         <img
           src={listing.avatarUrl}
           alt=""
-          width={128}
-          height={128}
+          width={96}
+          height={96}
           loading={priority ? "eager" : "lazy"}
           decoding="async"
-          className="absolute -bottom-5 left-4 size-14 rounded-full border-[3px] border-surface bg-surface-2 object-cover sm:left-5"
+          className="absolute -bottom-5 left-4 size-12 rounded-full border-[3px] border-surface bg-surface-2 object-cover"
         />
       </div>
 
-      <div className="px-4 pt-7 sm:px-5">
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          <h3 className="truncate font-display text-[0.9375rem] font-semibold sm:text-base">
-            {listing.handle}
+      <div className="flex flex-1 flex-col px-4 pt-7 pb-4">
+        <div className="flex min-w-0 items-center gap-1.5">
+          <h3 className="min-w-0 truncate text-[0.9375rem] font-semibold text-fg">
+            <Link
+              href={`/listing/${listing.slug}`}
+              className="after:absolute after:inset-0 after:rounded-card focus-visible:outline-none"
+            >
+              {listing.handle}
+            </Link>
           </h3>
           {listing.ownershipVerified ? (
             <BadgeCheckIcon
@@ -107,117 +122,88 @@ export function ListingCard({
             />
           ) : null}
         </div>
-        <p className="mt-0.5 truncate text-xs text-subtle">
+        <p className="mt-0.5 truncate text-[0.8125rem] text-subtle">
           {platform.name} · {listing.niche}
         </p>
 
-        {/* Two-line reservation keeps metric strips aligned across a row. */}
-        <p className="mt-2.5 line-clamp-2 min-h-[2.6rem] text-[0.8125rem] leading-relaxed text-muted sm:min-h-[2.75rem] sm:text-sm">
+        {/* Two lines reserved, so the facts line up across a row. */}
+        <p className="mt-2 line-clamp-2 min-h-[2.75rem] text-sm leading-relaxed text-muted">
           {listing.title}
         </p>
-      </div>
 
-      <dl className="mt-4 grid grid-cols-2 gap-px overflow-hidden border-y border-line bg-line @sm:grid-cols-4">
-        <Metric
-          label={platform.metricLabel}
-          value={formatCompact(listing.audience)}
-        />
-        <Metric label="Engagement" value={`${listing.engagement}%`} />
-        <Metric label="Age" value={`${listing.ageYears} yr`} />
-        <Metric
-          label="Revenue"
-          value={
-            listing.monthlyRevenue > 0 ? (
-              <Price usd={listing.monthlyRevenue} />
-            ) : (
-              "—"
-            )
-          }
-          highlight={listing.monthlyRevenue > 0}
-        />
-      </dl>
+        <dl className="mt-4 grid grid-cols-3 gap-3">
+          <Fact
+            label={platform.metricLabel}
+            value={formatCompact(listing.audience)}
+          />
+          <Fact label="Engagement" value={`${listing.engagement}%`} />
+          <Fact label="Age" value={`${listing.ageYears} yr`} />
+        </dl>
 
-      <div className="flex flex-wrap items-center gap-1.5 px-4 py-3.5 sm:px-5">
-        <Badge variant={listing.monetized ? "verified" : "neutral"}>
-          <CircleDollarSignIcon aria-hidden="true" />
-          {listing.monetized ? "Monetized" : "Not monetized"}
-        </Badge>
-        <Badge>
-          <MapPinIcon aria-hidden="true" />
-          {listing.country}
-        </Badge>
-        <Badge className="ml-auto text-subtle">
-          <EyeIcon aria-hidden="true" />
-          <span className="tnum">{listing.watching}</span> watching
-        </Badge>
-      </div>
+        <p className="mt-3 flex items-center gap-1.5 truncate text-[0.8125rem] text-subtle">
+          {listing.monthlyRevenue > 0 ? (
+            <span className="text-muted">
+              <Price
+                usd={listing.monthlyRevenue}
+                className="font-medium text-fg"
+              />{" "}
+              a month
+            </span>
+          ) : (
+            <span>Not monetized</span>
+          )}
+          <span aria-hidden="true">·</span>
+          <span className="truncate">{listing.country}</span>
+        </p>
 
-      <div className="mt-auto flex items-end justify-between gap-3 border-t border-line px-4 py-4 sm:px-5">
-        <div className="min-w-0">
+        {/* Price over the seller line: side by side, a three-across grid
+            cut the seller's name and sales down to "2 s…". */}
+        <div className="mt-auto pt-4">
           <div className="flex items-baseline gap-2">
             <Price
               usd={listing.price}
-              className="text-xl font-semibold text-fg sm:text-[1.375rem]"
+              className="tnum text-xl font-semibold tracking-[-0.01em] text-fg"
             />
             {listing.wasPrice ? (
               <Price
                 usd={listing.wasPrice}
-                className="text-xs text-subtle line-through"
+                className="tnum text-[0.8125rem] text-subtle line-through"
               />
             ) : null}
           </div>
-          <p className="mt-1 flex items-center gap-1.5 truncate text-xs text-subtle">
-            <StarIcon
-              aria-hidden="true"
-              className="size-3.5 shrink-0 fill-primary text-primary"
-            />
-            <span className="tnum text-muted">
-              {ratingLabel(listing.sellerRating)}
-            </span>
-            <span className="truncate">
-              · {listing.sellerName} · {listing.sellerSales} sales
+          <p className="mt-1 flex min-w-0 items-center gap-1 text-[0.8125rem] text-subtle">
+            {listing.sellerRating !== null ? (
+              <>
+                <StarIcon
+                  aria-hidden="true"
+                  className="size-3.5 shrink-0 fill-primary text-primary"
+                />
+                <span className="tnum font-medium text-muted">
+                  {listing.sellerRating.toFixed(1)}
+                </span>
+              </>
+            ) : (
+              <span className="font-medium text-muted">New</span>
+            )}
+            <span aria-hidden="true">·</span>
+            <span className="min-w-0 truncate">{listing.sellerName}</span>
+            <span aria-hidden="true">·</span>
+            <span className="tnum shrink-0">
+              {countOf(listing.sellerSales, "sale")}
             </span>
           </p>
         </div>
-
-        <Button asChild variant="secondary" size="sm" className="shrink-0">
-          {/* Card-wide click target: the overlay makes the whole card activate
-              this link, while keeping a single accessible name. */}
-          <Link href={`/listing/${listing.slug}`}>
-            View
-            <span className="sr-only"> details for {listing.handle}</span>
-            <span
-              aria-hidden="true"
-              className="absolute inset-0 rounded-card"
-            />
-          </Link>
-        </Button>
       </div>
     </article>
   );
 }
 
-function Metric({
-  label,
-  value,
-  highlight,
-}: {
-  label: string;
-  value: React.ReactNode;
-  highlight?: boolean;
-}) {
+/** One fact about the account: a quiet label over its value. */
+function Fact({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="min-w-0 bg-surface px-4 py-3 @sm:px-2.5">
-      {/* Single-line labels only — a wrapping label would push this cell's
-          value out of line with its neighbours. Sentence case rather than
-          uppercase: the cells are too narrow for full uppercase words. */}
-      <dt className="truncate text-[0.6875rem] text-subtle">{label}</dt>
-      <dd
-        className={cn(
-          "tnum mt-1 truncate text-sm font-semibold",
-          highlight ? "text-verified" : "text-fg",
-        )}
-      >
+    <div className="min-w-0">
+      <dt className="truncate text-xs text-subtle">{label}</dt>
+      <dd className="tnum mt-0.5 truncate text-sm font-semibold text-fg">
         {value}
       </dd>
     </div>

@@ -16,18 +16,21 @@ export function SoldTicker({ items }: { items: SoldItem[] }) {
   return (
     <section
       aria-labelledby="sold-heading"
-      className="border-y border-line bg-surface py-5"
+      className="border-y border-line py-4"
     >
       <h2 id="sold-heading" className="sr-only">
         Recently sold accounts
       </h2>
 
-      <div className="mx-auto flex w-full max-w-[81rem] items-center gap-4 px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto flex w-full max-w-[80rem] items-center gap-4 px-4 sm:px-6 lg:px-8">
         <Link
           href="/sold"
-          className="hidden shrink-0 items-center gap-2 text-xs font-semibold tracking-[0.12em] text-verified uppercase transition-opacity hover:opacity-75 sm:flex"
+          className="hidden shrink-0 items-center gap-1.5 text-[0.8125rem] font-medium text-muted transition-colors duration-150 hover:text-fg sm:flex"
         >
-          <CheckCircle2Icon aria-hidden="true" className="size-4" />
+          <CheckCircle2Icon
+            aria-hidden="true"
+            className="size-4 text-verified"
+          />
           Recently sold
         </Link>
 
@@ -40,10 +43,10 @@ export function SoldTicker({ items }: { items: SoldItem[] }) {
               return (
                 <li
                   key={`${item.id}-${item.copy}`}
-                  className="flex shrink-0 items-center gap-2.5 rounded-full border border-line bg-surface-2 py-2 pr-4 pl-2.5"
+                  className="flex shrink-0 items-center gap-2.5 rounded-full border border-line bg-surface py-1.5 pr-3.5 pl-2"
                 >
                   <span
-                    className="flex size-7 items-center justify-center rounded-full bg-surface"
+                    className="flex size-6 items-center justify-center rounded-full bg-surface-2"
                     style={{ color: platform.tint }}
                   >
                     <platform.icon className="size-3.5" />
@@ -57,7 +60,7 @@ export function SoldTicker({ items }: { items: SoldItem[] }) {
                   <span aria-hidden="true" className="h-3.5 w-px bg-line" />
                   <Price
                     usd={item.price}
-                    className="text-[0.8125rem] font-semibold text-verified"
+                    className="text-[0.8125rem] font-semibold text-fg"
                   />
                   <span className="hidden text-xs text-subtle sm:inline">
                     {soldAgoLabel(item.soldHoursAgo)}

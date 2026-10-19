@@ -55,7 +55,7 @@ export function ReportListing({
         Sign in to report a listing, so a moderator can come back to you.
         <Link
           href={`/signin?next=/listing/${listingSlug}`}
-          className="ml-1 font-medium text-primary-text underline-offset-4 hover:underline"
+          className="ml-1 font-medium text-fg underline decoration-line-strong underline-offset-4 transition-colors hover:decoration-fg"
         >
           Sign in
         </Link>

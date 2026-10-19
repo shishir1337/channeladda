@@ -17,7 +17,7 @@ import { authClient, useSession } from "@/lib/auth-client";
 import { cn } from "@/lib/utils";
 
 const itemClass =
-  "flex min-h-11 cursor-pointer items-center gap-3 rounded-xl px-3 text-sm text-muted outline-none select-none data-[highlighted]:bg-surface-2 data-[highlighted]:text-fg";
+  "flex min-h-10 cursor-pointer items-center gap-3 rounded-lg px-3 text-sm text-muted outline-none select-none data-[highlighted]:bg-surface-2 data-[highlighted]:text-fg";
 
 function initialsOf(name: string) {
   return name
@@ -60,14 +60,14 @@ export function AccountMenu({ className }: { className?: string }) {
     <DropdownMenu.Root>
       <DropdownMenu.Trigger
         className={cn(
-          "inline-flex h-11 cursor-pointer items-center gap-2 rounded-xl border border-line pr-3 pl-1.5 text-sm font-medium text-muted transition-colors duration-200 hover:border-line-strong hover:bg-surface-2 hover:text-fg data-[state=open]:bg-surface-2 data-[state=open]:text-fg",
+          "inline-flex h-11 cursor-pointer items-center gap-2 rounded-[10px] pr-3 pl-1.5 text-sm font-medium text-muted transition-colors duration-150 hover:bg-surface-2 hover:text-fg data-[state=open]:bg-surface-2 data-[state=open]:text-fg",
           className,
         )}
         aria-label={`Account menu for ${user.name}`}
       >
         <span
           aria-hidden="true"
-          className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-xs font-bold text-primary-text"
+          className="flex size-8 shrink-0 items-center justify-center rounded-md bg-surface-2 text-xs font-semibold text-fg ring-1 ring-line ring-inset"
         >
           {initialsOf(user.name)}
         </span>
@@ -80,7 +80,7 @@ export function AccountMenu({ className }: { className?: string }) {
         <DropdownMenu.Content
           align="end"
           sideOffset={8}
-          className="z-50 min-w-[15rem] overflow-hidden rounded-2xl border border-line bg-surface p-1.5 shadow-lift data-[state=closed]:animate-[fade-out_160ms_ease-in] data-[state=open]:animate-[fade-in_200ms_ease-out]"
+          className="z-50 min-w-[15rem] overflow-hidden rounded-xl border border-line bg-surface p-1 shadow-lift data-[state=closed]:animate-[fade-out_160ms_ease-in] data-[state=open]:animate-[fade-in_200ms_ease-out]"
         >
           <div className="px-3 py-2.5">
             <p className="truncate text-sm font-semibold text-fg">

@@ -18,7 +18,6 @@ export default function HelpPage() {
     <>
       <PageHeader
         crumbs={[{ label: "Home", href: "/" }, { label: "Help" }]}
-        eyebrow="Help centre"
         title="Guides, not FAQ filler"
         description="Written for the questions people actually ask before their first deal — what each deal type holds, what a handover involves, and what happens when it goes wrong."
       />
@@ -34,9 +33,7 @@ export default function HelpPage() {
 
               return (
                 <section key={category.id}>
-                  <h2 className="font-display text-xl font-bold">
-                    {category.label}
-                  </h2>
+                  <h2 className="text-xl font-semibold">{category.label}</h2>
                   <p className="mt-1.5 text-sm text-muted">{category.blurb}</p>
 
                   <ul className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -44,13 +41,13 @@ export default function HelpPage() {
                       <li key={article.slug}>
                         <Link
                           href={`/help/${article.slug}`}
-                          className="lift-card group flex h-full flex-col rounded-card border border-line bg-surface p-5 hover:border-primary/45"
+                          className="lift-card group flex h-full flex-col rounded-card border border-line bg-surface p-5 hover:border-line-strong"
                         >
-                          <h3 className="flex items-start gap-1.5 font-display text-[0.9375rem] font-semibold">
+                          <h3 className="flex items-start gap-1.5 text-[0.9375rem] font-semibold">
                             {article.title}
                             <ArrowRightIcon
                               aria-hidden="true"
-                              className="mt-0.5 size-4 shrink-0 text-subtle transition-transform duration-300 ease-[var(--ease-out-soft)] group-hover:translate-x-0.5 group-hover:text-primary-text"
+                              className="mt-0.5 size-4 shrink-0 text-subtle transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-fg"
                             />
                           </h3>
                           <p className="mt-2 text-sm leading-relaxed text-muted">
@@ -67,15 +64,15 @@ export default function HelpPage() {
 
           <div className="mt-12 flex flex-col items-start gap-4 rounded-panel border border-line bg-surface p-6 sm:flex-row sm:items-center sm:justify-between sm:p-8">
             <div className="flex items-start gap-3.5">
-              <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary-soft text-primary-text">
-                <LifeBuoyIcon aria-hidden="true" className="size-5" />
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-line bg-surface-2 text-muted">
+                <LifeBuoyIcon aria-hidden="true" className="size-4.5" />
               </span>
               <div className="max-w-lg">
-                <h2 className="font-display text-lg font-semibold">
+                <h2 className="text-base font-semibold text-fg">
                   Cannot find it?
                 </h2>
-                <p className="mt-1.5 text-sm leading-relaxed text-muted">
-                  Live chat replies in under ten minutes, every day of the year.
+                <p className="mt-1 text-sm leading-relaxed text-muted">
+                  Write to us and a person on our support team replies.
                 </p>
               </div>
             </div>

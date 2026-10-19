@@ -53,9 +53,7 @@ export function AcceptInviteForm({
         <span className="flex size-12 items-center justify-center rounded-xl bg-surface text-verified">
           <CheckCircle2Icon aria-hidden="true" className="size-6" />
         </span>
-        <h2 className="mt-5 font-display text-lg font-bold">
-          Your account is ready
-        </h2>
+        <h2 className="mt-5 text-lg font-semibold">Your account is ready</h2>
         <p className="mt-2.5 text-sm leading-relaxed text-muted">
           You are {roleLabel.toLowerCase()} on Channel Adda. Sign in with{" "}
           {email} and the password you just chose. Turn on two-factor under

@@ -5,8 +5,10 @@ import { useRouter } from "next/navigation";
 import { useId, useState, useTransition } from "react";
 import { FormNotice } from "@/components/auth/fields";
 import { Button } from "@/components/ui/button";
+import { siteInput, siteTextarea } from "@/components/ui/field";
 import { useSession } from "@/lib/auth-client";
 import { useHydrated } from "@/lib/use-hydrated";
+import { cn } from "@/lib/utils";
 import { makeOffer } from "@/server/actions/offers";
 
 function usd(value: number) {
@@ -79,7 +81,7 @@ export function OfferForm({
         This is your listing. Offers you receive appear in{" "}
         <Link
           href="/dashboard/offers"
-          className="font-medium text-primary-text underline-offset-4 hover:underline"
+          className="font-medium text-fg underline decoration-line-strong underline-offset-4 transition-colors hover:decoration-fg"
         >
           your offers
         </Link>
@@ -143,7 +145,7 @@ export function OfferForm({
         value={amount}
         onChange={(e) => setAmount(e.target.value)}
         placeholder={String(Math.round(askingPrice * 0.9))}
-        className="mt-2 h-12 w-full rounded-xl border border-line bg-surface-2 px-3.5 text-base text-fg placeholder:text-subtle focus:border-primary/60 focus:outline-none sm:text-[0.9375rem]"
+        className={cn(siteInput, "tnum mt-2")}
         required
       />
       {tooLow ? (
@@ -165,7 +167,7 @@ export function OfferForm({
         value={message}
         onChange={(e) => setMessage(e.target.value)}
         placeholder="Anything the seller should know about why you are offering this."
-        className="mt-2 w-full rounded-xl border border-line bg-surface-2 p-3.5 text-base text-fg placeholder:text-subtle focus:border-primary/60 focus:outline-none sm:text-[0.9375rem]"
+        className={cn(siteTextarea, "mt-2")}
       />
 
       <Button

@@ -1,9 +1,6 @@
-import { QuoteIcon, StarIcon } from "lucide-react";
 import { Container, Section, SectionHeading } from "@/components/ui/section";
+import { Stars } from "@/components/ui/stars";
 import { db } from "@/lib/db";
-
-/** One name per star, so a rating row is keyed by name, not position. */
-const STAR_KEYS = ["one", "two", "three", "four", "five"] as const;
 
 /**
  * Reviews, from the reviews table.
@@ -65,44 +62,27 @@ export async function Testimonials() {
     <Section>
       <Container>
         <SectionHeading
-          eyebrow="Reviews"
           title="What closing a deal here actually feels like"
           description="Left by buyers on deals that completed. Nobody can review a deal they were not part of."
           align="center"
         />
 
-        <ul className="mt-10 grid gap-4 sm:mt-14 lg:grid-cols-3 lg:gap-5">
+        <ul className="mt-8 grid gap-3 sm:mt-10 lg:grid-cols-3">
           {reviews.map((review) => (
             <li key={review.id}>
-              <figure className="lift-card flex h-full flex-col rounded-card border border-line bg-surface p-6 hover:border-primary/40 sm:p-7">
-                <QuoteIcon
-                  aria-hidden="true"
-                  className="size-7 text-primary/35"
-                  fill="currentColor"
-                />
+              <figure className="flex h-full flex-col rounded-card border border-line bg-surface p-6">
+                <div role="img" aria-label={`Rated ${review.rating} out of 5`}>
+                  <Stars rating={review.rating} />
+                </div>
                 <blockquote className="mt-4 flex-1 text-[0.9375rem] leading-relaxed text-fg">
                   {review.body}
                 </blockquote>
 
-                <div
-                  role="img"
-                  className="mt-6 flex items-center gap-0.5"
-                  aria-label={`Rated ${review.rating} out of 5`}
-                >
-                  {STAR_KEYS.slice(0, review.rating).map((star) => (
-                    <StarIcon
-                      key={star}
-                      aria-hidden="true"
-                      className="size-4 fill-primary text-primary"
-                    />
-                  ))}
-                </div>
-
-                <figcaption className="mt-4 border-t border-line pt-5">
+                <figcaption className="mt-5 border-t border-line pt-4">
                   <span className="block truncate text-sm font-semibold">
                     {shortName(review.author.name)}
                   </span>
-                  <span className="mt-0.5 block text-xs text-subtle">
+                  <span className="mt-0.5 block text-[0.8125rem] text-subtle">
                     Bought a{" "}
                     {PLATFORM_NAMES[review.order.listing.platform] ?? "channel"}{" "}
                     account ·{" "}

@@ -121,7 +121,7 @@ export function ActiveFilterChips({
           key={chip.key}
           type="button"
           onClick={() => apply(chip.clear)}
-          className="group inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-full border border-primary/40 bg-primary-soft px-3 text-xs font-medium text-primary-text transition-colors hover:border-primary/70"
+          className="group inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-full border border-line bg-surface px-3 text-[0.8125rem] font-medium text-fg transition-colors duration-150 hover:border-line-strong hover:bg-surface-2"
         >
           {chip.label}
           <XIcon

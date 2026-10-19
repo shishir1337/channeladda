@@ -9,6 +9,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ListingCard } from "@/components/home/listing-card";
 import { BuyPanel } from "@/components/listing/buy-panel";
+import { ListingBuyBar } from "@/components/listing/listing-buy-bar";
 import {
   MetricsPanel,
   MonetizationNotice,
@@ -19,12 +20,17 @@ import {
 } from "@/components/listing/listing-sections";
 import { OfferForm } from "@/components/listing/offer-form";
 import { Badge } from "@/components/ui/badge";
+import { Breadcrumbs } from "@/components/ui/page-header";
 import { Container } from "@/components/ui/section";
 import { platformMap } from "@/data/platforms";
 import { databaseGate } from "@/lib/db-gate";
 import { withResellerDiscount } from "@/lib/reseller";
 import { formatCompact } from "@/lib/utils";
-import { getListing, getSimilarListings } from "@/server/listings";
+import {
+  getListing,
+  getProofLabels,
+  getSimilarListings,
+} from "@/server/listings";
 import { heldByAcceptedOffer } from "@/server/offers";
 import { activeResellers } from "@/server/reseller-status";
 import { getSeller } from "@/server/sellers";
@@ -72,9 +78,10 @@ export default async function ListingPage({
   if (!listing) notFound();
 
   const platform = platformMap[listing.platform];
-  const [seller, similar] = await Promise.all([
+  const [seller, similar, proofLabels] = await Promise.all([
     getSeller(listing.sellerSlug),
     getSimilarListings(listing),
+    getProofLabels(listing.id),
   ]);
   if (!seller) notFound();
 
@@ -105,51 +112,16 @@ export default async function ListingPage({
 
   return (
     <>
-      {/* Cover banner */}
-      <div className="relative border-b border-line">
-        {/* biome-ignore lint/performance/noImgElement: static SVG artwork. */}
-        <img
-          src={listing.coverUrl}
-          alt=""
-          width={480}
-          height={210}
-          className="h-40 w-full object-cover sm:h-56 lg:h-64"
+      <Container className="pt-8 pb-12 sm:pt-10 sm:pb-16">
+        <Breadcrumbs
+          className="mb-6"
+          crumbs={[
+            { label: "Home", href: "/" },
+            { label: "Browse", href: "/browse" },
+            { label: platform.name, href: `/browse/${platform.id}` },
+            { label: listing.handle },
+          ]}
         />
-        <span
-          aria-hidden="true"
-          className="absolute inset-0 bg-gradient-to-t from-bg via-bg/55 to-transparent"
-        />
-      </div>
-
-      <Container className="relative -mt-14 pb-12 sm:-mt-16 sm:pb-16">
-        <nav aria-label="Breadcrumb" className="mb-5">
-          <ol className="flex flex-wrap items-center gap-1.5 text-xs text-subtle">
-            <li>
-              <Link href="/" className="transition-colors hover:text-fg">
-                Home
-              </Link>
-            </li>
-            <li aria-hidden="true">/</li>
-            <li>
-              <Link href="/browse" className="transition-colors hover:text-fg">
-                Browse
-              </Link>
-            </li>
-            <li aria-hidden="true">/</li>
-            <li>
-              <Link
-                href={`/browse/${platform.id}`}
-                className="transition-colors hover:text-fg"
-              >
-                {platform.name}
-              </Link>
-            </li>
-            <li aria-hidden="true">/</li>
-            <li aria-current="page" className="text-muted">
-              {listing.handle}
-            </li>
-          </ol>
-        </nav>
 
         <div className="lg:grid lg:grid-cols-[1fr_22rem] lg:items-start lg:gap-8">
           <div className="min-w-0">
@@ -161,11 +133,11 @@ export default async function ListingPage({
                 alt=""
                 width={128}
                 height={128}
-                className="size-16 shrink-0 rounded-2xl border-[3px] border-bg bg-surface-2 sm:size-20"
+                className="size-16 shrink-0 rounded-xl bg-surface-2 ring-1 ring-line sm:size-[4.5rem]"
               />
-              <div className="min-w-0 flex-1">
+              <div className="min-w-0 flex-1 pt-0.5">
                 <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="font-display text-[1.5rem] leading-tight font-bold sm:text-3xl">
+                  <h1 className="text-[1.75rem] leading-[1.1] font-semibold tracking-[-0.03em] break-all sm:text-[2.25rem]">
                     {listing.handle}
                   </h1>
                   {listing.ownershipVerified ? (
@@ -193,10 +165,7 @@ export default async function ListingPage({
 
             <ul className="mt-5 flex flex-wrap gap-2">
               <li>
-                <Badge
-                  variant={listing.monetized ? "verified" : "neutral"}
-                  size="md"
-                >
+                <Badge size="md">
                   <CircleDollarSignIcon aria-hidden="true" />
                   {listing.monetized ? "Monetized" : "Not monetized"}
                 </Badge>
@@ -227,7 +196,7 @@ export default async function ListingPage({
             </ul>
 
             {/* Purchase panel sits here on mobile, in the rail on desktop. */}
-            <div className="mt-7 lg:hidden">
+            <div id="buy" className="mt-7 scroll-mt-20 lg:hidden">
               <BuyPanel
                 listing={listing}
                 holdDays={platform.holdDays}
@@ -237,11 +206,11 @@ export default async function ListingPage({
               />
             </div>
 
-            <div className="mt-7 flex flex-col gap-4 lg:mt-8">
+            <div className="mt-7 flex flex-col gap-3 lg:mt-8">
               <MetricsPanel listing={listing} platform={platform} />
               <MonetizationNotice listing={listing} />
               <TransferPanel platform={platform} />
-              <ProofPanel platform={platform} />
+              <ProofPanel labels={proofLabels} />
               <SellerPanel seller={seller} />
 
               {listing.reserved ? null : (
@@ -282,21 +251,31 @@ export default async function ListingPage({
         </div>
       </Container>
 
+      {/* Neither a seller on their own listing nor someone else's held one
+          has a deal to start, so neither gets the bar. */}
+      {isOwnListing || (listing.reserved && !heldOfferUsd) ? null : (
+        <ListingBuyBar
+          price={heldOfferUsd ?? listing.price}
+          wasPrice={heldOfferUsd ? undefined : listing.wasPrice}
+          targetId="buy"
+        />
+      )}
+
       {similar.length ? (
         <section className="border-t border-line bg-bg-subtle">
           <Container className="py-12 sm:py-16">
             <div className="flex flex-wrap items-end justify-between gap-4">
-              <h2 className="font-display text-xl font-bold sm:text-2xl">
+              <h2 className="text-xl font-semibold tracking-[-0.02em] sm:text-2xl">
                 Similar accounts for sale
               </h2>
               <Link
                 href={`/browse/${platform.id}`}
-                className="inline-flex min-h-11 items-center text-sm font-semibold text-primary-text transition-colors hover:text-fg"
+                className="inline-flex min-h-11 items-center text-sm font-medium text-fg transition-colors duration-150 hover:text-muted"
               >
                 All {platform.name} {platform.assetNoun}
               </Link>
             </div>
-            <ul className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <ul className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {similar.map((item) => (
                 <li key={item.id}>
                   <ListingCard listing={item} />

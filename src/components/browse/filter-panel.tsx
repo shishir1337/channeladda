@@ -3,6 +3,7 @@
 import { BadgeCheckIcon, RotateCcwIcon } from "lucide-react";
 import { type ReactNode, useEffect, useId, useState } from "react";
 import { useFilterNav } from "@/components/browse/use-filter-nav";
+import { siteInput } from "@/components/ui/field";
 import { platformMap } from "@/data/platforms";
 import { useCurrency } from "@/lib/currency";
 import type { ListingFilters, QueryResult } from "@/lib/listing-query";
@@ -35,11 +36,14 @@ const revenueBands = [
 export function FilterPanel({
   filters,
   facets,
+  priceBounds,
   hidePlatform,
   onNavigate,
 }: {
   filters: ListingFilters;
   facets: QueryResult["facets"];
+  /** The cheapest and dearest listing under the other filters. */
+  priceBounds: QueryResult["priceBounds"];
   /** True on /browse/[platform], where the platform is fixed by the route. */
   hidePlatform?: boolean;
   /** Lets the mobile sheet close itself once a filter is applied. */
@@ -56,7 +60,7 @@ export function FilterPanel({
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="font-display text-base font-semibold">Filters</h2>
+        <h2 className="text-base font-semibold">Filters</h2>
         {count > 0 ? (
           <button
             type="button"
@@ -98,7 +102,11 @@ export function FilterPanel({
         </Section>
       ) : null}
 
-      <PriceSection filters={filters} onApply={(p) => act(() => apply(p))} />
+      <PriceSection
+        filters={filters}
+        bounds={priceBounds}
+        onApply={(p) => act(() => apply(p))}
+      />
 
       <Section title="Audience size">
         <RadioGroup
@@ -206,9 +214,11 @@ export function FilterPanel({
 /** Free-text price range. Committed on blur or Enter, never per keystroke. */
 function PriceSection({
   filters,
+  bounds,
   onApply,
 }: {
   filters: ListingFilters;
+  bounds: QueryResult["priceBounds"];
   onApply: (patch: Partial<ListingFilters>) => void;
 }) {
   const minId = useId();
@@ -252,7 +262,7 @@ function PriceSection({
             onChange={(e) => setMin(e.target.value)}
             onBlur={commit}
             onKeyDown={(e) => e.key === "Enter" && commit()}
-            className="tnum h-11 w-full rounded-xl border border-line bg-surface px-3 text-sm text-fg placeholder:text-subtle focus:border-primary/60 focus:outline-none"
+            className={cn(siteInput, "tnum px-3")}
           />
         </div>
         <span aria-hidden="true" className="text-subtle">
@@ -272,13 +282,16 @@ function PriceSection({
             onChange={(e) => setMax(e.target.value)}
             onBlur={commit}
             onKeyDown={(e) => e.key === "Enter" && commit()}
-            className="tnum h-11 w-full rounded-xl border border-line bg-surface px-3 text-sm text-fg placeholder:text-subtle focus:border-primary/60 focus:outline-none"
+            className={cn(siteInput, "tnum px-3")}
           />
         </div>
       </div>
-      <p className="mt-2 text-xs text-subtle">
-        Listings run {format(25)} to {format(79_000)}.
-      </p>
+      {/* The real spread, not the sample data's $25 to $79,000. */}
+      {bounds.max > 0 ? (
+        <p className="mt-2 text-xs text-subtle">
+          Listings run {format(bounds.min)} to {format(bounds.max)}.
+        </p>
+      ) : null}
     </Section>
   );
 }
@@ -294,10 +307,14 @@ function Section({
 }) {
   return (
     <fieldset className="border-t border-line pt-5 first-of-type:border-t-0 first-of-type:pt-0">
-      <legend className="mb-3 text-xs font-semibold tracking-[0.1em] text-subtle uppercase">
+      {/* Floated, so the fieldset's top rule runs above the label instead
+          of breaking around it. */}
+      <legend className="float-left mb-3 w-full text-[0.8125rem] font-medium text-subtle">
         {title}
       </legend>
-      <div className={cn(scroll && "max-h-56 overflow-y-auto pr-1")}>
+      <div
+        className={cn("clear-both", scroll && "max-h-56 overflow-y-auto pr-1")}
+      >
         {children}
       </div>
     </fieldset>
@@ -332,7 +349,7 @@ function CheckRow({
         checked={checked}
         disabled={disabled}
         onChange={onChange}
-        className="size-4 shrink-0 cursor-pointer accent-primary"
+        className="size-4 shrink-0 cursor-pointer accent-fg"
       />
       <span className="flex min-w-0 flex-1 items-center gap-2">{children}</span>
       {count !== undefined ? (
@@ -365,7 +382,7 @@ function RadioGroup({
             name={`${name}-${groupId}`}
             checked={option.selected}
             onChange={option.onSelect}
-            className="size-4 shrink-0 cursor-pointer accent-primary"
+            className="size-4 shrink-0 cursor-pointer accent-fg"
           />
           {option.label}
         </label>

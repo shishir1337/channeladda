@@ -29,8 +29,8 @@ export function SiteFooter() {
               className="inline-flex min-h-11 items-center gap-2.5 rounded-lg"
               aria-label="Channel Adda home"
             >
-              <ChannelAddaLogo className="size-9" />
-              <span className="font-display text-xl font-bold tracking-tight">
+              <ChannelAddaLogo className="size-8" />
+              <span className="text-[1.0625rem] font-semibold tracking-[-0.02em]">
                 Channel <span className="text-primary-text">Adda</span>
               </span>
             </Link>
@@ -39,9 +39,9 @@ export function SiteFooter() {
               content websites.
             </p>
 
-            <div className="mt-6 inline-flex items-center gap-2.5 rounded-xl border border-line bg-surface px-3.5 py-2.5">
-              <CryptomusIcon aria-hidden="true" className="size-5 text-muted" />
-              <span className="text-xs text-muted">
+            <div className="mt-5 inline-flex items-center gap-2 rounded-lg border border-line bg-surface px-3 py-2">
+              <CryptomusIcon aria-hidden="true" className="size-4 text-muted" />
+              <span className="text-[0.8125rem] text-muted">
                 Payments secured by{" "}
                 <span className="font-medium text-fg">Cryptomus</span>
               </span>
@@ -59,9 +59,9 @@ export function SiteFooter() {
               {socials.map((social) => (
                 <li
                   key={social.label}
-                  className="inline-flex size-11 items-center justify-center rounded-xl border border-line text-muted"
+                  className="inline-flex size-9 items-center justify-center rounded-lg border border-line text-subtle"
                 >
-                  <social.icon aria-hidden="true" className="size-[1.05rem]" />
+                  <social.icon aria-hidden="true" className="size-4" />
                   <span className="sr-only">{social.label}</span>
                 </li>
               ))}
@@ -72,15 +72,15 @@ export function SiteFooter() {
             <div className="grid grid-cols-2 gap-8 sm:grid-cols-4 sm:gap-6">
               {footerNav.map((group) => (
                 <div key={group.title}>
-                  <h2 className="font-display text-sm font-semibold">
+                  <h2 className="text-sm font-semibold text-fg">
                     {group.title}
                   </h2>
-                  <ul className="mt-4 flex flex-col gap-3">
+                  <ul className="mt-3 flex flex-col gap-1">
                     {group.links.map((link) => (
                       <li key={link.href}>
                         <Link
                           href={link.href}
-                          className="inline-flex min-h-9 items-center text-sm text-muted transition-colors duration-200 hover:text-fg"
+                          className="inline-flex min-h-9 items-center text-sm text-muted transition-colors duration-150 hover:text-fg"
                         >
                           {link.label}
                         </Link>
@@ -93,28 +93,33 @@ export function SiteFooter() {
           </nav>
         </div>
 
-        <div className="mt-12 grid gap-4 rounded-card border border-line bg-surface p-5 sm:grid-cols-2 sm:p-6">
-          <div className="flex items-start gap-3">
+        <div className="mt-12 grid gap-4 rounded-card border border-line bg-surface p-5 sm:grid-cols-2">
+          <Link href="/support" className="group flex items-start gap-3">
             <MessagesSquareIcon
               aria-hidden="true"
-              className="mt-0.5 size-5 shrink-0 text-primary-text"
+              className="mt-0.5 size-4.5 shrink-0 text-subtle"
             />
             <div>
-              <h2 className="text-sm font-semibold">Support, 24/7</h2>
+              <h2 className="text-sm font-semibold text-fg group-hover:underline group-hover:underline-offset-4">
+                Support
+              </h2>
               <p className="mt-1 text-sm text-muted">
-                Live chat replies in under 10 minutes, every day of the year.
+                Write to us from the support page and a person replies.
               </p>
             </div>
-          </div>
+          </Link>
           <div className="flex items-start gap-3">
             <MailIcon
               aria-hidden="true"
-              className="mt-0.5 size-5 shrink-0 text-primary-text"
+              className="mt-0.5 size-4.5 shrink-0 text-subtle"
             />
             <div>
-              <h2 className="text-sm font-semibold">Disputes & escalations</h2>
+              <h2 className="text-sm font-semibold text-fg">
+                Disputes & escalations
+              </h2>
               <p className="mt-1 text-sm text-muted">
-                disputes@channeladda.com — reviewed by a moderator within 24
+                Open one from the deal page, or write to
+                disputes@channeladda.com. Reviewed by a moderator within 24
                 hours.
               </p>
             </div>
@@ -122,7 +127,7 @@ export function SiteFooter() {
         </div>
 
         <div className="mt-10 flex flex-col gap-5 border-t border-line pt-8 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-xs text-subtle">
+          <p className="text-[0.8125rem] text-subtle">
             © {new Date().getFullYear()} Channel Adda. All rights reserved.
           </p>
           <ul className="flex flex-wrap items-center gap-x-5 gap-y-2">
@@ -135,7 +140,7 @@ export function SiteFooter() {
               <li key={link.href}>
                 <Link
                   href={link.href}
-                  className="inline-flex min-h-9 items-center text-xs text-subtle transition-colors duration-200 hover:text-fg"
+                  className="inline-flex min-h-9 items-center text-[0.8125rem] text-subtle transition-colors duration-150 hover:text-fg"
                 >
                   {link.label}
                 </Link>
@@ -159,7 +164,7 @@ export function SiteFooter() {
         <p className="mt-6 flex items-start gap-2.5 text-xs leading-relaxed text-subtle">
           <ShieldCheckIcon
             aria-hidden="true"
-            className="mt-0.5 size-4 shrink-0 text-verified"
+            className="mt-0.5 size-4 shrink-0 text-subtle"
           />
           <span>
             Channel Adda is an independent marketplace and is not affiliated

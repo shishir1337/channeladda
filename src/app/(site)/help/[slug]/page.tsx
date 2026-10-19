@@ -6,12 +6,18 @@ import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { Container, Section } from "@/components/ui/section";
 import { helpArticleMap, helpArticles, helpCategories } from "@/data/help";
+import { badgeValues, fillHelpText } from "@/lib/help-text";
+import { RESELLER_DEFAULTS } from "@/lib/reseller";
+import { getSettings } from "@/server/settings";
 
 export function generateStaticParams() {
   return helpArticles.map((a) => ({ slug: a.slug }));
 }
 
 export const dynamicParams = false;
+
+/** Some articles quote admin settings, so they refresh like the fees page. */
+export const revalidate = 300;
 
 export async function generateMetadata({
   params,
@@ -35,6 +41,18 @@ export default async function HelpArticlePage({
   const article = helpArticleMap[slug];
   if (!article) notFound();
 
+  // Read only by the articles that quote a setting, and never fatal: these
+  // pages are prerendered, and a build without a database still gets the
+  // figures the code ships with.
+  const quotes = article.body.some((p) => p.includes("{"));
+  const settings = quotes ? await getSettings().catch(() => null) : null;
+  const values = badgeValues({
+    resellerPointsMultiplier:
+      settings?.resellerPointsMultiplier ?? RESELLER_DEFAULTS.pointsMultiplier,
+    resellerDiscountBp:
+      settings?.resellerDiscountBp ?? RESELLER_DEFAULTS.discountBp,
+  });
+
   const category = helpCategories.find((c) => c.id === article.category);
   const related = helpArticles
     .filter((a) => a.category === article.category && a.slug !== article.slug)
@@ -48,7 +66,6 @@ export default async function HelpArticlePage({
           { label: "Help", href: "/help" },
           { label: article.title },
         ]}
-        eyebrow={category?.label}
         title={article.title}
         description={article.summary}
       />
@@ -57,7 +74,9 @@ export default async function HelpArticlePage({
         <Container className="max-w-3xl">
           <div className="flex flex-col gap-5 text-[1.0625rem] leading-relaxed text-muted">
             {article.body.map((paragraph) => (
-              <p key={paragraph.slice(0, 40)}>{paragraph}</p>
+              <p key={paragraph.slice(0, 40)}>
+                {fillHelpText(paragraph, values)}
+              </p>
             ))}
           </div>
 
@@ -78,7 +97,7 @@ export default async function HelpArticlePage({
 
           {related.length ? (
             <div className="mt-12 border-t border-line pt-8">
-              <h2 className="font-display text-lg font-semibold">
+              <h2 className="text-lg font-semibold">
                 More on {category?.label.toLowerCase()}
               </h2>
               <ul className="mt-4 flex flex-col gap-1">

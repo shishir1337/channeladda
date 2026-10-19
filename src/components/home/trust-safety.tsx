@@ -41,35 +41,47 @@ const safeguards = [
   },
 ];
 
-export function TrustSafety() {
+/**
+ * The safeguards. On the home page it is the one band and carries its own
+ * heading; on the trust and safety page, whose title already says this, it
+ * sits under that title instead of repeating it.
+ */
+export function TrustSafety({ embedded = false }: { embedded?: boolean }) {
   return (
     <Section
       id="trust"
-      className="relative scroll-mt-24 overflow-hidden border-y border-line bg-bg-subtle"
+      className={
+        embedded
+          ? "scroll-mt-24"
+          : "scroll-mt-24 border-y border-line bg-bg-subtle py-14 sm:py-20 lg:py-24"
+      }
     >
-      <div
-        aria-hidden="true"
-        className="grid-backdrop pointer-events-none absolute inset-0 opacity-40 [mask-image:radial-gradient(ellipse_60%_60%_at_50%_0%,#000,transparent)]"
-      />
-      <Container className="relative">
-        <SectionHeading
-          eyebrow="Trust & safety"
-          title="The boring machinery that keeps deals clean"
-          description="Account trading has a scam problem. These are the specific controls we run so a Channel Adda deal is not a leap of faith."
-          align="center"
-        />
+      <Container>
+        {embedded ? null : (
+          <SectionHeading
+            title="The boring machinery that keeps deals clean"
+            description="Account trading has a scam problem. These are the specific controls we run so a Channel Adda deal is not a leap of faith."
+            align="center"
+          />
+        )}
 
-        <ul className="mt-10 grid gap-4 sm:mt-14 sm:grid-cols-2 lg:grid-cols-3 lg:gap-5">
+        <ul
+          className={
+            embedded
+              ? "grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
+              : "mt-8 grid gap-3 sm:mt-10 sm:grid-cols-2 lg:grid-cols-3"
+          }
+        >
           {safeguards.map((item) => (
             <li key={item.title}>
-              <div className="lift-card group flex h-full flex-col rounded-card border border-line bg-surface p-5 hover:border-verified/45 sm:p-6">
-                <span className="flex size-11 items-center justify-center rounded-xl bg-verified-soft text-verified transition-transform duration-300 ease-[var(--ease-out-soft)] group-hover:scale-105">
-                  <item.icon aria-hidden="true" className="size-5" />
+              <div className="flex h-full flex-col rounded-card border border-line bg-surface p-5">
+                <span className="flex size-9 items-center justify-center rounded-lg border border-line bg-surface-2 text-muted">
+                  <item.icon aria-hidden="true" className="size-4.5" />
                 </span>
-                <h3 className="mt-5 font-display text-base font-semibold sm:text-lg">
+                <h3 className="mt-4 text-base font-semibold text-fg">
                   {item.title}
                 </h3>
-                <p className="mt-2.5 text-sm leading-relaxed text-muted">
+                <p className="mt-2 text-sm leading-relaxed text-muted">
                   {item.body}
                 </p>
               </div>
@@ -77,7 +89,7 @@ export function TrustSafety() {
           ))}
         </ul>
 
-        <div className="mt-8 rounded-panel border border-line bg-surface p-6 sm:mt-10 sm:p-8">
+        <div className="mt-3 rounded-card border border-line bg-surface p-6 sm:p-7">
           <dl className="grid gap-6 text-center sm:grid-cols-3 sm:text-left">
             {/* Facts about how the product is built, which are checkable
                 from the product itself. The figures that used to sit here
@@ -90,7 +102,7 @@ export function TrustSafety() {
               <div key={stat.l}>
                 <dt className="sr-only">{stat.l}</dt>
                 <dd>
-                  <span className="tnum block font-sans text-3xl font-semibold text-primary-text">
+                  <span className="tnum block text-3xl font-semibold tracking-[-0.02em] text-fg">
                     {stat.v}
                   </span>
                   <span className="mt-1.5 block text-sm text-muted">

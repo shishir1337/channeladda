@@ -3,8 +3,13 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { Container, Section } from "@/components/ui/section";
-import { platforms, totalListings } from "@/data/platforms";
-import { sellers } from "@/data/sellers";
+import { platforms } from "@/data/platforms";
+import { databaseGate } from "@/lib/db-gate";
+import { getPlatformCounts } from "@/server/listings";
+import { getSellers } from "@/server/sellers";
+
+/** Counts from the marketplace itself, refreshed like the pages they echo. */
+export const revalidate = 60;
 
 export const metadata: Metadata = {
   title: "About Channel Adda",
@@ -13,18 +18,30 @@ export const metadata: Metadata = {
   alternates: { canonical: "/about" },
 };
 
-export default function AboutPage() {
+export default async function AboutPage() {
+  const gate = await databaseGate();
+  if (gate) return gate;
+
+  // These were the sample data's totals — 9,140 listings beside a
+  // marketplace showing 43 — so they are read from the database now.
+  const [counts, sellers] = await Promise.all([
+    getPlatformCounts(),
+    getSellers(),
+  ]);
+  const live = Object.values(counts).reduce((sum, n) => sum + n, 0);
   const stats = [
-    { label: "Live listings", value: totalListings.toLocaleString("en-US") },
+    { label: "Live listings", value: live.toLocaleString("en-US") },
     { label: "Platforms", value: String(platforms.length) },
-    { label: "Verified sellers", value: String(sellers.length) },
+    {
+      label: "Verified sellers",
+      value: sellers.length.toLocaleString("en-US"),
+    },
   ];
 
   return (
     <>
       <PageHeader
         crumbs={[{ label: "Home", href: "/" }, { label: "About" }]}
-        eyebrow="About us"
         title="We built the middle of the deal"
         description="Channel Adda exists because two strangers on opposite sides of the world both need to move first, and neither can afford to."
       />
@@ -54,23 +71,21 @@ export default function AboutPage() {
               point where a supervised handover can do its job.
             </p>
             <p>
-              We make money one way: a percentage when a deal completes. Not on
-              listings, not on subscriptions, not on advertising. If your sale
-              falls through we earn nothing, which is exactly the incentive we
-              want.
+              We make money on deals: a percentage when one opens, and the
+              optional Reseller badge for people who trade often. Not on
+              listings and not on advertising. If a deal falls through before
+              our agent takes custody, our fee is refunded in full, which is
+              exactly the incentive we want.
             </p>
           </div>
 
-          <dl className="mt-12 grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <dl className="mt-12 grid grid-cols-3 gap-6 border-y border-line py-6">
             {stats.map((s) => (
-              <div
-                key={s.label}
-                className="rounded-card border border-line bg-surface px-4 py-4"
-              >
-                <dt className="text-[0.6875rem] tracking-wide text-subtle uppercase">
-                  {s.label}
-                </dt>
-                <dd className="tnum mt-1 text-lg font-semibold">{s.value}</dd>
+              <div key={s.label}>
+                <dt className="text-[0.8125rem] text-subtle">{s.label}</dt>
+                <dd className="tnum mt-1 text-2xl font-semibold tracking-[-0.02em] text-fg">
+                  {s.value}
+                </dd>
               </div>
             ))}
           </dl>
@@ -79,7 +94,7 @@ export default function AboutPage() {
             <Button asChild size="lg">
               <Link href="/browse">Browse the marketplace</Link>
             </Button>
-            <Button asChild variant="outline" size="lg">
+            <Button asChild variant="secondary" size="lg">
               <Link href="/how-it-works">See how a deal works</Link>
             </Button>
           </div>

@@ -29,7 +29,7 @@ const MODES = [
     icon: ShieldCheckIcon,
     holds: "We hold the channel",
     blurb:
-      "Our agent takes ownership of the channel first. Then you pay the seller directly, and once they confirm it arrived, our agent makes you the owner. One Google waiting period.",
+      "Our agent takes ownership of the channel first. Then you pay the seller directly, and once they confirm it arrived, our agent makes you the owner.",
     upfrontNote: "Up front you pay our fee only",
   },
   {
@@ -95,7 +95,7 @@ export function StartDeal({
         aria-describedby={`${groupId}-detail`}
         disabled={pending}
       >
-        <legend className="mb-2.5 text-xs font-semibold tracking-[0.14em] text-subtle uppercase">
+        <legend className="mb-2 text-[0.8125rem] font-medium text-subtle">
           How you want to buy
         </legend>
         {MODES.map((option) => {
@@ -107,9 +107,9 @@ export function StartDeal({
               aria-pressed={selected}
               onClick={() => setMode(option.id)}
               className={cn(
-                "flex w-full cursor-pointer items-start gap-3 rounded-card border p-3.5 text-left transition-colors duration-200",
+                "flex w-full cursor-pointer items-start gap-3 rounded-card border p-3.5 text-left transition-colors duration-150",
                 selected
-                  ? "border-primary bg-primary-soft"
+                  ? "border-fg/80 bg-surface-2/60 ring-1 ring-fg/10"
                   : "border-line hover:border-line-strong hover:bg-surface-2",
               )}
             >
@@ -117,7 +117,7 @@ export function StartDeal({
                 aria-hidden="true"
                 className={cn(
                   "mt-0.5 size-4 shrink-0",
-                  selected ? "text-primary-text" : "text-muted",
+                  selected ? "text-fg" : "text-subtle",
                 )}
               />
               <span className="min-w-0">
@@ -145,6 +145,11 @@ export function StartDeal({
         className="mt-3 text-xs leading-relaxed text-muted"
       >
         {chosen.blurb}
+        {/* Google's own wait before a manager can be made owner; the other
+            platforms have nothing like it. */}
+        {mode === "SAFEST" && platform === "YOUTUBE"
+          ? " One Google waiting period."
+          : null}
       </p>
 
       <dl className="mt-4 space-y-2 border-y border-line py-3.5 text-sm">
@@ -170,7 +175,7 @@ export function StartDeal({
         </div>
         {mode === "SAFEST" ? (
           <div className="flex items-center justify-between gap-3 text-xs text-subtle">
-            <dt>Then, to Channel Adda once our agent holds it</dt>
+            <dt>Then, to the seller once our agent holds it</dt>
             <dd>
               <Price usd={price} />
             </dd>
@@ -233,7 +238,7 @@ export function StartDeal({
           type="checkbox"
           checked={acceptedRisk}
           onChange={(e) => setAcceptedRisk(e.target.checked)}
-          className="mt-0.5 size-4 shrink-0 cursor-pointer accent-primary"
+          className="mt-0.5 size-4 shrink-0 cursor-pointer accent-fg"
         />
         <span>
           I understand that revenue, subscriber counts and monetization can

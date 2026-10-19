@@ -51,10 +51,10 @@ export function TextField({
         }
         className={cn(
           // 16px base avoids iOS zooming the field on focus.
-          "mt-2 h-12 w-full rounded-xl border bg-surface-2 px-3.5 text-base text-fg placeholder:text-subtle focus:outline-none sm:text-[0.9375rem] app:mt-1.5 app:h-11 app:px-3 app:pointer-fine:h-9 app:rounded-lg app:bg-surface app:shadow-xs app:transition-[border-color,box-shadow] app:duration-150 app:focus:ring-[3px] app:sm:text-sm app:dark:bg-surface-2",
+          "mt-2 h-11 w-full rounded-[10px] border bg-surface px-3.5 text-base text-fg shadow-xs transition-[border-color,box-shadow] duration-150 placeholder:text-subtle hover:border-line-strong focus:ring-[3px] focus:outline-none sm:text-[0.9375rem] dark:bg-surface-2 app:mt-1.5 app:px-3 app:pointer-fine:h-9 app:rounded-lg app:sm:text-sm",
           error
-            ? "border-danger focus:border-danger app:focus:ring-danger/15"
-            : "border-line focus:border-primary/60 app:hover:border-line-strong app:focus:border-primary app:focus:ring-primary/20",
+            ? "border-danger focus:border-danger focus:ring-danger/15"
+            : "border-line focus:border-primary focus:ring-primary/20",
         )}
         {...props}
       />
@@ -119,10 +119,10 @@ export function PasswordField({
               .join(" ") || undefined
           }
           className={cn(
-            "h-12 w-full rounded-xl border bg-surface-2 pr-12 pl-3.5 text-base text-fg placeholder:text-subtle focus:outline-none sm:text-[0.9375rem] app:h-11 app:pl-3 app:pointer-fine:h-9 app:rounded-lg app:bg-surface app:shadow-xs app:transition-[border-color,box-shadow] app:duration-150 app:focus:ring-[3px] app:sm:text-sm app:dark:bg-surface-2",
+            "h-11 w-full rounded-[10px] border bg-surface pr-12 pl-3.5 text-base text-fg shadow-xs transition-[border-color,box-shadow] duration-150 placeholder:text-subtle hover:border-line-strong focus:ring-[3px] focus:outline-none sm:text-[0.9375rem] dark:bg-surface-2 app:pl-3 app:pointer-fine:h-9 app:rounded-lg app:sm:text-sm",
             error
-              ? "border-danger focus:border-danger app:focus:ring-danger/15"
-              : "border-line focus:border-primary/60 app:hover:border-line-strong app:focus:border-primary app:focus:ring-primary/20",
+              ? "border-danger focus:border-danger focus:ring-danger/15"
+              : "border-line focus:border-primary focus:ring-primary/20",
           )}
           {...props}
         />
@@ -205,10 +205,10 @@ export function TextArea({
             .join(" ") || undefined
         }
         className={cn(
-          "mt-2 w-full resize-y rounded-xl border bg-surface-2 p-3.5 text-base leading-relaxed text-fg placeholder:text-subtle focus:outline-none sm:text-[0.9375rem] app:mt-1.5 app:px-3 app:py-2 app:rounded-lg app:bg-surface app:shadow-xs app:transition-[border-color,box-shadow] app:duration-150 app:focus:ring-[3px] app:sm:text-sm app:dark:bg-surface-2",
+          "mt-2 w-full resize-y rounded-[10px] border bg-surface px-3.5 py-2.5 text-base leading-relaxed text-fg shadow-xs transition-[border-color,box-shadow] duration-150 placeholder:text-subtle hover:border-line-strong focus:ring-[3px] focus:outline-none sm:text-[0.9375rem] dark:bg-surface-2 app:mt-1.5 app:px-3 app:py-2 app:rounded-lg app:sm:text-sm",
           error
-            ? "border-danger focus:border-danger app:focus:ring-danger/15"
-            : "border-line focus:border-primary/60 app:hover:border-line-strong app:focus:border-primary app:focus:ring-primary/20",
+            ? "border-danger focus:border-danger focus:ring-danger/15"
+            : "border-line focus:border-primary focus:ring-primary/20",
         )}
         {...props}
       />
@@ -229,7 +229,7 @@ export function FormNotice({ children }: { children: React.ReactNode }) {
   return (
     <p
       role="alert"
-      className="mb-5 rounded-xl border border-danger/30 bg-danger-soft px-4 py-3 text-sm text-fg app:mb-3 app:rounded-lg app:py-2.5 app:text-[0.8125rem]"
+      className="mb-5 rounded-[10px] border border-danger/25 bg-danger-soft/80 px-4 py-3 text-sm text-fg app:mb-3 app:rounded-lg app:py-2.5 app:text-[0.8125rem]"
     >
       {children}
     </p>

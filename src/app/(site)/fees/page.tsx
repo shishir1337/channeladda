@@ -12,7 +12,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const fees = await getFeeSettings();
   return {
     title: "Pricing & fees",
-    description: `Buyers pay ${formatRate(fees.buyerFeeBpSafest)}% on top of the listing price. Sellers pay ${formatRate(fees.sellerFeeBp)}% when a Fastest deal completes. No listing fee and no monthly cost.`,
+    description: `Buyers pay ${formatRate(fees.buyerFeeBpSafest)}% on top of the listing price. ${fees.sellerFeeBp > 0 ? `Sellers pay ${formatRate(fees.sellerFeeBp)}% when a Fastest deal completes.` : "Sellers pay nothing."} No listing fee and no monthly cost.`,
     alternates: { canonical: "/fees" },
   };
 }
@@ -43,19 +43,18 @@ export default async function FeesPage() {
     <>
       <PageHeader
         crumbs={[{ label: "Home", href: "/" }, { label: "Fees" }]}
-        eyebrow="Pricing"
         title="Two fees, both stated up front"
-        description="There is no listing fee and no subscription. The buyer's fee is charged when a deal opens and refunded in full if it falls through before our agent takes custody of the account."
+        description="There is no listing fee and no required subscription. The buyer's fee is charged when a deal opens and refunded in full if it falls through before our agent takes custody of the account."
       />
 
       <Section>
         <Container>
-          <div className="grid gap-4 lg:grid-cols-2 lg:gap-5">
+          <div className="grid gap-3 lg:grid-cols-2">
             <div className="rounded-panel border border-line bg-surface p-6 sm:p-8">
-              <p className="text-xs font-semibold tracking-[0.14em] text-subtle uppercase">
+              <p className="text-[0.8125rem] font-medium text-subtle">
                 Buyer fee
               </p>
-              <p className="tnum mt-3 font-display text-5xl font-bold text-primary-text">
+              <p className="tnum mt-2 text-5xl font-semibold tracking-[-0.03em] text-fg">
                 {formatRate(fees.buyerFeeBpSafest)}%
               </p>
               <p className="mt-4 text-[0.9375rem] leading-relaxed text-muted">
@@ -65,18 +64,19 @@ export default async function FeesPage() {
               </p>
             </div>
 
-            <div className="rounded-panel border-2 border-primary bg-surface p-6 sm:p-8">
-              <p className="text-xs font-semibold tracking-[0.14em] text-subtle uppercase">
+            <div className="rounded-panel border border-line bg-surface p-6 sm:p-8">
+              <p className="text-[0.8125rem] font-medium text-subtle">
                 Seller fee
               </p>
-              <p className="tnum mt-3 font-display text-5xl font-bold text-primary-text">
+              <p className="tnum mt-2 text-5xl font-semibold tracking-[-0.03em] text-fg">
                 {formatRate(fees.sellerFeeBp)}%
               </p>
               <p className="mt-4 text-[0.9375rem] leading-relaxed text-muted">
-                Deducted from the sale price when a Fastest deal completes. A
-                Safest buyer pays you directly, so there is nothing to deduct it
-                from. Free to list, free to edit, and nothing owed if the
-                account does not sell.
+                {fees.sellerFeeBp > 0
+                  ? "Deducted from the sale price when a Fastest deal completes. A Safest buyer pays you directly, so there is nothing to deduct it from."
+                  : "Sellers pay nothing: a Fastest seller receives the full sale price, and a Safest buyer pays you directly."}{" "}
+                Free to list, free to edit, and nothing owed if the account does
+                not sell.
               </p>
             </div>
           </div>
@@ -86,12 +86,11 @@ export default async function FeesPage() {
       <Section className="border-y border-line bg-bg-subtle">
         <Container>
           <SectionHeading
-            eyebrow="Worked examples"
             title="What both sides see on a real deal"
             description="Every figure below follows the currency switcher in the header."
           />
 
-          <div className="mt-9 flex flex-col gap-8 sm:mt-12">
+          <div className="mt-8 flex flex-col gap-8 sm:mt-10">
             <ModeTable
               mode="FASTEST"
               fees={fees}
@@ -143,9 +142,9 @@ export default async function FeesPage() {
 
       <Section>
         <Container>
-          <div className="grid gap-4 sm:grid-cols-2 sm:gap-5">
+          <div className="grid gap-3 sm:grid-cols-2">
             <div className="rounded-card border border-line bg-surface p-6">
-              <h2 className="font-display text-lg font-semibold">
+              <h2 className="text-base font-semibold text-fg">
                 What the fee covers
               </h2>
               <ul className="mt-4 flex flex-col gap-2.5">
@@ -156,7 +155,7 @@ export default async function FeesPage() {
                   >
                     <CheckIcon
                       aria-hidden="true"
-                      className="mt-0.5 size-4 shrink-0 text-verified"
+                      className="mt-0.5 size-4 shrink-0 text-fg"
                     />
                     {item}
                   </li>
@@ -165,7 +164,7 @@ export default async function FeesPage() {
             </div>
 
             <div className="rounded-card border border-line bg-surface p-6">
-              <h2 className="font-display text-lg font-semibold">
+              <h2 className="text-base font-semibold text-fg">
                 What we never charge for
               </h2>
               <ul className="mt-4 flex flex-col gap-2.5">
@@ -185,10 +184,10 @@ export default async function FeesPage() {
             </div>
           </div>
 
-          <p className="mt-6 flex items-start gap-2.5 rounded-card border border-line bg-surface-2 p-5 text-sm leading-relaxed text-muted">
+          <p className="mt-3 flex items-start gap-2.5 rounded-card border border-info/20 bg-info-soft/70 p-4 text-sm leading-relaxed text-muted">
             <InfoIcon
               aria-hidden="true"
-              className="mt-0.5 size-4 shrink-0 text-primary-text"
+              className="mt-0.5 size-4 shrink-0 text-info"
             />
             <span>
               Network fees on a crypto withdrawal are set by the blockchain, not
@@ -198,14 +197,14 @@ export default async function FeesPage() {
           </p>
 
           <div className="mt-10 flex flex-col items-start gap-4 rounded-panel border border-line bg-surface p-6 sm:flex-row sm:items-center sm:justify-between sm:p-8">
-            <h2 className="max-w-lg font-display text-xl font-bold sm:text-2xl">
+            <h2 className="max-w-lg text-xl font-semibold tracking-[-0.02em] sm:text-2xl">
               No listing fee. Nothing to lose by trying.
             </h2>
             <div className="flex flex-wrap gap-3">
               <Button asChild size="lg">
                 <Link href="/sell">Start selling</Link>
               </Button>
-              <Button asChild variant="outline" size="lg">
+              <Button asChild variant="secondary" size="lg">
                 <Link href="/browse">Browse accounts</Link>
               </Button>
             </div>
@@ -239,15 +238,13 @@ function ModeTable({
 }) {
   return (
     <div>
-      <h3 className="font-display text-base font-semibold sm:text-lg">
-        {title}
-      </h3>
+      <h3 className="text-base font-semibold text-fg">{title}</h3>
       <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-muted">
         {note}
       </p>
 
       <div className="mt-4 overflow-x-auto rounded-card border border-line bg-surface">
-        <table className="w-full min-w-[38rem] text-sm">
+        <table className="tnum w-full min-w-[38rem] text-sm">
           <caption className="sr-only">{title}</caption>
           <thead>
             <tr className="border-b border-line bg-surface-2">
@@ -255,7 +252,7 @@ function ModeTable({
                 <th
                   key={h}
                   scope="col"
-                  className="px-4 py-3 text-left text-[0.6875rem] font-medium tracking-wide text-subtle uppercase whitespace-nowrap"
+                  className="px-4 py-2.5 text-left text-[0.8125rem] font-medium whitespace-nowrap text-subtle"
                 >
                   {h}
                 </th>
@@ -284,10 +281,10 @@ function ModeTable({
                   <td className="px-4 py-4 text-muted">
                     <Price usd={s.fee} />
                   </td>
-                  <td className="px-4 py-4 font-medium text-verified">
+                  <td className="px-4 py-4 font-medium text-fg">
                     <Price usd={s.payout} />
                   </td>
-                  <td className="px-4 py-4 font-semibold text-primary-text">
+                  <td className="px-4 py-4 font-semibold text-fg">
                     <Price usd={b.fee + s.fee} />
                   </td>
                 </tr>

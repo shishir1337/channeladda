@@ -2,8 +2,10 @@
 
 import { SearchIcon, TagIcon } from "lucide-react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { hasOwnActionBar } from "@/lib/action-bar";
 import { cn } from "@/lib/utils";
 
 /**
@@ -11,6 +13,7 @@ import { cn } from "@/lib/utils";
  * scrolled away so the two primary paths stay one tap from anywhere.
  */
 export function MobileActionBar() {
+  const pathname = usePathname();
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -20,10 +23,12 @@ export function MobileActionBar() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  if (hasOwnActionBar(pathname)) return null;
+
   return (
     <div
       className={cn(
-        "fixed inset-x-0 bottom-0 z-30 border-t border-line bg-bg/92 backdrop-blur-xl transition-transform duration-300 ease-[var(--ease-out-soft)] lg:hidden",
+        "fixed inset-x-0 bottom-0 z-30 border-t border-line bg-bg/90 backdrop-blur-xl transition-transform duration-300 ease-[var(--ease-out-soft)] lg:hidden",
         visible ? "translate-y-0" : "translate-y-full",
       )}
       // Clears the iOS home indicator / Android gesture bar.

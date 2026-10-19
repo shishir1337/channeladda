@@ -71,7 +71,7 @@ export function HeroSearch() {
             );
           }}
           aria-label="Search accounts for sale"
-          className="mt-4 rounded-panel border border-line bg-surface p-2 shadow-lift sm:mt-5 sm:rounded-[1.75rem]"
+          className="mt-4 rounded-2xl border border-line bg-surface p-1.5 shadow-soft sm:mt-5"
         >
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <div className="relative flex-1">
@@ -89,7 +89,7 @@ export function HeroSearch() {
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder={placeholder}
                 // 16px minimum keeps iOS from auto-zooming the field on focus.
-                className="h-14 w-full rounded-2xl bg-transparent pr-4 pl-12 text-base text-fg placeholder:text-subtle focus:outline-none"
+                className="h-12 w-full rounded-xl bg-transparent pr-4 pl-12 text-base text-fg placeholder:text-subtle focus:outline-none sm:h-13"
               />
             </div>
 
@@ -106,7 +106,7 @@ export function HeroSearch() {
                 id={budgetId}
                 value={budget}
                 onChange={(e) => setBudget(e.target.value)}
-                className="h-14 w-full cursor-pointer appearance-none rounded-2xl bg-surface-2 pr-11 pl-4 text-[0.9375rem] font-medium text-fg focus:outline-none sm:w-auto sm:min-w-[10.5rem] sm:bg-transparent"
+                className="h-12 w-full cursor-pointer appearance-none rounded-xl bg-surface-2 pr-11 pl-4 text-[0.9375rem] font-medium text-fg focus:outline-none sm:h-13 sm:w-auto sm:min-w-[10.5rem] sm:bg-transparent"
               >
                 {budgets.map((b) => (
                   <option key={b.value} value={b.value}>
@@ -120,8 +120,12 @@ export function HeroSearch() {
               />
             </div>
 
-            <Button type="submit" size="lg" className="h-14 w-full sm:w-auto">
-              <SearchIcon aria-hidden="true" className="size-5" />
+            <Button
+              type="submit"
+              size="lg"
+              className="h-12 w-full rounded-xl sm:h-13 sm:w-auto"
+            >
+              <SearchIcon aria-hidden="true" className="size-4.5" />
               Search
             </Button>
           </div>
@@ -148,16 +152,15 @@ function PlatformChip({
       aria-pressed={selected}
       onClick={onSelect}
       className={cn(
-        "inline-flex h-11 shrink-0 cursor-pointer items-center gap-2 rounded-full border px-4 text-sm font-medium whitespace-nowrap transition-all duration-200 ease-[var(--ease-out-soft)]",
+        "inline-flex h-10 shrink-0 cursor-pointer items-center gap-2 rounded-full border px-3.5 text-sm font-medium whitespace-nowrap transition-colors duration-150",
+        // Selected is the ink colour, not gold: gold is for the one action.
         selected
-          ? "border-primary bg-primary text-primary-fg shadow-soft"
+          ? "border-fg bg-fg text-bg"
           : "border-line bg-surface text-muted hover:border-line-strong hover:text-fg",
       )}
     >
       {icon ? (
-        <span className={cn(selected && "[&_svg]:!text-primary-fg")}>
-          {icon}
-        </span>
+        <span className={cn(selected && "[&_svg]:!text-bg")}>{icon}</span>
       ) : null}
       {label}
     </button>

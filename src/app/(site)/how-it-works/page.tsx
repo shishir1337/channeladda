@@ -20,7 +20,6 @@ export default function HowItWorksPage() {
     <>
       <PageHeader
         crumbs={[{ label: "Home", href: "/" }, { label: "How it works" }]}
-        eyebrow="The process"
         title="Nobody goes first on trust"
         description="The oldest problem in account trading is that someone has to move first — hand over the login, or hand over the money. We take one side of the exchange and hold it, so neither of you has to."
       />
@@ -30,12 +29,11 @@ export default function HowItWorksPage() {
       <Section className="border-y border-line bg-bg-subtle">
         <Container>
           <SectionHeading
-            eyebrow="Holding period"
             title="Why the wait is different on every platform"
             description="On a Fastest deal you are a manager for the whole holding period before you become primary owner, and the seller is paid only after that. On YouTube it is Google's own wait before a manager can be made primary owner."
           />
 
-          <div className="mt-9 overflow-x-auto rounded-card border border-line bg-surface sm:mt-12">
+          <div className="mt-8 overflow-x-auto rounded-card border border-line bg-surface sm:mt-10">
             <table className="w-full min-w-[44rem] text-sm">
               <caption className="sr-only">
                 Hold period and transfer mechanism by platform
@@ -44,19 +42,19 @@ export default function HowItWorksPage() {
                 <tr className="border-b border-line bg-surface-2">
                   <th
                     scope="col"
-                    className="px-4 py-3 text-left text-[0.6875rem] font-medium tracking-wide text-subtle uppercase"
+                    className="px-4 py-3 text-left text-[0.8125rem] font-medium text-subtle"
                   >
                     Platform
                   </th>
                   <th
                     scope="col"
-                    className="px-4 py-3 text-left text-[0.6875rem] font-medium tracking-wide text-subtle uppercase"
+                    className="px-4 py-3 text-left text-[0.8125rem] font-medium text-subtle"
                   >
                     How ownership moves
                   </th>
                   <th
                     scope="col"
-                    className="px-4 py-3 text-left text-[0.6875rem] font-medium tracking-wide text-subtle uppercase"
+                    className="px-4 py-3 text-left text-[0.8125rem] font-medium text-subtle"
                   >
                     Hold
                   </th>
@@ -82,7 +80,7 @@ export default function HowItWorksPage() {
                         {p.transferNote}
                       </td>
                       <td className="px-4 py-4 align-top">
-                        <span className="tnum inline-flex items-center gap-1.5 rounded-full border border-line bg-surface-2 px-2.5 py-1 text-xs font-semibold whitespace-nowrap">
+                        <span className="tnum inline-flex items-center gap-1.5 rounded-full border border-line bg-surface-2 px-2.5 py-1 text-xs font-medium whitespace-nowrap text-fg">
                           <TimerIcon aria-hidden="true" className="size-3.5" />
                           {p.holdDays} days
                         </span>
@@ -99,8 +97,9 @@ export default function HowItWorksPage() {
               className="mt-0.5 size-4 shrink-0 text-verified"
             />
             <span>
-              If anything goes wrong inside that window, you open a dispute and
-              it is decided on the record — your money is still with us.
+              If anything goes wrong inside that window on a Fastest deal, you
+              open a dispute and it is decided on the record — your money is
+              still with us.
             </span>
           </p>
         </Container>
@@ -112,18 +111,18 @@ export default function HowItWorksPage() {
         <Container>
           <div className="flex flex-col items-start gap-4 rounded-panel border border-line bg-surface p-6 sm:flex-row sm:items-center sm:justify-between sm:p-8">
             <div className="max-w-lg">
-              <h2 className="font-display text-xl font-bold sm:text-2xl">
+              <h2 className="text-xl font-semibold tracking-[-0.02em] sm:text-2xl">
                 Still have a question?
               </h2>
               <p className="mt-2 text-sm leading-relaxed text-muted">
-                Support replies in under ten minutes, every day of the year.
+                Write to us and a person on our support team will answer.
               </p>
             </div>
             <div className="flex flex-wrap gap-3">
               <Button asChild size="lg">
                 <Link href="/browse">Browse accounts</Link>
               </Button>
-              <Button asChild variant="outline" size="lg">
+              <Button asChild variant="secondary" size="lg">
                 <Link href="/support">Contact support</Link>
               </Button>
             </div>

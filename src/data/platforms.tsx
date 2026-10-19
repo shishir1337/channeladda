@@ -22,8 +22,6 @@ export type Platform = {
   icon: ComponentType<SVGProps<SVGSVGElement>>;
   /** What the audience metric is called on this platform. */
   metricLabel: string;
-  listings: number;
-  startingPrice: number;
   searchPlaceholder: string;
   /** Plural noun for the asset, used in headings and copy. */
   assetNoun: string;
@@ -65,8 +63,6 @@ export const platforms: Platform[] = [
     tint: "var(--brand-youtube)",
     icon: YouTubeIcon,
     metricLabel: "Subscribers",
-    listings: 2418,
-    startingPrice: 120,
     searchPlaceholder: "Try “monetized tech channel, 100K+ subs”",
     assetNoun: "channels",
     blurb:
@@ -96,8 +92,6 @@ export const platforms: Platform[] = [
     tint: "var(--brand-instagram)",
     icon: InstagramIcon,
     metricLabel: "Followers",
-    listings: 3162,
-    startingPrice: 45,
     searchPlaceholder: "Try “fashion page, 500K followers, India”",
     assetNoun: "pages",
     blurb:
@@ -127,8 +121,6 @@ export const platforms: Platform[] = [
     tint: "var(--brand-facebook)",
     icon: FacebookIcon,
     metricLabel: "Followers",
-    listings: 1943,
-    startingPrice: 35,
     searchPlaceholder: "Try “monetized page, in-stream ads enabled”",
     assetNoun: "pages",
     blurb:
@@ -158,8 +150,6 @@ export const platforms: Platform[] = [
     tint: "var(--brand-telegram)",
     icon: TelegramIcon,
     metricLabel: "Members",
-    listings: 1105,
-    startingPrice: 25,
     searchPlaceholder: "Try “crypto signals channel, 50K members”",
     assetNoun: "channels",
     blurb:
@@ -189,8 +179,6 @@ export const platforms: Platform[] = [
     tint: "var(--brand-website)",
     icon: WebsiteIcon,
     metricLabel: "Visits / mo",
-    listings: 512,
-    startingPrice: 250,
     searchPlaceholder: "Try “AdSense blog, $500/mo revenue”",
     assetNoun: "sites",
     blurb:
@@ -219,6 +207,3 @@ export const platforms: Platform[] = [
 export const platformMap = Object.fromEntries(
   platforms.map((p) => [p.id, p]),
 ) as Record<PlatformId, Platform>;
-
-/** Total live listings, shown on the browse-all calls to action. */
-export const totalListings = platforms.reduce((sum, p) => sum + p.listings, 0);

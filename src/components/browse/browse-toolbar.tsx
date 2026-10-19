@@ -4,6 +4,7 @@ import { SearchIcon, SlidersHorizontalIcon, XIcon } from "lucide-react";
 import { useEffect, useId, useState } from "react";
 import { FilterPanel } from "@/components/browse/filter-panel";
 import { useFilterNav } from "@/components/browse/use-filter-nav";
+import { siteInput } from "@/components/ui/field";
 import {
   Sheet,
   SheetContent,
@@ -17,15 +18,18 @@ import {
   type QueryResult,
   sortOptions,
 } from "@/lib/listing-query";
+import { cn } from "@/lib/utils";
 
 export function BrowseToolbar({
   filters,
   facets,
+  priceBounds,
   total,
   hidePlatform,
 }: {
   filters: ListingFilters;
   facets: QueryResult["facets"];
+  priceBounds: QueryResult["priceBounds"];
   total: number;
   hidePlatform?: boolean;
 }) {
@@ -62,7 +66,7 @@ export function BrowseToolbar({
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Search by handle, niche or country"
-            className="h-12 w-full rounded-xl border border-line bg-surface pr-10 pl-11 text-base text-fg placeholder:text-subtle focus:border-primary/60 focus:outline-none sm:text-[0.9375rem]"
+            className={cn(siteInput, "pr-10 pl-11")}
           />
           {q ? (
             <button
@@ -96,7 +100,7 @@ export function BrowseToolbar({
               </button>
             </SheetTrigger>
             <SheetContent>
-              <SheetTitle className="border-b border-line px-6 py-5 font-display text-lg font-bold">
+              <SheetTitle className="border-b border-line px-6 py-5 text-lg font-semibold">
                 Filters
               </SheetTitle>
               <SheetDescription className="sr-only">
@@ -106,6 +110,7 @@ export function BrowseToolbar({
                 <FilterPanel
                   filters={filters}
                   facets={facets}
+                  priceBounds={priceBounds}
                   hidePlatform={hidePlatform}
                   onNavigate={() => setSheetOpen(false)}
                 />
@@ -123,7 +128,10 @@ export function BrowseToolbar({
               onChange={(e) =>
                 apply({ sort: e.target.value as ListingFilters["sort"] })
               }
-              className="h-12 w-full cursor-pointer appearance-none rounded-xl border border-line bg-surface pr-9 pl-4 text-sm font-medium text-fg focus:border-primary/60 focus:outline-none"
+              className={cn(
+                siteInput,
+                "cursor-pointer appearance-none pr-9 font-medium",
+              )}
             >
               {sortOptions.map((option) => (
                 <option key={option.value} value={option.value}>

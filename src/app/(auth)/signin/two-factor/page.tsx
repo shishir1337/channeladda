@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { TwoFactorChallenge } from "@/components/auth/two-factor-challenge";
+import { supportHref } from "@/lib/support";
 
 export const metadata: Metadata = {
   title: "Two-step verification",
@@ -29,7 +30,7 @@ export default async function TwoFactorPage({
         <p>
           Locked out?{" "}
           <Link
-            href="/support?topic=account"
+            href={supportHref("I am locked out of my account")}
             className="font-medium text-fg underline decoration-line-strong underline-offset-4 transition-colors hover:decoration-fg"
           >
             Contact support

@@ -28,7 +28,6 @@ export default async function BrowsePage({
     <>
       <PageHeader
         crumbs={[{ label: "Home", href: "/" }, { label: "Browse" }]}
-        eyebrow="Marketplace"
         title="Every account on the block"
         description={`${total.toLocaleString("en-US")} listings across five platforms. Ownership is verified before anything reaches this page.`}
       />

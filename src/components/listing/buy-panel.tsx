@@ -6,7 +6,6 @@ import { FavoriteButton } from "@/components/home/favorite-button";
 import { AskSeller } from "@/components/listing/ask-seller";
 import { ReportListing } from "@/components/listing/report-listing";
 import { StartDeal } from "@/components/listing/start-deal";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Price } from "@/components/ui/price";
 import type { Listing } from "@/data/listings";
@@ -43,14 +42,14 @@ export function BuyPanel({
   // page saying the listing was held.
   const heldForSomeoneElse = listing.reserved === true && !heldOfferUsd;
   return (
-    <div className="rounded-panel border border-line bg-surface p-5 shadow-soft sm:p-6">
+    <div className="rounded-panel border border-line bg-surface p-5 sm:p-6">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-xs text-subtle">Asking price</p>
-          <div className="mt-1 flex items-baseline gap-2.5">
+          <p className="text-[0.8125rem] text-subtle">Asking price</p>
+          <div className="mt-0.5 flex items-baseline gap-2.5">
             <Price
               usd={listing.price}
-              className="text-3xl font-semibold text-fg"
+              className="tnum text-3xl font-semibold tracking-[-0.02em] text-fg"
             />
             {listing.wasPrice ? (
               <Price
@@ -60,7 +59,11 @@ export function BuyPanel({
             ) : null}
           </div>
         </div>
-        <FavoriteButton listingId={listing.id} handle={listing.handle} />
+        <FavoriteButton
+          listingId={listing.id}
+          handle={listing.handle}
+          on="surface"
+        />
       </div>
 
       {heldOfferUsd ? (
@@ -104,12 +107,15 @@ export function BuyPanel({
         ) : null}
       </div>
 
-      <div className="mt-5 rounded-card border border-verified/25 bg-verified-soft p-4">
-        <p className="flex items-center gap-2 text-sm font-semibold text-verified">
-          <ShieldCheckIcon aria-hidden="true" className="size-4 shrink-0" />
+      <div className="mt-5 rounded-card border border-line bg-bg-subtle p-4">
+        <p className="flex items-center gap-2 text-sm font-semibold text-fg">
+          <ShieldCheckIcon
+            aria-hidden="true"
+            className="size-4 shrink-0 text-verified"
+          />
           Nobody can be left short
         </p>
-        <p className="mt-2 text-xs leading-relaxed text-muted">
+        <p className="mt-1.5 text-[0.8125rem] leading-relaxed text-muted">
           On a Fastest deal you pay Channel Adda, never the seller: you are a
           manager for{" "}
           <span className="font-medium text-fg">{holdDays} days</span> before
@@ -120,10 +126,10 @@ export function BuyPanel({
       </div>
 
       <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
-        <Badge className="text-subtle">
-          <EyeIcon aria-hidden="true" />
+        <span className="inline-flex items-center gap-1.5 text-[0.8125rem] text-subtle">
+          <EyeIcon aria-hidden="true" className="size-3.5" />
           <span className="tnum">{listing.watching}</span> watching
-        </Badge>
+        </span>
         <ReportListing listingId={listing.id} listingSlug={listing.slug} />
       </div>
     </div>

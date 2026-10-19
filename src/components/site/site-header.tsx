@@ -44,20 +44,20 @@ export function SiteHeader() {
   return (
     <header
       className={cn(
-        "sticky top-0 z-40 transition-[background-color,border-color,box-shadow] duration-300",
+        "sticky top-0 z-40 transition-[background-color,border-color] duration-200",
         scrolled
-          ? "border-b border-line bg-bg/85 shadow-soft backdrop-blur-xl"
+          ? "border-b border-line bg-bg/80 backdrop-blur-xl"
           : "border-b border-transparent bg-bg",
       )}
     >
-      <div className="mx-auto flex h-16 w-full max-w-[81rem] items-center gap-3 px-4 sm:px-6 lg:h-[4.5rem] lg:gap-6 lg:px-8">
+      <div className="mx-auto flex h-16 w-full max-w-[81rem] items-center gap-3 px-4 sm:px-6 lg:gap-6 lg:px-8">
         <Link
           href="/"
           className="flex min-h-11 shrink-0 items-center gap-2.5 rounded-lg"
           aria-label="Channel Adda home"
         >
-          <ChannelAddaLogo className="size-8 lg:size-9" />
-          <span className="font-display text-lg font-bold tracking-tight lg:text-xl">
+          <ChannelAddaLogo className="size-8" />
+          <span className="text-[1.0625rem] font-semibold tracking-[-0.02em]">
             Channel <span className="text-primary-text">Adda</span>
           </span>
         </Link>
@@ -68,7 +68,7 @@ export function SiteHeader() {
               <li key={link.href}>
                 <Link
                   href={link.href}
-                  className="inline-flex h-10 items-center rounded-lg px-3 text-sm font-medium text-muted transition-colors duration-200 hover:bg-surface-2 hover:text-fg"
+                  className="inline-flex h-9 items-center rounded-lg px-3 text-sm font-medium text-muted transition-colors duration-150 hover:bg-surface-2 hover:text-fg"
                 >
                   {link.label}
                 </Link>
@@ -81,7 +81,7 @@ export function SiteHeader() {
           <Link
             href="/browse"
             aria-label="Search accounts"
-            className="inline-flex size-11 cursor-pointer items-center justify-center rounded-xl border border-line text-muted transition-colors duration-200 hover:border-line-strong hover:bg-surface-2 hover:text-fg lg:hidden"
+            className="inline-flex size-11 cursor-pointer items-center justify-center rounded-[10px] text-muted transition-colors duration-150 hover:bg-surface-2 hover:text-fg lg:hidden"
           >
             <SearchIcon aria-hidden="true" className="size-[1.15rem]" />
           </Link>
@@ -97,13 +97,13 @@ export function SiteHeader() {
               <button
                 type="button"
                 aria-label="Open menu"
-                className="inline-flex size-11 cursor-pointer items-center justify-center rounded-xl border border-line text-fg transition-colors duration-200 hover:bg-surface-2 lg:hidden"
+                className="inline-flex size-11 cursor-pointer items-center justify-center rounded-[10px] text-fg transition-colors duration-150 hover:bg-surface-2 lg:hidden"
               >
                 <MenuIcon aria-hidden="true" className="size-5" />
               </button>
             </SheetTrigger>
             <SheetContent>
-              <SheetTitle className="border-b border-line px-6 py-5 font-display text-lg font-bold">
+              <SheetTitle className="border-b border-line px-6 py-5 text-base font-semibold">
                 Menu
               </SheetTitle>
               <SheetDescription className="sr-only">
@@ -118,7 +118,7 @@ export function SiteHeader() {
                         <SheetClose asChild>
                           <Link
                             href={link.href}
-                            className="flex min-h-12 items-center rounded-xl px-3 text-[0.9375rem] font-medium text-fg transition-colors hover:bg-surface-2"
+                            className="flex min-h-12 items-center rounded-[10px] px-3 text-[0.9375rem] font-medium text-fg transition-colors hover:bg-surface-2"
                           >
                             {link.label}
                           </Link>
@@ -128,7 +128,7 @@ export function SiteHeader() {
                   </ul>
                 </nav>
 
-                <p className="mt-8 mb-3 px-3 text-xs font-semibold tracking-[0.14em] text-subtle uppercase">
+                <p className="mt-8 mb-3 px-3 text-[0.8125rem] font-medium text-subtle">
                   Shop by platform
                 </p>
                 <ul className="grid grid-cols-2 gap-2">
@@ -137,7 +137,7 @@ export function SiteHeader() {
                       <SheetClose asChild>
                         <Link
                           href={`/browse/${platform.id}`}
-                          className="flex min-h-12 items-center gap-2.5 rounded-xl border border-line px-3 text-sm font-medium transition-colors hover:bg-surface-2"
+                          className="flex min-h-12 items-center gap-2.5 rounded-[10px] border border-line px-3 text-sm font-medium transition-colors hover:bg-surface-2"
                         >
                           <platform.icon
                             className="size-4 shrink-0"
@@ -153,7 +153,7 @@ export function SiteHeader() {
 
               <div className="grid gap-2.5 border-t border-line bg-surface px-6 py-5">
                 <div className="sm:hidden">
-                  <p className="mb-2 text-xs font-semibold tracking-[0.14em] text-subtle uppercase">
+                  <p className="mb-2 text-[0.8125rem] font-medium text-subtle">
                     Currency
                   </p>
                   <CurrencySwitcher fullWidth />

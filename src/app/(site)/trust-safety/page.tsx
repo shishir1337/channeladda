@@ -33,31 +33,27 @@ export default function TrustSafetyPage() {
     <>
       <PageHeader
         crumbs={[{ label: "Home", href: "/" }, { label: "Trust & safety" }]}
-        eyebrow="Trust & safety"
         title="The boring machinery that keeps deals clean"
         description="Account trading has a scam problem. Rather than promise you it is safe, here are the specific controls we run and what each one actually prevents."
       />
 
-      <TrustSafety />
+      <TrustSafety embedded />
 
       <Section>
         <Container>
           <SectionHeading
-            eyebrow="Disputes"
             title="What happens when a deal goes wrong"
             description="Most deals complete without incident. This is the process for the ones that do not."
           />
 
-          <ol className="mt-9 grid gap-4 sm:mt-12 sm:grid-cols-3">
+          <ol className="mt-8 grid gap-3 sm:mt-10 sm:grid-cols-3">
             {disputeSteps.map((step, i) => (
               <li key={step.title}>
                 <div className="flex h-full flex-col rounded-card border border-line bg-surface p-5 sm:p-6">
-                  <span className="tnum flex size-9 items-center justify-center rounded-full bg-primary-soft font-display text-sm font-bold text-primary-text">
+                  <span className="tnum flex size-7 items-center justify-center rounded-full border border-line bg-surface-2 text-[0.8125rem] font-semibold text-fg">
                     {i + 1}
                   </span>
-                  <h3 className="mt-4 font-display text-base font-semibold">
-                    {step.title}
-                  </h3>
+                  <h3 className="mt-4 text-base font-semibold">{step.title}</h3>
                   <p className="mt-2 text-sm leading-relaxed text-muted">
                     {step.body}
                   </p>
@@ -72,7 +68,7 @@ export default function TrustSafetyPage() {
         <Container>
           <div className="grid gap-8 lg:grid-cols-2 lg:gap-16">
             <div>
-              <h2 className="flex items-center gap-2.5 font-display text-xl font-bold sm:text-2xl">
+              <h2 className="flex items-center gap-2.5 text-xl font-semibold sm:text-2xl">
                 <ShieldCheckIcon
                   aria-hidden="true"
                   className="size-6 shrink-0 text-verified"
@@ -115,10 +111,10 @@ export default function TrustSafetyPage() {
             </div>
 
             <div className="rounded-panel border border-line bg-surface p-6 sm:p-8">
-              <h2 className="flex items-center gap-2.5 font-display text-lg font-semibold">
+              <h2 className="flex items-center gap-2.5 text-lg font-semibold">
                 <ScaleIcon
                   aria-hidden="true"
-                  className="size-5 shrink-0 text-primary-text"
+                  className="size-5 shrink-0 text-subtle"
                 />
                 Where we draw the line
               </h2>

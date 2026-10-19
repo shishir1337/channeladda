@@ -14,6 +14,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Price } from "@/components/ui/price";
 import { Container, Section } from "@/components/ui/section";
 import { serviceMap, services } from "@/data/site";
+import { supportHref } from "@/lib/support";
 
 export function generateStaticParams() {
   return services.map((s) => ({ slug: s.slug }));
@@ -55,7 +56,7 @@ export default async function ServicePage({
         ]}
         title={
           <span className="flex flex-wrap items-center gap-3">
-            <span className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary-soft text-primary-text sm:size-14">
+            <span className="flex size-12 shrink-0 items-center justify-center rounded-lg border border-line bg-surface-2 text-muted sm:size-14">
               <ServiceIcon name={service.icon} className="size-6" />
             </span>
             {service.title}
@@ -72,7 +73,7 @@ export default async function ServicePage({
                 {service.body}
               </p>
 
-              <h2 className="mt-9 font-display text-lg font-semibold">
+              <h2 className="mt-9 text-base font-semibold text-fg">
                 What is included
               </h2>
               <ul className="mt-4 flex flex-col gap-3">
@@ -80,7 +81,7 @@ export default async function ServicePage({
                   <li key={item} className="flex gap-3 text-[0.9375rem]">
                     <CheckIcon
                       aria-hidden="true"
-                      className="mt-0.5 size-4 shrink-0 text-verified"
+                      className="mt-0.5 size-4 shrink-0 text-fg"
                     />
                     <span className="leading-relaxed text-muted">{item}</span>
                   </li>
@@ -88,11 +89,11 @@ export default async function ServicePage({
               </ul>
 
               {service.caution ? (
-                <div className="mt-8 rounded-card border border-danger/30 bg-danger-soft p-5">
-                  <h2 className="flex items-center gap-2.5 font-display text-base font-semibold text-danger">
+                <div className="mt-8 rounded-card border border-primary/30 bg-primary-soft/70 p-5">
+                  <h2 className="flex items-center gap-2.5 text-base font-semibold text-fg">
                     <TriangleAlertIcon
                       aria-hidden="true"
-                      className="size-5 shrink-0"
+                      className="size-4.5 shrink-0 text-primary-text"
                     />
                     Read this before you order
                   </h2>
@@ -103,10 +104,10 @@ export default async function ServicePage({
               ) : null}
 
               <div className="mt-9 rounded-card border border-line bg-surface p-5 sm:p-6">
-                <h2 className="flex items-center gap-2.5 font-display text-base font-semibold">
+                <h2 className="flex items-center gap-2 text-base font-semibold text-fg">
                   <ShieldCheckIcon
                     aria-hidden="true"
-                    className="size-5 text-verified"
+                    className="size-4.5 text-verified"
                   />
                   How ordering works
                 </h2>
@@ -131,20 +132,24 @@ export default async function ServicePage({
             </div>
 
             <aside className="mt-8 lg:sticky lg:top-24 lg:mt-0">
-              <div className="rounded-panel border border-line bg-surface p-5 shadow-soft sm:p-6">
+              <div className="rounded-panel border border-line bg-surface p-5 sm:p-6">
                 <dl className="space-y-4">
                   <div>
-                    <dt className="text-xs text-subtle">Starting from</dt>
-                    <dd className="mt-1 text-2xl font-semibold">
+                    <dt className="text-[0.8125rem] text-subtle">
+                      Starting from
+                    </dt>
+                    <dd className="tnum mt-0.5 text-2xl font-semibold tracking-[-0.02em] text-fg">
                       {service.fromPrice === 0 ? (
-                        <span className="text-verified">Free</span>
+                        <span>Free</span>
                       ) : (
                         <Price usd={service.fromPrice} />
                       )}
                     </dd>
                   </div>
                   <div className="border-t border-line pt-4">
-                    <dt className="text-xs text-subtle">Typical turnaround</dt>
+                    <dt className="text-[0.8125rem] text-subtle">
+                      Typical turnaround
+                    </dt>
                     <dd className="mt-1 flex items-center gap-1.5 text-sm font-semibold">
                       <TimerIcon aria-hidden="true" className="size-4" />
                       {service.turnaround}
@@ -153,7 +158,9 @@ export default async function ServicePage({
                 </dl>
 
                 <Button asChild size="lg" className="mt-6 w-full">
-                  <Link href="/support">Request this service</Link>
+                  <Link href={supportHref("Ordering a service")}>
+                    Request this service
+                  </Link>
                 </Button>
                 <p className="mt-3 text-center text-xs text-subtle">
                   Final price is quoted after we see the account.
@@ -161,9 +168,7 @@ export default async function ServicePage({
               </div>
 
               <div className="mt-4 rounded-card border border-line bg-surface p-5">
-                <h2 className="font-display text-sm font-semibold">
-                  Other services
-                </h2>
+                <h2 className="text-sm font-semibold">Other services</h2>
                 <ul className="mt-3 flex flex-col gap-1">
                   {others.map((other) => (
                     <li key={other.slug}>

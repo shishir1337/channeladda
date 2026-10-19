@@ -109,7 +109,7 @@ export const helpArticles: HelpArticle[] = [
       "How points are earned from deals, and what the Reseller badge adds.",
     body: [
       "Every deal that completes earns rating points for both sides: half of what the deal was worth, in US dollars. A $500 deal is 250 points for the buyer and 250 for the seller. Points come from completed deals only, so they cannot be typed in or bought one by one, and they show on your profile and to anyone you are dealing with.",
-      "The Reseller badge is bought 30 days at a time from your wallet, from your balance or with crypto. While it is active it shows beside your name, your rating points count three times — 250 becomes 750 — and every Channel Adda fee you pay is 30% lower, buying or selling. When it ends your points count once again and fees go back to normal; a deal keeps the fee it was opened at.",
+      "The Reseller badge is bought 30 days at a time from your wallet, from your balance or with crypto. While it is active it shows beside your name, your rating points count {multiplier} times — 250 becomes {multiplied250} — and every Channel Adda fee you pay is {discount}% lower. When it ends your points count once again and fees go back to normal; a deal keeps the fee it was opened at.",
       "Paying while the badge is active adds 30 days on to the end, so nothing is lost by renewing early. We remind you three days before it ends.",
     ],
   },
@@ -119,7 +119,7 @@ export const helpArticles: HelpArticle[] = [
     category: "selling",
     summary: "Payout timing, the seller fee, and withdrawal security.",
     body: [
-      "On a Fastest deal the buyer paid us, so we pay you. While the deal runs, the price shows in your wallet under Held for your sales; once the buyer is primary owner and our agent has checked, the sale amount, less the seller fee if one is set (check /fees), lands in your Channel Adda balance, and you withdraw it to your own crypto wallet, usually within the hour. On a Safest deal the buyer pays you directly, the way you agree in the deal chat, once our agent holds the account — press Received when it arrives, and only then does the account move to them.",
+      "On a Fastest deal the buyer paid us, so we pay you. While the deal runs, the price shows in your wallet under Held for your sales; once the buyer is primary owner and our agent has checked, the sale amount, less the seller fee if one is set (check /fees), lands in your Channel Adda balance, and you withdraw it to your own crypto wallet once our finance team approves the payout. On a Safest deal the buyer pays you directly, the way you agree in the deal chat, once our agent holds the account — press Received when it arrives, and only then does the account move to them.",
       "For your own protection, adding or changing a payout address locks withdrawals for 24 hours and sends you an email. Address-change attacks are the most common way marketplace sellers lose money, and this delay is what stops them.",
     ],
   },

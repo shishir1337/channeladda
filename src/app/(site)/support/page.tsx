@@ -15,16 +15,16 @@ import { helpArticles } from "@/data/help";
 export const metadata: Metadata = {
   title: "Contact support",
   description:
-    "Live chat replies in under ten minutes, every day of the year. Disputes are reviewed by a moderator within 24 hours.",
+    "Write to a person on our support team. Email is answered within 12 hours, and disputes are reviewed by a moderator within 24 hours.",
   alternates: { canonical: "/support" },
 };
 
 const channels = [
   {
     icon: MessagesSquareIcon,
-    title: "Live chat",
-    body: "The fastest route for anything about a live order.",
-    meta: "Replies in under 10 minutes, 24/7",
+    title: "The form below",
+    body: "The quickest route for anything about a live order. Add the order reference and we start from it.",
+    meta: "Read by a person, never a bot",
   },
   {
     icon: MailIcon,
@@ -58,7 +58,6 @@ export default async function SupportPage({
     <>
       <PageHeader
         crumbs={[{ label: "Home", href: "/" }, { label: "Support" }]}
-        eyebrow="Support"
         title={suspended ? "Your account is suspended" : "Talk to a human"}
         description={
           suspended
@@ -69,20 +68,20 @@ export default async function SupportPage({
 
       <Section>
         <Container>
-          <ul className="grid gap-4 sm:grid-cols-3">
+          <ul className="grid gap-3 sm:grid-cols-3">
             {channels.map((channel) => (
               <li key={channel.title}>
                 <div className="flex h-full flex-col rounded-card border border-line bg-surface p-5 sm:p-6">
-                  <span className="flex size-11 items-center justify-center rounded-xl bg-primary-soft text-primary-text">
-                    <channel.icon aria-hidden="true" className="size-5" />
+                  <span className="flex size-9 items-center justify-center rounded-lg border border-line bg-surface-2 text-muted">
+                    <channel.icon aria-hidden="true" className="size-4.5" />
                   </span>
-                  <h2 className="mt-4 font-display text-base font-semibold">
+                  <h2 className="mt-4 text-[0.9375rem] font-semibold text-fg">
                     {channel.title}
                   </h2>
                   <p className="mt-2 text-sm leading-relaxed text-muted">
                     {channel.body}
                   </p>
-                  <p className="mt-auto flex items-center gap-1.5 pt-4 text-xs text-verified">
+                  <p className="mt-auto flex items-center gap-1.5 pt-4 text-[0.8125rem] text-subtle">
                     <ClockIcon aria-hidden="true" className="size-3.5" />
                     {channel.meta}
                   </p>
@@ -96,7 +95,7 @@ export default async function SupportPage({
 
             <aside className="mt-8 lg:mt-0">
               <div className="rounded-card border border-line bg-surface p-5">
-                <h2 className="font-display text-base font-semibold">
+                <h2 className="text-[0.9375rem] font-semibold text-fg">
                   Answers you might need first
                 </h2>
                 <ul className="mt-4 flex flex-col gap-1">
@@ -117,7 +116,7 @@ export default async function SupportPage({
                 </ul>
                 <Link
                   href="/help"
-                  className="mt-3 inline-flex min-h-11 items-center gap-1.5 px-2 text-sm font-semibold text-primary-text transition-colors hover:text-fg"
+                  className="mt-3 inline-flex min-h-11 items-center gap-1.5 px-2 text-sm font-medium text-fg transition-colors duration-150 hover:text-muted"
                 >
                   Visit the help centre
                   <ArrowRightIcon aria-hidden="true" className="size-4" />

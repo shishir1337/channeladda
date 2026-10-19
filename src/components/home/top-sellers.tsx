@@ -1,58 +1,44 @@
-import {
-  ArrowRightIcon,
-  BadgeCheckIcon,
-  StarIcon,
-  TimerIcon,
-} from "lucide-react";
+import { ArrowRightIcon, BadgeCheckIcon, TimerIcon } from "lucide-react";
 import Link from "next/link";
 import { ResellerBadge } from "@/components/app/reseller-badge";
+import { SellerAvatar } from "@/components/site/seller-avatar";
 import { Badge } from "@/components/ui/badge";
 import { Price } from "@/components/ui/price";
 import { Container, Section, SectionHeading } from "@/components/ui/section";
+import { Stars } from "@/components/ui/stars";
 import { platformMap } from "@/data/platforms";
-import { type Seller, sellerAvatarSrc } from "@/data/sellers";
-import { ratingLabel } from "@/lib/utils";
-
-/** One name per star, so a rating row is keyed by name, not position. */
-const STAR_KEYS = ["one", "two", "three", "four", "five"] as const;
+import type { Seller } from "@/data/sellers";
+import { countOf } from "@/lib/plural";
 
 export function TopSellers({ sellers }: { sellers: Seller[] }) {
   return (
     <Section>
       <Container>
         <SectionHeading
-          eyebrow="Verified sellers"
           title="The people behind the listings"
           description="Ratings come only from deals that completed — there is no way to buy a review here."
           action={
             <Link
               href="/sellers"
-              className="inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-primary-text transition-colors hover:text-fg"
+              className="group inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-fg transition-colors duration-150 hover:text-muted"
             >
               See all verified sellers
-              <ArrowRightIcon aria-hidden="true" className="size-4" />
+              <ArrowRightIcon
+                aria-hidden="true"
+                className="size-4 transition-transform duration-150 group-hover:translate-x-0.5"
+              />
             </Link>
           }
         />
 
-        <ul className="mt-9 grid gap-4 sm:mt-12 sm:grid-cols-2 xl:grid-cols-4">
+        <ul className="mt-8 grid gap-3 sm:mt-10 sm:grid-cols-2 xl:grid-cols-4">
           {sellers.map((seller) => (
             <li key={seller.slug}>
-              <article className="lift-card group relative flex h-full flex-col rounded-card border border-line bg-surface p-5 hover:border-primary/45 sm:p-6">
+              <article className="lift-card group relative flex h-full flex-col rounded-card border border-line bg-surface p-5 hover:border-line-strong">
                 <div className="flex items-center gap-3">
-                  {/* biome-ignore lint/performance/noImgElement: static SVG
-                      profile picture; dimensions set, so no layout shift. */}
-                  <img
-                    src={sellerAvatarSrc(seller.slug)}
-                    alt=""
-                    width={160}
-                    height={160}
-                    loading="lazy"
-                    decoding="async"
-                    className="size-13 shrink-0 rounded-full border-2 border-line object-cover"
-                  />
+                  <SellerAvatar initials={seller.initials} />
                   <div className="min-w-0">
-                    <h3 className="flex items-center gap-1.5 font-display text-base font-semibold">
+                    <h3 className="flex items-center gap-1.5 text-[0.9375rem] font-semibold">
                       <Link
                         href={`/seller/${seller.slug}`}
                         className="truncate"
@@ -69,55 +55,50 @@ export function TopSellers({ sellers }: { sellers: Seller[] }) {
                       />
                       {seller.reseller ? <ResellerBadge /> : null}
                     </h3>
-                    <p className="truncate text-xs text-subtle">
+                    <p className="truncate text-[0.8125rem] text-subtle">
                       {seller.country} · Member since {seller.memberSince}
                     </p>
                   </div>
                 </div>
 
-                <div className="mt-5 flex items-center gap-2">
-                  <span
-                    className="flex items-center gap-0.5"
-                    aria-hidden="true"
-                  >
-                    {STAR_KEYS.map((star) => (
-                      <StarIcon
-                        key={star}
-                        className="size-3.5 fill-primary text-primary"
-                      />
-                    ))}
-                  </span>
-                  <span className="tnum text-sm font-semibold">
-                    {ratingLabel(seller.rating)}
-                  </span>
-                  <span className="tnum text-xs text-subtle">
-                    ({seller.reviews} reviews)
-                  </span>
+                <div className="mt-4 flex items-center gap-2 text-[0.8125rem]">
+                  {seller.rating !== null ? (
+                    <>
+                      <Stars rating={seller.rating} />
+                      <span className="tnum font-semibold text-fg">
+                        {seller.rating.toFixed(1)}
+                      </span>
+                      <span className="tnum text-subtle">
+                        {countOf(seller.reviews, "review")}
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-subtle">
+                      <span className="font-medium text-fg">New</span> · no
+                      reviews yet
+                    </span>
+                  )}
                 </div>
 
-                <dl className="mt-5 grid grid-cols-2 gap-4 border-t border-line pt-5">
+                <dl className="mt-4 grid grid-cols-2 gap-4 border-t border-line pt-4">
                   <div>
-                    <dt className="text-[0.6875rem] text-subtle">
-                      Completed sales
-                    </dt>
-                    <dd className="tnum mt-1 text-sm font-semibold">
+                    <dt className="text-xs text-subtle">Completed sales</dt>
+                    <dd className="tnum mt-0.5 text-sm font-semibold">
                       {seller.sales}
                     </dd>
                   </div>
                   <div>
-                    <dt className="text-[0.6875rem] text-subtle">
-                      Settled volume
-                    </dt>
-                    <dd className="mt-1 text-sm font-semibold">
+                    <dt className="text-xs text-subtle">Settled volume</dt>
+                    <dd className="mt-0.5 text-sm font-semibold">
                       <Price usd={seller.volume} compact />
                     </dd>
                   </div>
                 </dl>
 
-                <p className="mt-4 flex items-center gap-1.5 text-xs text-muted">
+                <p className="mt-4 flex items-center gap-1.5 text-[0.8125rem] text-muted">
                   <TimerIcon
                     aria-hidden="true"
-                    className="size-3.5 text-verified"
+                    className="size-3.5 text-subtle"
                   />
                   Replies in{" "}
                   <span className="tnum font-medium text-fg">

@@ -25,7 +25,7 @@ export function ThemeToggle({ className }: { className?: string }) {
           : "Switch colour theme"
       }
       className={cn(
-        "inline-flex size-11 cursor-pointer items-center justify-center rounded-xl border border-line text-muted transition-colors duration-200 hover:border-line-strong hover:bg-surface-2 hover:text-fg",
+        "inline-flex size-11 cursor-pointer items-center justify-center rounded-[10px] text-muted transition-colors duration-150 hover:bg-surface-2 hover:text-fg",
         className,
       )}
     >

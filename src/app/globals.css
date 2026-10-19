@@ -10,101 +10,12 @@
 
 /* ------------------------------------------------------------------ *
  * Channel Adda design tokens
- * Dark-first "trading floor" palette: ink surfaces, signal gold as the
- * single primary action colour, emerald reserved for trust/verified
- * states so a green badge always means the same thing.
+ * One quiet palette for the whole product — the public site, the sign-in
+ * pages and the dashboards: true neutrals, gold as the single action and
+ * brand colour, emerald only for verified or completed, blue for
+ * information, red for danger and nothing else.
  * ------------------------------------------------------------------ */
 :root {
-  --db-bg: #fbfbfd;
-  --db-bg-subtle: #f4f5f9;
-  --db-surface: #ffffff;
-  --db-surface-2: #f6f7fb;
-  --db-surface-3: #eceff6;
-  --db-border: #e2e6ef;
-  --db-border-strong: #cdd4e2;
-
-  --db-fg: #0b1020;
-  --db-fg-muted: #57617a;
-  --db-fg-subtle: #7d8698;
-
-  --db-primary: #ffb020;
-  --db-primary-hover: #f5a30d;
-  --db-primary-fg: #1a1204;
-  /* Amber is unreadable as small text on light surfaces, so links and
-     numerals use this darkened ramp instead of the fill colour. */
-  --db-primary-text: #96590a;
-  --db-primary-soft: #fff5e0;
-
-  --db-verified: #0f9d63;
-  --db-verified-soft: #e4f7ee;
-  --db-info: #2563eb;
-  --db-info-soft: #e6edfd;
-  --db-danger: #d92d20;
-  --db-danger-soft: #fdeceb;
-
-  --db-ring: #ffb020;
-  --db-shadow-color: 220 45% 12%;
-  --db-glow: 0 0 0 0 transparent;
-
-  /* Platform marks keep their own brand colour, tuned per theme so each
-     one still clears 3:1 against the surface it sits on. */
-  --brand-youtube: #e8002b;
-  --brand-instagram: #d6246e;
-  --brand-facebook: #1877f2;
-  --brand-telegram: #1b8fc4;
-  --brand-website: #0f9d63;
-
-  --db-font-display: var(--font-space-grotesk), var(--font-inter), sans-serif;
-  --db-radius-card: 1rem;
-  --db-radius-panel: 1.5rem;
-}
-
-.dark {
-  --db-bg: #07090f;
-  --db-bg-subtle: #0a0d15;
-  --db-surface: #11151f;
-  --db-surface-2: #171d29;
-  --db-surface-3: #1f2634;
-  --db-border: #232a39;
-  --db-border-strong: #333c4f;
-
-  --db-fg: #f2f5fa;
-  --db-fg-muted: #98a2b8;
-  --db-fg-subtle: #6f7a90;
-
-  --db-primary: #ffb020;
-  --db-primary-hover: #ffc04d;
-  --db-primary-fg: #150e02;
-  --db-primary-text: #ffc55c;
-  --db-primary-soft: #2a1f08;
-
-  --db-verified: #23c98a;
-  --db-verified-soft: #0d2a20;
-  --db-info: #5b8dff;
-  --db-info-soft: #101c33;
-  --db-danger: #ff6a5e;
-  --db-danger-soft: #2c1310;
-
-  --db-ring: #ffb020;
-  --db-shadow-color: 220 60% 2%;
-  --db-glow: 0 0 40px -12px rgb(255 176 32 / 0.55);
-
-  --brand-youtube: #ff4062;
-  --brand-instagram: #f4589b;
-  --brand-facebook: #4d94ff;
-  --brand-telegram: #46b6e8;
-  --brand-website: #23c98a;
-}
-
-/* ------------------------------------------------------------------ *
- * The app: dashboards for members, agents and staff.
- * A tool is scanned, not read, so it gets its own quieter palette: true
- * neutrals, colour only where it means something, one type family, tighter
- * radii. Keyed off the shell being in the document rather than a class on
- * <html>, so menus and sheets portalled to <body> pick it up too and the
- * public site never does.
- * ------------------------------------------------------------------ */
-:root:has([data-app]) {
   --db-bg: #fafafa;
   --db-bg-subtle: #f4f4f5;
   --db-surface: #ffffff;
@@ -117,7 +28,14 @@
   --db-fg-muted: #52525b;
   --db-fg-subtle: #71717a;
 
+  --db-primary: #ffb020;
+  --db-primary-hover: #f5a30d;
+  --db-primary-fg: #1a1204;
+  /* Amber is unreadable as small text on light surfaces, so links and
+     numerals use this darkened ramp instead of the fill colour. */
+  --db-primary-text: #96590a;
   --db-primary-soft: #fff6e3;
+
   --db-verified: #0c8a57;
   --db-verified-soft: #e9f6ef;
   --db-info: #2457d6;
@@ -125,22 +43,27 @@
   --db-danger: #cf2a1e;
   --db-danger-soft: #fdefee;
 
+  --db-ring: #ffb020;
   --db-shadow-color: 240 6% 10%;
+  --db-glow: 0 0 0 0 transparent;
+
+  /* Platform marks keep their own brand colour, tuned per theme so each
+     one still clears 3:1 against the surface it sits on. */
+  --brand-youtube: #e8002b;
+  --brand-instagram: #d6246e;
+  --brand-facebook: #1877f2;
+  --brand-telegram: #1b8fc4;
+  --brand-website: #0f9d63;
 
   --db-font-display: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  /* The site keeps softer curves than the tool: 12px cards, 16px panels. */
   --db-radius-card: 0.75rem;
-  --db-radius-panel: 0.75rem;
-
-  /* Tailwind's own steps, pulled in so a stray rounded-2xl on a page cannot
-     reintroduce the marketing curves. */
-  --radius-xl: 0.5rem;
-  --radius-2xl: 0.75rem;
-  --radius-3xl: 0.75rem;
+  --db-radius-panel: 1rem;
 
   color-scheme: light;
 }
 
-:root.dark:has([data-app]) {
+.dark {
   --db-bg: #09090b;
   --db-bg-subtle: #0e0e10;
   --db-surface: #111113;
@@ -153,7 +76,12 @@
   --db-fg-muted: #a1a1aa;
   --db-fg-subtle: #80808a;
 
+  --db-primary: #ffb020;
+  --db-primary-hover: #ffc04d;
+  --db-primary-fg: #150e02;
+  --db-primary-text: #ffc55c;
   --db-primary-soft: #2a1f0a;
+
   --db-verified: #2fc48a;
   --db-verified-soft: #0f2219;
   --db-info: #6b97ff;
@@ -161,10 +89,34 @@
   --db-danger: #ff6b60;
   --db-danger-soft: #2a1513;
 
+  --db-ring: #ffb020;
   --db-shadow-color: 240 10% 2%;
   --db-glow: 0 0 0 0 transparent;
 
+  --brand-youtube: #ff4062;
+  --brand-instagram: #f4589b;
+  --brand-facebook: #4d94ff;
+  --brand-telegram: #46b6e8;
+  --brand-website: #23c98a;
+
   color-scheme: dark;
+}
+
+/* ------------------------------------------------------------------ *
+ * The app: dashboards for members, agents and staff.
+ * The same palette; a tool is scanned, not read, so it only tightens the
+ * curves. Keyed off the shell being in the document rather than a class on
+ * <html>, so menus and sheets portalled to <body> pick it up too.
+ * ------------------------------------------------------------------ */
+:root:has([data-app]) {
+  --db-radius-card: 0.75rem;
+  --db-radius-panel: 0.75rem;
+
+  /* Tailwind's own steps, pulled in so a stray rounded-2xl on a page cannot
+     reintroduce the marketing curves. */
+  --radius-xl: 0.5rem;
+  --radius-2xl: 0.75rem;
+  --radius-3xl: 0.75rem;
 }
 
 @theme inline {
@@ -372,17 +324,17 @@
     overflow-x: clip;
   }
 
+  /* Inter at display sizes wants tighter tracking; the tool's smaller
+     headings want less. Page and section titles set their own. */
   h1,
   h2,
   h3,
   h4 {
     font-family: var(--db-font-display);
-    letter-spacing: -0.02em;
+    letter-spacing: -0.018em;
     text-wrap: balance;
   }
 
-  /* In the app headings are Inter, and Inter at heading sizes wants less
-     negative tracking than Space Grotesk did. */
   :root:has([data-app]) :is(h1, h2, h3, h4) {
     letter-spacing: -0.011em;
   }
@@ -391,17 +343,12 @@
     text-wrap: pretty;
   }
 
-  /* Numbers in prices, follower counts and stats stay column-aligned. */
+  /* Numbers in prices, follower counts and stats stay column-aligned, in
+     the text face: a price reads as money, not as code. References and
+     codes opt into font-mono. */
   .tnum {
-    font-family: var(--font-mono);
     font-variant-numeric: tabular-nums;
     font-feature-settings: "tnum";
-  }
-
-  /* The app keeps the aligned figures and drops the typewriter: money in a
-     table reads as data, not as code. References opt back in with font-mono. */
-  :root:has([data-app]) .tnum {
-    font-family: inherit;
   }
 
   :focus-visible {
@@ -426,19 +373,12 @@
     height: 10px;
   }
   ::-webkit-scrollbar-track {
-    background: var(--color-bg-subtle);
+    background: transparent;
   }
   ::-webkit-scrollbar-thumb {
     background: var(--color-line-strong);
     border-radius: 999px;
-    border: 2px solid var(--color-bg-subtle);
-  }
-
-  :root:has([data-app]) ::-webkit-scrollbar-track {
-    background: transparent;
-  }
-  :root:has([data-app]) ::-webkit-scrollbar-thumb {
-    border-color: var(--color-bg);
+    border: 2px solid var(--color-bg);
   }
 }
 
@@ -497,7 +437,7 @@
 
   .lift-card:hover,
   .lift-card:focus-within {
-    transform: translate3d(0, -4px, 0);
+    transform: translate3d(0, -2px, 0);
   }
 
   .lift-card:hover::after,

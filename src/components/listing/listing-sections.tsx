@@ -5,7 +5,6 @@ import {
   GlobeIcon,
   ImageIcon,
   MapPinIcon,
-  StarIcon,
   TrendingUpIcon,
   TriangleAlertIcon,
   UsersIcon,
@@ -14,13 +13,16 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { pointsLabel, ResellerBadge } from "@/components/app/reseller-badge";
 import { TrackRecordStats } from "@/components/deals/track-record";
+import { SellerAvatar } from "@/components/site/seller-avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Price } from "@/components/ui/price";
+import { Stars } from "@/components/ui/stars";
 import type { Listing } from "@/data/listings";
 import type { Platform } from "@/data/platforms";
-import { type Seller, sellerAvatarSrc } from "@/data/sellers";
-import { formatCompact, ratingLabel } from "@/lib/utils";
+import type { Seller } from "@/data/sellers";
+import { countOf } from "@/lib/plural";
+import { formatCompact } from "@/lib/utils";
 
 export function Panel({
   title,
@@ -38,7 +40,7 @@ export function Panel({
       id={id}
       className="scroll-mt-24 rounded-card border border-line bg-surface p-5 sm:p-6"
     >
-      <h2 className="flex items-center gap-2.5 font-display text-lg font-semibold">
+      <h2 className="flex items-center gap-2 text-base font-semibold text-fg">
         {icon}
         {title}
       </h2>
@@ -85,15 +87,7 @@ export function MetricsPanel({
   ];
 
   return (
-    <Panel
-      title="The numbers"
-      icon={
-        <TrendingUpIcon
-          aria-hidden="true"
-          className="size-5 text-primary-text"
-        />
-      }
-    >
+    <Panel title="The numbers">
       <dl className="grid grid-cols-1 gap-px overflow-hidden rounded-xl border border-line bg-line sm:grid-cols-2">
         {rows.map((row) => (
           <div
@@ -105,7 +99,9 @@ export function MetricsPanel({
               className="size-4 shrink-0 text-subtle"
             />
             <dt className="text-sm text-muted">{row.label}</dt>
-            <dd className="tnum ml-auto text-sm font-semibold">{row.value}</dd>
+            <dd className="tnum ml-auto text-sm font-semibold text-fg">
+              {row.value}
+            </dd>
           </div>
         ))}
       </dl>
@@ -118,37 +114,39 @@ export function MonetizationNotice({ listing }: { listing: Listing }) {
   if (listing.monthlyRevenue <= 0) return null;
 
   return (
-    <div className="rounded-card border border-danger/30 bg-danger-soft p-5 sm:p-6">
-      <h2 className="flex items-center gap-2.5 font-display text-base font-semibold text-danger sm:text-lg">
-        <TriangleAlertIcon aria-hidden="true" className="size-5 shrink-0" />
-        Revenue does not transfer with this account
-      </h2>
-      <p className="mt-3 text-sm leading-relaxed text-muted">
-        The{" "}
-        <Price usd={listing.monthlyRevenue} className="font-semibold text-fg" />{" "}
-        per month shown above is paid to the current owner&apos;s own ad
-        account, which is tied to their tax identity and cannot be sold. After
-        the handover you will need to connect your own account and be approved
-        again.
-      </p>
-      <p className="mt-3 text-sm leading-relaxed text-muted">
-        Buy this listing for the audience and the content library. Treat the
-        revenue figure as evidence of what the audience earns, not as income
-        that arrives on day one.
-      </p>
+    <div className="flex gap-3 rounded-card border border-primary/30 bg-primary-soft/70 p-5 sm:p-6">
+      <TriangleAlertIcon
+        aria-hidden="true"
+        className="mt-0.5 size-4.5 shrink-0 text-primary-text"
+      />
+      <div className="min-w-0">
+        <h2 className="text-base font-semibold text-fg">
+          Revenue does not transfer with this account
+        </h2>
+        <p className="mt-2 text-sm leading-relaxed text-muted">
+          The{" "}
+          <Price
+            usd={listing.monthlyRevenue}
+            className="font-semibold text-fg"
+          />{" "}
+          per month shown above is paid to the current owner&apos;s own ad
+          account, which is tied to their tax identity and cannot be sold. After
+          the handover you will need to connect your own account and be approved
+          again.
+        </p>
+        <p className="mt-3 text-sm leading-relaxed text-muted">
+          Buy this listing for the audience and the content library. Treat the
+          revenue figure as evidence of what the audience earns, not as income
+          that arrives on day one.
+        </p>
+      </div>
     </div>
   );
 }
 
 export function TransferPanel({ platform }: { platform: Platform }) {
   return (
-    <Panel
-      title={`How this ${platform.name} handover works`}
-      icon={
-        <BadgeCheckIcon aria-hidden="true" className="size-5 text-verified" />
-      }
-      id="transfer"
-    >
+    <Panel title={`How this ${platform.name} handover works`} id="transfer">
       <p className="text-sm leading-relaxed text-muted">
         {platform.transferNote}
       </p>
@@ -164,14 +162,14 @@ export function TransferPanel({ platform }: { platform: Platform }) {
           </li>
         ))}
       </ol>
-      <p className="mt-5 rounded-xl border border-line bg-surface-2 p-4 text-xs leading-relaxed text-muted">
+      <p className="mt-5 rounded-xl border border-line bg-bg-subtle p-4 text-[0.8125rem] leading-relaxed text-muted">
         On a Fastest deal you are a manager for{" "}
         <span className="font-semibold text-fg">{platform.holdDays} days</span>{" "}
         before you are made primary owner, and the seller is paid only after
         that.{" "}
         <Link
           href="/how-it-works"
-          className="text-primary-text underline-offset-4 hover:underline"
+          className="font-medium text-fg underline underline-offset-4 decoration-line-strong hover:decoration-fg"
         >
           See the full process
         </Link>
@@ -181,49 +179,39 @@ export function TransferPanel({ platform }: { platform: Platform }) {
   );
 }
 
-export function ProofPanel({ platform }: { platform: Platform }) {
-  const shots = [1, 2, 3].map((n) => `/media/proof/${platform.id}-${n}.svg`);
-  const labels = [
-    "Audience growth, last 12 months",
-    "Reach and engagement breakdown",
-    "Revenue and payouts history",
-  ];
-
+export function ProofPanel({ labels }: { labels: string[] }) {
   return (
-    <Panel
-      title="Seller proof"
-      icon={
-        <ImageIcon aria-hidden="true" className="size-5 text-primary-text" />
-      }
-      id="proof"
-    >
-      <p className="text-sm leading-relaxed text-muted">
-        Uploaded by the seller and checked by our moderation team before this
-        listing went live. Full-resolution originals are shared with the buyer
-        once an order opens.
-      </p>
-      <ul className="mt-5 grid gap-3 sm:grid-cols-3">
-        {shots.map((src, i) => (
-          <li key={src}>
-            <figure className="overflow-hidden rounded-xl border border-line bg-surface-2">
-              {/* biome-ignore lint/performance/noImgElement: static SVG mock —
-                  next/image cannot optimise vectors. Dimensions set, no CLS. */}
-              <img
-                src={src}
-                alt={labels[i]}
-                width={640}
-                height={400}
-                loading="lazy"
-                decoding="async"
-                className="aspect-[8/5] w-full object-cover"
-              />
-              <figcaption className="border-t border-line px-3 py-2.5 text-xs text-subtle">
-                {labels[i]}
-              </figcaption>
-            </figure>
-          </li>
-        ))}
-      </ul>
+    <Panel title="Seller proof" id="proof">
+      {labels.length ? (
+        <>
+          <p className="text-sm leading-relaxed text-muted">
+            {countOf(labels.length, "screenshot")} uploaded by the seller and
+            checked by our moderation team before this listing went live. The
+            screenshots are shared with the buyer once a deal opens.
+          </p>
+          <ul className="mt-4 grid gap-2 sm:grid-cols-2">
+            {labels.map((label, i) => (
+              <li
+                // Captions can repeat; their order is the seller's.
+                // biome-ignore lint/suspicious/noArrayIndexKey: see above.
+                key={i}
+                className="flex items-center gap-2.5 rounded-lg border border-line bg-bg-subtle px-3 py-2.5 text-sm text-fg"
+              >
+                <ImageIcon
+                  aria-hidden="true"
+                  className="size-4 shrink-0 text-subtle"
+                />
+                <span className="min-w-0 truncate">{label}</span>
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : (
+        <p className="text-sm leading-relaxed text-muted">
+          The seller has not uploaded proof screenshots for this listing. Ask
+          them for analytics before you start a deal.
+        </p>
+      )}
     </Panel>
   );
 }
@@ -232,18 +220,9 @@ export function SellerPanel({ seller }: { seller: Seller }) {
   return (
     <Panel title="About the seller">
       <div className="flex items-center gap-4">
-        {/* biome-ignore lint/performance/noImgElement: static SVG avatar. */}
-        <img
-          src={sellerAvatarSrc(seller.slug)}
-          alt=""
-          width={160}
-          height={160}
-          loading="lazy"
-          decoding="async"
-          className="size-14 shrink-0 rounded-full border-2 border-line"
-        />
+        <SellerAvatar initials={seller.initials} />
         <div className="min-w-0">
-          <h3 className="flex items-center gap-1.5 font-display text-base font-semibold">
+          <h3 className="flex items-center gap-1.5 text-[0.9375rem] font-semibold">
             <span className="truncate">{seller.name}</span>
             <BadgeCheckIcon
               aria-label="Verified seller"
@@ -251,21 +230,26 @@ export function SellerPanel({ seller }: { seller: Seller }) {
             />
             {seller.reseller ? <ResellerBadge /> : null}
           </h3>
-          <p className="mt-0.5 flex items-center gap-1.5 text-xs text-subtle">
-            <StarIcon
-              aria-hidden="true"
-              className="size-3.5 fill-primary text-primary"
-            />
+          <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[0.8125rem] text-subtle">
+            {seller.rating !== null ? (
+              <>
+                <Stars rating={seller.rating} />
+                <span className="tnum font-medium text-fg">
+                  {seller.rating.toFixed(1)}
+                </span>
+                <span className="tnum">
+                  {countOf(seller.reviews, "review")}
+                </span>
+              </>
+            ) : (
+              <span className="font-medium text-fg">New</span>
+            )}
+            <span aria-hidden="true">·</span>
             <span className="tnum text-muted">
-              {ratingLabel(seller.rating)}
+              {pointsLabel(seller.points ?? 0)}
             </span>
-            <span>
-              ({seller.reviews} reviews) ·{" "}
-              <span className="tnum text-muted">
-                {pointsLabel(seller.points ?? 0)}
-              </span>{" "}
-              · {seller.country}
-            </span>
+            <span aria-hidden="true">·</span>
+            <span>{seller.country}</span>
           </p>
         </div>
       </div>

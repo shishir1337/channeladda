@@ -25,9 +25,6 @@ export type Seller = {
   specialties: PlatformId[];
 };
 
-/** Profile pictures live in /public/media/sellers. */
-export const sellerAvatarSrc = (slug: string) => `/media/sellers/${slug}.svg`;
-
 export const sellers: Seller[] = [
   {
     slug: "arman-karimov",

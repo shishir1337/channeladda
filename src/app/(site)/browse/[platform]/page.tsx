@@ -9,7 +9,11 @@ import { Price } from "@/components/ui/price";
 import { type PlatformId, platformMap, platforms } from "@/data/platforms";
 import { databaseGate } from "@/lib/db-gate";
 import { parseFilters } from "@/lib/listing-query";
-import { getPlatformCounts, queryListings } from "@/server/listings";
+import {
+  getPlatformCounts,
+  getPlatformFloors,
+  queryListings,
+} from "@/server/listings";
 
 export function generateStaticParams() {
   return platforms.map((p) => ({ platform: p.id }));
@@ -49,10 +53,12 @@ export default async function PlatformBrowsePage({
 
   // The platform comes from the path, so it always overrides the query string.
   const filters = { ...parseFilters(await searchParams), platforms: [p.id] };
-  const [result, counts] = await Promise.all([
+  const [result, counts, floors] = await Promise.all([
     queryListings(filters),
     getPlatformCounts(),
+    getPlatformFloors(),
   ]);
+  const floor = floors[p.id];
 
   return (
     <>
@@ -75,12 +81,15 @@ export default async function PlatformBrowsePage({
         }
         description={p.blurb}
       >
-        <dl className="mt-7 grid gap-4 sm:grid-cols-3">
+        <dl className="mt-7 grid grid-cols-3 gap-6 border-y border-line py-5">
           <Stat
             label="Live listings"
             value={counts[p.id].toLocaleString("en-US")}
           />
-          <Stat label="Starting from" value={<Price usd={p.startingPrice} />} />
+          <Stat
+            label="Starting from"
+            value={floor === null ? "—" : <Price usd={floor} />}
+          />
           <Stat
             label="Hold period"
             value={`${p.holdDays} days`}
@@ -106,7 +115,7 @@ export default async function PlatformBrowsePage({
                 <ShieldCheckIcon aria-hidden="true" />
                 Transfer &amp; hold
               </Badge>
-              <h2 className="mt-4 text-[1.5rem] leading-[1.2] font-bold sm:text-3xl">
+              <h2 className="mt-4 text-[1.5rem] leading-[1.2] font-semibold sm:text-3xl">
                 How a {p.name} handover actually works
               </h2>
               <p className="mt-4 text-[0.9375rem] leading-relaxed text-muted sm:text-base">
@@ -122,7 +131,7 @@ export default async function PlatformBrowsePage({
               </p>
               <Link
                 href="/how-it-works"
-                className="mt-6 inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-primary-text transition-colors hover:text-fg"
+                className="group mt-6 inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-fg transition-colors duration-150 hover:text-muted"
               >
                 See how a deal works
                 <ArrowRightIcon aria-hidden="true" className="size-4" />
@@ -167,11 +176,9 @@ function Stat({
   icon?: React.ReactNode;
 }) {
   return (
-    <div className="rounded-card border border-line bg-surface px-4 py-3.5">
-      <dt className="text-[0.6875rem] tracking-wide text-subtle uppercase">
-        {label}
-      </dt>
-      <dd className="tnum mt-1 flex items-center gap-1.5 text-base font-semibold">
+    <div>
+      <dt className="text-[0.8125rem] text-subtle">{label}</dt>
+      <dd className="tnum mt-1 flex items-center gap-1.5 text-xl font-semibold tracking-[-0.02em] text-fg">
         {icon}
         {value}
       </dd>

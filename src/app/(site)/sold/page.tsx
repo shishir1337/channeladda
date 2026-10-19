@@ -54,11 +54,10 @@ export default async function SoldPage() {
     <>
       <PageHeader
         crumbs={[{ label: "Home", href: "/" }, { label: "Recently sold" }]}
-        eyebrow="Completed deals"
         title="What accounts actually sell for"
         description="Asking prices are easy to find. These are settled prices — what a buyer really paid after negotiation, on a deal that completed and a seller who was paid."
       >
-        <dl className="mt-7 grid grid-cols-2 gap-4 sm:grid-cols-3">
+        <dl className="mt-7 grid grid-cols-3 gap-6 border-y border-line py-5">
           <Stat label="Deals shown" value={String(sorted.length)} />
           <Stat
             label="Settled value"
@@ -79,7 +78,7 @@ export default async function SoldPage() {
 
             return (
               <section key={group.label} className="mb-10 last:mb-0">
-                <h2 className="flex items-center gap-2.5 font-display text-lg font-semibold">
+                <h2 className="flex items-center gap-2.5 text-lg font-semibold">
                   {group.label}
                   <span className="tnum rounded-full bg-surface-2 px-2 py-0.5 text-xs font-medium text-muted">
                     {items.length}
@@ -126,7 +125,7 @@ export default async function SoldPage() {
                         <span className="ml-auto shrink-0 text-right">
                           <Price
                             usd={item.price}
-                            className="block text-base font-semibold text-verified"
+                            className="block text-base font-semibold text-fg"
                           />
                           <span className="block text-xs text-subtle">
                             {soldAgoLabel(item.soldHoursAgo)}
@@ -142,7 +141,7 @@ export default async function SoldPage() {
 
           <div className="mt-10 flex flex-col items-start gap-4 rounded-panel border border-line bg-surface p-6 sm:flex-row sm:items-center sm:justify-between sm:p-8">
             <div className="max-w-lg">
-              <h2 className="flex items-center gap-2.5 font-display text-lg font-semibold">
+              <h2 className="flex items-center gap-2.5 text-lg font-semibold">
                 <CheckCircle2Icon
                   aria-hidden="true"
                   className="size-5 text-verified"
@@ -152,7 +151,7 @@ export default async function SoldPage() {
               <p className="mt-2.5 text-sm leading-relaxed text-muted">
                 The buyer confirmed the handover before the deal closed, and
                 nobody was asked to hand over an account they had not been paid
-                for. None of these deals went to dispute.
+                for.
               </p>
             </div>
             <Button asChild size="lg" className="shrink-0">
@@ -175,12 +174,10 @@ function Stat({
   tone?: "verified";
 }) {
   return (
-    <div className="rounded-card border border-line bg-surface px-4 py-3.5">
-      <dt className="text-[0.6875rem] tracking-wide text-subtle uppercase">
-        {label}
-      </dt>
+    <div>
+      <dt className="text-[0.8125rem] text-subtle">{label}</dt>
       <dd
-        className={`tnum mt-1 text-base font-semibold ${tone === "verified" ? "text-verified" : ""}`}
+        className={`tnum mt-1 text-2xl font-semibold tracking-[-0.02em] ${tone === "verified" ? "text-verified" : "text-fg"}`}
       >
         {value}
       </dd>

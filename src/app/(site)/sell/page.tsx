@@ -29,7 +29,7 @@ const steps = [
   },
   {
     title: "Prove you own it",
-    body: "We give you a one-time code to paste into your bio or description, and we read it live. No screenshot can fake that, which is why buyers here trust listings they have never seen before.",
+    body: "We give you a one-time code to paste into your bio or description, and we check it on the live account: automatically on YouTube, by a moderator everywhere else. No screenshot can fake that, which is why buyers here trust listings they have never seen before.",
   },
   {
     title: "Field offers in one place",
@@ -52,7 +52,6 @@ export default async function SellPage() {
     <>
       <PageHeader
         crumbs={[{ label: "Home", href: "/" }, { label: "Sell" }]}
-        eyebrow="For sellers"
         title="Your channel is an asset. Cash it out safely."
         description="List for free, put your account in front of active buyers, and let a supervised handover prove you are dealing with someone serious. We only earn when your deal completes."
         actions={
@@ -68,7 +67,7 @@ export default async function SellPage() {
           {[
             "Free to list",
             "No exclusivity",
-            "Payout in under an hour",
+            "Paid when the deal completes",
             "You set the price",
           ].map((point) => (
             <li
@@ -77,7 +76,7 @@ export default async function SellPage() {
             >
               <CheckIcon
                 aria-hidden="true"
-                className="size-4 shrink-0 text-verified"
+                className="size-4 shrink-0 text-fg"
               />
               {point}
             </li>
@@ -87,22 +86,19 @@ export default async function SellPage() {
 
       <Section>
         <Container>
-          <SectionHeading
-            eyebrow="How selling works"
-            title="Four steps, and you never hand over an account on trust"
-          />
+          <SectionHeading title="Four steps, and you never hand over an account on trust" />
 
-          <ol className="mt-9 grid gap-4 sm:mt-12 sm:grid-cols-2">
+          <ol className="mt-8 grid gap-3 sm:mt-10 sm:grid-cols-2">
             {steps.map((step, i) => (
               <li key={step.title}>
                 <div className="flex h-full flex-col rounded-card border border-line bg-surface p-5 sm:p-6">
-                  <span className="tnum font-display text-sm font-bold text-primary-text">
-                    0{i + 1}
+                  <span className="tnum text-[0.8125rem] font-medium text-subtle">
+                    Step {i + 1}
                   </span>
-                  <h3 className="mt-3 font-display text-lg font-semibold">
+                  <h3 className="mt-2 text-base font-semibold text-fg">
                     {step.title}
                   </h3>
-                  <p className="mt-2.5 text-sm leading-relaxed text-muted">
+                  <p className="mt-2 text-sm leading-relaxed text-muted">
                     {step.body}
                   </p>
                 </div>
@@ -117,35 +113,38 @@ export default async function SellPage() {
           <div className="lg:grid lg:grid-cols-2 lg:items-center lg:gap-16">
             <div className="max-w-xl">
               <SectionHeading
-                eyebrow="Fees"
                 title="What you actually take home"
                 description="No listing fee and no monthly cost. A success fee is deducted only when a deal completes, and the buyer pays their own fee on top of your asking price."
               />
-              <Button asChild variant="outline" size="md" className="mt-7">
+              <Button asChild variant="secondary" size="md" className="mt-7">
                 <Link href="/fees">See the full fee breakdown</Link>
               </Button>
             </div>
 
-            <div className="mt-8 rounded-panel border border-line bg-surface p-6 shadow-soft sm:p-8 lg:mt-0">
-              <p className="text-xs font-semibold tracking-[0.14em] text-subtle uppercase">
-                Worked example
+            <div className="mt-8 rounded-panel border border-line bg-surface p-6 sm:p-8 lg:mt-0">
+              <p className="text-[0.8125rem] font-medium text-subtle">
+                A Fastest sale, worked through
               </p>
               <dl className="mt-5 space-y-3 text-sm">
                 <Row
                   label="Your asking price"
                   value={<Price usd={EXAMPLE} />}
                 />
-                <Row
-                  label={`Seller fee (${formatRate(fees.sellerFeeBp)}%)`}
-                  value={
-                    <span className="text-danger">
-                      −<Price usd={fee} />
-                    </span>
-                  }
-                />
+                {fees.sellerFeeBp > 0 ? (
+                  <Row
+                    label={`Seller fee (${formatRate(fees.sellerFeeBp)}%)`}
+                    value={
+                      <>
+                        −<Price usd={fee} />
+                      </>
+                    }
+                  />
+                ) : (
+                  <Row label="Seller fee" value="None" />
+                )}
                 <div className="flex items-center justify-between gap-3 border-t border-line pt-3 text-base font-semibold">
                   <dt>You receive</dt>
-                  <dd className="text-verified">
+                  <dd className="tnum text-fg">
                     <Price usd={payout} />
                   </dd>
                 </div>
@@ -164,28 +163,27 @@ export default async function SellPage() {
       <Section>
         <Container>
           <SectionHeading
-            eyebrow="What you can sell"
             title="Five marketplaces, one listing flow"
             description="Each platform has its own transfer mechanism, so each has its own checklist and its own hold period. Pick yours to see how the handover works."
           />
 
-          <ul className="mt-9 grid grid-cols-2 gap-3 sm:mt-12 sm:grid-cols-3 sm:gap-4 lg:grid-cols-5">
+          <ul className="mt-8 grid grid-cols-2 gap-3 sm:mt-10 sm:grid-cols-3 lg:grid-cols-5">
             {platforms.map((platform) => (
               <li key={platform.id}>
                 <Link
                   href={`/browse/${platform.id}`}
-                  className="lift-card group flex h-full flex-col gap-3 rounded-card border border-line bg-surface p-4 hover:border-primary/45 sm:p-5"
+                  className="lift-card group flex h-full flex-col gap-3 rounded-card border border-line bg-surface p-4 hover:border-line-strong sm:p-5"
                 >
                   <span
-                    className="flex size-11 items-center justify-center rounded-xl border border-line bg-surface-2"
+                    className="flex size-10 items-center justify-center rounded-lg border border-line bg-surface-2"
                     style={{ color: platform.tint }}
                   >
                     <platform.icon className="size-5" />
                   </span>
-                  <h3 className="font-display text-sm font-semibold sm:text-base">
+                  <h3 className="text-[0.9375rem] font-semibold text-fg">
                     {platform.name}
                   </h3>
-                  <p className="text-xs text-subtle">
+                  <p className="text-[0.8125rem] text-subtle">
                     <span className="tnum">{platform.holdDays}</span>-day hold
                   </p>
                 </Link>
@@ -195,14 +193,14 @@ export default async function SellPage() {
         </Container>
       </Section>
 
-      <Section className="border-t border-line bg-bg-subtle">
+      <Section>
         <Container>
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-3">
             {[
               {
                 icon: LockIcon,
                 title: "You are protected too",
-                body: "A buyer cannot vanish mid-deal with your credentials. On a Fastest deal their money is with us before you start; on a Safest deal the account is with our agent, and the buyer's money is with us before it reaches them.",
+                body: "A buyer cannot vanish mid-deal with your credentials. On a Fastest deal their money is with us before you start; on a Safest deal our agent holds the account, and it moves on only after you confirm the buyer's payment arrived.",
               },
               {
                 icon: BadgeCheckIcon,
@@ -212,17 +210,17 @@ export default async function SellPage() {
               {
                 icon: WalletIcon,
                 title: "Paid in crypto",
-                body: "Fastest payouts settle to your own Cryptomus wallet, usually within an hour of the deal completing.",
+                body: "A Fastest sale reaches your Channel Adda balance when the deal completes, and you withdraw it to your own crypto wallet through Cryptomus.",
               },
             ].map((item) => (
               <div
                 key={item.title}
                 className="rounded-card border border-line bg-surface p-5 sm:p-6"
               >
-                <span className="flex size-11 items-center justify-center rounded-xl bg-primary-soft text-primary-text">
-                  <item.icon aria-hidden="true" className="size-5" />
+                <span className="flex size-9 items-center justify-center rounded-lg border border-line bg-surface-2 text-muted">
+                  <item.icon aria-hidden="true" className="size-4.5" />
                 </span>
-                <h3 className="mt-4 font-display text-base font-semibold">
+                <h3 className="mt-4 text-[0.9375rem] font-semibold text-fg">
                   {item.title}
                 </h3>
                 <p className="mt-2 text-sm leading-relaxed text-muted">
@@ -234,7 +232,7 @@ export default async function SellPage() {
 
           <div className="mt-10 flex flex-col items-start gap-4 rounded-panel border border-line bg-surface p-6 sm:flex-row sm:items-center sm:justify-between sm:p-8">
             <div className="max-w-lg">
-              <h2 className="font-display text-xl font-bold sm:text-2xl">
+              <h2 className="text-xl font-semibold tracking-[-0.02em] sm:text-2xl">
                 Ready to list?
               </h2>
               <p className="mt-2 text-sm leading-relaxed text-muted">
@@ -260,7 +258,7 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-3">
       <dt className="text-muted">{label}</dt>
-      <dd className="font-medium">{value}</dd>
+      <dd className="tnum font-medium text-fg">{value}</dd>
     </div>
   );
 }

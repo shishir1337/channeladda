@@ -12,7 +12,6 @@ export function LegalPage({ doc }: { doc: LegalDoc }) {
     <>
       <PageHeader
         crumbs={[{ label: "Home", href: "/" }, { label: doc.title }]}
-        eyebrow="Legal"
         title={doc.title}
         description={doc.summary}
       >
@@ -29,9 +28,7 @@ export function LegalPage({ doc }: { doc: LegalDoc }) {
               <div className="flex flex-col gap-10">
                 {doc.sections.map((section) => (
                   <section key={section.heading}>
-                    <h2 className="font-display text-xl font-semibold">
-                      {section.heading}
-                    </h2>
+                    <h2 className="text-xl font-semibold">{section.heading}</h2>
 
                     {section.paragraphs?.length ? (
                       <div className="mt-3 flex flex-col gap-4">
@@ -78,7 +75,7 @@ export function LegalPage({ doc }: { doc: LegalDoc }) {
 
             <aside className="mt-10 lg:mt-0">
               <nav aria-label="Policies" className="lg:sticky lg:top-24">
-                <h2 className="text-xs font-semibold tracking-[0.14em] text-subtle uppercase">
+                <h2 className="text-[0.8125rem] font-medium text-subtle">
                   All policies
                 </h2>
                 <ul className="mt-3 flex flex-col gap-1">
@@ -92,7 +89,7 @@ export function LegalPage({ doc }: { doc: LegalDoc }) {
                           aria-current={current ? "page" : undefined}
                           className={`flex min-h-11 items-center rounded-lg px-3 text-sm transition-colors ${
                             current
-                              ? "bg-primary-soft font-medium text-primary-text"
+                              ? "bg-surface-2 font-medium text-fg"
                               : "text-muted hover:bg-surface-2 hover:text-fg"
                           }`}
                         >

@@ -82,9 +82,12 @@ function useSaved(listingId: string) {
 export function FavoriteButton({
   listingId,
   handle,
+  on = "cover",
 }: {
   listingId: string;
   handle: string;
+  /** Over cover art it needs a scrim; on a panel it is a quiet control. */
+  on?: "cover" | "surface";
 }) {
   const saved = useSaved(listingId);
   const { data: session } = useSession();
@@ -132,9 +135,14 @@ export function FavoriteButton({
         // z-10 keeps this above the card-wide link overlay. The scrim gives
         // the icon contrast over whatever cover art sits behind it.
         "relative z-10 inline-flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors duration-200",
-        saved
-          ? "bg-black/55 text-danger backdrop-blur-sm"
-          : "bg-black/40 text-white/80 backdrop-blur-sm hover:bg-black/65 hover:text-white",
+        on === "surface"
+          ? cn(
+              "border border-line hover:bg-surface-2",
+              saved ? "text-danger" : "text-muted hover:text-fg",
+            )
+          : saved
+            ? "bg-black/55 text-danger backdrop-blur-sm"
+            : "bg-black/40 text-white/80 backdrop-blur-sm hover:bg-black/65 hover:text-white",
       )}
     >
       <HeartIcon

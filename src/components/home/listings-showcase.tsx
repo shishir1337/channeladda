@@ -63,7 +63,6 @@ export function ListingsShowcase({ listings }: { listings: Listing[] }) {
     <Section id="browse" className="scroll-mt-24">
       <Container>
         <SectionHeading
-          eyebrow="Live marketplace"
           title="Accounts on the block right now"
           description="Ownership verified, analytics screenshots on file, and every seller through KYC before a listing goes live."
         />
@@ -79,12 +78,17 @@ export function ListingsShowcase({ listings }: { listings: Listing[] }) {
               ))}
             </TabsList>
 
-            <Button variant="outline" size="sm" className="w-full sm:w-auto">
-              <SlidersHorizontalIcon aria-hidden="true" className="size-4" />
-              All filters
-              <span className="ml-1 rounded-md bg-surface-3 px-1.5 py-0.5 text-[0.6875rem] text-muted">
-                9
-              </span>
+            {/* A link, not a button: the filters live on the browse page. */}
+            <Button
+              asChild
+              variant="outline"
+              size="sm"
+              className="w-full sm:w-auto"
+            >
+              <Link href="/browse">
+                <SlidersHorizontalIcon aria-hidden="true" className="size-4" />
+                All filters
+              </Link>
             </Button>
           </div>
 
@@ -111,7 +115,7 @@ export function ListingsShowcase({ listings }: { listings: Listing[] }) {
         <div className="mt-9 flex justify-center sm:mt-12">
           <Button
             asChild
-            variant="outline"
+            variant="secondary"
             size="lg"
             className="w-full sm:w-auto"
           >

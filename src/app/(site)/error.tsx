@@ -25,7 +25,7 @@ export default function ErrorBoundary({
           <TriangleAlertIcon aria-hidden="true" className="size-7" />
         </span>
 
-        <h1 className="mt-8 text-[1.75rem] leading-[1.12] font-bold sm:text-4xl">
+        <h1 className="mt-8 text-[1.75rem] leading-[1.12] font-semibold sm:text-4xl">
           Something broke on our side
         </h1>
         <p className="mx-auto mt-5 max-w-lg text-[0.9375rem] leading-relaxed text-muted sm:text-base">

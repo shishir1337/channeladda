@@ -45,6 +45,7 @@ export function BrowseView({
             <FilterPanel
               filters={filters}
               facets={result.facets}
+              priceBounds={result.priceBounds}
               hidePlatform={hidePlatform}
             />
           </div>
@@ -54,6 +55,7 @@ export function BrowseView({
           <BrowseToolbar
             filters={filters}
             facets={result.facets}
+            priceBounds={result.priceBounds}
             total={result.total}
             hidePlatform={hidePlatform}
           />

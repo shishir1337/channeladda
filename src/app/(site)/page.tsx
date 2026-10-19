@@ -13,6 +13,7 @@ import { databaseGate } from "@/lib/db-gate";
 import {
   getFeaturedListings,
   getPlatformCounts,
+  getPlatformFloors,
   getRecentlySold,
 } from "@/server/listings";
 import { getSellers, getSiteStats } from "@/server/sellers";
@@ -26,9 +27,10 @@ export default async function HomePage() {
   if (gate) return gate;
 
   // One round trip per section rather than each component reaching for data.
-  const [featured, counts, sold, sellers, stats] = await Promise.all([
+  const [featured, counts, floors, sold, sellers, stats] = await Promise.all([
     getFeaturedListings(),
     getPlatformCounts(),
+    getPlatformFloors(),
     getRecentlySold(10),
     getSellers(),
     getSiteStats(),
@@ -38,7 +40,7 @@ export default async function HomePage() {
     <>
       <Hero stats={stats} />
       <SoldTicker items={sold} />
-      <Categories counts={counts} />
+      <Categories counts={counts} floors={floors} />
       <ListingsShowcase listings={featured} />
       <HowItWorks />
       <TrustSafety />

@@ -151,7 +151,7 @@ export async function AuthShell({
 
         <div className="relative">
           <h2 className="max-w-[18ch] text-[2rem] leading-[1.15] font-semibold tracking-[-0.025em] text-white">
-            We hold the money, and on Safest the account too.
+            We hold the money, or on Safest the account.
           </h2>
           <p className="mt-3 max-w-[38ch] text-sm leading-relaxed text-white/55">
             Until the handover is confirmed, neither side has to trust a

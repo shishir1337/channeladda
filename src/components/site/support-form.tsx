@@ -3,7 +3,9 @@
 import { CheckCircle2Icon, SendIcon } from "lucide-react";
 import { useId, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
+import { siteInput, siteTextarea } from "@/components/ui/field";
 import { SUPPORT_TOPICS } from "@/lib/support";
+import { cn } from "@/lib/utils";
 import { sendSupportMessage } from "@/server/actions/support";
 
 /**
@@ -30,7 +32,7 @@ export function SupportForm({ topic }: { topic?: string }) {
         <span className="flex size-12 items-center justify-center rounded-xl bg-surface text-verified">
           <CheckCircle2Icon aria-hidden="true" className="size-6" />
         </span>
-        <h2 className="mt-5 font-display text-xl font-bold">Message sent</h2>
+        <h2 className="mt-5 text-xl font-semibold">Message sent</h2>
         <p className="mt-2.5 max-w-md text-sm leading-relaxed text-muted">
           Your reference is{" "}
           <span className="font-semibold text-fg">{reference}</span>. We reply
@@ -89,7 +91,7 @@ export function SupportForm({ topic }: { topic?: string }) {
       }}
       className="rounded-panel border border-line bg-surface p-6 sm:p-8"
     >
-      <h2 className="font-display text-xl font-bold">Send us a message</h2>
+      <h2 className="text-xl font-semibold">Send us a message</h2>
       <p className="mt-2 text-sm text-muted">
         The more detail you give, the fewer round trips it takes.
       </p>
@@ -122,7 +124,7 @@ export function SupportForm({ topic }: { topic?: string }) {
                 ? topic
                 : SUPPORT_TOPICS[0]
             }
-            className="mt-2 h-12 w-full cursor-pointer appearance-none rounded-xl border border-line bg-surface-2 px-3.5 text-[0.9375rem] text-fg focus:border-primary/60 focus:outline-none"
+            className={cn(siteInput, "mt-2 cursor-pointer appearance-none")}
           >
             {SUPPORT_TOPICS.map((topic) => (
               <option key={topic} value={topic}>
@@ -155,11 +157,7 @@ export function SupportForm({ topic }: { topic?: string }) {
             aria-invalid={Boolean(errors.message)}
             aria-describedby={errors.message ? `${messageId}-error` : undefined}
             placeholder="What happened, and what were you expecting instead?"
-            className={`mt-2 w-full rounded-xl border bg-surface-2 px-3.5 py-3 text-[0.9375rem] text-fg placeholder:text-subtle focus:outline-none ${
-              errors.message
-                ? "border-danger focus:border-danger"
-                : "border-line focus:border-primary/60"
-            }`}
+            className={cn(siteTextarea, "mt-2")}
           />
           {errors.message ? (
             <p
@@ -223,11 +221,7 @@ function Field({
         required={required}
         aria-invalid={Boolean(error)}
         aria-describedby={error ? `${id}-error` : undefined}
-        className={`mt-2 h-12 w-full rounded-xl border bg-surface-2 px-3.5 text-base text-fg placeholder:text-subtle focus:outline-none sm:text-[0.9375rem] ${
-          error
-            ? "border-danger focus:border-danger"
-            : "border-line focus:border-primary/60"
-        }`}
+        className={cn(siteInput, "mt-2")}
         {...props}
       />
       {error ? (

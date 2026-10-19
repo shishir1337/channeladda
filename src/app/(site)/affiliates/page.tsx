@@ -1,4 +1,10 @@
-import { BanknoteIcon, CheckIcon, LinkIcon, UsersIcon } from "lucide-react";
+import {
+  BanknoteIcon,
+  CheckIcon,
+  InfoIcon,
+  LinkIcon,
+  UsersIcon,
+} from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -6,6 +12,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Price } from "@/components/ui/price";
 import { Container, Section, SectionHeading } from "@/components/ui/section";
 import { quote } from "@/lib/fees";
+import { supportHref } from "@/lib/support";
 import { getFeeSettings } from "@/server/settings";
 
 export const metadata: Metadata = {
@@ -19,7 +26,7 @@ const steps = [
   {
     icon: LinkIcon,
     title: "Share your link",
-    body: "Every account gets a referral link. Put it in a video description, a newsletter, or a Telegram channel about buying and selling accounts.",
+    body: "Every affiliate gets a referral link. Put it in a video description, a newsletter, or a Telegram channel about buying and selling accounts.",
   },
   {
     icon: UsersIcon,
@@ -32,6 +39,13 @@ const steps = [
     body: "You get 20% of the Channel Adda fee on every deal they complete. Nothing on a deal that falls through, same as us.",
   },
 ];
+
+/**
+ * Nothing tracks a referral yet — there is no link to hand out and no
+ * dashboard to watch — so the page takes names rather than promising a link
+ * on sign-up. The terms are the programme's; only the way in is honest now.
+ */
+const REGISTER = supportHref("The affiliate programme");
 
 /** The sale the worked example is built on. */
 const EXAMPLE_PRICE = 42_500;
@@ -48,29 +62,41 @@ export default async function AffiliatesPage() {
     <>
       <PageHeader
         crumbs={[{ label: "Home", href: "/" }, { label: "Affiliates" }]}
-        eyebrow="Affiliate programme"
         title="Get paid for sending us serious people"
         description="Twenty per cent of our fee on every completed deal from anyone you refer, for a full year. No cap, no tiers, no minimum volume."
         actions={
           <Button asChild size="lg">
-            <Link href="/signup">Get your link</Link>
+            <Link href={REGISTER}>Register your interest</Link>
           </Button>
         }
-      />
+      >
+        <p className="mt-5 flex max-w-2xl items-start gap-2.5 rounded-card border border-info/20 bg-info-soft/70 px-4 py-3 text-sm leading-relaxed text-muted">
+          <InfoIcon
+            aria-hidden="true"
+            className="mt-0.5 size-4 shrink-0 text-info"
+          />
+          <span>
+            <span className="font-medium text-fg">
+              The programme is not open yet.
+            </span>{" "}
+            Register your interest and we will send your link when it opens.
+          </span>
+        </p>
+      </PageHeader>
 
       <Section>
         <Container>
-          <ol className="grid gap-4 sm:grid-cols-3">
+          <ol className="grid gap-3 sm:grid-cols-3">
             {steps.map((step, i) => (
               <li key={step.title}>
                 <div className="flex h-full flex-col rounded-card border border-line bg-surface p-5 sm:p-6">
-                  <span className="flex size-11 items-center justify-center rounded-xl bg-primary-soft text-primary-text">
-                    <step.icon aria-hidden="true" className="size-5" />
+                  <span className="flex size-9 items-center justify-center rounded-lg border border-line bg-surface-2 text-muted">
+                    <step.icon aria-hidden="true" className="size-4.5" />
                   </span>
-                  <p className="tnum mt-4 font-display text-xs font-bold text-subtle">
-                    STEP 0{i + 1}
+                  <p className="tnum mt-4 text-[0.8125rem] font-medium text-subtle">
+                    Step {i + 1}
                   </p>
-                  <h2 className="mt-1 font-display text-base font-semibold">
+                  <h2 className="mt-1 text-base font-semibold text-fg">
                     {step.title}
                   </h2>
                   <p className="mt-2 text-sm leading-relaxed text-muted">
@@ -88,7 +114,6 @@ export default async function AffiliatesPage() {
           <div className="lg:grid lg:grid-cols-2 lg:items-center lg:gap-16">
             <div className="max-w-xl">
               <SectionHeading
-                eyebrow="What it pays"
                 title="One referred sale, one real number"
                 description={`A ${EXAMPLE_PRICE.toLocaleString("en-US")} channel sale on a Fastest deal earns Channel Adda ${exampleFee.toLocaleString("en-US")} in buyer and seller fees combined. Your share of that is ${SHARE * 100}%.`}
               />
@@ -97,7 +122,6 @@ export default async function AffiliatesPage() {
                   "Twelve-month attribution window",
                   "Both buyers and sellers count",
                   "Paid in crypto to your own wallet",
-                  "Live dashboard of referred deals",
                 ].map((point) => (
                   <li
                     key={point}
@@ -105,7 +129,7 @@ export default async function AffiliatesPage() {
                   >
                     <CheckIcon
                       aria-hidden="true"
-                      className="mt-0.5 size-4 shrink-0 text-verified"
+                      className="mt-0.5 size-4 shrink-0 text-fg"
                     />
                     {point}
                   </li>
@@ -113,8 +137,8 @@ export default async function AffiliatesPage() {
               </ul>
             </div>
 
-            <div className="mt-8 rounded-panel border border-line bg-surface p-6 shadow-soft sm:p-8 lg:mt-0">
-              <p className="text-xs font-semibold tracking-[0.14em] text-subtle uppercase">
+            <div className="mt-8 rounded-panel border border-line bg-surface p-6 sm:p-8 lg:mt-0">
+              <p className="text-[0.8125rem] font-medium text-subtle">
                 Worked example
               </p>
               <dl className="mt-5 space-y-3 text-sm">
@@ -132,7 +156,7 @@ export default async function AffiliatesPage() {
                 </div>
                 <div className="flex items-center justify-between gap-3 border-t border-line pt-3 text-base font-semibold">
                   <dt>Your share (20%)</dt>
-                  <dd className="text-verified">
+                  <dd className="tnum text-fg">
                     <Price usd={exampleFee * SHARE} />
                   </dd>
                 </div>
@@ -151,7 +175,7 @@ export default async function AffiliatesPage() {
       <Section>
         <Container>
           <div className="rounded-panel border border-line bg-surface p-6 sm:p-8">
-            <h2 className="font-display text-lg font-semibold">
+            <h2 className="text-base font-semibold text-fg">
               What we will not accept
             </h2>
             <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted">
@@ -161,7 +185,7 @@ export default async function AffiliatesPage() {
               not. Referrals from anyone doing this are removed and unpaid.
             </p>
             <Button asChild size="lg" className="mt-6">
-              <Link href="/signup">Join the programme</Link>
+              <Link href={REGISTER}>Register your interest</Link>
             </Button>
           </div>
         </Container>

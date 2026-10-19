@@ -24,11 +24,11 @@ export function DatabaseSetup() {
   return (
     <Section>
       <Container className="max-w-2xl">
-        <span className="flex size-16 items-center justify-center rounded-2xl bg-primary-soft text-primary-text">
+        <span className="flex size-14 items-center justify-center rounded-2xl border border-line bg-surface text-muted">
           <DatabaseIcon aria-hidden="true" className="size-7" />
         </span>
 
-        <h1 className="mt-8 text-[1.75rem] leading-[1.12] font-bold sm:text-4xl">
+        <h1 className="mt-8 text-[1.75rem] leading-[1.12] font-semibold sm:text-4xl">
           The database is not running
         </h1>
         <p className="mt-5 text-[0.9375rem] leading-relaxed text-muted sm:text-base">
@@ -62,9 +62,7 @@ export function DatabaseSetup() {
         </ol>
 
         <div className="mt-8 rounded-card border border-line bg-surface p-5">
-          <h2 className="font-display text-base font-semibold">
-            Not using Docker?
-          </h2>
+          <h2 className="text-base font-semibold">Not using Docker?</h2>
           <p className="mt-2 text-sm leading-relaxed text-muted">
             Point <code className="font-mono text-fg">DATABASE_URL</code> in{" "}
             <code className="font-mono text-fg">.env</code> at any Postgres you
