@@ -3,28 +3,27 @@ import { join, relative } from "node:path";
 import { expect, test } from "vitest";
 
 /**
- * The promise the product no longer makes, kept out of the code for good.
+ * The promises the product no longer makes, kept out of the code for good.
  *
- * Safest used to send the buyer to pay the seller directly. It does not any
- * more — on both kinds of deal the buyer pays Channel Adda — and a page that
- * still told someone to pay a seller would be telling them to do the one
- * thing our Trust & Safety page calls a scam. Copy lives in pages, data
- * files, components and emails alike, so the whole of src is read.
- *
- * Moderation wording about people taking a deal off the platform is fine;
- * only payment phrasing is banned.
+ * A Safest buyer used to pay the channel's price to Channel Adda, and a
+ * Fastest seller used to wait out a recovery hold after the handover. Since
+ * the client's flows of 2026-10-20 neither is true: a Safest buyer pays the
+ * seller directly once our agent holds the channel, and a Fastest deal's
+ * hold runs while the buyer is a manager, before the handover. A page that
+ * still described either would send a buyer to a checkout that no longer
+ * exists, or tell a seller to wait for money that is already theirs. Copy
+ * lives in pages, data files, components and emails alike, so the whole of
+ * src is read.
  */
 const BANNED: readonly RegExp[] = [
-  /pays? the seller directly/i,
-  /paid (to )?the seller directly/i,
-  /never holds? the (channel's )?price/i,
-  /(price|seller)[^.\n]{0,40}off-platform/i,
-  /paid off-platform/i,
-  /paid direct\b/i,
-  /price never (passes|passed|reaches|touches)/i,
-  /buyer pays the seller/i,
-  /pays you directly/i,
-  /we hold the money, or we hold the account/i,
+  // The Safest price, paid to us between the two transfers.
+  /(pay|pays|paid|paying) the (channel's )?price to (channel adda|us)/i,
+  /price to (channel adda|us),? (later|once|after|then)/i,
+  /price (is )?paid to (channel adda|us)/i,
+  /the (account|channel) and then the money/i,
+  // The Fastest hold that ran after the handover, and Safest's two holds.
+  /recovery hold/i,
+  /hold [12]/i,
 ];
 
 const ROOT = join(__dirname, "..");
@@ -40,7 +39,7 @@ function sources(dir: string): string[] {
   });
 }
 
-test("no page tells anyone to pay a seller directly", () => {
+test("no page describes the deal flows the product replaced", () => {
   const offenders: string[] = [];
   for (const file of sources(ROOT)) {
     readFileSync(file, "utf8")

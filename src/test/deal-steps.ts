@@ -1,41 +1,24 @@
-import { db } from "@/lib/db";
-import { templateFor } from "@/lib/deal-templates";
-import {
-  advanceStep,
-  type DealOutcome,
-  recordPricePayment,
-} from "@/server/deals";
+import { advanceStep, type DealOutcome } from "@/server/deals";
+import { passHold } from "@/test/db";
 
 /**
- * Runs one step of a deal the way the product does.
+ * Runs one step of a deal the way the product does: its actor pressing it,
+ * once the deal's hold has run out.
  *
- * A step completed by a payment — the Safest price — is the buyer paying
- * Channel Adda, which the system records; nobody can press it done. Every
- * other step is its actor pressing the button. Tests that walk a deal through
- * its template use this so they do not each re-learn which step is which.
+ * Every step after the opening payment is a person's — the Safest price
+ * goes from the buyer to the seller directly — and the one hold on a deal
+ * (Google's wait on Safest, the holding period on Fastest) is days long.
+ * Tests that walk a deal through its template use this so they neither
+ * re-learn which step is which nor wait a week; the hold itself is pinned
+ * by tests that call `advanceStep` directly.
  */
 export async function runStep(input: {
   orderId: string;
   position: number;
   userId: string;
   proofUrl?: string;
+  approvedById?: string;
 }): Promise<DealOutcome> {
-  const order = await db.order.findUniqueOrThrow({
-    where: { id: input.orderId },
-    select: { mode: true },
-  });
-  const step = templateFor(order.mode).find(
-    (s) => s.position === input.position,
-  );
-  if (step?.byPayment) {
-    const outcome = await recordPricePayment(
-      input.orderId,
-      `price-${input.orderId}`,
-      "USDT",
-    );
-    return outcome === "applied"
-      ? { ok: true }
-      : { ok: false, reason: "wrong-step" };
-  }
+  await passHold(input.orderId);
   return advanceStep(input);
 }

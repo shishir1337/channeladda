@@ -6,7 +6,7 @@ import { db } from "@/lib/db";
 import { TERMINAL_STATUSES } from "@/lib/deal-machine";
 import { recordAudit } from "@/server/audit";
 import { classifyStatus, lookupInvoice } from "@/server/cryptomus";
-import { recordOpeningPayment, recordPricePayment } from "@/server/deals";
+import { recordOpeningPayment, recordStrayPricePayment } from "@/server/deals";
 import { notifyStaff } from "@/server/notifications";
 import { creditDeposit } from "@/server/wallet";
 
@@ -399,9 +399,11 @@ async function reconcileOne(invoice: {
       data: { settledAt: new Date(), lastStatus: confirmed.status },
     });
 
+    // A Safest price invoice from before the price went to the seller
+    // directly: the buyer's balance, never a step.
     const record =
       invoice.purpose === "DEAL_PRICE"
-        ? recordPricePayment
+        ? recordStrayPricePayment
         : recordOpeningPayment;
     const outcome = await record(
       invoice.orderId,

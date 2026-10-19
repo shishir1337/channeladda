@@ -2,14 +2,9 @@ import { beforeEach, expect, test, vi } from "vitest";
 import { signPayload } from "@/lib/cryptomus-sign";
 import { db } from "@/lib/db";
 import { templateFor } from "@/lib/deal-templates";
-import {
-  balanceOf,
-  createDeal,
-  recordOpeningPayment,
-  resolveDeal,
-} from "@/server/deals";
+import { balanceOf, createDeal, recordOpeningPayment } from "@/server/deals";
 import { reconcileInvoice } from "@/server/invoices";
-import { seedListing, seedUser, withCleanDb } from "@/test/db";
+import { seedListing, withCleanDb } from "@/test/db";
 import { runStep } from "@/test/deal-steps";
 
 // Cryptomus as observed against the live API on 2026-10-17: asking for an
@@ -135,8 +130,8 @@ function settle(
   row.paid = paid;
 }
 
-/** A Safest deal whose fee is paid, inspected, and waiting on its price. */
-async function safestAwaitingPrice() {
+/** A Safest deal whose fee is paid and whose channel our agent now holds. */
+async function safestInCustody() {
   const seeded = await seedListing();
   const created = await createDeal({
     listingId: seeded.listing.id,
@@ -167,10 +162,28 @@ async function safestAwaitingPrice() {
   return { ...seeded, orderId: created.orderId };
 }
 
-async function priceHeld(orderId: string) {
-  return db.ledgerEntry.count({
-    where: { orderId, userId: null, note: { contains: "price" } },
+/**
+ * A Safest price invoice raised before the price went to the seller
+ * directly, paid at the processor: the one way a price can still reach us.
+ */
+async function legacyPriceInvoice(orderId: string, buyerId: string) {
+  const reference = `PRICE-${orderId}`;
+  await db.invoice.create({
+    data: {
+      reference,
+      purpose: "DEAL_PRICE",
+      amountUsd: 10_000,
+      userId: buyerId,
+      orderId,
+    },
   });
+  fake.invoices.set(reference, {
+    uuid: `uuid-${reference}`,
+    amountUsd: 10_000,
+    status: "paid",
+    isFinal: true,
+  });
+  return reference;
 }
 
 test(
@@ -276,91 +289,51 @@ test(
 // ------------------------------------------------- the Safest price, by crypto
 
 test(
-  "a price checkout raises an invoice for the price",
+  "a safest deal in custody has nothing to pay Channel Adda",
   withCleanDb(async () => {
-    const { orderId } = await safestAwaitingPrice();
+    // The buyer pays the seller directly now; there is no price checkout.
+    const { orderId } = await safestInCustody();
 
     const started = await startPayment(orderId);
-    expect(started.ok).toBe(true);
-
-    const invoice = await db.invoice.findFirstOrThrow({
-      where: { orderId, purpose: "DEAL_PRICE" },
-    });
-    expect(invoice.amountUsd).toBe(10_000);
-    expect(fake.invoices.get(invoice.reference)?.amountUsd).toBe(10_000);
+    expect(started).toMatchObject({ ok: false });
+    expect(fake.created).toHaveLength(0);
+    expect(
+      await db.invoice.count({ where: { orderId, purpose: "DEAL_PRICE" } }),
+    ).toBe(0);
   }),
 );
 
 test(
-  "a price checkout never reuses the fee invoice",
+  "a price invoice from before is credited to the buyer when it settles",
   withCleanDb(async () => {
-    // The buyer opened a fee checkout, then paid the fee another way. That
-    // invoice is still open and unapplied; reusing it for the price would
-    // send them to a page asking for the fee.
-    const seeded = await seedListing();
-    const created = await createDeal({
-      listingId: seeded.listing.id,
-      buyerId: seeded.buyer.id,
-      mode: "SAFEST",
-    });
-    if (!created.ok) throw new Error(created.reason);
-    fake.buyerId = seeded.buyer.id;
-    await startPayment(created.orderId);
-    const feeInvoice = fake.created[0];
-    await db.order.update({
-      where: { id: created.orderId },
-      data: { agentId: seeded.agent.id },
-    });
-    await recordOpeningPayment(created.orderId, created.reference, "USDT");
-    const actors: Record<string, string> = {
-      buyer: seeded.buyer.id,
-      seller: seeded.seller.id,
-      agent: seeded.agent.id,
-    };
-    for (const step of templateFor("SAFEST")) {
-      if (step.position < 2 || step.position >= 6) continue;
-      await runStep({
-        orderId: created.orderId,
-        position: step.position,
-        userId: actors[step.actor],
-      });
-    }
-
-    expect((await startPayment(created.orderId)).ok).toBe(true);
-    expect(fake.created).toHaveLength(2);
-    expect(fake.created[1]).not.toBe(feeInvoice);
-    expect(fake.invoices.get(fake.created[1])?.amountUsd).toBe(10_000);
-  }),
-);
-
-test(
-  "a settled price invoice moves the deal through reconciliation",
-  withCleanDb(async () => {
-    const { orderId } = await safestAwaitingPrice();
-    await startPayment(orderId);
-    const reference = fake.created[0];
-    settle(reference, "paid", true);
+    const { orderId, buyer } = await safestInCustody();
+    const reference = await legacyPriceInvoice(orderId, buyer.id);
 
     expect(await reconcileInvoice(reference)).toBe("applied");
+    await reconcileInvoice(reference);
 
+    expect(await balanceOf(buyer.id)).toBe(10_000);
+    expect(
+      await db.ledgerEntry.count({
+        where: { userId: buyer.id, kind: "DEPOSIT" },
+      }),
+    ).toBe(1);
+    // It starts nothing: the deal is where it was.
     const order = await db.order.findUniqueOrThrow({ where: { id: orderId } });
-    expect(order.status).toBe("AWAITING_HANDOVER");
-    expect(order.buyerPaymentRef).toBe(reference);
-    expect(await priceHeld(orderId)).toBe(1);
+    expect(order.status).toBe("IN_CUSTODY");
+    expect(order.buyerPaidAt).toBeNull();
   }),
 );
 
 test(
-  "a paid callback for a price invoice books the price",
+  "a paid callback for a price invoice from before credits the buyer",
   withCleanDb(async () => {
-    const { orderId } = await safestAwaitingPrice();
-    await startPayment(orderId);
-    const reference = fake.created[0];
-    settle(reference, "paid", true);
+    const { orderId, buyer } = await safestInCustody();
+    const reference = await legacyPriceInvoice(orderId, buyer.id);
 
     const body = {
       type: "payment",
-      uuid: fake.invoices.get(reference)?.uuid,
+      uuid: `uuid-${reference}`,
       order_id: reference,
       status: "paid",
       is_final: true,
@@ -379,61 +352,10 @@ test(
     );
 
     expect(response.status).toBe(200);
-    const order = await db.order.findUniqueOrThrow({ where: { id: orderId } });
-    expect(order.status).toBe("AWAITING_HANDOVER");
-    expect(order.buyerPaymentRef).toBe(reference);
-    // The opening payment's name is untouched.
-    expect(order.paymentRef).not.toBe(reference);
-  }),
-);
-
-test(
-  "an underpaid price invoice does not move the deal",
-  withCleanDb(async () => {
-    // Paid at least the fee, but nowhere near the price. Checked against
-    // the deal's up-front total — the fee — this would have bought the
-    // channel transfer for $3.
-    const { orderId } = await safestAwaitingPrice();
-    await startPayment(orderId);
-    const reference = fake.created[0];
-    settle(reference, "paid", true, 300);
-
-    expect(await reconcileInvoice(reference)).toBe("not-yet");
-
-    const order = await db.order.findUniqueOrThrow({ where: { id: orderId } });
-    expect(order.status).toBe("AWAITING_BUYER_PAYMENT");
-    expect(order.buyerPaymentRef).toBeNull();
-    expect(await priceHeld(orderId)).toBe(0);
-  }),
-);
-
-test(
-  "a late price payment is credited at the price",
-  withCleanDb(async () => {
-    // The buyer opened the price checkout and the deal was returned before
-    // the money arrived. It is real money, and it is the price, not the fee.
-    const { orderId, buyer } = await safestAwaitingPrice();
-    await startPayment(orderId);
-    const reference = fake.created[0];
-    const finance = await seedUser("FINANCE");
-    const returned = await resolveDeal({
-      orderId,
-      to: "RETURNED_TO_SELLER",
-      byUserId: finance.id,
-      note: "buyer went quiet",
-    });
-    expect(returned).toMatchObject({ ok: true });
-
-    settle(reference, "paid", true);
-    await reconcileInvoice(reference);
-    await reconcileInvoice(reference);
-
     expect(await balanceOf(buyer.id)).toBe(10_000);
-    expect(
-      await db.ledgerEntry.count({
-        where: { userId: buyer.id, kind: "DEPOSIT" },
-      }),
-    ).toBe(1);
+    const order = await db.order.findUniqueOrThrow({ where: { id: orderId } });
+    expect(order.status).toBe("IN_CUSTODY");
+    expect(order.buyerPaymentRef).toBeNull();
   }),
 );
 

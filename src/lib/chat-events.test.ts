@@ -25,7 +25,7 @@ const EXAMPLES: ChatEvent[] = [
   { type: "agent-changed", agentName: "Tanvir" },
   { type: "step-done", name: "Nadia", label: "Invite the agent as owner" },
   { type: "hold-started", until: new Date("2026-11-02T12:00:00Z") },
-  { type: "price-paid", reference: "CA-40218", amountCents: 220_000 },
+  { type: "hold-ended" },
   { type: "dispute-raised", name: "Rafi" },
   { type: "deal-ended", outcome: "Buyer refunded" },
 ];

@@ -7,7 +7,7 @@ import {
   cryptomusConfig,
   getInvoice,
 } from "@/server/cryptomus";
-import { recordOpeningPayment, recordPricePayment } from "@/server/deals";
+import { recordOpeningPayment, recordStrayPricePayment } from "@/server/deals";
 import {
   applyProcessorRefund,
   markApplied,
@@ -228,7 +228,8 @@ async function handle(
   // has gone: left alone, the deal completes normally and credits the
   // seller out of it. Freeze it and put it in front of a human, because
   // reversing a hold is a decision rather than a sweep.
-  // A Safest deal takes two payments; the price is the second.
+  // A Safest price invoice raised before the price went to the seller
+  // directly. It can still be paid, and is credited to the buyer.
   const isPrice = invoice?.purpose === "DEAL_PRICE";
 
   if (outcome === "refunded") {
@@ -281,7 +282,7 @@ async function handle(
   // name: the sweep applies the same payment under `invoice.reference`, and
   // two names for it meant the second caller saw an unfamiliar reference
   // and credited the buyer the whole deal out of nothing.
-  await (isPrice ? recordPricePayment : recordOpeningPayment)(
+  await (isPrice ? recordStrayPricePayment : recordOpeningPayment)(
     order.id,
     orderId,
     confirmed.payerCurrency ?? "USDT",

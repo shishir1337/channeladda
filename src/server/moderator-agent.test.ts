@@ -58,7 +58,7 @@ test(
   withCleanDb(async () => {
     const admin = await staff("SUPERADMIN");
     const moderator = await staff("MODERATOR", "UNDER_10K");
-    const deal = await paidDeal(250_000); // $2,500
+    const deal = await paidDeal(250_000, "SAFEST"); // $2,500
 
     expect(await assign(deal.orderId, moderator.id, admin.id)).toEqual({
       ok: true,
@@ -67,7 +67,7 @@ test(
       "agent",
     );
 
-    // Fastest: the seller invites the agent as manager, the agent verifies.
+    // Safest: the seller adds the agent as manager, the agent confirms it.
     await advanceStep({
       orderId: deal.orderId,
       position: 2,

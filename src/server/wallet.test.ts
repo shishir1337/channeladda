@@ -152,38 +152,11 @@ test(
 );
 
 test(
-  "a safest buyer pays the price from the balance",
+  "the price of a safest deal is never paid from the balance",
   withCleanDb(async () => {
+    // Our agent holds the channel and the buyer is to pay the seller
+    // directly: there is nothing here for Channel Adda to take.
     const { orderId, buyer } = await safestAt(6);
-    await fund(buyer.id, 12_000);
-
-    expect(await payFromWallet(orderId, buyer.id)).toEqual({ ok: true });
-
-    const wallet = await getWallet(buyer.id);
-    expect(wallet.availableUsd).toBe(2_000);
-    const order = await db.order.findUniqueOrThrow({ where: { id: orderId } });
-    expect(order.status).toBe("AWAITING_HANDOVER");
-    expect(order.buyerPaymentRef).toMatch(/^wallet:.*:price$/);
-    // Held, not paid to anybody yet.
-    expect(
-      await db.ledgerEntry.findMany({
-        where: { orderId, note: { contains: "price" } },
-        orderBy: { amountUsd: "asc" },
-        select: { userId: true, kind: true, amountUsd: true },
-      }),
-    ).toEqual([
-      { userId: buyer.id, kind: "ESCROW_HOLD", amountUsd: -10_000 },
-      { userId: null, kind: "ESCROW_HOLD", amountUsd: 10_000 },
-    ]);
-  }),
-);
-
-test(
-  "the price cannot be paid from the balance before the inspection",
-  withCleanDb(async () => {
-    // In custody, not yet inspected: the buyer approves the channel before
-    // being asked for the price.
-    const { orderId, buyer } = await safestAt(5);
     await fund(buyer.id, 12_000);
     expect(await payFromWallet(orderId, buyer.id)).toMatchObject({
       ok: false,
@@ -538,39 +511,52 @@ test(
 // --------------------------------------------- what we hold for a seller
 
 test(
-  "a seller sees a paid price as held, not as balance",
+  "a safest sale is never held for the seller, even once the buyer says they paid",
   withCleanDb(async () => {
-    const { orderId, buyer, seller } = await safestAt(6);
-    await fund(buyer.id, 10_000);
-    await payFromWallet(orderId, buyer.id);
-
+    // The buyer's Paid means they paid the seller directly. None of it is
+    // with us, so the seller's wallet must not promise it.
+    const { seller } = await safestAt(7);
     const wallet = await getWallet(seller.id);
-    expect(wallet.heldForSalesUsd).toBe(10_000);
-    expect(wallet.heldForSales).toEqual([
-      expect.objectContaining({
-        orderId,
-        mode: "SAFEST",
-        amountUsd: 10_000,
-        reference: expect.stringMatching(/^CA-/),
-      }),
-    ]);
-    // Not theirs to spend or withdraw until the transfer completes.
-    expect(wallet.balanceUsd).toBe(0);
-    expect(wallet.availableUsd).toBe(0);
+    expect(wallet.heldForSales).toEqual([]);
+    expect(wallet.heldForSalesUsd).toBe(0);
   }),
 );
+
+/** A Fastest deal paid and walked up to, not including, `stopBefore`. */
+async function fastestAt(stopBefore: number) {
+  const seeded = await seedListing();
+  const created = await createDeal({
+    listingId: seeded.listing.id,
+    buyerId: seeded.buyer.id,
+    mode: "FASTEST",
+  });
+  if (!created.ok) throw new Error(created.reason);
+  await db.order.update({
+    where: { id: created.orderId },
+    data: { agentId: seeded.agent.id },
+  });
+  await recordOpeningPayment(created.orderId, `pay-${created.orderId}`, "USDT");
+  const actors: Record<string, string> = {
+    buyer: seeded.buyer.id,
+    seller: seeded.seller.id,
+    agent: seeded.agent.id,
+  };
+  for (const step of templateFor("FASTEST")) {
+    if (step.position < 2 || step.position >= stopBefore) continue;
+    const r = await runStep({
+      orderId: created.orderId,
+      position: step.position,
+      userId: actors[step.actor],
+    });
+    if (!r.ok) throw new Error(`step ${step.position}: ${r.reason}`);
+  }
+  return { ...seeded, orderId: created.orderId };
+}
 
 test(
   "a held sale moves to the balance on completion",
   withCleanDb(async () => {
-    const { orderId, buyer, seller, agent } = await safestAt(6);
-    await fund(buyer.id, 10_000);
-    await payFromWallet(orderId, buyer.id);
-    for (const position of [7, 8]) {
-      const r = await runStep({ orderId, position, userId: agent.id });
-      if (!r.ok) throw new Error(`step ${position}: ${r.reason}`);
-    }
-
+    const { seller } = await fastestAt(7);
     const wallet = await getWallet(seller.id);
     expect(wallet.heldForSales).toEqual([]);
     expect(wallet.heldForSalesUsd).toBe(0);
@@ -581,9 +567,8 @@ test(
 test(
   "a held sale cannot be withdrawn",
   withCleanDb(async () => {
-    const { orderId, buyer, seller } = await safestAt(6);
-    await fund(buyer.id, 10_000);
-    await payFromWallet(orderId, buyer.id);
+    const { seller } = await fastestAt(4);
+    expect((await getWallet(seller.id)).heldForSalesUsd).toBe(10_000);
     await db.payoutAddress.create({
       data: { userId: seller.id, address: "TXyz1234567890", network: "TRON" },
     });
@@ -614,9 +599,9 @@ test(
 );
 
 test(
-  "a safest sale whose price is not paid yet is not shown as held",
+  "a safest sale in custody is not shown as held",
   withCleanDb(async () => {
-    // Only the fee is with us; the price has not been paid.
+    // Only the fee is with us, and the price never will be.
     const { seller } = await safestAt(6);
     const wallet = await getWallet(seller.id);
     expect(wallet.heldForSales).toEqual([]);

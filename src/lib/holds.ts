@@ -3,11 +3,11 @@ import type { DealMode } from "@/generated/prisma/enums";
 /**
  * What the platform should be holding for a deal that is still running.
  *
- * Everything a buyer pays is held, in both modes, and only becomes ours or
- * the seller's when it is earned: at completion, or — for a Safest fee — when
- * a deal fails after our agent has done the work. So this is simply what has
- * been paid in so far. A Safest deal takes the fee up front and the price
- * later; a Fastest deal takes both at once.
+ * Everything a buyer pays Channel Adda is held, in both modes, and only
+ * becomes ours or the seller's when it is earned: at completion, or — for a
+ * Safest fee — when a deal fails after our agent has done the work. So this
+ * is simply what has been paid in: the whole amount on Fastest, the fee on
+ * Safest, whose price goes from the buyer to the seller directly.
  *
  * Completion and every refund check the ledger against this before moving
  * anything, so a deal whose books do not add up stops instead of writing
@@ -18,12 +18,10 @@ export function requiredHold(order: {
   paymentRef: string | null;
   totalUsd: number;
   buyerFeeUsd: number;
-  priceUsd: number;
-  buyerPaidAt: Date | null;
 }): number {
   if (order.paymentRef === null) return 0;
   if (order.mode === "FASTEST") return order.totalUsd;
-  return order.buyerFeeUsd + (order.buyerPaidAt ? order.priceUsd : 0);
+  return order.buyerFeeUsd;
 }
 
 /**

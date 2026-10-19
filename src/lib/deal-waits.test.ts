@@ -1,8 +1,13 @@
 import { expect, test } from "vitest";
-import { activeWait, formatCountdown, type WaitInput } from "@/lib/deal-waits";
+import {
+  activeWait,
+  formatCountdown,
+  holdDaysFor,
+  type WaitInput,
+} from "@/lib/deal-waits";
 
 // A deal spends most of its life waiting on a clock nobody in the chat can
-// see: the payment window, Google's owner wait, the recovery hold. The chat
+// see: the payment window, Google's owner wait, the holding period. The chat
 // shows whichever one is running, counting down.
 
 const HOUR = 3_600_000;
@@ -17,22 +22,10 @@ function deal(overrides: Partial<WaitInput> = {}): WaitInput {
     status: "AWAITING_CUSTODY",
     createdAt: ago(DAY),
     holdUntil: null,
-    steps: [1, 2, 3, 4, 5, 6, 7, 8].map((position) => ({
-      position,
-      completedAt: null,
-    })),
     paymentWindowHours: 48,
-    ownerWaitDays: 7,
     now: NOW,
     ...overrides,
   };
-}
-
-function doneUpTo(last: number, at: (position: number) => Date) {
-  return [1, 2, 3, 4, 5, 6, 7, 8].map((position) => ({
-    position,
-    completedAt: position <= last ? at(position) : null,
-  }));
 }
 
 test("an unpaid deal counts down its payment window", () => {
@@ -51,47 +44,39 @@ test("a payment window already past shows nothing — the sweep will close it", 
   ).toBeNull();
 });
 
-test("after the agent accepts custody, Google's owner wait runs until hold 1", () => {
-  const accepted = ago(2 * DAY);
-  const wait = activeWait(
-    deal({ steps: doneUpTo(3, (p) => (p === 3 ? accepted : ago(3 * DAY))) }),
-  );
-  expect(wait).toEqual({
-    label: "Google's 7-day owner wait ends",
+test("a Safest deal waiting on Google counts down to our agent becoming primary owner", () => {
+  expect(activeWait(deal({ holdUntil: ahead(5 * DAY) }))).toEqual({
+    label: "Google's wait ends, then our agent is made primary owner",
     until: ahead(5 * DAY),
   });
 });
 
-test("after the agent transfers to the buyer, the second owner wait runs", () => {
-  const transferred = ago(DAY);
-  const wait = activeWait(
-    deal({
-      status: "AWAITING_HANDOVER",
-      steps: doneUpTo(7, (p) => (p === 7 ? transferred : ago(9 * DAY))),
-    }),
-  );
-  expect(wait?.until).toEqual(ahead(6 * DAY));
-});
-
-test("platforms without an owner wait show no owner timer", () => {
+test("a Fastest deal in its holding period counts down to the buyer becoming primary owner", () => {
   expect(
-    activeWait(deal({ ownerWaitDays: 0, steps: doneUpTo(3, () => ago(DAY)) })),
-  ).toBeNull();
-});
-
-test("a Fastest deal in its recovery hold counts down to the seller's payout", () => {
-  const wait = activeWait(
-    deal({
-      mode: "FASTEST",
-      status: "AWAITING_RELEASE",
-      holdUntil: ahead(3 * DAY),
-      steps: doneUpTo(5, () => ago(DAY)).slice(0, 6),
-    }),
-  );
-  expect(wait).toEqual({
-    label: "Recovery hold ends, then the seller is paid",
+    activeWait(
+      deal({
+        mode: "FASTEST",
+        status: "AWAITING_HANDOVER",
+        holdUntil: ahead(3 * DAY),
+      }),
+    ),
+  ).toEqual({
+    label: "Holding period ends, then the buyer is made primary owner",
     until: ahead(3 * DAY),
   });
+});
+
+test("a hold that has ended shows no clock", () => {
+  expect(activeWait(deal({ holdUntil: ago(HOUR) }))).toBeNull();
+  expect(activeWait(deal({ holdUntil: null }))).toBeNull();
+});
+
+test("the hold lasts Google's owner wait on Safest and the platform's holding period on Fastest", () => {
+  expect(holdDaysFor("SAFEST", "YOUTUBE")).toBe(7);
+  expect(holdDaysFor("SAFEST", "INSTAGRAM")).toBe(0);
+  // The client's seven days, on the platform they trade most.
+  expect(holdDaysFor("FASTEST", "YOUTUBE")).toBe(7);
+  expect(holdDaysFor("FASTEST", "INSTAGRAM")).toBe(21);
 });
 
 test("a finished, stopped or disputed deal has no clock running", () => {

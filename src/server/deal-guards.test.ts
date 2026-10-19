@@ -235,11 +235,11 @@ test(
 // ------------------- I2: do not return a channel the buyer has paid for
 
 test(
-  "returning a channel after the price is paid needs a dispute, and refunds the price",
+  "returning a channel after the buyer says they paid needs a dispute",
   withCleanDb(async () => {
     const { orderId, staff, buyer, actors } = await runTo("SAFEST", 7);
-    // The buyer has paid for it: undoing that is a decision, so it goes
-    // through a dispute first.
+    // The buyer says they have paid the seller: undoing that is a decision,
+    // so it goes through a dispute first.
     expect(
       await resolveDeal({
         orderId,
@@ -264,18 +264,20 @@ test(
       }),
     ).toMatchObject({ ok: true });
 
-    // The price comes back to the buyer; the fee is the agent's work.
-    expect(await balanceOf(buyer.id)).toBe(10_000);
+    // The price never reached us, so there is none to give back: what the
+    // buyer paid the seller is between them and the dispute. The fee is the
+    // agent's work.
+    expect(await balanceOf(buyer.id)).toBe(0);
     expect(await platformPositionFor(orderId)).toBe(300);
   }),
 );
 
 test(
-  "a safest deal cannot be decided for the seller before the price is paid",
+  "a safest deal cannot be finished before the buyer says they paid",
   withCleanDb(async () => {
-    // Completing would sell the channel with only the fee on our books:
-    // the seller paid nothing for giving it away, and a price arriving
-    // during the dispute would go back to the buyer as well.
+    // Completing hands the buyer the channel, and the price never passes
+    // through us: before the buyer has even said they paid the seller, the
+    // channel would go for the fee alone.
     const { orderId, staff, actors, listing } = await runTo("SAFEST", 6);
     await resolveDeal({
       orderId,
@@ -288,7 +290,7 @@ test(
         orderId,
         to: "COMPLETED",
         byUserId: staff.id,
-        note: "decided for the seller",
+        note: "decided for the buyer",
       }),
     ).toMatchObject({ ok: false, reason: "price-not-paid" });
     expect(
@@ -302,12 +304,13 @@ test(
 );
 
 test(
-  "a failed second transfer can still be returned from a dispute",
+  "a stuck handover after the seller was paid is decided for the buyer",
   withCleanDb(async () => {
-    const { orderId, staff, buyer, actors } = await runTo("SAFEST", 8);
-    // Step 7 is done: the agent has started Google's transfer to the buyer.
-    // If it never completes, the buyer must still be able to get the price
-    // back — the deal is not the seller's money until Hold 2 ends.
+    const { orderId, staff, seller, actors } = await runTo("SAFEST", 9);
+    // The seller said the money arrived and our agent has made the buyer
+    // the owner, but the buyer says it never arrived. The channel cannot go
+    // back — the seller has been paid — so the dispute ends for the buyer,
+    // with the channel still ours to hand on.
     await resolveDeal({
       orderId,
       to: "DISPUTED",
@@ -321,8 +324,17 @@ test(
         byUserId: staff.id,
         note: "transfer failed; channel back to the seller",
       }),
+    ).toMatchObject({ ok: false, reason: "already-paid" });
+    expect(
+      await resolveDeal({
+        orderId,
+        to: "COMPLETED",
+        byUserId: staff.id,
+        note: "agent re-sent the transfer",
+      }),
     ).toMatchObject({ ok: true });
-    expect(await balanceOf(buyer.id)).toBe(10_000);
+    expect(await balanceOf(seller.id)).toBe(0);
+    expect(await platformPositionFor(orderId)).toBe(300);
   }),
 );
 
@@ -453,8 +465,8 @@ test(
 test(
   "a completed safest deal leaves the platform holding only its fee",
   withCleanDb(async () => {
-    const { orderId, seller } = await runTo("SAFEST", 9);
-    // Held 10_300 across two payments, paid out 10_000, keeps 300.
+    const { orderId, seller } = await runTo("SAFEST", 10);
+    // Held 300, the fee, and nothing else: the price went to the seller.
     expect(await platformPositionFor(orderId)).toBe(300);
     // Earned at completion, not at payment.
     expect(
@@ -462,7 +474,7 @@ test(
         where: { orderId, userId: null, kind: "BUYER_FEE" },
       }),
     ).toMatchObject({ amountUsd: 300 });
-    expect(await balanceOf(seller.id)).toBe(10_000);
+    expect(await balanceOf(seller.id)).toBe(0);
   }),
 );
 

@@ -31,8 +31,8 @@ export type Platform = {
   blurb: string;
   /** How ownership actually moves on this platform, in plain language. */
   transferNote: string;
-  /** Days the handover is held open afterwards, set by the platform's own
-   *  account-recovery window rather than by preference. */
+  /** A Fastest deal's holding period, in days: how long the buyer is a
+   *  manager before being made primary owner and the seller is paid. */
   holdDays: number;
   /** Buyer-facing handover checklist shown on every listing for this platform. */
   transferSteps: string[];
@@ -73,7 +73,7 @@ export const platforms: Platform[] = [
       "Monetized and faceless YouTube channels with verified watch time, revenue history and a clean strike record. Every channel is checked for ownership before it is listed, and we confirm whether it sits on a Brand Account before a sale can start.",
     transferNote:
       "A Brand Account channel moves cleanly: you are invited as a manager, then promoted to primary owner once Google’s waiting period passes. Channels on a personal Google account cannot be transferred this way, so we flag them separately.",
-    holdDays: 14,
+    holdDays: 7,
     transferSteps: [
       "Seller invites your Google account as a channel manager",
       "Google’s waiting period passes before ownership can move",

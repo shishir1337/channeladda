@@ -225,11 +225,12 @@ export async function seedUser(role: UserRole = "USER") {
 }
 
 /**
- * Lets a Fastest deal's recovery hold pass.
+ * Lets a deal's hold pass: Google's wait on Safest, the holding period on
+ * Fastest.
  *
- * The release step is refused until Order.holdUntil, which is days away. A
- * test about what happens *after* release stands in for the wait with this;
- * the hold itself is pinned by its own tests. A no-op when there is no hold.
+ * No step can be done until Order.holdUntil, which is days away. A test
+ * about what happens *after* the hold stands in for the wait with this; the
+ * hold itself is pinned by its own tests. A no-op when there is no hold.
  */
 export async function passHold(orderId: string): Promise<void> {
   assertSafeDatabase();

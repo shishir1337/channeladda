@@ -34,10 +34,10 @@ export type ChatEvent =
       priceCents: number;
     }
   | { type: "payment-received" | "payment-lapsed"; reference: string }
-  | { type: "price-paid"; reference: string; amountCents: number }
   | { type: "agent-joined" | "agent-changed"; agentName: string }
   | { type: "step-done"; name: string; label: string }
   | { type: "hold-started"; until: Date }
+  | { type: "hold-ended" }
   | { type: "dispute-raised"; name: string }
   | { type: "deal-ended"; outcome: string };
 
@@ -81,8 +81,6 @@ export function eventText(event: ChatEvent): string {
       return `${who(event.name)} opened a ${event.mode === "SAFEST" ? "Safest" : "Fastest"} deal at ${money(event.priceCents)} (${event.reference})`;
     case "payment-received":
       return `Payment received for ${event.reference}. The deal is under way`;
-    case "price-paid":
-      return `${money(event.amountCents)} paid to Channel Adda for ${event.reference}. We hold it until the channel is the buyer's, then pay the seller`;
     case "payment-lapsed":
       return `${event.reference} closed: the payment window ran out before it was paid`;
     case "agent-joined":
@@ -92,11 +90,13 @@ export function eventText(event: ChatEvent): string {
     case "step-done":
       return `Done: ${event.label} (${who(event.name)})`;
     case "hold-started":
-      return `Recovery hold until ${event.until.toLocaleDateString("en-GB", {
+      return `Waiting period until ${event.until.toLocaleDateString("en-GB", {
         day: "numeric",
         month: "long",
         year: "numeric",
-      })}. The seller is paid when it ends`;
+      })}. The next step opens then`;
+    case "hold-ended":
+      return "The waiting period is over. The next step is open";
     case "dispute-raised":
       return `${who(event.name)} raised a dispute. The deal is paused while Channel Adda looks at it`;
     case "deal-ended":

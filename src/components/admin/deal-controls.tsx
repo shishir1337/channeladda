@@ -23,7 +23,6 @@ import {
   claimDeal,
   endDeal,
   markOpeningPaymentReceived,
-  markPriceReceived,
 } from "@/server/actions/deals";
 import { checkInvoiceNow } from "@/server/actions/money";
 import type { AssignableAgent } from "@/server/admin-users";
@@ -228,7 +227,7 @@ export function ClaimDeal({
 }
 
 /**
- * Recording a payment by hand: the opening one, or a Safest deal's price.
+ * Recording the opening payment by hand.
  *
  * Stands in for the Cryptomus webhook. Every later step of a deal unlocks
  * behind it, so it is the one control on this page that staff will use on
@@ -237,13 +236,7 @@ export function ClaimDeal({
  * A secondary button, not the gold one: the processor's callback is the
  * expected way a payment clears, and this is the exception to it.
  */
-export function RecordPayment({
-  orderId,
-  stage = "opening",
-}: {
-  orderId: string;
-  stage?: "opening" | "price";
-}) {
+export function RecordPayment({ orderId }: { orderId: string }) {
   const router = useRouter();
   const ids = { ref: useId(), asset: useId() };
   const [ref, setRef] = useState("");
@@ -283,11 +276,11 @@ export function RecordPayment({
           onClick={() => {
             setMessage(null);
             startTransition(async () => {
-              const record =
-                stage === "price"
-                  ? markPriceReceived
-                  : markOpeningPaymentReceived;
-              const result = await record(orderId, ref.trim(), asset.trim());
+              const result = await markOpeningPaymentReceived(
+                orderId,
+                ref.trim(),
+                asset.trim(),
+              );
               setOk(result.ok);
               setMessage(result.ok ? result.message : result.error);
               if (result.ok) router.refresh();
@@ -296,7 +289,7 @@ export function RecordPayment({
         >
           <SteadyLabel
             pending={pending}
-            idle={stage === "price" ? "Price received" : "Payment received"}
+            idle="Payment received"
             busy="Recording…"
           />
         </Button>

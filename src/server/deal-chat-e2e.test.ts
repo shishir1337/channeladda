@@ -182,28 +182,33 @@ test(
 
     await step(2, "seller");
     expect((await kinds(id)).agent).toBe("step:mine");
-    await step(3, "agent");
-    await step(4, "agent");
+    // The agent's manager access starts Google's wait, and the seller's
+    // next step is closed until it ends.
+    const access = await advanceStep({
+      orderId: order.id,
+      position: 3,
+      userId: agent.id,
+    });
+    if (!access.ok) throw new Error(access.reason);
+    expect((await lastLine(id)).body).toMatch(/^Waiting period until/);
+    expect((await kinds(id)).seller).toBe("step:theirs");
+    await passHold(order.id);
+    expect((await kinds(id)).seller).toBe("step:mine");
+    await step(4, "seller");
+    await step(5, "agent");
+    // Our agent holds the channel: the buyer pays the seller directly, the
+    // way they agreed in this chat, and presses Paid.
     expect((await kinds(id)).buyer).toBe("step:mine");
-    await step(5, "buyer");
-    // The buyer pays the price to Channel Adda — here from their balance —
-    // and never to the seller. Nobody presses anything for it: the panel
-    // is the payment, as it is for the opening one.
-    expect((await kinds(id)).buyer).toBe("pay");
-    await creditDeposit(buyer.id, 10_000, "top-chat", "USDT");
-    expect(await payFromWallet(order.id, buyer.id)).toEqual({ ok: true });
-    expect(await lastLine(id)).toMatchObject({ kind: "EVENT", senderId: null });
-    expect((await lastLine(id)).body).toMatch(/to Channel Adda/);
+    await step(6, "buyer");
+    expect((await kinds(id)).seller).toBe("step:mine");
+    await step(7, "seller");
     expect((await kinds(id)).agent).toBe("step:mine");
-    // Nobody is ever shown where to pay the other side.
-    expect(await getDealFor(buyer.id, order.id)).not.toHaveProperty(
-      "sellerPayTo",
-    );
-    await step(7, "agent");
+    await step(8, "agent");
+    expect((await kinds(id)).buyer).toBe("step:mine");
     const done = await advanceStep({
       orderId: order.id,
-      position: 8,
-      userId: agent.id,
+      position: 9,
+      userId: buyer.id,
     });
     if (!done.ok) throw new Error(done.reason);
 
@@ -267,25 +272,34 @@ test(
     if (!assigned.ok) throw new Error(assigned.reason);
 
     const people = { buyer, seller, agent } as const;
-    for (const [position, by] of [
-      [2, "seller"],
-      [3, "agent"],
-      [4, "seller"],
-      [5, "buyer"],
-    ] as const) {
-      const done = await advanceStep({
-        orderId: deal.orderId,
-        position,
-        userId: people[by].id,
-      });
-      if (!done.ok) throw new Error(`${position}: ${done.reason}`);
-    }
+    const run = async (steps: (readonly [number, keyof typeof people])[]) => {
+      for (const [position, by] of steps) {
+        const done = await advanceStep({
+          orderId: deal.orderId,
+          position,
+          userId: people[by].id,
+        });
+        if (!done.ok) throw new Error(`${position}: ${done.reason}`);
+      }
+    };
 
-    // The recovery hold: the release is the agent's step, and not yet theirs.
-    expect((await kinds(id)).agent).toBe("step:theirs");
-    expect((await lastLine(id)).body).toMatch(/^Recovery hold until/);
+    // The seller adds the buyer as manager and the buyer confirms it.
+    await run([
+      [2, "seller"],
+      [3, "buyer"],
+    ]);
+
+    // The holding period: making the buyer primary owner is the seller's
+    // step, and not yet theirs.
+    expect((await kinds(id)).seller).toBe("step:theirs");
+    expect((await lastLine(id)).body).toMatch(/^Waiting period until/);
 
     await passHold(deal.orderId);
+    expect((await kinds(id)).seller).toBe("step:mine");
+    await run([
+      [4, "seller"],
+      [5, "buyer"],
+    ]);
     expect((await kinds(id)).agent).toBe("step:mine");
     const released = await advanceStep({
       orderId: deal.orderId,

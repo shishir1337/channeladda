@@ -183,6 +183,6 @@ test(
     const turn = await db.notification.findFirst({
       where: { userId: seller.id, kind: "ORDER" },
     });
-    expect(turn?.title).toContain("Invite the agent as channel owner");
+    expect(turn?.title).toContain("Add the agent as manager");
   }),
 );

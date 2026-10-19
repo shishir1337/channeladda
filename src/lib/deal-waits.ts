@@ -1,3 +1,4 @@
+import { platformMap } from "@/data/platforms";
 import type { DealMode, OrderStatus, Platform } from "@/generated/prisma/enums";
 import { isTerminal } from "@/lib/deal-machine";
 
@@ -15,11 +16,26 @@ export const OWNER_WAIT_DAYS: Readonly<Record<Platform, number>> = {
 };
 
 /**
+ * How long a deal's one hold lasts, in days. 0 means there is none.
+ *
+ * Safest waits on Google's own clock before our agent can be made primary
+ * owner; Fastest runs the platform's holding period while the buyer is a
+ * manager, before they are made primary owner and the seller is paid.
+ */
+export function holdDaysFor(mode: DealMode, platform: Platform): number {
+  if (mode === "SAFEST") return OWNER_WAIT_DAYS[platform];
+  return (
+    platformMap[platform.toLowerCase() as keyof typeof platformMap]?.holdDays ??
+    14
+  );
+}
+
+/**
  * Which clock a deal is waiting on right now, if any.
  *
  * Most of a deal is waiting: for the buyer to pay inside the window, for
- * Google to let a new owner become primary, for the recovery hold that
- * protects a Fastest buyer to run out. None of those were visible in the
+ * Google to let our agent become primary owner, for the holding period
+ * before a Fastest buyer does. None of those were visible in the
  * conversation, so both sides asked "how long now?" — the chat shows the one
  * that is running instead. Pure, so each wait is pinned by a test.
  */
@@ -28,27 +44,19 @@ export type WaitInput = {
   status: OrderStatus;
   createdAt: Date;
   holdUntil: Date | null;
-  steps: { position: number; completedAt: Date | null }[];
   paymentWindowHours: number;
-  /** Google's wait before a new owner can be made primary; 0 where none applies. */
-  ownerWaitDays: number;
   now: Date;
 };
 
 export type Wait = { label: string; until: Date };
 
 const HOUR = 3_600_000;
-const DAY = 24 * HOUR;
 
-/**
- * Safest's two ownership transfers, each starting a Google wait: the agent
- * accepting custody (step 3) runs until hold 1 is confirmed (step 4), and the
- * agent transferring to the buyer (step 7) runs until hold 2 (step 8).
- */
-const SAFEST_OWNER_WAITS = [
-  { starts: 3, ends: 4 },
-  { starts: 7, ends: 8 },
-] as const;
+/** What the end of each mode's hold opens. */
+const HOLD_LABELS: Readonly<Record<DealMode, string>> = {
+  SAFEST: "Google's wait ends, then our agent is made primary owner",
+  FASTEST: "Holding period ends, then the buyer is made primary owner",
+};
 
 export function activeWait(input: WaitInput): Wait | null {
   // A dispute freezes every step, so no clock it shows would mean anything.
@@ -65,30 +73,9 @@ export function activeWait(input: WaitInput): Wait | null {
     );
   }
 
-  if (input.holdUntil) {
-    const hold = running(
-      input.holdUntil,
-      "Recovery hold ends, then the seller is paid",
-    );
-    if (hold) return hold;
-  }
-
-  if (input.mode === "SAFEST" && input.ownerWaitDays > 0) {
-    const completed = (position: number) =>
-      input.steps.find((step) => step.position === position)?.completedAt ??
-      null;
-    for (const wait of SAFEST_OWNER_WAITS) {
-      const started = completed(wait.starts);
-      if (started && !completed(wait.ends)) {
-        return running(
-          new Date(started.getTime() + input.ownerWaitDays * DAY),
-          `Google's ${input.ownerWaitDays}-day owner wait ends`,
-        );
-      }
-    }
-  }
-
-  return null;
+  return input.holdUntil
+    ? running(input.holdUntil, HOLD_LABELS[input.mode])
+    : null;
 }
 
 /** "4d 6h", "5h 12m", "12m 05s", "45s": the coarsest grain still worth reading. */

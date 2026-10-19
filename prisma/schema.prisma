@@ -549,15 +549,17 @@ model Order {
 
   feePaidAt         DateTime? // opening payment cleared
   custodyAt         DateTime? // safest: agent confirmed it owns the channel
-  buyerPaidAt       DateTime? // safest: the price reached Channel Adda (set by the system)
-  /// The Safest price payment's own name — an invoice reference, a balance
-  /// payment or a payment finance recorded by hand — so a second arrival can
-  /// be told from a retry. Set by the system, never typed by the buyer.
+  buyerPaidAt       DateTime? // safest: the buyer pressed Paid (they paid the seller directly)
+  sellerConfirmedAt DateTime? // safest: the seller pressed Received
+  /// Legacy: the name of a Safest price paid to Channel Adda, from when the
+  /// price went through us. Nothing writes it now.
   buyerPaymentRef   String?
-  handoverAt        DateTime? // Fastest: the BUYER confirmed access (step 5); starts the recovery hold
+  handoverAt        DateTime? // the buyer confirmed the channel is theirs (Safest 9, Fastest 5)
 
   confirmedAt DateTime? // buyer pressed confirm
-  /// Set from the platform's own recovery window when the buyer confirms.
+  /// The end of the deal's one hold — Google's wait before our agent is made
+  /// primary owner (Safest), the holding period before the buyer is
+  /// (Fastest). No step can be done before it.
   holdUntil   DateTime?
   completedAt DateTime?
   cancelledAt DateTime?
@@ -925,7 +927,7 @@ model Upload {
 /// What an invoice was raised for.
 enum InvoicePurpose {
   DEAL // the opening payment: the whole amount on Fastest, the admin fee on Safest
-  DEAL_PRICE // the channel price on Safest, paid after custody and inspection
+  DEAL_PRICE // legacy: a Safest price paid to us; no longer raised, credited to the buyer if paid
   TOPUP
 }
 

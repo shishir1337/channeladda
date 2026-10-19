@@ -37,7 +37,9 @@ const MESSAGES: Record<repo.DealFailure, string> = {
   "needs-dispute":
     "One side says this already happened, so reversing it is a decision, not a correction. Pause it for review first — then it can be decided with both accounts of it on the record.",
   "on-hold":
-    "This deal is in its recovery hold: the window in which an old owner could still reclaim the account. The seller is paid when it ends — the deal page shows the date.",
+    "The waiting period is still running, so this step is not open yet. The chat shows when it ends, and we email you the moment it does.",
+  "already-paid":
+    "The seller has said the buyer's payment arrived, so the channel cannot go back to them — they would keep the money and the channel both. Decide it for the buyer instead.",
   "in-custody":
     "One of our agents is holding this channel. Give it back to the seller rather than cancelling — cancelling would close the deal and leave the channel in a staff account.",
   "needs-finance":
@@ -50,10 +52,8 @@ const MESSAGES: Record<repo.DealFailure, string> = {
   "bad-handover": "That account does not look right for this platform.",
   "out-of-level":
     "This deal's price is outside that person's level. Level 1 runs deals under $10,000, level 2 from $10,000 to under $100,000, level 3 from $100,000.",
-  "pay-in-checkout":
-    "The price is paid to Channel Adda from this page, by crypto or from your balance. The step completes on its own when the money arrives.",
   "price-not-paid":
-    "The buyer has not paid the price yet, so this deal cannot be decided for the seller — it would hand over the channel for the fee alone. Return the channel to the seller instead.",
+    "The buyer has not marked the price paid, so this deal cannot be finished for them — the channel would go for the fee alone. Return the channel to the seller instead.",
   "books-mismatch":
     "What Channel Adda is holding for this deal does not match what the deal says was paid, so nothing has been moved. It is listed on the money desk for a developer to look at.",
 };
@@ -273,61 +273,6 @@ export async function markOpeningPaymentReceived(
   } catch (error) {
     // Only an order that does not exist, or a row that kept moving under
     // the write, reaches here now. Everything else has an outcome.
-    return {
-      ok: false,
-      error:
-        error instanceof Error
-          ? error.message
-          : "Could not record that payment.",
-    };
-  }
-}
-
-/**
- * Finance recording a Safest price that reached us outside Cryptomus.
- *
- * The same desk and the same rules as `markOpeningPaymentReceived`, for the
- * second payment on a Safest deal: FINANCE only, because it decides money
- * arrived and releases the channel transfer behind it.
- */
-export async function markPriceReceived(
-  orderId: string,
-  ref: string,
-  asset: string,
-): Promise<DealResult> {
-  await requireRole("FINANCE");
-
-  const reference = ref.trim();
-  if (!reference) {
-    return { ok: false, error: "Enter the payment reference." };
-  }
-
-  const outcomes: Record<repo.PaymentOutcome, string> = {
-    applied: "Price recorded. Our agent can transfer the channel now.",
-    "already-applied":
-      "That price payment was already recorded. Nothing has changed.",
-    "second-payment-credited":
-      "The price was already paid, so that payment went to the buyer's balance.",
-    "reference-mismatch":
-      "The price is already paid under another reference, and there is no settled invoice matching this one. Nothing was credited — the mismatch is in the audit trail for you to reconcile.",
-    "credited-to-balance":
-      "This deal is not waiting on its price, so that payment went to the buyer's balance.",
-    "invoice-open":
-      "This deal has a Cryptomus checkout for the price that is still open or already paid, so the money you saw may be that payment. Use “Check now” on the money desk instead — recording it here as well would count it twice. Nothing was recorded.",
-  };
-
-  try {
-    const outcome = await repo.recordManualPricePayment(
-      orderId,
-      reference,
-      asset.trim() || "USDT",
-    );
-    refresh(orderId);
-    if (outcome === "reference-mismatch" || outcome === "invoice-open") {
-      return { ok: false, error: outcomes[outcome] };
-    }
-    return { ok: true, message: outcomes[outcome] };
-  } catch (error) {
     return {
       ok: false,
       error:

@@ -67,7 +67,7 @@ test(
     // second staff member. resolveDeal checked none of that, and the same
     // transition is legal for an agent, so one call closed a Safest deal with
     // the agent still holding the channel the buyer had already paid for.
-    const o = await runTo("SAFEST", 7);
+    const o = await runTo("SAFEST", 8);
 
     const result = await resolveDeal({
       orderId: o.orderId,
@@ -114,9 +114,9 @@ test(
 test(
   "handing a channel back is not a one-click action once a payment is claimed",
   withCleanDb(async () => {
-    // Once the buyer has paid the price to us, giving the channel back
-    // undoes a purchase. buyerPaidAt is that payment, recorded by the system
-    // when the money arrived, and it is what the guard reads.
+    // Once the buyer says they have paid the seller, giving the channel back
+    // may undo a purchase. buyerPaidAt is the buyer's Paid, and it is what
+    // the guard reads: the seller's word against it is a dispute.
     const o = await runTo("SAFEST", 7);
     const mid = await db.order.findUniqueOrThrow({
       where: { id: o.orderId },
@@ -448,7 +448,7 @@ test(
     // staff agent still personally owned the seller's Google channel, with
     // RETURNED_TO_SELLER no longer reachable. The seller's channel sat in a
     // staff member's account and the same channel went back on sale.
-    const o = await runTo("SAFEST", 5);
+    const o = await runTo("SAFEST", 6);
     const mid = await db.order.findUniqueOrThrow({ where: { id: o.orderId } });
     expect(mid.custodyAt).not.toBeNull();
 

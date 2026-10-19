@@ -33,8 +33,11 @@ test("safest holds the fee", () => {
   expect(requiredHold(order)).toBe(300);
 });
 
-test("safest holds the price once it is paid", () => {
-  expect(requiredHold({ ...order, buyerPaidAt: new Date() })).toBe(10_300);
+test("safest holds only the fee, even once the buyer has paid the seller", () => {
+  // buyerPaidAt is the buyer saying they paid the seller directly: none of
+  // that money is ours to hold.
+  const paidTheSeller = { ...order, buyerPaidAt: new Date() };
+  expect(requiredHold(paidTheSeller)).toBe(300);
 });
 
 test("safest keeps its fee once custody is reached", () => {

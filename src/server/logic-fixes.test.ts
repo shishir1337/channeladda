@@ -60,14 +60,12 @@ async function runTo(mode: Mode, stopBefore: number) {
 // ------------------------------------------------- the hold that was promised
 
 test(
-  "a fastest seller is not paid the moment the buyer confirms",
+  "a fastest seller cannot hand over primary ownership the moment the buyer is a manager",
   withCleanDb(async () => {
-    // Every listing page promises "the 14-day hold on this platform covers the
-    // window in which an old owner could try to recover the account".
-    // Order.holdUntil — "set from the platform's own recovery window when the
-    // buyer confirms" — was written by nothing and read by nothing, and the
-    // seller's balance was credited and withdrawable the same minute.
-    const o = await runTo("FASTEST", 6);
+    // The holding period runs while the buyer is a manager, and nothing
+    // moves until it is over: the seller is paid only after the handover
+    // that follows it, so a recovery inside the window costs nobody.
+    const o = await runTo("FASTEST", 4);
 
     const order = await db.order.findUniqueOrThrow({
       where: { id: o.orderId },
@@ -77,8 +75,8 @@ test(
     expect(
       await advanceStep({
         orderId: o.orderId,
-        position: 6,
-        userId: o.agent.id,
+        position: 4,
+        userId: o.seller.id,
       }),
     ).toMatchObject({ ok: false, reason: "on-hold" });
     expect(await balanceOf(o.seller.id)).toBe(0);

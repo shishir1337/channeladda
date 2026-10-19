@@ -102,35 +102,29 @@ const ROWS: Row[] = [
     want: { kind: "pay", dealId: "d1" },
   },
   {
-    name: "buyer: safest price due",
+    // The price goes to the seller directly, so there is no checkout: the
+    // buyer presses Paid like any other step.
+    name: "buyer: paying the safest seller is a step, not a checkout",
     viewer: "buyer",
     input: {
       listingStatus: "RESERVED",
       deal: deal({
         mode: "SAFEST",
-        status: "AWAITING_BUYER_PAYMENT",
-        nextStep: {
-          position: 6,
-          label: "Pay the price to Channel Adda",
-          actor: "buyer",
-        },
+        status: "IN_CUSTODY",
+        nextStep: { position: 6, label: "Pay the seller", actor: "buyer" },
       }),
     },
-    want: { kind: "pay", dealId: "d1" },
+    want: { kind: "step", dealId: "d1", yourMove: true },
   },
   {
-    name: "seller: safest price due is the buyer's move",
+    name: "seller: the buyer paying them is the buyer's move",
     viewer: "seller",
     input: {
       listingStatus: "RESERVED",
       deal: deal({
         mode: "SAFEST",
-        status: "AWAITING_BUYER_PAYMENT",
-        nextStep: {
-          position: 6,
-          label: "Pay the price to Channel Adda",
-          actor: "buyer",
-        },
+        status: "IN_CUSTODY",
+        nextStep: { position: 6, label: "Pay the seller", actor: "buyer" },
       }),
     },
     want: { kind: "step", dealId: "d1", yourMove: false },
@@ -290,35 +284,35 @@ const ROWS: Row[] = [
   },
   {
     name: "hold-running-not-your-move",
-    viewer: "agent",
+    viewer: "seller",
     input: {
       listingStatus: "RESERVED",
       deal: deal({
         mode: "FASTEST",
-        status: "AWAITING_RELEASE",
+        status: "AWAITING_HANDOVER",
         holdUntil: LATER,
         nextStep: {
-          position: 6,
-          label: "Release the seller's funds",
-          actor: "agent",
+          position: 4,
+          label: "Make the buyer primary owner",
+          actor: "seller",
         },
       }),
     },
     want: { kind: "step", dealId: "d1", yourMove: false },
   },
   {
-    name: "hold over: the agent's move again",
-    viewer: "agent",
+    name: "hold over: the seller's move again",
+    viewer: "seller",
     input: {
       listingStatus: "RESERVED",
       deal: deal({
         mode: "FASTEST",
-        status: "AWAITING_RELEASE",
+        status: "AWAITING_HANDOVER",
         holdUntil: EARLIER,
         nextStep: {
-          position: 6,
-          label: "Release the seller's funds",
-          actor: "agent",
+          position: 4,
+          label: "Make the buyer primary owner",
+          actor: "seller",
         },
       }),
     },

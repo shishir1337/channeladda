@@ -3,8 +3,8 @@ import { orderAmounts } from "@/lib/fees";
 
 const FEES = { buyerFeeBpSafest: 300, buyerFeeBpFastest: 300, sellerFeeBp: 0 };
 
-test("a safest buyer owes the fee up front, and the price later", () => {
-  // The up-front payment is the fee; the price is paid to us at step 6.
+test("a safest buyer pays channel adda the fee and nothing else", () => {
+  // The price goes from the buyer to the seller directly, at step 6.
   const amounts = orderAmounts(10_000, FEES, "SAFEST");
   expect(amounts.totalUsd).toBe(300);
   expect(amounts.priceUsd).toBe(10_000);
@@ -24,13 +24,13 @@ test("each mode reads its own rate", () => {
   expect(orderAmounts(10_000, split, "FASTEST").buyerFeeUsd).toBe(500);
 });
 
-test("the seller fee applies to safest sales", () => {
-  // The price now passes through us on both kinds of deal, so there is
-  // something to take the seller fee from.
+test("the seller fee applies only to fastest sales", () => {
+  // A Safest price never passes through Channel Adda, so there is nothing
+  // to take a seller fee from: the seller receives the whole price.
   const withSellerFee = { ...FEES, sellerFeeBp: 500 };
   const safest = orderAmounts(10_000, withSellerFee, "SAFEST");
-  expect(safest.sellerFeeUsd).toBe(500);
-  expect(safest.payoutUsd).toBe(9_500);
+  expect(safest.sellerFeeUsd).toBe(0);
+  expect(safest.payoutUsd).toBe(10_000);
   expect(safest.totalUsd).toBe(300);
   expect(orderAmounts(10_000, withSellerFee, "FASTEST").sellerFeeUsd).toBe(500);
 });

@@ -33,20 +33,27 @@ export type StepTemplate = {
    */
   needsApprovalAbove?: boolean;
   /**
-   * The seller's irreversible act on a Fastest deal: making the buyer the
-   * owner. It stamps nothing on the order, so without this a refund could
-   * not tell “the seller has given the channel away” from “nothing has
-   * happened yet” — and a buyer who held the channel and never pressed
-   * confirm could be refunded in full with one click.
+   * The irreversible act of giving the channel to the buyer: our agent on
+   * Safest, the seller on Fastest. It stamps nothing on the order, so
+   * without this a refund could not tell “the channel has gone to the
+   * buyer” from “nothing has happened yet” — and a buyer who held the
+   * channel and never pressed confirm could be refunded in full with one
+   * click.
    */
   handsOver?: boolean;
   /**
-   * Completed by a payment reaching Channel Adda, never by anybody pressing
-   * it: the system records the payment, completes the step and moves the
-   * status as itself. A step a person could mark paid is a step a person
-   * could mark paid without paying.
+   * The first step that acts on the buyer's handover account. Until it is
+   * done the buyer may still correct the account; after it, a change would
+   * only point at somewhere the channel is not.
    */
-  byPayment?: boolean;
+  usesHandover?: boolean;
+  /**
+   * Completing this step starts the deal's one hold — Google's wait before
+   * our agent can be made primary owner on Safest, the holding period
+   * before the buyer is on Fastest. While it runs no step can be done, and
+   * when it ends the next person is told (`announceEndedHolds`).
+   */
+  startsHold?: boolean;
 };
 
 /**
@@ -63,83 +70,91 @@ export const OPENING_STATUS: Readonly<Record<DealMode, OrderStatus>> =
   });
 
 /**
- * Safest: the channel is escrowed, and so is the money.
+ * Safest: the channel is escrowed, not the money.
  *
- * Two ownership transfers, each waiting on Google's own clock, with the
- * buyer paying the price to Channel Adda between them. That ordering is the
- * whole protection — the buyer does not pay the price until the channel is
- * verifiably out of the seller's hands, and the seller does not lose it to
- * the buyer until the money is with us. The price is released to the
- * seller's Channel Adda wallet when Hold 2 completes; it never goes from
- * buyer to seller directly.
+ * Our agent takes the channel first — manager, Google's wait, then primary
+ * owner — and only then does the buyer pay the seller, directly, the way
+ * they agreed in the chat. That ordering is the whole protection: the buyer
+ * pays nobody until the channel is verifiably out of the seller's hands,
+ * and the seller loses it to the buyer only once they have said the money
+ * arrived. Channel Adda takes the admin fee and nothing else; a seller who
+ * is paid and will not say so is a dispute, decided by staff with the
+ * channel still in our hands.
  */
 const SAFEST_STEPS: readonly StepTemplate[] = Object.freeze([
   { position: 1, label: "Pay the admin fee", actor: "buyer" },
-  { position: 2, label: "Invite the agent as channel owner", actor: "seller" },
-  { position: 3, label: "Accept and confirm custody", actor: "agent" },
+  { position: 2, label: "Add the agent as manager", actor: "seller" },
   {
-    position: 4,
-    label: "Hold 1 complete, ownership verified",
+    position: 3,
+    label: "Confirm manager access",
     actor: "agent",
-    // Only now does the agent genuinely own it: step 3 is accepting the
-    // invite, this is Google's transfer actually completing.
-    entersStatus: "IN_CUSTODY",
+    startsHold: true,
   },
+  { position: 4, label: "Make the agent primary owner", actor: "seller" },
   {
     position: 5,
-    label: "Inspect the channel",
-    actor: "buyer",
-    entersStatus: "AWAITING_BUYER_PAYMENT",
+    label: "Confirm primary ownership",
+    actor: "agent",
+    // Only now does the agent genuinely own it: step 3 is a manager's
+    // access, which the seller could still take back.
+    entersStatus: "IN_CUSTODY",
   },
-  {
-    position: 6,
-    label: "Pay the price to Channel Adda",
-    actor: "buyer",
-    entersStatus: "AWAITING_HANDOVER",
-    byPayment: true,
-  },
+  { position: 6, label: "Pay the seller", actor: "buyer" },
   {
     position: 7,
-    label: "Transfer ownership to the buyer",
-    actor: "agent",
-    needsApprovalAbove: true,
-    handsOver: true,
+    label: "Confirm the payment arrived",
+    actor: "seller",
+    entersStatus: "AWAITING_HANDOVER",
   },
   {
     position: 8,
-    label: "Hold 2 complete, ownership verified",
+    label: "Make the buyer the owner",
     actor: "agent",
-    entersStatus: "COMPLETED",
-    // Completing releases the price to the seller's wallet.
     needsApprovalAbove: true,
+    handsOver: true,
+    usesHandover: true,
+  },
+  {
+    position: 9,
+    label: "Confirm ownership received",
+    actor: "buyer",
+    entersStatus: "COMPLETED",
   },
 ]);
 
 /**
  * Fastest: the money is escrowed, not the channel.
  *
- * One ownership transfer, straight from seller to buyer, with the agent
- * supervising as a manager rather than taking ownership. The platform holds
- * the whole amount throughout, so the protection is that it can refund.
+ * One transfer, straight from seller to buyer, with our agent supervising
+ * it rather than taking the channel: the buyer is a manager through the
+ * holding period, then primary owner with the seller's email gone, and
+ * only then is the seller paid. The platform holds the whole amount
+ * throughout, so the protection is that it can refund.
  */
 const FASTEST_STEPS: readonly StepTemplate[] = Object.freeze([
   { position: 1, label: "Pay the full amount", actor: "buyer" },
-  { position: 2, label: "Invite the agent as manager", actor: "seller" },
+  {
+    position: 2,
+    label: "Add the buyer as manager",
+    actor: "seller",
+    usesHandover: true,
+  },
   {
     position: 3,
-    label: "Verify the channel matches the listing",
-    actor: "agent",
+    label: "Confirm manager access",
+    actor: "buyer",
     entersStatus: "AWAITING_HANDOVER",
+    startsHold: true,
   },
   {
     position: 4,
-    label: "Promote the buyer to primary owner",
+    label: "Make the buyer primary owner",
     actor: "seller",
     handsOver: true,
   },
   {
     position: 5,
-    label: "Confirm access received",
+    label: "Confirm primary ownership",
     actor: "buyer",
     entersStatus: "AWAITING_RELEASE",
   },
@@ -154,12 +169,4 @@ const FASTEST_STEPS: readonly StepTemplate[] = Object.freeze([
 
 export function templateFor(mode: DealMode): readonly StepTemplate[] {
   return mode === "FASTEST" ? FASTEST_STEPS : SAFEST_STEPS;
-}
-
-/**
- * The step a payment completes after the opening one — Safest's price — or
- * null for a mode that takes everything up front.
- */
-export function priceStepFor(mode: DealMode): number | null {
-  return templateFor(mode).find((s) => s.byPayment)?.position ?? null;
 }

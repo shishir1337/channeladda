@@ -9,7 +9,7 @@ import {
   listDealsFor,
   platformPositionFor,
   recordOpeningPayment,
-  recordPricePayment,
+  recordStrayPricePayment,
   resolveDeal,
 } from "@/server/deals";
 import { passHold, seedListing, seedUser, withCleanDb } from "@/test/db";
@@ -82,35 +82,37 @@ const listingStatus = async (id: string) =>
 // ---------------------------------------------------------------- advancement
 
 test(
-  "a safest deal pays the seller's wallet on completion",
+  "a safest deal completes with only our fee on the books",
   withCleanDb(async () => {
-    const { orderId, listing, seller } = await runTo("SAFEST", 9);
+    const { orderId, listing, seller } = await runTo("SAFEST", 10);
 
     const order = await db.order.findUniqueOrThrow({ where: { id: orderId } });
     expect(order.status).toBe("COMPLETED");
     expect(order.custodyAt).not.toBeNull();
     expect(order.buyerPaidAt).not.toBeNull();
+    expect(order.sellerConfirmedAt).not.toBeNull();
     expect(order.handoverAt).not.toBeNull();
     expect(await listingStatus(listing.id)).toBe("SOLD");
 
-    // The buyer paid the price to us, so it is ours to pass on: into the
-    // seller's Channel Adda wallet, with our fee kept.
-    expect(await balanceOf(seller.id)).toBe(10_000);
+    // The buyer paid the seller directly, so there is nothing of theirs
+    // with us to pass on: the seller's wallet is untouched and the fee is
+    // ours.
+    expect(await balanceOf(seller.id)).toBe(0);
     expect(await platformPositionFor(orderId)).toBe(300);
     expect(
-      await db.ledgerEntry.findFirstOrThrow({
+      await db.ledgerEntry.count({
         where: { orderId, kind: "ESCROW_RELEASE", userId: seller.id },
       }),
-    ).toMatchObject({ amountUsd: 10_000 });
+    ).toBe(0);
   }),
 );
 
 test(
-  "a safest seller fee is taken from the price on completion",
+  "a seller fee is never taken on a safest sale",
   withCleanDb(async () => {
-    const { orderId, seller } = await runTo("SAFEST", 9, { sellerFeeBp: 500 });
-    expect(await balanceOf(seller.id)).toBe(9_500);
-    expect(await platformPositionFor(orderId)).toBe(800);
+    const { orderId, seller } = await runTo("SAFEST", 10, { sellerFeeBp: 500 });
+    expect(await balanceOf(seller.id)).toBe(0);
+    expect(await platformPositionFor(orderId)).toBe(300);
   }),
 );
 
@@ -206,56 +208,106 @@ test(
 );
 
 test(
-  "the buyer cannot mark the price paid themselves",
+  "safest: the agent cannot be made primary owner before Google's wait is over",
+  withCleanDb(async () => {
+    const { orderId, actors } = await runTo("SAFEST", 3);
+    const before = Date.now();
+    expect(
+      await advanceStep({ orderId, position: 3, userId: actors.agent }),
+    ).toMatchObject({ ok: true });
+
+    // YouTube's seven days, from the agent confirming manager access.
+    const order = await db.order.findUniqueOrThrow({ where: { id: orderId } });
+    const days = ((order.holdUntil?.getTime() ?? 0) - before) / 86_400_000;
+    expect(days).toBeGreaterThan(6.99);
+    expect(days).toBeLessThan(7.01);
+
+    expect(
+      await advanceStep({ orderId, position: 4, userId: actors.seller }),
+    ).toMatchObject({ ok: false, reason: "on-hold" });
+
+    await passHold(orderId);
+    expect(
+      await advanceStep({ orderId, position: 4, userId: actors.seller }),
+    ).toMatchObject({ ok: true });
+  }),
+);
+
+test(
+  "fastest: the buyer confirming manager access starts the holding period",
+  withCleanDb(async () => {
+    const { orderId, actors } = await runTo("FASTEST", 3);
+    expect(
+      await advanceStep({ orderId, position: 3, userId: actors.buyer }),
+    ).toMatchObject({ ok: true });
+
+    const order = await db.order.findUniqueOrThrow({ where: { id: orderId } });
+    expect(order.status).toBe("AWAITING_HANDOVER");
+    expect(order.holdUntil?.getTime()).toBeGreaterThan(
+      Date.now() + 6.99 * 86_400_000,
+    );
+
+    // The seller hands over primary ownership only once it is over.
+    expect(
+      await advanceStep({ orderId, position: 4, userId: actors.seller }),
+    ).toMatchObject({ ok: false, reason: "on-hold" });
+    await passHold(orderId);
+    expect(
+      await advanceStep({ orderId, position: 4, userId: actors.seller }),
+    ).toMatchObject({ ok: true });
+  }),
+);
+
+test(
+  "fastest: the seller is paid as soon as the agent releases, with no hold after the handover",
+  withCleanDb(async () => {
+    const { orderId, actors, seller } = await runTo("FASTEST", 6);
+    expect(
+      await advanceStep({ orderId, position: 6, userId: actors.agent }),
+    ).toMatchObject({ ok: true });
+    expect(await balanceOf(seller.id)).toBe(10_000);
+  }),
+);
+
+test(
+  "the buyer saying they paid the seller is recorded, and nothing is held for it",
   withCleanDb(async () => {
     const { orderId, actors } = await runTo("SAFEST", 6);
     expect(
       await advanceStep({ orderId, position: 6, userId: actors.buyer }),
-    ).toMatchObject({ ok: false, reason: "pay-in-checkout" });
-    const order = await db.order.findUniqueOrThrow({ where: { id: orderId } });
-    expect(order.status).toBe("AWAITING_BUYER_PAYMENT");
-    expect(order.buyerPaidAt).toBeNull();
-  }),
-);
-
-test(
-  "the price paid to Channel Adda is held and moves the deal on",
-  withCleanDb(async () => {
-    const { orderId } = await runTo("SAFEST", 6);
-    expect(await recordPricePayment(orderId, "price-1", "USDT")).toBe(
-      "applied",
-    );
+    ).toMatchObject({ ok: true });
 
     const order = await db.order.findUniqueOrThrow({ where: { id: orderId } });
-    expect(order.status).toBe("AWAITING_HANDOVER");
-    expect(order.buyerPaymentRef).toBe("price-1");
+    expect(order.status).toBe("IN_CUSTODY");
     expect(order.buyerPaidAt).not.toBeNull();
-    expect(
-      await db.transferStep.findFirstOrThrow({
-        where: { orderId, position: 6 },
-      }),
-    ).toMatchObject({ completedAt: expect.any(Date) });
-    expect(
-      await db.ledgerEntry.findFirstOrThrow({
-        where: { orderId, userId: null, note: { contains: "price" } },
-      }),
-    ).toMatchObject({ kind: "ESCROW_HOLD", amountUsd: 10_000 });
+    expect(order.sellerConfirmedAt).toBeNull();
+    // Only the fee is with us.
+    expect(await platformPositionFor(orderId)).toBe(300);
 
-    // The same payment again is a retry, not a second payment.
-    expect(await recordPricePayment(orderId, "price-1", "USDT")).toBe(
-      "already-applied",
-    );
+    // The seller's Received moves it on, and only theirs.
+    expect(
+      await advanceStep({ orderId, position: 7, userId: actors.buyer }),
+    ).toMatchObject({ ok: false, reason: "wrong-actor" });
+    expect(
+      await advanceStep({ orderId, position: 7, userId: actors.seller }),
+    ).toMatchObject({ ok: true });
+    const received = await db.order.findUniqueOrThrow({
+      where: { id: orderId },
+    });
+    expect(received.status).toBe("AWAITING_HANDOVER");
+    expect(received.sellerConfirmedAt).not.toBeNull();
   }),
 );
 
 test(
-  "a second price payment goes to the buyer's balance",
+  "a safest price paid to Channel Adda is credited to the buyer's balance",
   withCleanDb(async () => {
+    // The flow that took it is gone, but an invoice raised under it can
+    // still be paid. The money is real and theirs; it starts nothing.
     const { orderId, buyer } = await runTo("SAFEST", 6);
-    await recordPricePayment(orderId, "price-1", "USDT");
     await db.invoice.create({
       data: {
-        reference: "DEAL-second",
+        reference: "DEAL-price",
         purpose: "DEAL_PRICE",
         amountUsd: 10_000,
         userId: buyer.id,
@@ -264,22 +316,23 @@ test(
       },
     });
 
-    expect(await recordPricePayment(orderId, "DEAL-second", "USDT")).toBe(
-      "second-payment-credited",
-    );
+    await recordStrayPricePayment(orderId, "DEAL-price", "USDT");
+    // A retry credits nothing more.
+    await recordStrayPricePayment(orderId, "DEAL-price", "USDT");
+
     expect(await balanceOf(buyer.id)).toBe(10_000);
     const order = await db.order.findUniqueOrThrow({ where: { id: orderId } });
-    expect(order.status).toBe("AWAITING_HANDOVER");
-    expect(order.buyerPaymentRef).toBe("price-1");
+    expect(order.status).toBe("IN_CUSTODY");
+    expect(order.buyerPaidAt).toBeNull();
   }),
 );
 
 test(
   "a completed deal rejects further steps",
   withCleanDb(async () => {
-    const { orderId, actors } = await runTo("SAFEST", 9);
+    const { orderId, actors } = await runTo("SAFEST", 10);
     expect(
-      await advanceStep({ orderId, position: 8, userId: actors.agent }),
+      await advanceStep({ orderId, position: 9, userId: actors.buyer }),
     ).toMatchObject({ ok: false, reason: "terminal" });
   }),
 );
@@ -330,6 +383,29 @@ test(
     expect(
       await db.ledgerEntry.count({ where: { orderId, kind: "REFUND" } }),
     ).toBe(0);
+  }),
+);
+
+test(
+  "a channel cannot be handed back once the seller says the money arrived",
+  withCleanDb(async () => {
+    // The seller would keep the money and the channel both. Not even a
+    // dispute reaches this: a seller does not falsely admit to being paid.
+    const { orderId, staff, actors } = await runTo("SAFEST", 8);
+    await resolveDeal({
+      orderId,
+      to: "DISPUTED",
+      byUserId: actors.seller,
+      note: "buyer wants out",
+    });
+    expect(
+      await resolveDeal({
+        orderId,
+        to: "RETURNED_TO_SELLER",
+        byUserId: staff.id,
+        note: "return it",
+      }),
+    ).toMatchObject({ ok: false, reason: "already-paid" });
   }),
 );
 
@@ -444,7 +520,7 @@ test(
     expect((await getDealFor(seller.id, orderId))?.agentEmail).toBe(
       "transfers@channeladda.test",
     );
-    expect(asBuyer?.steps).toHaveLength(8);
+    expect(asBuyer?.steps).toHaveLength(9);
     expect(asBuyer?.totalUsd).toBe(300);
 
     expect((await getDealFor(seller.id, orderId))?.viewerRole).toBe("seller");
@@ -464,7 +540,7 @@ test(
 test(
   "a completed deal has no next step",
   withCleanDb(async () => {
-    const { orderId, buyer } = await runTo("SAFEST", 9);
+    const { orderId, buyer } = await runTo("SAFEST", 10);
     const view = await getDealFor(buyer.id, orderId);
     expect(view?.status).toBe("COMPLETED");
     expect(view?.nextStep).toBeNull();
@@ -506,7 +582,7 @@ test(
 test(
   "a finished deal is waiting on nobody",
   withCleanDb(async () => {
-    const { buyer } = await runTo("SAFEST", 9);
+    const { buyer } = await runTo("SAFEST", 10);
     expect((await listDealsFor(buyer.id))[0].awaiting).toBeNull();
   }),
 );

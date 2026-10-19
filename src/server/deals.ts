@@ -1,6 +1,5 @@
 import "server-only";
 
-import { platformMap } from "@/data/platforms";
 import type {
   DealMode,
   OrderStatus,
@@ -16,12 +15,8 @@ import {
   isTerminal,
   TERMINAL_STATUSES,
 } from "@/lib/deal-machine";
-import {
-  OPENING_STATUS,
-  priceStepFor,
-  templateFor,
-} from "@/lib/deal-templates";
-import { activeWait, OWNER_WAIT_DAYS, type Wait } from "@/lib/deal-waits";
+import { OPENING_STATUS, templateFor } from "@/lib/deal-templates";
+import { activeWait, holdDaysFor, type Wait } from "@/lib/deal-waits";
 import { orderAmounts } from "@/lib/fees";
 import { parseHandoverTo } from "@/lib/handover-target";
 import { keptFee, requiredHold } from "@/lib/holds";
@@ -50,9 +45,9 @@ import { markUploadsAttached } from "@/server/upload-access";
  * The rule everything here exists to protect: **a deal must never leave one
  * side exposed.** In a Safest deal that means the buyer's money and the
  * seller's channel are never both out of their owner's hands at once — the
- * agent holds the channel, and the buyer pays while they still hold it. In a
- * Fastest deal it means the platform holds the whole amount until the buyer
- * confirms they have access.
+ * agent holds the channel while the buyer pays the seller, and hands it on
+ * only once the seller says the money arrived. In a Fastest deal it means
+ * the platform holds the whole amount until the buyer is primary owner.
  *
  * Decisions about *who may do what* are not made here. They live in
  * `@/lib/deal-machine`, which is pure and exhaustively tested. This file does
@@ -81,11 +76,11 @@ export type DealFailure =
   | "needs-finance"
   /** The channel is ours to give back, so it cannot just be abandoned. */
   | "in-custody"
-  /** A payment completes this step when it reaches us; nobody presses it. */
-  | "pay-in-checkout"
-  /** A Safest deal is not finished before its price has reached us. */
+  /** A Safest deal is not finished before the buyer says they paid. */
   | "price-not-paid"
-  /** The recovery hold on this platform has not ended yet. */
+  /** The seller said the money arrived: the channel cannot go back to them. */
+  | "already-paid"
+  /** The deal's hold — Google's wait, or the holding period — is running. */
   | "on-hold"
   /**
    * The platform's hold on this deal is not what the deal says it should
@@ -534,14 +529,11 @@ export type PaymentOutcome =
  * about to record by hand: still open, so the buyer may be paying it, or
  * already paid. A dead or never-paid invoice is neither.
  */
-async function checkoutInPlay(
-  orderId: string,
-  purpose: "DEAL" | "DEAL_PRICE",
-): Promise<boolean> {
+async function checkoutInPlay(orderId: string): Promise<boolean> {
   const count = await db.invoice.count({
     where: {
       orderId,
-      purpose,
+      purpose: "DEAL",
       OR: [{ appliedAt: null }, { settledAt: { not: null } }],
     },
   });
@@ -572,7 +564,7 @@ export async function recordManualPayment(
   });
   if (!order) throw new Error(`No such order: ${orderId}`);
 
-  if (await checkoutInPlay(orderId, "DEAL")) {
+  if (await checkoutInPlay(orderId)) {
     await recordAudit({
       actorId: null,
       action: "payment.manual_refused",
@@ -864,208 +856,45 @@ export async function recordOpeningPayment(
   return "applied";
 }
 
-/** Safest's price step: the step the price payment completes. */
-function safestPriceStep(): number {
-  const position = priceStepFor("SAFEST");
-  if (position === null)
-    throw new Error("The Safest template has no price step.");
-  return position;
-}
-
 /**
- * The Safest price reaching Channel Adda.
+ * A Safest price paid to Channel Adda.
  *
- * The second payment on a Safest deal, made after our agent holds the channel
- * and the buyer has inspected it — by invoice, or recorded by finance when it
- * arrived some other way (a payment from the balance is `payFromWallet`). It
- * goes to us, never to the seller: it is held, and released to the seller's
- * Channel Adda wallet when Hold 2 completes.
- *
- * It mirrors `recordOpeningPayment` case for case — the same reference twice
- * is a retry, a second reference is a second payment and becomes the buyer's
- * balance, a deal that can no longer take it credits it back — but keyed on
- * its own reference, so the two payments on one deal can never be mistaken
- * for each other.
+ * The buyer pays a Safest seller directly, so no step takes this money any
+ * more — but an invoice raised before that changed can still be paid. The
+ * money is real and the buyer's, so it becomes their balance, withdrawable
+ * like any other, and it moves nothing on the deal. Idempotent on the
+ * reference, so a retried callback credits once.
  */
-export async function recordPricePayment(
+export async function recordStrayPricePayment(
   orderId: string,
   ref: string,
   asset: string,
-  /** Guards the one re-entry after a lost compare-and-set. */
-  attempt = 0,
 ): Promise<PaymentOutcome> {
   const order = await db.order.findUnique({
     where: { id: orderId },
-    select: {
-      id: true,
-      mode: true,
-      status: true,
-      buyerPaymentRef: true,
-      priceUsd: true,
-      totalUsd: true,
-      buyerId: true,
-      reference: true,
-      conversationId: true,
-    },
+    select: { id: true, buyerId: true, status: true },
   });
   if (!order) throw new Error(`No such order: ${orderId}`);
 
-  if (order.buyerPaymentRef === ref) return "already-applied";
-
-  if (order.buyerPaymentRef) {
-    return creditSecondPayment(
-      { ...order, paymentRef: order.buyerPaymentRef },
-      ref,
-      asset,
-    );
-  }
-
-  // Only a Safest deal waiting on its price can take one. Anything else —
-  // a deal returned, cancelled or paused in a dispute meanwhile — means real
-  // money the deal cannot use, which becomes the buyer's balance.
-  if (
-    order.mode !== "SAFEST" ||
-    order.status !== "AWAITING_BUYER_PAYMENT" ||
-    !canTransition(order.mode, order.status, "AWAITING_HANDOVER", "system")
-  ) {
-    await creditUnusablePayment(order, ref, asset, order.priceUsd);
-    return "credited-to-balance";
-  }
-
-  const now = new Date();
-  let claimed = true;
-  await db.$transaction(async (tx) => {
-    // Compare-and-set on the reference and the status, as the opening
-    // payment does: two deliveries in flight, or the balance and an invoice
-    // landing together, must not both write a hold.
-    const took = await tx.order.updateMany({
-      where: {
-        id: order.id,
-        buyerPaymentRef: null,
-        status: "AWAITING_BUYER_PAYMENT",
-      },
-      data: {
-        status: "AWAITING_HANDOVER",
-        buyerPaymentRef: ref,
-        buyerPaidAt: now,
-      },
-    });
-    if (took.count !== 1) {
-      claimed = false;
-      return;
-    }
-
-    await tx.transferStep.updateMany({
-      where: {
-        orderId: order.id,
-        position: safestPriceStep(),
-        completedAt: null,
-      },
-      data: { completedAt: now },
-    });
-
-    await tx.ledgerEntry.create({
-      data: {
-        orderId: order.id,
-        userId: null,
-        kind: "ESCROW_HOLD",
-        amountUsd: order.priceUsd,
-        note: "SAFEST price payment",
-      },
-    });
-
-    if (order.conversationId) {
-      await postEvent(tx, {
-        conversationId: order.conversationId,
-        kind: "EVENT",
-        event: {
-          type: "price-paid",
-          reference: order.reference,
-          amountCents: order.priceUsd,
-        },
-        senderId: null,
-        orderId: order.id,
-        at: now,
-      });
-    }
+  // Credited for what the invoice asked, and only against one of this
+  // deal's own: the amount is not ours to guess.
+  const invoice = await db.invoice.findUnique({
+    where: { reference: ref },
+    select: { orderId: true, amountUsd: true },
   });
-
-  // Lost the race: read the order again and decide from what is there now,
-  // once, exactly as the opening payment does.
-  if (!claimed) {
-    if (attempt > 0) {
-      await recordAudit({
-        actorId: null,
-        action: "payment.unsettled",
-        entity: "order",
-        entityId: order.id,
-        after: { reference: ref, status: order.status, stage: "price" },
-      });
-      throw new Error(
-        `Could not settle price payment ${ref} on ${order.id}: the order kept moving.`,
-      );
-    }
-    return recordPricePayment(orderId, ref, asset, attempt + 1);
-  }
-
-  await notifyNextActor(order.id);
-
-  await recordAudit({
-    actorId: null,
-    action: "deal.price_paid",
-    entity: "order",
-    entityId: order.id,
-    before: { status: order.status },
-    after: {
-      status: "AWAITING_HANDOVER",
-      reference: ref,
-      asset,
-      amountUsd: order.priceUsd,
-    },
-  });
-
-  return "applied";
-}
-
-/**
- * Finance recording a Safest price that reached us outside Cryptomus.
- *
- * Named by the deal's own reference with a `:price` suffix, for the reason
- * `recordManualPayment` gives: a typed txid as the payment's name made a
- * second name for the same money. The suffix keeps it apart from the
- * opening payment, which is named by the bare reference.
- */
-export async function recordManualPricePayment(
-  orderId: string,
-  txid: string,
-  asset: string,
-): Promise<PaymentOutcome> {
-  const order = await db.order.findUnique({
-    where: { id: orderId },
-    select: { reference: true },
-  });
-  if (!order) throw new Error(`No such order: ${orderId}`);
-
-  if (await checkoutInPlay(orderId, "DEAL_PRICE")) {
+  if (!invoice || invoice.orderId !== order.id) {
     await recordAudit({
       actorId: null,
-      action: "payment.manual_refused",
+      action: "payment.reference_mismatch",
       entity: "order",
-      entityId: orderId,
-      after: { txid, asset, reason: "invoice-open", stage: "price" },
+      entityId: order.id,
+      after: { offered: ref, stage: "price" },
     });
-    return "invoice-open";
+    return "reference-mismatch";
   }
 
-  await recordAudit({
-    actorId: null,
-    action: "payment.recorded_by_hand",
-    entity: "order",
-    entityId: orderId,
-    after: { txid, asset, reference: order.reference, stage: "price" },
-  });
-
-  return recordPricePayment(orderId, `${order.reference}:price`, asset);
+  await creditUnusablePayment(order, ref, asset, invoice.amountUsd);
+  return "credited-to-balance";
 }
 
 /** The staff desks. `AGENT` is deliberately absent — see `roleOnDeal`. */
@@ -1125,12 +954,21 @@ async function isStaffMember(userId: string): Promise<boolean> {
 
 /** Which `Order` timestamp a completed step stamps, if any. */
 const STEP_TIMESTAMP: Partial<
-  Record<DealMode, Record<number, "custodyAt" | "handoverAt">>
+  Record<
+    DealMode,
+    Record<
+      number,
+      "custodyAt" | "buyerPaidAt" | "sellerConfirmedAt" | "handoverAt"
+    >
+  >
 > = {
-  // buyerPaidAt is the price arriving, which recordPricePayment stamps.
   SAFEST: {
-    4: "custodyAt",
-    8: "handoverAt",
+    5: "custodyAt",
+    // The buyer's Paid and the seller's Received: the price never reaches
+    // us, so these two moments are the whole record of it.
+    6: "buyerPaidAt",
+    7: "sellerConfirmedAt",
+    9: "handoverAt",
   },
   FASTEST: { 5: "handoverAt" },
 };
@@ -1138,8 +976,8 @@ const STEP_TIMESTAMP: Partial<
 /**
  * How many channels this agent is holding right now.
  *
- * Only Safest counts. A Fastest agent supervises as a manager and never takes
- * ownership, so they tie up nothing that has to be given back.
+ * Only Safest counts. A Fastest agent supervises the handover and never takes
+ * the channel, so they tie up nothing that has to be given back.
  */
 export async function holdsFor(agentId: string): Promise<number> {
   return db.order.count({
@@ -1372,9 +1210,6 @@ export async function advanceStep(input: {
     (s) => s.position === input.position,
   );
   if (!template) return { ok: false, reason: "wrong-step" };
-  // The Safest price is the buyer paying us, recorded when the money
-  // arrives. Letting anyone mark it done would let a deal move on unpaid.
-  if (template.byPayment) return { ok: false, reason: "pay-in-checkout" };
   if (template.actor !== actor) return { ok: false, reason: "wrong-actor" };
 
   if (
@@ -1400,24 +1235,19 @@ export async function advanceStep(input: {
   const stamp = STEP_TIMESTAMP[order.mode]?.[input.position];
   const completing = template.entersStatus === "COMPLETED";
 
-  // Every listing page promises a recovery hold: the seller's money is not
-  // released until the window in which an old owner can reclaim the account
-  // has passed. Nothing implemented it — Order.holdUntil was written by
-  // nothing — so a Fastest seller was credited the minute the buyer
-  // confirmed, and a recovery on day six left the buyer with neither.
-  if (
-    completing &&
-    order.mode === "FASTEST" &&
-    order.holdUntil &&
-    order.holdUntil > now
-  ) {
+  // The deal's one hold gates the step after it: Google will not let our
+  // agent become primary owner before its wait is over, and a Fastest buyer
+  // is a manager through the whole holding period before they are made
+  // primary owner. Pressing it early would record a handover Google has
+  // not allowed, or one the holding period exists to delay.
+  if (order.holdUntil && order.holdUntil > now) {
     return { ok: false, reason: "on-hold" };
   }
-  const startsHold = order.mode === "FASTEST" && stamp === "handoverAt";
-  const holdDays =
-    platformMap[
-      order.listing.platform.toLowerCase() as keyof typeof platformMap
-    ]?.holdDays ?? 14;
+  const holdDays = template.startsHold
+    ? holdDaysFor(order.mode, order.listing.platform)
+    : 0;
+  // A platform with no wait starts none: the next step opens at once.
+  const startsHold = holdDays > 0;
   const holdUntil = new Date(now.getTime() + holdDays * 86_400_000);
   const doer = await db.user.findUnique({
     where: { id: input.userId },
@@ -1593,8 +1423,9 @@ async function completeOrder(tx: Tx, order: CompletableOrder) {
     data: { status: "SOLD" },
   });
 
-  // The seller is paid from the hold only when the price is in it: always on
-  // Fastest, and on Safest once the buyer has paid the price to us.
+  // The seller is paid from the hold only when the price is in it: on
+  // Fastest. A Safest buyer paid the seller directly, so there the hold is
+  // the fee alone and it is all ours.
   const priceHeld = held === order.priceUsd + order.buyerFeeUsd;
 
   await tx.ledgerEntry.createMany({
@@ -1785,6 +1616,7 @@ export async function resolveDeal(input: {
       buyerPaymentRef: true,
       custodyAt: true,
       buyerPaidAt: true,
+      sellerConfirmedAt: true,
       handoverAt: true,
       reference: true,
       conversationId: true,
@@ -1832,10 +1664,9 @@ export async function resolveDeal(input: {
     return { ok: false, reason: "not-disputed" };
   }
 
-  // Deciding a Safest dispute for the seller sells the channel, and the
-  // seller is paid from the price we hold. Before the buyer has paid it there
-  // is only the fee: the channel would go for nothing, and a price arriving
-  // later would go back to the buyer as well.
+  // Deciding a Safest dispute for the buyer finishes the sale, and the price
+  // never passes through us — so it needs the buyer to have said they paid
+  // the seller at least. Before that the channel would go for nothing.
   if (
     input.to === "COMPLETED" &&
     order.mode === "SAFEST" &&
@@ -1855,12 +1686,21 @@ export async function resolveDeal(input: {
     return { ok: false, reason: "in-custody" };
   }
 
+  // Handing the channel back once the **seller** has said the buyer's
+  // payment arrived would leave the seller holding the money and the asset
+  // both. That one is an outright refusal, dispute or not, because it is the
+  // one signal here that cannot be gamed by the party it would favour: a
+  // seller does not falsely admit to having been paid.
+  if (input.to === "RETURNED_TO_SELLER" && order.sellerConfirmedAt) {
+    return { ok: false, reason: "already-paid" };
+  }
+
   // Everything below is a decision rather than a rule.
   //
   // Both of these reverse something that has already happened. Returning a
   // Safest channel once `buyerPaidAt` is set undoes a purchase the buyer
-  // has paid us for — the price is refunded, but the buyer loses a channel
-  // they were owed. A Fastest refund once `handoverAt` is set, or the
+  // says they have paid the seller for — and the seller may be holding
+  // that money. A Fastest refund once `handoverAt` is set, or the
   // seller has handed over, reverses the buyer's own word that access
   // arrived. Refusing either outright made the guard a dead end: a refund
   // became unreachable in the only state a Fastest refund exists for, and a
@@ -2223,11 +2063,11 @@ export type DealView = {
   sellerFeeUsd: number;
   /** What the seller is credited on completion: the price less the fee. */
   payoutUsd: number;
-  /** Safest: the price payment's own name, and when it reached Channel Adda.
-   *  Set by the system when the money arrives. */
-  buyerPaymentRef: string | null;
+  /** Safest: when the buyer said they paid the seller, and when the seller
+   *  said it arrived. The price never reaches us; these are its record. */
   buyerPaidAt: Date | null;
-  /** Fastest only: the seller is not released before this. */
+  sellerConfirmedAt: Date | null;
+  /** The end of the deal's hold: no step can be done before it. */
   holdUntil: Date | null;
   listingTitle: string;
   listingSlug: string;
@@ -2276,8 +2116,8 @@ export async function getDealFor(
       totalUsd: true,
       buyerFeeUsd: true,
       sellerFeeUsd: true,
-      buyerPaymentRef: true,
       buyerPaidAt: true,
+      sellerConfirmedAt: true,
       holdUntil: true,
       buyerId: true,
       sellerId: true,
@@ -2306,9 +2146,7 @@ export async function getDealFor(
     status: order.status,
     createdAt: order.createdAt,
     holdUntil: order.holdUntil,
-    steps: order.steps,
     paymentWindowHours,
-    ownerWaitDays: OWNER_WAIT_DAYS[order.listing.platform],
     now: new Date(),
   });
 
@@ -2330,8 +2168,8 @@ export async function getDealFor(
     buyerFeeUsd: order.buyerFeeUsd,
     sellerFeeUsd: order.sellerFeeUsd,
     payoutUsd: order.priceUsd - order.sellerFeeUsd,
-    buyerPaymentRef: order.buyerPaymentRef,
     buyerPaidAt: order.buyerPaidAt,
+    sellerConfirmedAt: order.sellerConfirmedAt,
     holdUntil: order.holdUntil,
     listingTitle: order.listing.title,
     listingSlug: order.listing.slug,
@@ -2375,7 +2213,7 @@ function handoverStillOpen(
   steps: { position: number; completedAt: Date | null }[],
 ): boolean {
   if (isTerminal(status)) return false;
-  const uses = templateFor(mode).find((step) => step.handsOver)?.position;
+  const uses = templateFor(mode).find((step) => step.usesHandover)?.position;
   const used = steps.find((step) => step.position === uses)?.completedAt;
   return !used;
 }

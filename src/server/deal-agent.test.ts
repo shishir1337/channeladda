@@ -244,7 +244,7 @@ async function atHandover(priceUsd: number) {
     agent: seeded.agent.id,
   };
   for (const step of templateFor("SAFEST")) {
-    if (step.position < 2 || step.position >= 7) continue;
+    if (step.position < 2 || step.position >= 8) continue;
     const r = await runStep({
       orderId: seeded.orderId,
       position: step.position,
@@ -261,20 +261,20 @@ test(
     const { orderId, actors, staff } = await atHandover(600_000);
 
     expect(
-      await advanceStep({ orderId, position: 7, userId: actors.agent }),
+      await advanceStep({ orderId, position: 8, userId: actors.agent }),
     ).toMatchObject({ ok: false, reason: "needs-approval" });
 
     expect(
       await advanceStep({
         orderId,
-        position: 7,
+        position: 8,
         userId: actors.agent,
         approvedById: staff.id,
       }),
     ).toMatchObject({ ok: true });
 
     const step = await db.transferStep.findFirstOrThrow({
-      where: { orderId, position: 7 },
+      where: { orderId, position: 8 },
     });
     expect(step.approvedById).toBe(staff.id);
   }),
@@ -285,7 +285,7 @@ test(
   withCleanDb(async () => {
     const { orderId, actors } = await atHandover(10_000);
     expect(
-      await advanceStep({ orderId, position: 7, userId: actors.agent }),
+      await advanceStep({ orderId, position: 8, userId: actors.agent }),
     ).toMatchObject({ ok: true });
   }),
 );
@@ -297,7 +297,7 @@ test(
     expect(
       await advanceStep({
         orderId,
-        position: 7,
+        position: 8,
         userId: actors.agent,
         approvedById: actors.agent,
       }),
@@ -312,7 +312,7 @@ test(
     expect(
       await advanceStep({
         orderId,
-        position: 7,
+        position: 8,
         userId: actors.agent,
         approvedById: actors.buyer,
       }),

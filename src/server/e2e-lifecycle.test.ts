@@ -95,24 +95,20 @@ test(
 
     expect(order.status).toBe("COMPLETED");
     expect(order.steps.every((s) => s.completedAt !== null)).toBe(true);
-    expect(order.steps).toHaveLength(8);
-    // The price was paid to us, under a name the system gave it.
-    expect(order.buyerPaymentRef).toBe(`price-${orderId}`);
+    expect(order.steps).toHaveLength(9);
+    // The buyer's Paid and the seller's Received are the record of the price.
+    expect(order.buyerPaidAt).not.toBeNull();
+    expect(order.sellerConfirmedAt).not.toBeNull();
     expect(
       (await db.listing.findUniqueOrThrow({ where: { id: listing.id } }))
         .status,
     ).toBe("SOLD");
 
-    // The books: both payments came to us, the seller was paid the price
-    // into their Channel Adda wallet, and we kept the 3% fee.
+    // The books: only the fee came to us, and we kept it. The price went
+    // from the buyer to the seller directly, so neither wallet moved.
     expect(await platformPositionFor(orderId)).toBe(300);
-    expect(await balanceOf(seller.id)).toBe(10_000);
+    expect(await balanceOf(seller.id)).toBe(0);
     expect(await balanceOf(buyer.id)).toBe(0);
-    expect(
-      await db.ledgerEntry.findFirstOrThrow({
-        where: { orderId, userId: seller.id, kind: "ESCROW_RELEASE" },
-      }),
-    ).toMatchObject({ amountUsd: 10_000 });
 
     // Both sides were told whose move it was, all the way through.
     expect(
@@ -264,7 +260,7 @@ test(
       agent: seeded.agent.id,
     };
     for (const step of templateFor("SAFEST")) {
-      if (step.position < 2 || step.position >= 7) continue;
+      if (step.position < 2 || step.position >= 8) continue;
       const r = await runStep({
         orderId: created.orderId,
         position: step.position,
@@ -276,7 +272,7 @@ test(
     expect(
       await advanceStep({
         orderId: created.orderId,
-        position: 7,
+        position: 8,
         userId: actors.agent,
       }),
     ).toMatchObject({ ok: false, reason: "needs-approval" });
@@ -284,7 +280,7 @@ test(
     expect(
       await advanceStep({
         orderId: created.orderId,
-        position: 7,
+        position: 8,
         userId: actors.agent,
         approvedById: staff.id,
       }),

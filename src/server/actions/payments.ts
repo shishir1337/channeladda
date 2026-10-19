@@ -53,15 +53,12 @@ export async function startPayment(orderId: string): Promise<PayResult> {
   if (deal.viewerRole !== "buyer") {
     return { ok: false, error: "Only the buyer pays this." };
   }
-  // Which payment the deal is waiting on: the opening one, or — on a Safest
-  // deal the buyer has inspected — the channel price. Each has its own
-  // invoices, so a checkout for one never reopens a page for the other.
+  // The opening payment is the only one Channel Adda takes: the whole amount
+  // on Fastest, the admin fee on Safest, whose price goes to the seller.
   const stage =
     deal.status === "AWAITING_PAYMENT"
       ? ({ purpose: "DEAL", amountUsd: deal.totalUsd } as const)
-      : deal.mode === "SAFEST" && deal.status === "AWAITING_BUYER_PAYMENT"
-        ? ({ purpose: "DEAL_PRICE", amountUsd: deal.priceUsd } as const)
-        : null;
+      : null;
   if (!stage) {
     return { ok: false, error: "This deal has nothing left to pay." };
   }

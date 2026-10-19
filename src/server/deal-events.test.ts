@@ -154,8 +154,9 @@ test(
     await recordOpeningPayment(orderId, `pay-${orderId}`, "USDT");
 
     const actors = { buyer, seller, agent } as const;
+    // Up to the buyer confirming manager access, which starts the hold.
     const steps = templateFor("FASTEST").filter(
-      (s) => s.position >= 2 && s.position <= 5,
+      (s) => s.position >= 2 && s.position <= 3,
     );
     for (const step of steps) {
       const who = actors[step.actor as keyof typeof actors];
