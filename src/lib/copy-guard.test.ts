@@ -23,6 +23,9 @@ const BANNED: readonly RegExp[] = [
   /the (account|channel) and then the money/i,
   // The Fastest hold that ran after the handover, and Safest's two holds.
   /recovery hold/i,
+  // A Safest buyer pays the seller directly, so this is only true of
+  // Fastest and must never be said of both.
+  /(?<!fastest deal )you pay channel adda, never the seller/i,
   /\bhold [12]\b/i,
 ];
 

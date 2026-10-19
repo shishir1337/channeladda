@@ -223,9 +223,11 @@ export function ResellerPanel({
             </Button>
           </div>
           <p className="mt-2 text-xs leading-relaxed text-subtle">
-            {covered
-              ? "From your balance it is active at once."
-              : `Your available balance is ${dollars(availableUsd)}. Pay with crypto, or add funds first.`}
+            {!covered
+              ? `Your available balance is ${dollars(availableUsd)}. Pay with crypto, or add funds first.`
+              : active
+                ? "Paying again adds 30 days on to the end."
+                : "From your balance it is active at once."}
           </p>
           {message ? (
             <p

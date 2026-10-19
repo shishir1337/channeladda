@@ -181,7 +181,9 @@ export default async function ThreadPage({
         title={
           otherRating?.reseller ? (
             <span className="inline-flex max-w-full items-center gap-2">
-              <span className="truncate">{otherSide}</span>
+              <span className="truncate sm:overflow-visible sm:whitespace-normal">
+                {otherSide}
+              </span>
               <ResellerBadge />
             </span>
           ) : (
