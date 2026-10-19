@@ -348,6 +348,23 @@ export async function getListing(slug: string): Promise<Listing | null> {
   return toListing(row, stats.get(row.sellerId));
 }
 
+/**
+ * What the seller's proof screenshots show, by their captions.
+ *
+ * The listing page used to fill this section with the same three sample
+ * images for every listing on a platform, under a line saying the seller had
+ * uploaded them. The screenshots themselves stay private to the seller and
+ * the buyers dealing on the listing; the captions are what a visitor may see.
+ */
+export async function getProofLabels(listingId: string): Promise<string[]> {
+  const rows = await db.listingProof.findMany({
+    where: { listingId },
+    orderBy: { uploadedAt: "asc" },
+    select: { label: true },
+  });
+  return rows.map((row) => row.label);
+}
+
 export async function getListingSlugs(): Promise<string[]> {
   const rows = await db.listing.findMany({
     where: { status: "LIVE" },
@@ -420,6 +437,33 @@ export async function getPlatformCounts(): Promise<Record<PlatformId, number>> {
     website: 0,
   } as Record<PlatformId, number>;
   for (const g of groups) out[PLATFORM_TO_ID[g.platform]] = g._count._all;
+  return out;
+}
+
+/**
+ * The cheapest live listing per platform, in dollars; null where nothing is
+ * on sale. The category tiles and platform pages used the sample data's
+ * "from $25" whatever the marketplace actually held.
+ */
+export async function getPlatformFloors(): Promise<
+  Record<PlatformId, number | null>
+> {
+  const groups = await db.listing.groupBy({
+    by: ["platform"],
+    where: { status: "LIVE" },
+    _min: { priceUsd: true },
+  });
+  const out = {
+    youtube: null,
+    instagram: null,
+    facebook: null,
+    telegram: null,
+    website: null,
+  } as Record<PlatformId, number | null>;
+  for (const g of groups) {
+    const min = g._min.priceUsd;
+    out[PLATFORM_TO_ID[g.platform]] = min === null ? null : toUsd(min);
+  }
   return out;
 }
 
