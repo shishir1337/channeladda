@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { OfferStatus } from "@/generated/prisma/enums";
+import type { OfferStatus, Platform } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
 import { MAX_MESSAGE } from "@/lib/messages";
 import {
@@ -91,6 +91,11 @@ export type Thread = {
   listingTitle: string;
   listingHandle: string;
   listingPrice: number;
+  listingPlatform: Platform;
+  /** The account's own page, as the seller gave it; checked before it is linked. */
+  listingSourceUrl: string | null;
+  buyerId: string;
+  sellerId: string;
   buyerName: string;
   sellerName: string;
   staffName: string | null;
@@ -236,6 +241,8 @@ export async function getThread(
           title: true,
           handle: true,
           priceUsd: true,
+          platform: true,
+          sourceUrl: true,
         },
       },
       buyer: { select: { id: true, name: true } },
@@ -284,6 +291,10 @@ export async function getThread(
     listingTitle: row.listing.title,
     listingHandle: row.listing.handle,
     listingPrice: row.listing.priceUsd,
+    listingPlatform: row.listing.platform,
+    listingSourceUrl: row.listing.sourceUrl,
+    buyerId: row.buyerId,
+    sellerId: row.sellerId,
     buyerName: row.buyer.name,
     sellerName: row.seller.name,
     staffName: row.staff?.name ?? null,

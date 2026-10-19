@@ -230,11 +230,11 @@ function Bubble({
   if (message.fromStaff) {
     return (
       <li className="flex justify-center">
-        <div className="w-full max-w-xl rounded-card border border-line bg-surface px-4 py-3 shadow-xs">
+        <div className="w-full max-w-xl rounded-card border border-primary/35 bg-primary-soft px-4 py-3">
           <p className="flex flex-wrap items-center gap-1.5 text-[0.8125rem] font-medium text-fg">
             <ShieldCheckIcon
               aria-hidden="true"
-              className="size-3.5 text-muted"
+              className="size-3.5 text-primary-text"
             />
             Channel Adda
             <span className="ml-auto text-xs font-normal text-subtle tabular-nums">
@@ -248,6 +248,8 @@ function Bubble({
       </li>
     );
   }
+
+  const agent = message.senderRole === "agent";
 
   return (
     <li
@@ -266,7 +268,16 @@ function Bubble({
       >
         {!message.mine ? (
           first ? (
-            <Initials name={message.senderName} className="mt-0.5 size-7" />
+            agent ? (
+              <span
+                aria-hidden="true"
+                className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full bg-primary text-primary-fg"
+              >
+                <ShieldCheckIcon className="size-3.5" />
+              </span>
+            ) : (
+              <Initials name={message.senderName} className="mt-0.5 size-7" />
+            )
           ) : (
             <span aria-hidden="true" className="w-7 shrink-0" />
           )
@@ -280,9 +291,21 @@ function Bubble({
                 message.mine && "justify-end",
               )}
             >
-              <span className="font-medium text-muted">
-                {message.mine ? "You" : displayName(message)}
-              </span>
+              {agent && !message.mine ? (
+                <>
+                  <span className="font-medium text-fg">
+                    {message.senderName}
+                  </span>
+                  <span className="inline-flex h-5 items-center gap-1 self-center rounded-full border border-primary/35 bg-primary-soft px-1.5 text-[0.6875rem] font-medium text-primary-text">
+                    <ShieldCheckIcon aria-hidden="true" className="size-3" />
+                    Channel Adda agent
+                  </span>
+                </>
+              ) : (
+                <span className="font-medium text-muted">
+                  {message.mine ? "You" : displayName(message)}
+                </span>
+              )}
               <span className="tabular-nums">{when(message.createdAt)}</span>
             </p>
           ) : null}
@@ -297,7 +320,11 @@ function Bubble({
                 "min-w-0 rounded-card px-3.5 py-2",
                 message.mine
                   ? "rounded-tr-md bg-surface-3 text-fg"
-                  : "rounded-tl-md border border-line bg-surface text-fg",
+                  : agent
+                    ? // The agent is the one voice both sides should never
+                      // miss: what to do next, and that it is safe to do it.
+                      "rounded-tl-md border border-primary/40 bg-primary-soft text-fg"
+                    : "rounded-tl-md border border-line bg-surface text-fg",
                 !last && (message.mine ? "rounded-br-md" : "rounded-bl-md"),
               )}
             >

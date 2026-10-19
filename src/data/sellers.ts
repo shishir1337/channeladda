@@ -1,8 +1,11 @@
 import type { PlatformId } from "@/data/platforms";
+import type { TrackRecord } from "@/lib/track-record";
 
 export type Seller = {
   slug: string;
   name: string;
+  /** Completed deals as buyer and seller. Absent on the seed fixtures. */
+  record?: TrackRecord;
   initials: string;
   country: string;
   /** Out of 5, one decimal. */

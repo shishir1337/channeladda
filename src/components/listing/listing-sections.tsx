@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { TrackRecordStats } from "@/components/deals/track-record";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Price } from "@/components/ui/price";
@@ -263,9 +264,13 @@ export function SellerPanel({ seller }: { seller: Seller }) {
         </div>
       </div>
 
-      <dl className="mt-5 grid grid-cols-2 gap-4 border-t border-line pt-5 sm:grid-cols-4">
-        <Stat label="Sales" value={String(seller.sales)} />
-        <Stat label="Volume" value={<Price usd={seller.volume} compact />} />
+      {seller.record ? (
+        <TrackRecordStats
+          record={seller.record}
+          className="mt-5 border-t border-line pt-5"
+        />
+      ) : null}
+      <dl className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
         <Stat label="Replies in" value={`~${seller.responseMins} min`} />
         <Stat label="Member since" value={seller.memberSince} />
       </dl>
@@ -286,9 +291,7 @@ export function SellerPanel({ seller }: { seller: Seller }) {
 function Stat({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div>
-      <dt className="text-[0.6875rem] tracking-wide text-subtle uppercase">
-        {label}
-      </dt>
+      <dt className="text-xs text-subtle">{label}</dt>
       <dd className="tnum mt-1 text-sm font-semibold">{value}</dd>
     </div>
   );

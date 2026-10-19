@@ -7,8 +7,9 @@ import { AgentInvite } from "@/components/deals/agent-invite";
 import { dealHeadline, STATUS_TONE } from "@/components/deals/deal-status";
 import { DealNextStep, RaiseDispute } from "@/components/deals/deal-timeline";
 import { PayNow } from "@/components/deals/pay-now";
+import { TrackRecordLine } from "@/components/deals/track-record";
 import { StartDeal } from "@/components/listing/start-deal";
-import { ThreadHeader } from "@/components/messages/chat-parts";
+import { channelOf, ThreadHeader } from "@/components/messages/chat-parts";
 import { DealPanel } from "@/components/messages/deal-panel";
 import { LiveRefresh } from "@/components/messages/live-refresh";
 import type { OfferComposerConfig } from "@/components/messages/offer-composer";
@@ -27,6 +28,7 @@ import { getThread, markThreadRead } from "@/server/messages";
 import { requireUser } from "@/server/session";
 import { getSettings } from "@/server/settings";
 import { threadFingerprint } from "@/server/thread-fingerprint";
+import { trackRecord } from "@/server/track-record";
 import { getWallet } from "@/server/wallet";
 
 export const metadata: Metadata = {
@@ -54,7 +56,6 @@ const PANEL_COLUMN =
  */
 const FIXED_VIEW =
   "lg:@3xl:flex lg:@3xl:h-[calc(100dvh-6.5rem)] lg:@3xl:flex-col";
-
 /**
  * One conversation: the people, the negotiation and the deal, in one place.
  *
@@ -120,6 +121,13 @@ export default async function ThreadPage({
       : thread.viewerRole === "seller"
         ? thread.buyerName
         : `${thread.buyerName} and ${thread.sellerName}`;
+  // Each side sees the other's completed deals before agreeing to anything.
+  const otherRecord =
+    thread.viewerRole === "buyer"
+      ? await trackRecord(thread.sellerId)
+      : thread.viewerRole === "seller"
+        ? await trackRecord(thread.buyerId)
+        : null;
   const closed = thread.closedAt !== null;
   // The message box is closed only to those the server would refuse: the
   // deal's agent and staff can still write in a closed conversation.
@@ -160,6 +168,8 @@ export default async function ThreadPage({
           handle: thread.listingHandle,
           title: thread.listingTitle,
         }}
+        channel={channelOf(thread.listingPlatform, thread.listingSourceUrl)}
+        record={otherRecord ? <TrackRecordLine record={otherRecord} /> : null}
         actions={
           deal ? (
             <Button asChild variant="secondary" size="sm">
@@ -214,6 +224,7 @@ export default async function ThreadPage({
               listingSlug={thread.listingSlug}
               dealReference={panelInput?.deal?.reference ?? null}
               progress={progress}
+              wait={deal?.wait ?? null}
             >
               {panel.kind === "buy" || panel.kind === "start-deal" ? (
                 <StartDeal

@@ -17,6 +17,7 @@ import { Container, Section } from "@/components/ui/section";
 import { platformMap } from "@/data/platforms";
 import { sellerAvatarSrc } from "@/data/sellers";
 import { databaseGate } from "@/lib/db-gate";
+import { emptyRecord } from "@/lib/track-record";
 import { ratingLabel } from "@/lib/utils";
 import { getSellerListings } from "@/server/listings";
 import { getSeller, getSellerSlugs } from "@/server/sellers";
@@ -56,6 +57,7 @@ export default async function SellerPage({
   if (!seller) notFound();
 
   const active = await getSellerListings(seller.slug);
+  const record = seller.record ?? emptyRecord();
 
   return (
     <>
@@ -142,11 +144,35 @@ export default async function SellerPage({
             </Button>
           </div>
 
-          <dl className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
-            <Stat label="Completed sales" value={String(seller.sales)} />
+          {/* Every completed deal, bought or sold, so a buyer sees the whole
+              of someone's record here before deciding to deal with them. */}
+          <dl className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-6">
+            <Stat label="Deals done" value={String(record.deals)} />
             <Stat
-              label="Settled volume"
-              value={<Price usd={seller.volume} compact />}
+              label="Deal worth"
+              value={<Price usd={record.worthCents / 100} compact />}
+            />
+            <Stat
+              label="Safest deals"
+              value={
+                <>
+                  {record.safest.deals}
+                  <span className="text-sm font-normal text-subtle">
+                    <Price usd={record.safest.worthCents / 100} compact />
+                  </span>
+                </>
+              }
+            />
+            <Stat
+              label="Fastest deals"
+              value={
+                <>
+                  {record.fastest.deals}
+                  <span className="text-sm font-normal text-subtle">
+                    <Price usd={record.fastest.worthCents / 100} compact />
+                  </span>
+                </>
+              }
             />
             <Stat
               label="Replies in"
@@ -215,10 +241,8 @@ function Stat({
 }) {
   return (
     <div className="rounded-card border border-line bg-surface px-4 py-3.5">
-      <dt className="text-[0.6875rem] tracking-wide text-subtle uppercase">
-        {label}
-      </dt>
-      <dd className="tnum mt-1 flex items-center gap-1.5 text-base font-semibold">
+      <dt className="text-xs text-subtle">{label}</dt>
+      <dd className="tnum mt-1 flex items-baseline gap-1.5 text-base font-semibold">
         {icon}
         {value}
       </dd>

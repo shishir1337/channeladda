@@ -2,6 +2,7 @@ import "server-only";
 import type { PlatformId } from "@/data/platforms";
 import type { Seller } from "@/data/sellers";
 import { db } from "@/lib/db";
+import { trackRecord } from "@/server/track-record";
 
 const PLATFORM_TO_ID = {
   YOUTUBE: "youtube",
@@ -57,6 +58,7 @@ async function buildSeller(userId: string): Promise<Seller | null> {
   return {
     slug: user.slug,
     name: user.name,
+    record: await trackRecord(user.id),
     initials: initialsOf(user.name),
     country: user.country ?? "Global",
     rating: rating === null ? null : Math.round(rating * 10) / 10,

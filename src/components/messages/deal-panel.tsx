@@ -5,6 +5,7 @@ import Link from "next/link";
 import { type ReactNode, useState } from "react";
 import { InfoTip } from "@/components/app/info-tip";
 import { Dot, Reference, Ring, TurnFlag } from "@/components/app/kit";
+import { WaitCountdown } from "@/components/messages/countdown";
 import { OfferActions } from "@/components/offers/offer-actions";
 import { Price } from "@/components/ui/price";
 import type {
@@ -69,6 +70,7 @@ export function DealPanel({
   listingSlug,
   dealReference,
   progress = null,
+  wait = null,
   children,
 }: {
   state: PanelStateView;
@@ -83,6 +85,12 @@ export function DealPanel({
    * card; the deal's step card says "Step 3 of 9" itself, so not there.
    */
   progress?: { done: number; total: number } | null;
+  /**
+   * The clock the deal is waiting on, from `activeWait`. Drawn above the
+   * card and outside the phone's fold: how long is left is the one thing
+   * both sides keep coming back to ask.
+   */
+  wait?: { label: string; until: Date | string } | null;
   /**
    * The deal's own card for the states that need one — paying, a step —
    * drawn by the page from the deal it has already loaded.
@@ -139,9 +147,14 @@ export function DealPanel({
     </button>
   );
 
+  const clock = wait ? (
+    <WaitCountdown label={wait.label} until={wait.until} className="mb-3" />
+  ) : null;
+
   if (childOwns) {
     return (
       <section aria-label="What happens next">
+        {clock}
         {toggle}
         <div className={cn("mt-2 lg:mt-0 lg:block", open ? "block" : "hidden")}>
           {children}
@@ -160,6 +173,7 @@ export function DealPanel({
 
   return (
     <section aria-label="What happens next">
+      {clock}
       <div
         className={cn(
           "rounded-card border bg-surface shadow-xs transition-colors duration-150",

@@ -15,6 +15,7 @@ import {
   priceStepFor,
   templateFor,
 } from "@/lib/deal-templates";
+import { activeWait, OWNER_WAIT_DAYS, type Wait } from "@/lib/deal-waits";
 import { orderAmounts } from "@/lib/fees";
 import { keptFee, requiredHold } from "@/lib/holds";
 import { movesHeldMoney } from "@/lib/outcomes";
@@ -2194,6 +2195,8 @@ export type DealView = {
   steps: DealStepView[];
   /** The lowest incomplete step, or null once the deal has stopped. */
   nextStep: DealStepView | null;
+  /** The clock the deal is waiting on right now, if one is running. */
+  wait: Wait | null;
 };
 
 /**
@@ -2226,7 +2229,8 @@ export async function getDealFor(
       agentEmail: true,
       agentBrand: true,
       conversationId: true,
-      listing: { select: { title: true, slug: true } },
+      createdAt: true,
+      listing: { select: { title: true, slug: true, platform: true } },
       buyer: { select: { name: true } },
       seller: { select: { name: true } },
       agent: { select: { name: true } },
@@ -2238,6 +2242,18 @@ export async function getDealFor(
 
   const viewerRole = await roleOnDeal(order, userId);
   if (!viewerRole) return null;
+
+  const { paymentWindowHours } = await getSettings();
+  const wait = activeWait({
+    mode: order.mode,
+    status: order.status,
+    createdAt: order.createdAt,
+    holdUntil: order.holdUntil,
+    steps: order.steps,
+    paymentWindowHours,
+    ownerWaitDays: OWNER_WAIT_DAYS[order.listing.platform],
+    now: new Date(),
+  });
 
   const steps: DealStepView[] = order.steps.map((s) => ({
     position: s.position,
@@ -2281,5 +2297,6 @@ export async function getDealFor(
     nextStep: isTerminal(order.status)
       ? null
       : (steps.find((s) => s.completedAt === null) ?? null),
+    wait,
   };
 }

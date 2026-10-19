@@ -2,7 +2,7 @@ import { FlagIcon } from "lucide-react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Callout } from "@/components/app/kit";
-import { ThreadHeader } from "@/components/messages/chat-parts";
+import { channelOf, ThreadHeader } from "@/components/messages/chat-parts";
 import { LiveRefresh } from "@/components/messages/live-refresh";
 import { toMessageViews } from "@/components/messages/serialize";
 import { StaffControls } from "@/components/messages/staff-controls";
@@ -48,6 +48,7 @@ export default async function AdminThreadPage({
             handle: thread.listingHandle,
             title: thread.listingTitle,
           }}
+          channel={channelOf(thread.listingPlatform, thread.listingSourceUrl)}
           meta={
             flagged || closed || thread.staffName ? (
               <>

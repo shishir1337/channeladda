@@ -1,7 +1,21 @@
 import { ArrowUpRightIcon, ChevronLeftIcon } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { platformMap } from "@/data/platforms";
+import type { Platform } from "@/generated/prisma/enums";
+import { channelLink } from "@/lib/channel-link";
 import { cn } from "@/lib/utils";
+
+/** The fixtures key platforms in lower case; the database in upper. */
+function toPlatformId(platform: Platform) {
+  return platform.toLowerCase() as keyof typeof platformMap;
+}
+
+/** The account on its own platform, for `ThreadHeader`, when its link checks out. */
+export function channelOf(platform: Platform, sourceUrl: string | null) {
+  const link = channelLink(platform, sourceUrl);
+  return link ? { ...link, platform } : null;
+}
 
 /**
  * Small pieces the inbox, the thread and the staff desk draw with, so the
@@ -82,6 +96,8 @@ export function ThreadHeader({
   people,
   title,
   listing,
+  channel,
+  record,
   meta,
   actions,
 }: {
@@ -91,9 +107,17 @@ export function ThreadHeader({
   people: string[];
   title: ReactNode;
   listing: { href: string; handle: string; title: string };
+  /**
+   * The account itself, on its own platform: a link checked by
+   * `channelLink`, never the raw URL the seller typed.
+   */
+  channel?: { href: string; label: string; platform: Platform } | null;
+  /** The other side's completed deals, read before agreeing to anything. */
+  record?: ReactNode;
   meta?: ReactNode;
   actions?: ReactNode;
 }) {
+  const brand = channel ? platformMap[toPlatformId(channel.platform)] : null;
   return (
     // Pinned under the app bar (h-14): in a long conversation the one thing
     // that must not scroll away is who it is with and where the deal stands.
@@ -148,14 +172,40 @@ export function ThreadHeader({
                 className="size-3.5 shrink-0 text-subtle transition duration-150 group-hover:translate-x-px group-hover:-translate-y-px group-hover:text-fg"
               />
             </Link>
+            {record ? (
+              <p className="text-xs leading-5 text-muted">{record}</p>
+            ) : null}
           </div>
         </div>
-        {meta || actions ? (
+        {meta || actions || channel ? (
           <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 sm:shrink-0 sm:justify-end">
             {meta ? (
               <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-subtle">
                 {meta}
               </div>
+            ) : null}
+            {channel && brand ? (
+              <a
+                href={channel.href}
+                target="_blank"
+                // nofollow: a seller's channel is not something we vouch for
+                // to search engines; noreferrer keeps the thread's URL to us.
+                rel="noopener noreferrer nofollow"
+                aria-label={`${channel.label} (opens in a new tab)`}
+                title={channel.label}
+                className="group inline-flex h-11 items-center gap-1.5 rounded-lg border border-line bg-surface px-3 text-[0.8125rem] font-medium text-fg shadow-xs transition-colors duration-150 hover:border-line-strong hover:bg-surface-2 pointer-fine:h-8 pointer-fine:px-2.5 dark:bg-surface-2 dark:hover:bg-surface-3"
+              >
+                <brand.icon
+                  aria-hidden="true"
+                  className="size-4 shrink-0"
+                  style={{ color: brand.tint }}
+                />
+                {brand.name}
+                <ArrowUpRightIcon
+                  aria-hidden="true"
+                  className="size-3.5 shrink-0 text-subtle transition duration-150 group-hover:translate-x-px group-hover:-translate-y-px group-hover:text-fg"
+                />
+              </a>
             ) : null}
             {actions}
           </div>
