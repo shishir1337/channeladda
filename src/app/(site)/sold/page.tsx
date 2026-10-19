@@ -150,9 +150,9 @@ export default async function SoldPage() {
                 Every one of these was supervised by an agent
               </h2>
               <p className="mt-2.5 text-sm leading-relaxed text-muted">
-                The buyer confirmed the handover, the cooling-off period passed,
-                and only then was the seller paid. None of these deals went to
-                dispute.
+                The buyer confirmed the handover before the deal closed, and
+                nobody was asked to hand over an account they had not been paid
+                for. None of these deals went to dispute.
               </p>
             </div>
             <Button asChild size="lg" className="shrink-0">

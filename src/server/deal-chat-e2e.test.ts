@@ -6,7 +6,6 @@ import {
   advanceStep,
   assignAgent,
   createDeal,
-  getDealFor,
   recordOpeningPayment,
 } from "@/server/deals";
 import { openConversation, sendMessage } from "@/server/messages";

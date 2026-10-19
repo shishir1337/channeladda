@@ -34,6 +34,7 @@ import { Button } from "@/components/ui/button";
 import { Price } from "@/components/ui/price";
 import { db } from "@/lib/db";
 import { isTerminal } from "@/lib/deal-machine";
+import { templateFor } from "@/lib/deal-templates";
 import { cn } from "@/lib/utils";
 import { getDealFor } from "@/server/deals";
 import { requireUser } from "@/server/session";
@@ -77,14 +78,21 @@ export default async function DealPage({
     deal.status,
     deal.mode,
     viewer,
-    deal.nextStep?.actor ?? null,
+    deal.nextStep?.position ?? null,
   );
   const sentence = headline.sentence;
 
   // Only the agent is ever asked to name a second approver, and only on the
-  // step that hands the channel over. Nobody else needs the staff list, and
+  // step that hands value across. Nobody else needs the staff list, and
   // buyers and sellers must not be shown it.
-  const needsApprover = viewer === "agent" && deal.nextStep?.actor === "agent";
+  const needsApprover =
+    viewer === "agent" &&
+    deal.nextStep?.actor === "agent" &&
+    Boolean(
+      templateFor(deal.mode).find(
+        (step) => step.position === deal.nextStep?.position,
+      )?.needsApprovalAbove,
+    );
   const staffIds = needsApprover
     ? await db.user.findMany({
         where: {
@@ -96,18 +104,11 @@ export default async function DealPage({
       })
     : undefined;
 
-  // A payment the buyer owes is the action at this point — the opening one,
-  // or a Safest deal's price — so it takes the place of the step's own
-  // action rather than sitting beside it.
-  const payStage =
-    viewer !== "buyer"
-      ? null
-      : deal.status === "AWAITING_PAYMENT"
-        ? ("opening" as const)
-        : safest && deal.status === "AWAITING_BUYER_PAYMENT"
-          ? ("price" as const)
-          : null;
-  const wallet = payStage ? await getWallet(user.id) : null;
+  // The opening payment, when the buyer owes it, is the action at this
+  // point, so it takes the place of the step's own action rather than
+  // sitting beside it. It is the only payment Channel Adda takes.
+  const paying = viewer === "buyer" && deal.status === "AWAITING_PAYMENT";
+  const wallet = paying ? await getWallet(user.id) : null;
 
   const ModeIcon = safest ? ShieldCheckIcon : ZapIcon;
 
@@ -193,13 +194,10 @@ export default async function DealPage({
               deal={deal}
               staffIds={staffIds}
               payment={
-                payStage && wallet ? (
+                paying && wallet ? (
                   <PayNow
                     orderId={deal.id}
-                    stage={payStage}
-                    amountUsd={
-                      payStage === "price" ? deal.priceUsd : deal.totalUsd
-                    }
+                    amountUsd={deal.totalUsd}
                     priceUsd={deal.priceUsd}
                     mode={deal.mode}
                     availableUsd={wallet.availableUsd}
@@ -227,6 +225,7 @@ export default async function DealPage({
             platform={deal.platform}
             handoverTo={deal.handoverTo}
             open={deal.handoverOpen}
+            inUse={deal.handoverInUse}
           />
 
           {/* ---- the money --------------------------------------------- */}
@@ -245,9 +244,11 @@ export default async function DealPage({
                   money
                   note={
                     safest
-                      ? deal.buyerPaidAt
-                        ? "paid to Channel Adda and held until the transfer completes"
-                        : "paid to Channel Adda after the inspection, never to the seller"
+                      ? deal.sellerConfirmedAt
+                        ? "paid to the seller directly, and confirmed by them"
+                        : deal.buyerPaidAt
+                          ? "paid to the seller directly, the buyer says; the seller confirms it next"
+                          : "paid to the seller directly, once our agent holds the channel"
                       : "part of what Channel Adda is holding"
                   }
                 />
@@ -269,24 +270,16 @@ export default async function DealPage({
                       safest ? "Channel Adda holds" : "Channel Adda is holding"
                     }
                     value={
-                      safest && !deal.buyerPaidAt ? (
+                      safest ? (
                         "The channel"
                       ) : (
-                        <Price
-                          usd={
-                            (safest
-                              ? deal.priceUsd + deal.buyerFeeUsd
-                              : deal.totalUsd) / 100
-                          }
-                        />
+                        <Price usd={deal.totalUsd / 100} />
                       )
                     }
                     money
                     note={
                       safest
-                        ? deal.buyerPaidAt
-                          ? "the channel, and your payment: the price and our fee"
-                          : "our agent owns it until the handover completes"
+                        ? "our agent holds it until it is handed to the buyer"
                         : "the price and our fee together"
                     }
                   />
@@ -317,7 +310,7 @@ export default async function DealPage({
                   }
                   note={
                     safest
-                      ? "pays our fee up front, then the price to Channel Adda"
+                      ? "pays our fee to Channel Adda, the price to the seller directly"
                       : "pays the price and our fee to Channel Adda"
                   }
                 />
@@ -328,7 +321,7 @@ export default async function DealPage({
                   }
                   note={
                     safest
-                      ? "hands the channel to our agent, is paid by Channel Adda"
+                      ? "hands the channel to our agent, is paid by the buyer directly"
                       : "transfers the channel, is paid by Channel Adda"
                   }
                 />
@@ -344,7 +337,7 @@ export default async function DealPage({
                   note={
                     safest
                       ? "takes ownership of the channel, then passes it on"
-                      : "supervises the transfer as a manager"
+                      : "supervises the handover, then releases the money"
                   }
                 />
               </dl>

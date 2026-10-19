@@ -14,7 +14,7 @@ import { getSettings } from "@/server/settings";
  * at the moment of asking — not just the thread's last message, because some
  * changes write nothing in this thread: another buyer reserving the listing,
  * the seller pausing it, staff removing it, an offer running out of time, a
- * recovery hold ending.
+ * deal's hold ending.
  *
  * Null when the person may not read the thread, by the same rule as the page,
  * so the poll cannot be used to learn anything the page would not show.

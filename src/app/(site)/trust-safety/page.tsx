@@ -89,9 +89,12 @@ export default function TrustSafetyPage() {
                 </li>
                 <li>
                   <span className="font-semibold text-fg">
-                    Never pay outside the platform.
+                    Never pay a seller before our agent holds the account.
                   </span>{" "}
-                  Anyone asking you to send crypto directly to a wallet is
+                  On a Fastest deal you pay Channel Adda and nobody else. On a
+                  Safest deal you pay the seller directly only once the deal
+                  says our agent is primary owner, and only the way you agreed
+                  in the deal chat. Anyone asking for money any other way is
                   running a scam, whatever their rating says.
                 </li>
                 <li>
@@ -128,10 +131,10 @@ export default function TrustSafetyPage() {
               <p className="mt-3 text-sm leading-relaxed text-muted">
                 Transferring an account is against the written terms of most
                 platforms. We are open about that rather than pretending
-                otherwise: it is why we verify ownership live, why the hold
-                matches each platform&apos;s recovery window, and why a platform
-                ban after completion is covered in our refund policy instead of
-                being left to argue about.
+                otherwise: it is why we verify ownership live, why the holding
+                period is set platform by platform, and why a platform ban after
+                completion is covered in our refund policy instead of being left
+                to argue about.
               </p>
               <Button asChild variant="secondary" size="md" className="mt-6">
                 <Link href="/listing-rules">Read the listing rules</Link>

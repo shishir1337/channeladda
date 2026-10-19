@@ -514,18 +514,10 @@ export function DisputeCase({
             </ol>
             {dispute.mode === "SAFEST" && dispute.buyerPaidAt ? (
               <p className="mt-3 rounded-lg border border-line bg-surface-2/50 px-3 py-2 text-xs leading-relaxed text-muted">
-                The buyer paid the price to Channel Adda on{" "}
-                {new Date(dispute.buyerPaidAt).toLocaleDateString("en-GB", {
-                  day: "numeric",
-                  month: "long",
-                  year: "numeric",
-                })}
-                , under{" "}
-                <code className="rounded bg-surface px-1 py-0.5 font-mono break-all text-fg ring-1 ring-line select-all">
-                  {dispute.buyerPaymentRef}
-                </code>
-                . We are holding it: returning the channel refunds it to the
-                buyer, completing the deal pays it to the seller.
+                The buyer pressed Paid on {when(new Date(dispute.buyerPaidAt))}
+                {dispute.sellerConfirmedAt
+                  ? `, and the seller pressed Received on ${when(new Date(dispute.sellerConfirmedAt))}. The channel cannot go back to the seller: they have said they were paid.`
+                  : ", and the seller has not pressed Received. The price went to the seller directly, never through us — the chat is where the proof is."}
               </p>
             ) : null}
           </section>

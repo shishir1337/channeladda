@@ -113,12 +113,12 @@ export default async function PlatformBrowsePage({
                 {p.transferNote}
               </p>
               <p className="mt-4 text-[0.9375rem] leading-relaxed text-muted sm:text-base">
-                The handover is held open for{" "}
+                On a Fastest deal you are a manager for{" "}
                 <span className="font-semibold text-fg">{p.holdDays} days</span>{" "}
-                — long enough for the window in which a previous owner can still
-                attempt account recovery. On a Fastest deal we are holding your
-                payment through that window. On a Safest deal we are holding the
-                account itself, and the price you pay us after inspecting it.
+                before you become primary owner, and we hold your payment
+                through all of it — the seller is paid only after the handover.
+                On a Safest deal our agent holds the account itself, and you pay
+                the seller only once it is in our hands.
               </p>
               <Link
                 href="/how-it-works"

@@ -30,8 +30,8 @@ import { TextField } from "@/components/auth/fields";
 import {
   ACTOR_LABELS,
   actorLabel,
+  confirmLabel,
   HOLD_NOTE,
-  isHoldStep,
   stepHelp,
 } from "@/components/deals/deal-status";
 import { Button } from "@/components/ui/button";
@@ -58,19 +58,6 @@ import type { DealStepView, DealView } from "@/server/deals";
  * it is.
  */
 
-/** Clearer than "Mark this done" where the step is a statement of fact. */
-const CONFIRM_LABELS: Record<string, string> = {
-  "Confirm access received": "I have access to the channel",
-  "Inspect the channel": "I have checked the channel",
-  "Invite the agent as channel owner": "I have sent the invite",
-  "Invite the agent as manager": "I have sent the invite",
-  "Promote the buyer to primary owner": "I have promoted the buyer",
-};
-
-function confirmLabel(label: string) {
-  return CONFIRM_LABELS[label] ?? "Mark this done";
-}
-
 type StaffList = { id: string; name: string }[];
 
 /**
@@ -81,8 +68,9 @@ function stepState(deal: DealView, step: DealStepView) {
   // A dispute freezes every step, so the person whose turn it nominally is
   // must not be offered a button the server will refuse.
   const frozen = deal.status === "DISPUTED";
-  // The recovery hold: the release step exists, and is not available yet.
-  // Offering the button would only produce a refusal.
+  // The deal's hold — Google's wait, or the holding period: the next step
+  // exists, and is not available yet. Offering the button would only
+  // produce a refusal.
   const heldUntil =
     deal.holdUntil && new Date(deal.holdUntil) > new Date()
       ? new Date(deal.holdUntil)
@@ -91,14 +79,11 @@ function stepState(deal: DealView, step: DealStepView) {
     frozen,
     heldUntil,
     mine: !frozen && !heldUntil && step.actor === deal.viewerRole,
-    help: stepHelp(step.label),
-    hold: isHoldStep(step.label),
-    // Step 1, and a Safest deal's price step, are completed by the payment
-    // clearing and by nothing else, so the buyer gets the payment panel
-    // rather than a button the server will refuse.
-    paymentPending:
-      deal.status === "AWAITING_PAYMENT" ||
-      (deal.mode === "SAFEST" && deal.status === "AWAITING_BUYER_PAYMENT"),
+    help: stepHelp(deal.mode, step.label),
+    // Step 1 is completed by the payment clearing and by nothing else, so
+    // the buyer gets the payment panel rather than a button the server will
+    // refuse.
+    paymentPending: deal.status === "AWAITING_PAYMENT",
   };
 }
 
@@ -311,20 +296,16 @@ function StepDetail({
       {state.heldUntil ? (
         <Note icon={ClockIcon}>
           <span className="font-medium text-fg tabular-nums">
-            Recovery hold until{" "}
+            Opens on{" "}
             {state.heldUntil.toLocaleDateString("en-GB", {
               day: "numeric",
               month: "long",
             })}
             .
           </span>{" "}
-          That is the window in which an old owner could still try to reclaim
-          the account. The seller is paid when it ends; until then the money
-          stays with Channel Adda.
+          {HOLD_NOTE[deal.mode]}
         </Note>
       ) : null}
-
-      {state.hold ? <Note icon={ClockIcon}>{HOLD_NOTE}</Note> : null}
 
       {state.mine ? (
         state.paymentPending ? (

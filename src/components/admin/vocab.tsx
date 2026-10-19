@@ -55,40 +55,40 @@ export const ORDER_STATUS: Record<
     note: "The buyer owes the opening payment. Nothing has moved yet.",
   },
   AGENT_VERIFYING: {
-    label: "Agent verifying",
+    label: "Adding the buyer",
     variant: "info",
-    whose: "agent",
-    note: "Fastest. We hold the money while the agent checks the channel against the listing.",
+    whose: "seller",
+    note: "Fastest. We hold the money while the seller adds the buyer as a manager and the buyer confirms it.",
   },
   AWAITING_CUSTODY: {
     label: "Awaiting custody",
     variant: "info",
     whose: "seller",
-    note: "Safest. The seller has to invite the agent as channel owner.",
+    note: "Safest. The seller adds the agent as manager, Google's wait runs, then the seller makes the agent primary owner.",
   },
   IN_CUSTODY: {
     label: "In custody",
     variant: "primary",
     whose: "buyer",
-    note: "Safest. The agent genuinely owns the channel while the buyer inspects it.",
+    note: "Safest. The agent owns the channel while the buyer pays the seller directly and the seller confirms it arrived.",
   },
   AWAITING_BUYER_PAYMENT: {
     label: "Awaiting buyer payment",
     variant: "info",
     whose: "buyer",
-    note: "Safest. The buyer has inspected the channel and is paying the price to Channel Adda. It is held until the transfer completes.",
+    note: "Safest, from the earlier steps, when the price came to us. No new deal reaches this.",
   },
   AWAITING_HANDOVER: {
     label: "Awaiting handover",
     variant: "primary",
     whose: "transfer",
-    note: "The final ownership transfer is under way.",
+    note: "Safest: the agent is making the buyer the owner. Fastest: the holding period, then the seller makes the buyer primary owner.",
   },
   AWAITING_RELEASE: {
     label: "Awaiting release",
     variant: "primary",
     whose: "agent",
-    note: "Fastest. The buyer has access and the seller has not been paid yet.",
+    note: "Fastest. The buyer is primary owner and the seller has not been paid yet.",
   },
   DISPUTED: {
     label: "Disputed",
@@ -100,7 +100,7 @@ export const ORDER_STATUS: Record<
     label: "Completed",
     variant: "verified",
     whose: null,
-    note: "The channel changed hands and everybody was paid.",
+    note: "The channel changed hands and the seller was paid.",
   },
   PAYMENT_EXPIRED: {
     label: "Payment expired",
@@ -160,15 +160,15 @@ export const DEAL_MODE: Record<
 > = {
   SAFEST: {
     label: "Safest",
-    escrow: "channel and money escrowed",
+    escrow: "channel escrowed",
     blurb:
-      "The buyer pays us the admin fee, an agent takes ownership of the channel, the buyer then pays the price to us, and the agent transfers the channel on. We release the price to the seller when it completes. Two Google waiting periods.",
+      "The buyer pays us the admin fee, an agent becomes the channel's primary owner after Google's wait, the buyer pays the seller directly, and once the seller confirms it arrived the agent makes the buyer the owner. We never hold the price.",
   },
   FASTEST: {
     label: "Fastest",
     escrow: "money escrowed",
     blurb:
-      "The buyer pays price plus fee to us. The seller transfers the channel with the agent supervising, and we credit the seller's wallet once the buyer confirms. One waiting period.",
+      "The buyer pays price plus fee to us. The seller adds the buyer as manager, the holding period runs, the seller makes the buyer primary owner, and we credit the seller's wallet once the agent has checked.",
   },
 };
 
@@ -248,9 +248,9 @@ export function DealHead({
  * What is in whose hands right now, and what can still be undone.
  *
  * What gets got wrong under pressure is what each mode can still give back.
- * On a Safest deal the price is only with us once the buyer has paid it after
- * inspecting the channel, and the admin fee is kept once the agent has taken
- * custody — so what returning a channel refunds depends on how far it got.
+ * On a Safest deal we only ever hold the admin fee — the price goes to the
+ * seller directly — and the fee is kept once the agent has taken custody, so
+ * what returning a channel refunds depends on how far it got.
  *
  * `facts` matters most for DISPUTED, which is the only status staff decide
  * a deal from — and the one the status alone cannot describe, because a
@@ -271,8 +271,8 @@ export function custodyFacts(
     mode === "SAFEST" &&
     (AGENT_HOLDS.includes(status) || (disputed && facts?.inCustody === true));
   // Every paid, running deal has money with us: price and fee on Fastest,
-  // the admin fee (and the price once paid) on Safest, where every state the
-  // agent holds the channel in comes after the opening payment.
+  // the admin fee on Safest, where every state the agent holds the channel
+  // in comes after the opening payment.
   const platformHolds =
     (mode === "FASTEST" ? PLATFORM_HOLDS : AGENT_HOLDS).includes(status) ||
     (disputed && facts?.paid === true);
@@ -291,7 +291,7 @@ export function custodyFacts(
     ? "Paused. Check whether the opening payment cleared."
     : platformHolds
       ? mode === "SAFEST"
-        ? "We are holding the admin fee, and the price once the buyer has paid it."
+        ? "We are holding the admin fee. The price goes to the seller directly."
         : "We are holding the price and the fee."
       : "Nothing has cleared to us yet.";
 
@@ -305,7 +305,7 @@ export function custodyFacts(
     recoverable = "Nothing has moved. Cancelling costs nobody anything.";
   } else if (agentHolds) {
     recoverable =
-      "The channel has to go back to the seller, or on to the buyer. Returning it refunds whatever we hold, less the admin fee once our agent has taken custody; finance decides.";
+      "The channel has to go back to the seller, or on to the buyer — only on, once the seller has pressed Received. Returning it refunds the admin fee unless our agent has taken custody; finance decides.";
   } else if (platformHolds) {
     recoverable =
       "We hold the full amount. Refunding or cancelling returns all of it to the buyer; finance decides which.";

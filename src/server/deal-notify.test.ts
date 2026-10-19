@@ -31,24 +31,27 @@ test("it says which kind of deal", () => {
     name: "Hannah",
     reference: "CA-1",
     listingTitle: "A channel",
-    stepLabel: "Pay the price to Channel Adda",
+    stepLabel: "Pay the seller",
     mode: "SAFEST",
     href: "https://x/y",
   });
   expect(safest.body).toContain("Safest");
-  expect(safest.body).toContain("the buyer pays the price to Channel Adda");
-  expect(safest.body).not.toMatch(/pays the seller directly/);
+  // The price goes from the buyer to the seller once our agent holds the
+  // channel; Channel Adda takes its fee and nothing else.
+  expect(safest.body).toContain("the buyer then pays the seller directly");
+  expect(safest.body).toContain("Channel Adda takes only its fee");
 
   const fastest = turnEmail({
     name: "Hannah",
     reference: "CA-2",
     listingTitle: "A channel",
-    stepLabel: "Confirm access received",
+    stepLabel: "Confirm primary ownership",
     mode: "FASTEST",
     href: "https://x/y",
   });
   expect(fastest.body).toContain("Fastest");
   expect(fastest.body).toContain("Channel Adda holds the buyer's payment");
+  expect(fastest.body).toContain("primary owner");
   expect(fastest.body).not.toMatch(/pays the seller directly/);
 });
 

@@ -49,12 +49,15 @@ async function disputedDeal(
 }
 
 test(
-  "a disputed safest deal says whether the price reached us, not what the seller claims",
+  "a disputed safest deal shows when the buyer pressed Paid and the seller Received",
   withCleanDb(async () => {
+    // The price goes from one to the other directly, so those two moments
+    // and the chat are the whole record a moderator has of it.
     await disputedDeal();
     const [row] = (await listDisputes({ role: "MODERATOR" })) ?? [];
     expect(row?.buyerPaidAt).toBeNull();
-    expect(row).not.toHaveProperty("sellerConfirmedAt");
+    expect(row?.sellerConfirmedAt).toBeNull();
+    expect(row).not.toHaveProperty("buyerPaymentRef");
   }),
 );
 

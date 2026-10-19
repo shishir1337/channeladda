@@ -64,9 +64,15 @@ export default async function DealsPage() {
   // press.
   const paused = deals.filter((deal) => deal.status === "DISPUTED");
   const live = deals.filter((deal) => deal.status !== "DISPUTED");
-  const mine = live.filter((deal) => deal.awaiting === deal.side);
+  // A step behind a running hold is nobody's move until it ends, so it
+  // waits with the others rather than under "Waiting on you".
+  const mine = live.filter(
+    (deal) => deal.awaiting === deal.side && deal.waitingUntil === null,
+  );
   const theirs = live.filter(
-    (deal) => deal.awaiting !== null && deal.awaiting !== deal.side,
+    (deal) =>
+      deal.awaiting !== null &&
+      (deal.awaiting !== deal.side || deal.waitingUntil !== null),
   );
   const finished = live.filter((deal) => deal.awaiting === null);
 
@@ -163,7 +169,8 @@ function DealRows({ deals }: { deals: DealListRow[] }) {
         const Icon = SIDE_ICONS[deal.side];
         // Frozen: the row still has a next actor, but nobody may act.
         const frozen = deal.status === "DISPUTED";
-        const yourTurn = !frozen && deal.awaiting === deal.side;
+        const yourTurn =
+          !frozen && deal.awaiting === deal.side && deal.waitingUntil === null;
 
         return (
           <ListItem key={deal.id} href={`/dashboard/deals/${deal.id}`}>
@@ -197,11 +204,19 @@ function DealRows({ deals }: { deals: DealListRow[] }) {
                         deal.status,
                         deal.mode,
                         deal.side,
-                        deal.awaiting,
+                        deal.openStep,
                       ).short
                     }
                   </Badge>
-                  {deal.awaiting && !frozen ? (
+                  {deal.waitingUntil && !frozen ? (
+                    <span className="text-xs whitespace-nowrap text-subtle tabular-nums">
+                      Opens{" "}
+                      {deal.waitingUntil.toLocaleDateString("en-GB", {
+                        day: "numeric",
+                        month: "short",
+                      })}
+                    </span>
+                  ) : deal.awaiting && !frozen ? (
                     <TurnFlag
                       mine={yourTurn}
                       who={ACTOR_LABELS[deal.awaiting]}

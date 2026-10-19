@@ -23,7 +23,7 @@ const steps = [
   {
     icon: LockIcon,
     title: "Choose how to pay",
-    body: "Fastest: your crypto payment goes to Channel Adda, not the seller, and the seller starts the transfer knowing it is secured. Safest: you pay our fee first, an agent takes the account into our hands, and then you pay the price — to Channel Adda, never to the seller.",
+    body: "Fastest: your crypto payment goes to Channel Adda, not the seller, and the seller starts the transfer knowing it is secured. Safest: you pay our fee, an agent takes the account into our hands, and only then do you pay the seller directly.",
   },
   {
     icon: HandshakeIcon,
@@ -32,8 +32,8 @@ const steps = [
   },
   {
     icon: BanknoteIcon,
-    title: "You confirm, seller gets paid",
-    body: "On a Fastest deal we hold the money and release it when you confirm full control. On a Safest deal we hold the account as well, and you pay the price to us only once it is in our hands.",
+    title: "You confirm, the deal closes",
+    body: "On a Fastest deal we hold the money and pay the seller once you are primary owner. On a Safest deal our agent holds the account, and makes you the owner once the seller confirms your payment arrived.",
   },
 ];
 
@@ -42,12 +42,12 @@ const modes = [
     id: "quick",
     icon: ZapIcon,
     name: "Fastest",
-    tagline: "One waiting period instead of two",
+    tagline: "The account comes straight to you",
     release: "After you confirm",
     accent: false,
     points: [
-      "We hold your money until you confirm you have full control",
-      "One waiting period, so it closes in days rather than weeks",
+      "We hold your money until you are the account's primary owner",
+      "You are a manager through the holding period, then primary owner",
       "The seller transfers the account to you directly, with an agent watching",
       "Ownership code verified before the listing goes up",
     ],
@@ -60,9 +60,9 @@ const modes = [
     release: "After you confirm",
     accent: true,
     points: [
-      "We hold the account, then your payment — you pay the price to us once the account is ours",
-      "Two waiting periods: seller to us, then us to you",
-      "Recovery email and 2FA reset supervised by an agent",
+      "Our agent holds the account before you pay the seller anything",
+      "You pay us only our fee; the price goes to the seller directly",
+      "The seller confirms your payment before the account moves to you",
       "If it breaks before our agent takes the channel, we refund our fee",
     ],
   },

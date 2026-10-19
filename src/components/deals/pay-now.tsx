@@ -13,13 +13,13 @@ import { startPayment } from "@/server/actions/payments";
 import { payDealFromWallet, startTopUp } from "@/server/actions/wallet";
 
 /**
- * A buyer's payment to Channel Adda: the opening one, or a Safest deal's
- * price.
+ * A buyer's payment to Channel Adda: the opening one, and the only one.
  *
  * Deliberately says what the money is for before asking for it: on a Safest
- * deal the opening payment is the fee alone and the channel's price follows
- * later, and a buyer who does not know that will think the figure is wrong.
- * Every version says where the money goes — to us, held, never to the seller.
+ * deal it is the fee alone and the channel's price goes to the seller
+ * directly later, and a buyer who does not know that will think the figure
+ * is wrong. On Fastest it is everything, held until the buyer is primary
+ * owner.
  *
  * In the conversation it is a card of its own, the same shape as the
  * next-step card, because at this point in a deal paying is the only thing
@@ -32,7 +32,6 @@ import { payDealFromWallet, startTopUp } from "@/server/actions/wallet";
  */
 export function PayNow({
   orderId,
-  stage,
   amountUsd,
   priceUsd,
   mode,
@@ -40,9 +39,7 @@ export function PayNow({
   inline = false,
 }: {
   orderId: string;
-  /** Which payment this is. A Fastest deal only ever has the opening one. */
-  stage: "opening" | "price";
-  /** Cents due now: the opening total, or the Safest price. */
+  /** Cents due now: the whole amount on Fastest, the fee on Safest. */
   amountUsd: number;
   /** Cents. Named on a Safest opening payment, as what follows it. */
   priceUsd: number;
@@ -65,22 +62,17 @@ export function PayNow({
   const body = (
     <>
       <p className="max-w-[62ch] text-[0.8125rem] leading-relaxed text-muted">
-        {stage === "price" ? (
+        {mode === "SAFEST" ? (
           <>
-            Pay the channel&rsquo;s price to Channel Adda, never to the seller.
-            We hold it until the channel is yours, then pay the seller.
-          </>
-        ) : mode === "SAFEST" ? (
-          <>
-            This is our fee to start. Once our agent owns the channel and you
-            have inspected it, you pay the price of{" "}
-            <Price usd={priceUsd / 100} className="font-medium text-fg" /> — to
-            Channel Adda as well, never to the seller.
+            This is our fee to start, and the only payment Channel Adda takes.
+            Once our agent holds the channel, you pay the seller the price of{" "}
+            <Price usd={priceUsd / 100} className="font-medium text-fg" />{" "}
+            directly, the way you agree in the chat.
           </>
         ) : (
           <>
             The channel price and our fee together. We hold all of it until you
-            confirm you have access.
+            are the channel&rsquo;s primary owner.
           </>
         )}
       </p>
@@ -217,11 +209,7 @@ export function PayNow({
           id="pay-now-heading"
           className="mt-2.5 text-[0.9375rem] leading-6 font-semibold text-fg"
         >
-          {stage === "price"
-            ? "Pay the price to Channel Adda"
-            : mode === "SAFEST"
-              ? "Pay the admin fee to begin"
-              : "Pay to begin"}
+          {mode === "SAFEST" ? "Pay the admin fee to begin" : "Pay to begin"}
         </h2>
         <div className="mt-1.5">{body}</div>
       </section>

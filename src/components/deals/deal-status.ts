@@ -11,10 +11,11 @@ import type { DealActor } from "@/lib/deal-machine";
  * seller and agent are told different things because different things are
  * true for each of them.
  *
- * The rule this copy must never break: no money moves directly between a
- * buyer and a seller. On both kinds of deal the buyer pays Channel Adda, we
- * hold it, and the seller is paid into their Channel Adda wallet when the
- * deal completes. Safest also has our agent hold the channel.
+ * The rule this copy must never break: nobody is ever exposed. On Fastest the
+ * buyer pays Channel Adda, we hold it, and the seller is paid into their
+ * Channel Adda wallet once the buyer is primary owner. On Safest our agent
+ * holds the channel first, and only then does the buyer pay the seller
+ * directly — Channel Adda takes the admin fee and nothing else.
  */
 
 export type StatusTone = "neutral" | "info" | "verified" | "danger";
@@ -25,7 +26,7 @@ export type StatusTone = "neutral" | "info" | "verified" | "danger";
  */
 export const STATUS_LABELS: Record<OrderStatus, string> = {
   AWAITING_PAYMENT: "Waiting for the buyer's payment",
-  AGENT_VERIFYING: "Our agent is checking the channel",
+  AGENT_VERIFYING: "Adding the buyer to the channel",
   AWAITING_CUSTODY: "Waiting for the seller to hand the channel over",
   IN_CUSTODY: "Our agent is holding the channel",
   AWAITING_BUYER_PAYMENT: "Waiting for the buyer to pay the price",
@@ -48,7 +49,7 @@ export const STATUS_LABELS: Record<OrderStatus, string> = {
  */
 export const STATUS_SHORT: Record<OrderStatus, string> = {
   AWAITING_PAYMENT: "Needs payment",
-  AGENT_VERIFYING: "Being checked",
+  AGENT_VERIFYING: "Adding the buyer",
   AWAITING_CUSTODY: "Handing over to us",
   IN_CUSTODY: "We hold the channel",
   AWAITING_BUYER_PAYMENT: "Buyer paying the price",
@@ -120,8 +121,8 @@ export function statusSentence(
     case "AWAITING_PAYMENT":
       if (viewer === "buyer") {
         return safest
-          ? "Nothing starts until our fee is paid. The channel's price is not paid now: you pay it to Channel Adda later, once our agent owns the channel and you have inspected it."
-          : "Nothing starts until your payment reaches Channel Adda. We hold it until you confirm the channel is yours.";
+          ? "Nothing starts until our fee is paid. You do not pay the channel's price now: you pay it to the seller directly, once our agent holds the channel."
+          : "Nothing starts until your payment reaches Channel Adda. We hold it until you are the channel's primary owner.";
       }
       if (viewer === "seller") {
         return "The buyer has not paid yet. Your channel stays with you, and nothing is asked of you until they do.";
@@ -130,72 +131,68 @@ export function statusSentence(
 
     case "AGENT_VERIFYING":
       if (viewer === "buyer") {
-        return "Channel Adda is holding your payment. Our agent is checking the channel matches the listing before anything is handed over.";
+        return "Channel Adda is holding your payment. The seller is adding your account as a manager of the channel.";
       }
       if (viewer === "seller") {
-        return "Our agent is checking the channel matches the listing. The buyer's payment is with Channel Adda in the meantime.";
+        return "Add the buyer's account as a manager of the channel — it is on this page. The buyer's payment is with Channel Adda in the meantime.";
       }
-      return "The channel is being checked against the listing.";
+      return "The seller is adding the buyer as a manager.";
 
     case "AWAITING_CUSTODY":
       if (viewer === "buyer") {
-        return "The seller is handing the channel to our agent. You have paid our fee and nothing else — you pay the price only once the channel is verifiably out of their hands, and you pay it to Channel Adda.";
+        return "The seller is handing the channel to our agent. You have paid our fee and nothing else — you pay the seller only once our agent holds the channel.";
       }
       if (viewer === "seller") {
-        return "Invite our agent as the channel's owner. Google then runs its own waiting period before the transfer completes.";
+        return "Add our agent as a manager of the channel. The address to add is on this page.";
       }
-      return "The seller is inviting the agent as owner of the channel.";
+      return "The seller is adding you as a manager of the channel.";
 
     case "IN_CUSTODY":
       if (viewer === "buyer") {
-        return "Our agent owns the channel now, not the seller. Look it over, and only then pay the price — to Channel Adda, never to the seller.";
+        return "Our agent holds the channel now, not the seller. Pay the seller the price directly, the way you agreed in this chat, then press Paid.";
       }
       if (viewer === "seller") {
-        return "The channel is with our agent — out of your hands and not yet in the buyer's. The buyer pays the price to Channel Adda next, and it is held for you.";
+        return "Our agent holds the channel. The buyer pays you directly next, the way you agreed in this chat.";
       }
-      return "You are holding this channel.";
+      return "You hold this channel. The buyer pays the seller directly next.";
 
     case "AWAITING_BUYER_PAYMENT":
-      if (viewer === "buyer") {
-        return "Pay the price to Channel Adda here, by crypto or from your balance. We hold it until the channel is yours, then pay the seller — never pay the seller yourself.";
-      }
-      if (viewer === "seller") {
-        return "The buyer is paying the price to Channel Adda. It is held for you and reaches your Channel Adda wallet when the transfer completes.";
-      }
-      return "The buyer is paying the price to Channel Adda. The channel stays with you until it arrives.";
+      // Only a deal opened before the price went to the seller directly can
+      // be here, and its steps are not this page's any more.
+      return "This deal began under our earlier steps. Channel Adda will finish it with you in the chat.";
 
     case "AWAITING_HANDOVER":
       if (safest) {
         if (viewer === "buyer") {
-          return "Your payment is with Channel Adda and our agent is transferring the channel to you. Google's second waiting period applies.";
+          return "The seller confirmed your payment. Our agent is making you the owner.";
         }
         if (viewer === "seller") {
-          return "The buyer has paid the price to Channel Adda, so your part is done. Our agent is transferring the channel, and the price reaches your wallet when it completes.";
+          return "You confirmed the buyer's payment, so your part is done. Our agent is handing the channel to the buyer.";
         }
-        return "Transfer the channel to the buyer.";
+        return "Make the buyer the owner, using the account on this page.";
       }
       if (viewer === "buyer") {
-        return "Channel Adda is still holding your payment. The seller is making you the channel's owner — confirm here once you are in control of it.";
+        return "You are a manager now. After the holding period, the seller makes you primary owner and removes their own email.";
       }
       if (viewer === "seller") {
-        return "Make the buyer the channel's primary owner. Channel Adda releases your money once they confirm access.";
+        return "When the holding period ends, make the buyer primary owner and remove your email from the channel. We email you the moment it opens.";
       }
-      return "The seller is promoting the buyer to owner, with our agent supervising.";
+      return "The holding period, then the seller makes the buyer primary owner.";
 
     case "AWAITING_RELEASE":
       if (viewer === "buyer") {
-        return "You have confirmed access, so nothing more is needed from you. We are paying the seller.";
+        return "You are the primary owner, so nothing more is needed from you. Our agent checks the handover, then Channel Adda pays the seller.";
       }
       if (viewer === "seller") {
-        return "The buyer has confirmed access. Channel Adda is releasing your money.";
+        return "The buyer is primary owner. Once our agent has checked your email is off the channel, your money reaches your Channel Adda wallet.";
       }
-      return "Release the seller's funds.";
+      return "Check the buyer is primary owner and the seller's email is gone, then release the seller's funds.";
 
     case "COMPLETED":
       if (viewer === "buyer") return "Finished. The channel is yours.";
       if (viewer === "seller") {
         return safest
-          ? "Finished. The channel is the buyer's, and the price is in your Channel Adda wallet."
+          ? "Finished. The channel is the buyer's, and the buyer paid you directly."
           : "Finished. Channel Adda has released your money to your Channel Adda wallet.";
       }
       return "Finished. Nothing is outstanding on this deal.";
@@ -219,7 +216,7 @@ export function statusSentence(
       return "The buyer has been refunded and nothing was transferred.";
 
     case "DISPUTED":
-      return "A moderator is reading the whole record, including every step and payment reference on it. Nothing moves until they decide, and we may message you for details.";
+      return "A moderator is reading the whole record: every step, when it was pressed, and this chat. Nothing moves until they decide, and we may message you for details.";
 
     default:
       return STATUS_LABELS[status];
@@ -236,55 +233,119 @@ type Override = {
 };
 
 /**
- * The statuses that span steps owned by different people, keyed
- * `MODE:STATUS:whose step is open`. Only the combinations where the
- * status-level copy would be wrong are listed; everything else falls back.
+ * The steps whose status-level copy would be wrong, keyed
+ * `MODE:STATUS:open step`. A status spans several steps — on Safest,
+ * AWAITING_CUSTODY is two of the seller's and two of our agent's — so the
+ * key is the step itself; the status is in it so a paused deal, whose open
+ * step has not moved, never reads as running. Everything else falls back.
  */
 const BY_OPEN_STEP: Partial<Record<string, Override>> = {
-  // Safest custody: the seller invites (step 2), then the agent accepts and
-  // waits out Google's transfer (steps 3 and 4).
-  "SAFEST:AWAITING_CUSTODY:agent": {
-    label: "Our agent is taking the channel",
-    short: "Agent taking over",
+  "SAFEST:AWAITING_CUSTODY:3": {
+    label: "Our agent is confirming access",
+    short: "Agent confirming",
     sentence: {
       buyer:
-        "The seller has invited our agent, who is taking the channel over while Google runs its own waiting period. You pay the price, to Channel Adda, only once it is verifiably ours.",
+        "The seller has added our agent as a manager. Our agent confirms it next, and then Google's waiting period starts.",
       seller:
-        "You have invited our agent, so your part is done for now. Google runs its own waiting period while our agent takes the channel over.",
+        "You have added our agent, so your part is done for now. They confirm it next, and then Google's waiting period starts.",
       agent:
-        "The seller has invited you. Accept it, then confirm custody once Google's transfer completes.",
+        "The seller has added you. Confirm once you have manager access — that starts Google's waiting period.",
     },
   },
-  // Fastest verifying: the seller invites the agent as manager (step 2)
-  // before the agent can check anything (step 3).
-  "FASTEST:AGENT_VERIFYING:seller": {
-    label: "Waiting for the seller to invite our agent",
-    short: "Seller inviting agent",
+  "SAFEST:AWAITING_CUSTODY:4": {
+    label: "Our agent becomes primary owner next",
+    short: "Agent to primary",
     sentence: {
       buyer:
-        "Channel Adda is holding your payment. The seller is giving our agent manager access, so the handover is supervised.",
+        "Our agent is a manager. After Google's waiting period, the seller makes our agent primary owner.",
       seller:
-        "Give our agent manager access to the channel — the address to invite is on this page. The buyer's payment is with Channel Adda in the meantime.",
-      agent: "The seller is inviting you as manager.",
+        "When Google's waiting period ends, make our agent primary owner of the channel. We email you the moment you can.",
+      agent:
+        "Google's waiting period, then the seller makes you primary owner.",
     },
   },
-  // Fastest handover: the seller promotes the buyer (step 4), then the buyer
-  // confirms access (step 5).
-  "FASTEST:AWAITING_HANDOVER:buyer": {
+  "SAFEST:AWAITING_CUSTODY:5": {
+    label: "Our agent is confirming ownership",
+    short: "Agent confirming",
+    sentence: {
+      buyer:
+        "The seller says our agent is primary owner now. Our agent confirms it — then you pay the seller.",
+      seller:
+        "You have made our agent primary owner. They confirm it next, then the buyer pays you.",
+      agent: "The seller says you are primary owner. Confirm once you are.",
+    },
+  },
+  "SAFEST:IN_CUSTODY:6": {
+    label: "Waiting for the buyer to pay the seller",
+    short: "Buyer paying",
+    sentence: {
+      buyer:
+        "Our agent holds the channel now, not the seller. Pay the seller the price directly, the way you agreed in this chat, then press Paid.",
+      seller:
+        "Our agent holds the channel. The buyer pays you directly next, the way you agreed in this chat.",
+      agent: "You hold the channel. The buyer is paying the seller directly.",
+    },
+  },
+  "SAFEST:IN_CUSTODY:7": {
+    label: "Waiting for the seller to confirm the payment",
+    short: "Seller confirming",
+    sentence: {
+      buyer:
+        "You have marked it paid. Once the seller confirms the money arrived, our agent makes you the owner.",
+      seller:
+        "The buyer says they have paid you. When the money is in your account, press Received. If it has not arrived, say so in this chat.",
+      agent:
+        "The buyer says they have paid. Waiting for the seller to confirm it arrived.",
+    },
+  },
+  "SAFEST:AWAITING_HANDOVER:9": {
+    label: "Waiting for the buyer to confirm ownership",
+    short: "Buyer confirming",
+    sentence: {
+      buyer:
+        "Our agent has made you the owner. Confirm here once the channel is yours.",
+      seller:
+        "Our agent has handed the channel to the buyer, who confirms it next.",
+      agent: "You have made the buyer the owner. They confirm it next.",
+    },
+  },
+  "FASTEST:AGENT_VERIFYING:2": {
+    label: "Waiting for the seller to add the buyer",
+    short: "Seller adding buyer",
+    sentence: {
+      buyer:
+        "Channel Adda is holding your payment. The seller is adding your account as a manager of the channel.",
+      seller:
+        "Add the buyer's account as a manager of the channel — it is on this page. The buyer's payment is with Channel Adda in the meantime.",
+      agent: "The seller is adding the buyer as a manager.",
+    },
+  },
+  "FASTEST:AGENT_VERIFYING:3": {
     label: "Waiting for the buyer to confirm access",
     short: "Buyer confirming",
     sentence: {
       buyer:
-        "The seller says you are now the primary owner. Confirm here once you are in control of the channel — that is what releases their money.",
+        "The seller says you are a manager now. Check the channel matches the listing, then confirm here — that starts the holding period.",
       seller:
-        "You have promoted the buyer. Channel Adda releases your money once they confirm access.",
-      agent: "The buyer is confirming they have access.",
+        "You have added the buyer. They confirm their access next, and then the holding period starts.",
+      agent: "The buyer is confirming their manager access.",
+    },
+  },
+  "FASTEST:AWAITING_HANDOVER:5": {
+    label: "Waiting for the buyer to confirm ownership",
+    short: "Buyer confirming",
+    sentence: {
+      buyer:
+        "The seller says you are now the primary owner. Confirm here once you are, and their email is gone from the channel.",
+      seller:
+        "You have made the buyer primary owner. Channel Adda pays you once they confirm and our agent has checked.",
+      agent: "The buyer is confirming primary ownership.",
     },
   },
 };
 
 /**
- * What the deal says at the top for this reader, given whose step is open.
+ * What the deal says at the top for this reader, given which step is open.
  *
  * A status can cover several steps owned by different people, and copy
  * written for the status alone went stale the moment the first of them was
@@ -295,11 +356,12 @@ export function dealHeadline(
   status: OrderStatus,
   mode: DealMode,
   viewer: DealActor,
-  awaiting: DealActor | null,
+  openStep: number | null,
 ): DealHeadline {
-  const override = awaiting
-    ? BY_OPEN_STEP[`${mode}:${status}:${awaiting}`]
-    : undefined;
+  const override =
+    openStep === null
+      ? undefined
+      : BY_OPEN_STEP[`${mode}:${status}:${openStep}`];
   if (override) {
     const reader =
       viewer === "buyer" || viewer === "seller" ? viewer : ("agent" as const);
@@ -319,81 +381,104 @@ export function dealHeadline(
 /**
  * Where the money is, in one line, for this reader.
  *
- * Both modes hold the buyer's money with Channel Adda until the deal
- * completes; Safest also has our agent hold the channel, and takes the price
- * in a second payment once it does. Nothing here may suggest a buyer pays a
- * seller directly.
+ * Fastest holds the buyer's money with Channel Adda until the buyer is
+ * primary owner. Safest holds the channel instead: our agent takes it, and
+ * only then does the buyer pay the seller directly — Channel Adda takes the
+ * admin fee and nothing else.
  */
 export function moneyNote(mode: DealMode, viewer: DealActor): string {
   if (mode === "SAFEST") {
     if (viewer === "buyer") {
-      return "You pay our fee up front, and the price to Channel Adda once our agent owns the channel and you have inspected it. Channel Adda holds the price until the channel is yours, then pays the seller.";
+      return "You pay Channel Adda only our fee. The channel's price you pay the seller directly, once our agent holds the channel — so the seller cannot take your money and keep the channel.";
     }
     if (viewer === "seller") {
-      return "The buyer pays the price to Channel Adda, never to you. We hold it until the transfer completes, then it is paid into your Channel Adda wallet.";
+      return "The buyer pays you directly, once our agent holds the channel. Our agent hands it to the buyer only after you confirm the money arrived. Channel Adda takes its fee from the buyer.";
     }
-    return "The buyer pays our fee up front and the price to Channel Adda after inspecting the channel. Channel Adda holds the price until the transfer completes.";
+    return "Channel Adda takes only the admin fee. The buyer pays the seller directly while our agent holds the channel, and the handover waits for the seller's Received.";
   }
   if (viewer === "buyer") {
-    return "Channel Adda holds the price and the fee together, and releases the price to the seller only after you confirm you have access.";
+    return "Channel Adda holds the price and the fee together, and pays the seller only once you are the channel's primary owner.";
   }
   if (viewer === "seller") {
-    return "Channel Adda is holding the buyer's payment and pays you once the buyer confirms they have access to the channel.";
+    return "Channel Adda is holding the buyer's payment and pays you once the buyer is primary owner and our agent has checked.";
   }
-  return "Channel Adda holds the whole amount until the buyer confirms access.";
+  return "Channel Adda holds the whole amount until the buyer is primary owner.";
 }
 
-/**
- * The Google waiting periods.
- *
- * Says "usually about 7 days" and never a date: the wait is Google's, there is
- * no API that reports when a Brand Account transfer finishes, and a promised
- * date would be the one thing on this page that is not true.
- */
-export const HOLD_NOTE =
-  "This is Google's own waiting period, usually about 7 days. Our agent confirms it the moment it completes — there is nothing to do but wait.";
-
-export function isHoldStep(label: string): boolean {
-  return label.startsWith("Hold ");
-}
+/** The deal's running hold, on the step it is holding back. */
+export const HOLD_NOTE: Readonly<Record<DealMode, string>> = {
+  SAFEST:
+    "Google makes a new manager wait, usually 7 days, before they can be made primary owner. There is nothing to do but wait — we email you the moment it ends.",
+  FASTEST:
+    "The holding period: the buyer is a manager before they become primary owner, so nothing can be rushed. We email you the moment it ends.",
+};
 
 /**
  * What each step actually involves, in words a first-time seller can act on.
  *
- * Keyed by the step labels in `@/lib/deal-templates`. An unknown label gets no
- * explanation rather than a wrong one, so adding a step to a template can
- * never make this file lie.
+ * Keyed by mode and then by the step labels in `@/lib/deal-templates`: the
+ * two deals share a label or two that mean different things. An unknown
+ * label gets no explanation rather than a wrong one, so adding a step to a
+ * template can never make this file lie.
  */
-const STEP_HELP: Record<string, string> = {
-  "Pay the admin fee":
-    "Channel Adda's fee, to start. The channel's price is paid to Channel Adda later, once our agent holds the channel and the buyer has inspected it.",
-  "Invite the agent as channel owner":
-    "The seller invites our agent's Google account as owner of the channel. The address to invite is on this page.",
-  "Accept and confirm custody":
-    "Our agent accepts that invitation, which is what starts Google's transfer.",
-  "Hold 1 complete, ownership verified":
-    "Google finishes the transfer and our agent confirms the channel is genuinely theirs. Only then is it out of the seller's hands.",
-  "Inspect the channel":
-    "The buyer checks the channel is what the listing described, while our agent holds it.",
-  "Pay the price to Channel Adda":
-    "The buyer pays the channel's price to Channel Adda, by crypto or from their balance — never to the seller. It is held until the channel is theirs, then paid into the seller's Channel Adda wallet.",
-  "Transfer ownership to the buyer":
-    "Our agent makes the buyer the owner of the channel.",
-  "Hold 2 complete, ownership verified":
-    "Google's second waiting period. When it finishes, the channel is the buyer's.",
-  "Pay the full amount":
-    "The channel's price and our fee together. Channel Adda holds all of it until the buyer confirms access.",
-  "Invite the agent as manager":
-    "The seller gives our agent manager access so the handover is supervised. The address to invite is on this page.",
-  "Verify the channel matches the listing":
-    "Our agent checks the channel against the listing before the seller hands it over.",
-  "Promote the buyer to primary owner":
-    "The seller makes the buyer the channel's primary owner.",
-  "Confirm access received":
-    "The buyer confirms they are in control of the channel. This is what releases the seller's money.",
-  "Release the seller's funds": "Channel Adda pays the seller.",
+const STEP_HELP: Readonly<Record<DealMode, Record<string, string>>> = {
+  SAFEST: {
+    "Pay the admin fee":
+      "Channel Adda's fee, to start, and the only payment Channel Adda takes on this deal. The channel's price goes to the seller directly, once our agent holds the channel.",
+    "Add the agent as manager":
+      "The seller adds our agent's Google account as a manager of the channel. The address to add is on this page.",
+    "Confirm manager access":
+      "Our agent confirms the access. That starts Google's waiting period, usually 7 days, before a manager can be made primary owner.",
+    "Make the agent primary owner":
+      "Once Google's waiting period is over, the seller makes our agent the channel's primary owner. We email the seller the moment they can.",
+    "Confirm primary ownership":
+      "Our agent confirms they are primary owner. From here the channel is out of the seller's hands, and not yet in the buyer's.",
+    "Pay the seller":
+      "The buyer pays the seller the price directly — crypto, bank, UPI, whatever the two of you agreed in this chat — then presses Paid. Put the transaction id or a screenshot in the chat: it is your proof.",
+    "Confirm the payment arrived":
+      "The seller presses Received once the money is in their account. Only then does our agent hand the channel over. If it has not arrived, say so in the chat and a moderator will look.",
+    "Make the buyer the owner":
+      "Our agent makes the buyer's account, named on this page, the channel's owner.",
+    "Confirm ownership received":
+      "The buyer confirms the channel is theirs. That completes the deal.",
+  },
+  FASTEST: {
+    "Pay the full amount":
+      "The channel's price and our fee together. Channel Adda holds all of it until the buyer is primary owner.",
+    "Add the buyer as manager":
+      "The seller adds the buyer's account, named on this page, as a manager of the channel. Our agent guides it in the chat.",
+    "Confirm manager access":
+      "The buyer confirms they are a manager and the channel matches the listing. That starts the holding period, shown in the chat, before they can be made primary owner.",
+    "Make the buyer primary owner":
+      "After the holding period, the seller makes the buyer primary owner and removes their own email from the channel.",
+    "Confirm primary ownership":
+      "The buyer confirms they are primary owner and the seller's email is gone.",
+    "Release the seller's funds":
+      "Our agent checks the handover, then Channel Adda pays the seller into their Channel Adda wallet.",
+  },
 };
 
-export function stepHelp(label: string): string | undefined {
-  return STEP_HELP[label];
+/** Clearer than "Mark this done" where the step is a statement of fact. */
+const CONFIRM_LABELS: Readonly<Record<string, string>> = {
+  "Add the agent as manager": "I have added the agent",
+  "Confirm manager access": "I have manager access",
+  "Make the agent primary owner": "I have made the agent primary owner",
+  "Confirm primary ownership": "I am the primary owner",
+  // The client's own words for the two that are the record of the price.
+  "Pay the seller": "Paid",
+  "Confirm the payment arrived": "Received",
+  "Make the buyer the owner": "I have made the buyer the owner",
+  "Confirm ownership received": "The channel is mine",
+  "Add the buyer as manager": "I have added the buyer",
+  "Make the buyer primary owner": "I have made the buyer primary owner",
+  "Release the seller's funds": "Release the funds",
+};
+
+/** What the step's button says. */
+export function confirmLabel(label: string): string {
+  return CONFIRM_LABELS[label] ?? "Mark this done";
+}
+
+export function stepHelp(mode: DealMode, label: string): string | undefined {
+  return STEP_HELP[mode][label];
 }

@@ -15,10 +15,11 @@ import { changeHandoverTo } from "@/server/actions/deals";
 /**
  * The buyer's own account that receives ownership, on the deal itself.
  *
- * Whoever transfers — the seller on Fastest, our agent on either — reads it
- * here, the same address their email gave them. The buyer sees what they
- * named and can correct it until the step that uses it is done. The server
- * has already left it out of a Safest seller's view.
+ * Whoever transfers — the seller on Fastest, our agent on Safest — reads it
+ * here, the same address their email gave them, until the channel has gone
+ * to it. The buyer sees what they named and can correct it until the step
+ * that first uses it is done. The server has already left it out of a
+ * Safest seller's view.
  */
 export function HandoverAccount({
   dealId,
@@ -27,14 +28,17 @@ export function HandoverAccount({
   platform,
   handoverTo,
   open,
+  inUse,
 }: {
   dealId: string;
   viewerRole: DealActor;
   mode: DealMode;
   platform: Platform;
   handoverTo: string | null;
-  /** The step that uses it is not done yet. */
+  /** The step that first uses it is not done yet: the buyer may change it. */
   open: boolean;
+  /** The channel has not gone to it yet, so it is still needed on screen. */
+  inUse: boolean;
 }) {
   const router = useRouter();
   const target = handoverTarget(platform);
@@ -44,7 +48,7 @@ export function HandoverAccount({
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  if (!open) return null;
+  if (!inUse) return null;
   const buyer = viewerRole === "buyer";
   if (!buyer && !handoverTo) return null;
   if (viewerRole === "seller" && mode === "SAFEST") return null;
@@ -67,7 +71,7 @@ export function HandoverAccount({
     });
   };
 
-  const showForm = buyer && (editing || !handoverTo);
+  const showForm = buyer && open && (editing || !handoverTo);
 
   return (
     <Card>
@@ -83,7 +87,7 @@ export function HandoverAccount({
           >
             {buyer ? "Ownership goes to" : "Give ownership to this account"}
           </h2>
-          {buyer && handoverTo && !editing ? (
+          {buyer && open && handoverTo && !editing ? (
             <Button
               type="button"
               variant="ghost"
@@ -166,7 +170,9 @@ export function HandoverAccount({
               </p>
               <p className="text-xs leading-relaxed text-subtle">
                 {buyer
-                  ? "Whoever transfers the account uses exactly this. You can correct it until they do."
+                  ? open
+                    ? "Whoever transfers the account uses exactly this. You can correct it until they do."
+                    : "It is in use now, so it can no longer change. If something is wrong, say so in the chat."
                   : "The buyer named it before paying. Use exactly this account, nothing they write in the chat instead."}
               </p>
             </>

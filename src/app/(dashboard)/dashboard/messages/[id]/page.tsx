@@ -20,6 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { db } from "@/lib/db";
 import { dealPanelState } from "@/lib/deal-panel";
+import { templateFor } from "@/lib/deal-templates";
 import { fromCents } from "@/lib/listing-form";
 import { writesInClosedThread } from "@/lib/thread-rules";
 import { cn } from "@/lib/utils";
@@ -102,9 +103,14 @@ export default async function ThreadPage({
       }
     : null;
   // As the deal page does it: only the agent is ever asked to name a second
-  // approver, only on their own step, and nobody else is shown the list.
+  // approver, only on the step that hands value across, and nobody else is
+  // shown the list.
   const staffIds =
-    deal?.viewerRole === "agent" && deal.nextStep?.actor === "agent"
+    deal?.viewerRole === "agent" &&
+    deal.nextStep?.actor === "agent" &&
+    templateFor(deal.mode).find(
+      (step) => step.position === deal.nextStep?.position,
+    )?.needsApprovalAbove
       ? await db.user.findMany({
           where: {
             role: { in: ["MODERATOR", "FINANCE", "SUPERADMIN"] },
@@ -194,7 +200,7 @@ export default async function ThreadPage({
                     deal.status,
                     deal.mode,
                     deal.viewerRole,
-                    deal.nextStep?.actor ?? null,
+                    deal.nextStep?.position ?? null,
                   ).label
                 }
               </Badge>
@@ -251,14 +257,7 @@ export default async function ThreadPage({
               ) : panel.kind === "pay" && deal && wallet ? (
                 <PayNow
                   orderId={deal.id}
-                  stage={
-                    deal.status === "AWAITING_PAYMENT" ? "opening" : "price"
-                  }
-                  amountUsd={
-                    deal.status === "AWAITING_PAYMENT"
-                      ? deal.totalUsd
-                      : deal.priceUsd
-                  }
+                  amountUsd={deal.totalUsd}
                   priceUsd={deal.priceUsd}
                   mode={deal.mode}
                   availableUsd={wallet.availableUsd}
@@ -275,6 +274,7 @@ export default async function ThreadPage({
                     platform={deal.platform}
                     handoverTo={deal.handoverTo}
                     open={deal.handoverOpen}
+                    inUse={deal.handoverInUse}
                   />
                   {deal.nextStep ? <RaiseDispute deal={deal} /> : null}
                 </div>

@@ -24,7 +24,7 @@ const trustPoints = [
 const glimpse = [
   { label: "Admin fee paid", state: "done" },
   { label: "Agent holds the channel", state: "done" },
-  { label: "Price paid to Channel Adda", state: "now" },
+  { label: "Buyer pays the seller", state: "now" },
   { label: "Ownership handed over", state: "next" },
 ] as const;
 

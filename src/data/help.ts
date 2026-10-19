@@ -38,16 +38,16 @@ export const helpArticles: HelpArticle[] = [
     summary:
       "Where your payment sits between checkout and payout, and what triggers a refund.",
     body: [
-      "On both kinds of deal your payment goes to us, never to the seller, and reaches the seller only once the account is yours. On a Fastest deal you pay it all up front and the seller hands the account to you directly while our agent watches. On a Safest deal we hold the account as well — one of our agents takes ownership of it before you pay anything but our fee, and you pay the price to us once it is verifiably in our hands.",
+      "On a Fastest deal you pay it all to us up front, never to the seller, and the seller hands the account to you directly while our agent watches; we pay the seller once you are primary owner. On a Safest deal we hold the account instead — one of our agents takes ownership of it before you pay anything but our fee — and only then do you pay the seller the price directly, the way you agree in the deal chat.",
       "Either way the gap is deliberate. Handing over a login is not the same as losing access forever: on several platforms a previous owner can attempt account recovery for days or weeks afterwards. Something has to sit between the two sides until that window closes — on a Fastest deal it is your money, on a Safest deal it is the account itself.",
-      "If the handover fails at any point, you open a dispute and the deal freezes where it stands. Nothing moves until a moderator has read the order record and decided. What that can recover: on a Fastest deal we are holding your money and can return it. On a Safest deal we are holding the account, and the price once you have paid it, so a dispute can return the channel to the seller and the price to you. Our admin fee is kept once an agent has held the account — it paid for that work.",
+      "If the handover fails at any point, you open a dispute and the deal freezes where it stands. Nothing moves until a moderator has read the order record and decided. What that can recover: on a Fastest deal we are holding your money and can return it. On a Safest deal we are holding the account: if you paid the seller and they will not confirm it, the moderator decides on the record — when you pressed Paid, and the proof in the chat — and our agent can hand you the account. Our admin fee is kept once an agent has held the account — it paid for that work.",
     ],
     steps: [
-      "You pay Channel Adda — the whole amount up front on a Fastest deal; on a Safest deal our fee first, and the price once our agent holds the account",
-      "The seller starts the transfer, working a platform-specific checklist",
-      "You verify and confirm you have full control",
-      "The cooling-off period passes",
-      "The seller is paid",
+      "You pay Channel Adda — the whole amount on a Fastest deal, only our fee on a Safest deal",
+      "The seller adds you (Fastest) or our agent (Safest) to the account, working a platform-specific checklist",
+      "The waiting period passes, then ownership moves on",
+      "On a Safest deal you pay the seller directly once our agent holds the account, and they confirm it arrived",
+      "You confirm you have full control. On a Fastest deal that is when we pay the seller",
     ],
   },
   {
@@ -65,10 +65,10 @@ export const helpArticles: HelpArticle[] = [
     title: "Confirming a handover safely",
     category: "buying",
     summary:
-      "What to check before you press confirm, and why confirming does not pay the seller straight away.",
+      "What to check before you press confirm, at each of the steps that ask you to.",
     body: [
       "Confirming means you have full, uncontested control of the account. Before you press it, work through the checklist on your order — it is different for every platform, because every platform transfers ownership differently.",
-      "Confirming does not release the money. It starts the cooling-off period, which runs from three days on Telegram to twenty-one on Instagram. You keep the right to open a dispute for that entire window.",
+      "On a Fastest deal you confirm twice: once you are a manager, which starts the holding period — from three days on Telegram to twenty-one on Instagram — and once you are primary owner, which is what pays the seller. You keep the right to open a dispute until the deal completes.",
     ],
     steps: [
       "Change the recovery email to one only you control",
@@ -107,7 +107,7 @@ export const helpArticles: HelpArticle[] = [
     category: "selling",
     summary: "Payout timing, the seller fee, and withdrawal security.",
     body: [
-      "The buyer paid us, so we pay you, on both kinds of deal. While the deal runs, the price shows in your wallet under Held for your sales. When the transfer completes — after the cooling-off period on a Fastest deal, after Google's second waiting period on a Safest one — the sale amount, less the seller fee if one is set (check /fees), lands in your Channel Adda balance. You then withdraw to your own crypto wallet, usually within the hour.",
+      "On a Fastest deal the buyer paid us, so we pay you. While the deal runs, the price shows in your wallet under Held for your sales; once the buyer is primary owner and our agent has checked, the sale amount, less the seller fee if one is set (check /fees), lands in your Channel Adda balance, and you withdraw it to your own crypto wallet, usually within the hour. On a Safest deal the buyer pays you directly, the way you agree in the deal chat, once our agent holds the account — press Received when it arrives, and only then does the account move to them.",
       "For your own protection, adding or changing a payout address locks withdrawals for 24 hours and sends you an email. Address-change attacks are the most common way marketplace sellers lose money, and this delay is what stops them.",
     ],
   },
@@ -117,7 +117,7 @@ export const helpArticles: HelpArticle[] = [
     category: "trust",
     summary: "When to open one, what we look at, and how long it takes.",
     body: [
-      "Open a dispute from the deal page the moment something looks wrong — the seller goes quiet, the transfer stalls, or the account is recovered after handover. The deal freezes where it stands, the account stays with our agent if it is there, and the money we hold for it stays with us — it is not in the seller's balance until the deal completes, so it cannot be withdrawn while the dispute is open.",
+      "Open a dispute from the deal page the moment something looks wrong — the seller goes quiet, the transfer stalls, a payment you made is not confirmed, or the account is recovered after handover. The deal freezes where it stands, the account stays with our agent if it is there, and any money we hold for it stays with us — it is not in the seller's balance until the deal completes, so it cannot be withdrawn while the dispute is open.",
       "A moderator reviews the whole order record: every message, every proof upload, the transfer checklist with timestamps, and a live check of who controls the account now. Nobody has to take anyone's word for anything.",
       "We aim to respond within 48 hours and decide within seven days. A dispute has two outcomes: the deal completes, or it is reversed — the account goes on to the buyer, or back to the seller with the money we hold returned to the buyer. We do not split a deal down the middle, because half an account is not a thing anybody can own.",
     ],

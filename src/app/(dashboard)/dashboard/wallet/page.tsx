@@ -271,17 +271,18 @@ export default async function WalletPage({
         </Card>
 
         {/* In sight, as one quiet line: a seller looking for their money
-            needs to see at once when it arrives here, and that it is never
-            paid to them by the buyer directly. */}
+            needs to see at once when it arrives here, and that a Safest price
+            never does. */}
         <div className="mt-3 flex items-start gap-2 text-[0.8125rem] leading-relaxed text-muted">
           <InfoIcon
             aria-hidden="true"
             className="mt-[0.1875rem] size-3.5 shrink-0 text-subtle"
           />
           <p className="max-w-[72ch]">
-            A sale reaches this balance when its transfer completes, on both
-            kinds of deal. Until then the buyer&rsquo;s payment is held by
-            Channel Adda and listed under{" "}
+            A Fastest sale reaches this balance when its transfer completes. A
+            Safest buyer pays you directly, so it never comes through here.
+            Until then a Fastest buyer&rsquo;s payment is held by Channel Adda
+            and listed under{" "}
             <strong className="font-semibold text-fg">
               Held for your sales
             </strong>

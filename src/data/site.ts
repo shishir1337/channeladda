@@ -121,15 +121,15 @@ export const serviceMap = Object.fromEntries(
 export const faqs = [
   {
     q: "How does Channel Adda protect my money?",
-    a: "Every purchase is supervised, and your payment always goes to Channel Adda, never to the seller. On a Safest deal one of our agents takes ownership of the account first, and you pay the price to us only once it is verifiably in our hands — so the seller cannot take it back or sell it twice. On a Fastest deal you pay us up front and we release it to the seller only once you confirm you have control. Either way, a handover that fails leaves you no worse off.",
+    a: "Every purchase is supervised. On a Safest deal one of our agents takes ownership of the account first, and only then do you pay the seller directly — so the seller cannot take it back or sell it twice — and the account moves to you once they confirm your payment. On a Fastest deal you pay us up front and we release it to the seller only once you are the account's primary owner. Either way, nobody hands over anything on trust.",
   },
   {
     q: "What is the difference between Quick and Safest checkout?",
-    a: "Safest means we hold the account and then the money: one of our agents takes ownership of it first, you pay the price to Channel Adda once it is verifiably in our hands, and we transfer it to you afterwards and then pay the seller. Two Google waiting periods. Fastest means we hold the money: you pay us the price and our fee together, our agent supervises while the seller transfers the account straight to you, and we pay the seller once you confirm access. One waiting period. You choose on every listing; there is no price threshold.",
+    a: "Safest means we hold the account: one of our agents takes ownership of it first, you pay the seller directly once it is verifiably in our hands, and when the seller confirms the payment arrived our agent makes you the owner. You pay us only our fee. Fastest means we hold the money: you pay us the price and our fee together, the seller makes you a manager and, after the holding period, primary owner, and we pay the seller once you are. You choose on every listing; there is no price threshold.",
   },
   {
     q: "Which payment methods do you accept?",
-    a: "Payments and payouts are processed in crypto through Cryptomus — USDT, BTC, ETH, TRX and 20+ other assets. Sellers withdraw to their own wallet once the buyer confirms the handover.",
+    a: "Payments to Channel Adda and payouts are processed in crypto through Cryptomus — USDT, BTC, ETH, TRX and 20+ other assets — and a Fastest seller withdraws to their own wallet once the deal completes. A Safest price goes from the buyer to the seller directly, by whatever method the two of you agree in the deal chat.",
   },
   {
     q: "How do you verify that a seller really owns the account?",
@@ -137,7 +137,7 @@ export const faqs = [
   },
   {
     q: "What fees does Channel Adda charge?",
-    a: "Buyers pay a platform fee, set by us and shown in full on every listing and on the fees page before you commit. On both kinds of deal you pay the price to us too, never to the seller — on a Safest deal after our agent holds the account. Sellers pay a success fee, taken from the price when a deal completes; there is no cost to create an account or publish a listing.",
+    a: "Buyers pay a platform fee, set by us and shown in full on every listing and on the fees page before you commit. On a Fastest deal the price comes to us too; on a Safest deal you pay it to the seller directly, once our agent holds the account. Sellers pay a success fee on a Fastest deal, taken from the price when it completes; there is no cost to create an account or publish a listing.",
   },
   {
     q: "What happens if a transfer goes wrong?",

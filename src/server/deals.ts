@@ -857,7 +857,7 @@ export async function recordOpeningPayment(
 }
 
 /**
- * A Safest price paid to Channel Adda.
+ * A Safest price that reached Channel Adda anyway.
  *
  * The buyer pays a Safest seller directly, so no step takes this money any
  * more — but an invoice raised before that changed can still be paid. The
@@ -2024,6 +2024,13 @@ export type DealListRow = {
   side: "buyer" | "seller" | "agent";
   /** Whose move it is, or null once the deal has stopped. */
   awaiting: DealActor | null;
+  /** The position of the step that is open, for the headline. */
+  openStep: number | null;
+  /**
+   * While the deal's hold runs: when it ends. The open step exists but
+   * cannot be taken, so it is nobody's move until then.
+   */
+  waitingUntil: Date | null;
   createdAt: Date;
 };
 
@@ -2049,6 +2056,7 @@ export async function listDealsFor(userId: string): Promise<DealListRow[]> {
       buyerId: true,
       sellerId: true,
       agentId: true,
+      holdUntil: true,
       createdAt: true,
       listing: { select: { title: true } },
       buyer: { select: { name: true } },
@@ -2057,11 +2065,12 @@ export async function listDealsFor(userId: string): Promise<DealListRow[]> {
         where: { completedAt: null },
         orderBy: { position: "asc" },
         take: 1,
-        select: { actor: true },
+        select: { actor: true, position: true },
       },
     },
   });
 
+  const now = new Date();
   return orders.map((order) => {
     const side =
       order.buyerId === userId
@@ -2083,6 +2092,13 @@ export async function listDealsFor(userId: string): Promise<DealListRow[]> {
       awaiting: isTerminal(order.status)
         ? null
         : ((order.steps[0]?.actor as DealActor) ?? null),
+      openStep: isTerminal(order.status)
+        ? null
+        : (order.steps[0]?.position ?? null),
+      waitingUntil:
+        !isTerminal(order.status) && order.holdUntil && order.holdUntil > now
+          ? order.holdUntil
+          : null,
       createdAt: order.createdAt,
     };
   });
@@ -2096,7 +2112,9 @@ export async function listDealsFor(userId: string): Promise<DealListRow[]> {
  */
 export async function countDealsAwaiting(userId: string): Promise<number> {
   const rows = await listDealsFor(userId);
-  return rows.filter((row) => row.awaiting === row.side).length;
+  return rows.filter(
+    (row) => row.awaiting === row.side && row.waitingUntil === null,
+  ).length;
 }
 
 export type DealStepView = {
@@ -2148,6 +2166,12 @@ export type DealView = {
   handoverTo: string | null;
   /** Whether the buyer may still correct it: the step using it is not done. */
   handoverOpen: boolean;
+  /**
+   * Whether it is still needed: until the channel has gone to it. Fastest
+   * uses it twice — the seller adds it as manager, then makes it primary
+   * owner — so it stays on screen after it can no longer change.
+   */
+  handoverInUse: boolean;
   platform: Platform;
 };
 
@@ -2254,6 +2278,7 @@ export async function getDealFor(
         ? null
         : order.handoverTo,
     handoverOpen: handoverStillOpen(order.mode, order.status, order.steps),
+    handoverInUse: handoverStillNeeded(order.mode, order.status, order.steps),
     platform: order.listing.platform,
   };
 }
@@ -2272,6 +2297,17 @@ function handoverStillOpen(
   const uses = templateFor(mode).find((step) => step.usesHandover)?.position;
   const used = steps.find((step) => step.position === uses)?.completedAt;
   return !used;
+}
+
+/** Until the step that gives the channel to the buyer's account is done. */
+function handoverStillNeeded(
+  mode: DealMode,
+  status: OrderStatus,
+  steps: { position: number; completedAt: Date | null }[],
+): boolean {
+  if (isTerminal(status)) return false;
+  const gives = templateFor(mode).find((step) => step.handsOver)?.position;
+  return !steps.find((step) => step.position === gives)?.completedAt;
 }
 
 /**

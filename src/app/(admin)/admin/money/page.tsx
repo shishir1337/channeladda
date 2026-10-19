@@ -448,7 +448,7 @@ export default async function AdminMoneyPage({
             count={plural(position.heldForBuyers.count, "deal")}
             icon={LockIcon}
             note="Not ours"
-            info="What buyers have paid into deals still running: price and fee on Fastest, including those waiting out their recovery hold; the fee, and the price once paid, on Safest. Not ours: the price becomes the seller's when the deal completes, the fee ours when it is earned, and anything else goes back to the buyer."
+            info="What buyers have paid into deals still running: price and fee on Fastest, the fee alone on Safest. Not ours: the price becomes the seller's when a Fastest deal completes, the fee ours when it is earned, and anything else goes back to the buyer."
           />
           <MoneyMetric
             label="In members' wallets"

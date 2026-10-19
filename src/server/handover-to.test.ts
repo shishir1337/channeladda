@@ -168,11 +168,11 @@ test(
       ),
     ).toBe(true);
 
-    // The seller promoting the buyer is the step that uses it. After that, a
-    // change would only send a channel somewhere it is not.
-    const handsOver = templateFor("FASTEST").find((s) => s.handsOver);
+    // The seller adding the buyer as manager is the step that uses it.
+    // After that, a change would only point somewhere the channel is not.
+    const uses = templateFor("FASTEST").find((s) => s.usesHandover);
     await db.transferStep.updateMany({
-      where: { orderId, position: { lte: handsOver?.position ?? 0 } },
+      where: { orderId, position: { lte: uses?.position ?? 0 } },
       data: { completedAt: new Date() },
     });
     expect(
@@ -182,6 +182,34 @@ test(
         raw: "too.late@gmail.com",
       }),
     ).toEqual({ ok: false, reason: "handed-over" });
+  }),
+);
+
+test(
+  "it can no longer change once it is used, but stays in view until the handover",
+  withCleanDb(async () => {
+    // Fastest uses the account twice: the seller adds it as manager, then
+    // after the holding period makes it primary owner. Locked from the
+    // first, it must still be on the seller's screen for the second.
+    const { orderId, buyer, seller } = await opened("FASTEST");
+    await pay(orderId);
+    const { getDealFor } = await import("@/server/deals");
+    const done = async (upTo: number) =>
+      db.transferStep.updateMany({
+        where: { orderId, position: { lte: upTo } },
+        data: { completedAt: new Date() },
+      });
+
+    await done(2);
+    const added = await getDealFor(seller.id, orderId);
+    expect(added).toMatchObject({ handoverOpen: false, handoverInUse: true });
+    expect(added?.handoverTo).toBe("buyer.owner@gmail.com");
+
+    await done(4);
+    expect(await getDealFor(buyer.id, orderId)).toMatchObject({
+      handoverOpen: false,
+      handoverInUse: false,
+    });
   }),
 );
 

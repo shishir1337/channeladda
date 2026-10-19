@@ -23,7 +23,7 @@ const BANNED: readonly RegExp[] = [
   /the (account|channel) and then the money/i,
   // The Fastest hold that ran after the handover, and Safest's two holds.
   /recovery hold/i,
-  /hold [12]/i,
+  /\bhold [12]\b/i,
 ];
 
 const ROOT = join(__dirname, "..");

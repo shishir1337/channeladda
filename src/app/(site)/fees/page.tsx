@@ -12,7 +12,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const fees = await getFeeSettings();
   return {
     title: "Pricing & fees",
-    description: `Buyers pay ${formatRate(fees.buyerFeeBpSafest)}% on top of the listing price. Sellers pay ${formatRate(fees.sellerFeeBp)}% only when a deal completes. No listing fee and no monthly cost.`,
+    description: `Buyers pay ${formatRate(fees.buyerFeeBpSafest)}% on top of the listing price. Sellers pay ${formatRate(fees.sellerFeeBp)}% when a Fastest deal completes. No listing fee and no monthly cost.`,
     alternates: { canonical: "/fees" },
   };
 }
@@ -73,9 +73,10 @@ export default async function FeesPage() {
                 {formatRate(fees.sellerFeeBp)}%
               </p>
               <p className="mt-4 text-[0.9375rem] leading-relaxed text-muted">
-                Deducted from the sale price when the deal completes. Free to
-                list, free to edit, and nothing owed if the account does not
-                sell.
+                Deducted from the sale price when a Fastest deal completes. A
+                Safest buyer pays you directly, so there is nothing to deduct it
+                from. Free to list, free to edit, and nothing owed if the
+                account does not sell.
               </p>
             </div>
           </div>
@@ -95,7 +96,7 @@ export default async function FeesPage() {
               mode="FASTEST"
               fees={fees}
               title="Fastest — the money passes through us"
-              note="You pay Channel Adda the price and the fee together. We pay the seller once you confirm you have full control."
+              note="You pay Channel Adda the price and the fee together. We pay the seller once you are the account's primary owner."
               columns={[
                 "Sale price",
                 "Buyer fee",
@@ -108,14 +109,14 @@ export default async function FeesPage() {
             <ModeTable
               mode="SAFEST"
               fees={fees}
-              title="Safest — the account passes through us, and so does the money"
-              note="You pay Channel Adda the fee up front, and the price once our agent holds the account and you have inspected it. We pay the seller when the account is yours."
+              title="Safest — the account passes through us, the money does not"
+              note="You pay Channel Adda only the fee. The price you pay the seller directly, once our agent holds the account — and the account comes to you once the seller confirms it arrived."
               columns={[
                 "Sale price",
                 "Our fee",
                 "Buyer pays us",
                 "Seller fee",
-                "Seller receives",
+                "Buyer pays the seller",
                 "Channel Adda earns",
               ]}
             />
@@ -260,8 +261,8 @@ function ModeTable({
                     <Price usd={b.fee} />
                   </td>
                   <td className="px-4 py-4 font-medium">
-                    {/* Safest takes it in two payments, fee then price. */}
-                    <Price usd={mode === "SAFEST" ? price + b.fee : b.total} />
+                    {/* Safest: the fee alone; the price goes to the seller. */}
+                    <Price usd={b.total} />
                   </td>
                   <td className="px-4 py-4 text-muted">
                     <Price usd={s.fee} />

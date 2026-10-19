@@ -3,7 +3,9 @@ import { db } from "@/lib/db";
 import {
   advanceStep,
   announceEndedHolds,
+  countDealsAwaiting,
   createDeal,
+  listDealsFor,
   recordOpeningPayment,
   resolveDeal,
 } from "@/server/deals";
@@ -120,5 +122,22 @@ test(
     });
     await passHold(orderId);
     expect(await announceEndedHolds()).toBe(0);
+  }),
+);
+
+test(
+  "a step behind a running hold is not counted as anyone's move",
+  withCleanDb(async () => {
+    // The dashboard's "waiting on you" badge would otherwise stay lit for
+    // the whole week on a step the seller cannot take.
+    const { orderId, seller } = await inHold("FASTEST");
+    expect(await countDealsAwaiting(seller.id)).toBe(0);
+    const [row] = await listDealsFor(seller.id);
+    expect(row).toMatchObject({ awaiting: "seller", openStep: 4 });
+    expect(row.waitingUntil?.getTime()).toBeGreaterThan(Date.now());
+
+    await passHold(orderId);
+    expect(await countDealsAwaiting(seller.id)).toBe(1);
+    expect((await listDealsFor(seller.id))[0].waitingUntil).toBeNull();
   }),
 );

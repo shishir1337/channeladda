@@ -148,7 +148,7 @@ export async function StuckDeals({
                       cents={order.priceUsd}
                       caption={
                         order.mode === "SAFEST"
-                          ? "paid to us after inspection"
+                          ? "paid to the seller directly"
                           : "we hold this"
                       }
                     />

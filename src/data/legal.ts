@@ -28,9 +28,9 @@ export const legalDocs: Record<string, LegalDoc> = {
         heading: "What Channel Adda is",
         paragraphs: [
           "Channel Adda is a marketplace and a supervised transfer service. We introduce buyers and sellers of social media accounts and content websites, and on every deal one side of the exchange is held by us while the other moves.",
-          "On a Safest deal we hold the account and then the money. One of our agents takes ownership of the account, the buyer pays the purchase price to Channel Adda once it is verifiably in our hands, and we transfer the account on to the buyer afterwards. We hold the price until that transfer completes and then credit it to the seller's Channel Adda balance. On no deal does a buyer pay a seller directly.",
-          "On a Fastest deal we hold the money. The buyer pays us the price and our fee together, our agent supervises while the seller transfers the account to the buyer, and we pay the seller once the buyer confirms access.",
-          "We are not a party to the sale itself. The contract for the account is between the buyer and the seller. Our role is to hold the buyer's payment on every deal — and on a Safest deal the account as well — to verify what we reasonably can, and to decide disputes fairly on the record in front of us.",
+          "On a Safest deal we hold the account. One of our agents takes ownership of it, and only once it is verifiably in our hands does the buyer pay the purchase price to the seller directly, by the method the two of them agree in the deal chat. When the seller confirms the payment arrived, our agent transfers the account on to the buyer. Channel Adda takes its fee from the buyer and never holds the price.",
+          "On a Fastest deal we hold the money. The buyer pays us the price and our fee together, our agent supervises while the seller makes the buyer a manager and, after the holding period, primary owner, and we pay the seller once the buyer is primary owner.",
+          "We are not a party to the sale itself. The contract for the account is between the buyer and the seller. Our role is to hold the buyer's payment on a Fastest deal and the account on a Safest one, to verify what we reasonably can, and to decide disputes fairly on the record in front of us.",
         ],
       },
       {
@@ -142,22 +142,22 @@ export const legalDocs: Record<string, LegalDoc> = {
       {
         heading: "A Fastest deal",
         paragraphs: [
-          "We hold the whole amount — the account's price and our fee — from the moment you pay until you confirm you have access. If the transfer does not complete, we return all of it.",
+          "We hold the whole amount — the account's price and our fee — from the moment you pay until you confirm you are the account's primary owner. If the transfer does not complete, we return all of it.",
         ],
         bullets: [
           "The seller never starts the transfer",
           "The seller goes silent partway through the handover",
           "The account is materially different from the listing — wrong audience size, undisclosed strikes, different niche",
-          "The previous owner recovers the account during the hold period",
+          "The seller removes you, or takes the account back, during the holding period",
           "The seller cannot complete the transfer for a reason within their control",
         ],
       },
       {
         heading: "A Safest deal",
         paragraphs: [
-          "You pay us our fee first, and the account's price once one of our agents has taken ownership of the account and you have inspected it. Both are paid to Channel Adda, never to the seller, and we hold the price until the account is yours.",
-          "What protects you is the order of events and the fact that we hold the money. Before you pay the price, the account is already out of the seller's hands and in ours — they cannot take it back, sell it twice, or disappear with it — and the seller is paid only once the account is yours.",
-          "If a deal fails before our agent has taken custody, we refund our fee in full. If it fails after that, we return the account to the seller and refund any price you have paid us; the fee has paid for the agent's work and is kept. If something goes wrong after you have paid the price, we decide the outcome on the record: the account goes to you and the price to the seller, or the account goes back to the seller and the price back to you.",
+          "You pay us our fee, and nothing else. Once one of our agents has taken ownership of the account, you pay the seller the account's price directly, by the method you agree in the deal chat, and press Paid; the seller presses Received when it arrives. Only then does our agent transfer the account to you.",
+          "What protects you is the order of events and the fact that we hold the account. Before you pay the seller, the account is already out of their hands and in ours — they cannot take it back, sell it twice, or disappear with it — and it moves to you once they confirm your payment.",
+          "If a deal fails before our agent has taken custody, we refund our fee in full. If it fails after that, we return the account to the seller; the fee has paid for the agent's work and is kept. We never hold the price, so we cannot refund it. If the seller will not confirm a payment you made, we decide on the record — when you pressed Paid, and the proof you put in the chat — and if it shows you paid, our agent transfers the account to you. Once the seller has confirmed the payment, the account cannot go back to them.",
         ],
       },
       {
@@ -165,16 +165,16 @@ export const legalDocs: Record<string, LegalDoc> = {
         bullets: [
           "Advertising revenue not continuing after the sale — this is disclosed on the listing and acknowledged at checkout, because ad accounts cannot be transferred",
           "The audience declining after you take over",
-          "A change of mind after you have confirmed the handover and the hold period has ended",
-          "Money paid to a seller outside Channel Adda, on either kind of deal — we never held it, and no part of this policy can bring it back. Never pay a seller directly",
+          "A change of mind after you have confirmed the handover",
+          "Money paid to a seller on a Fastest deal, or on a Safest deal before our agent holds the account or by a method not agreed in the deal chat — we never held it, and no part of this policy can bring it back",
           "A platform banning the account for something you did after taking ownership",
         ],
       },
       {
         heading: "Platform action after completion",
         paragraphs: [
-          "If a platform suspends or bans a sold account within the hold period for a reason that pre-dates the sale, that is treated as the account being materially different from the listing — but raise it before the deal completes. Once a deal is closed it cannot be reopened, on either side, which is why the hold periods exist and why we ask you to check the account properly before confirming. On a Fastest deal raised in time you are refunded in full. On a Safest deal raised in time, if our agent still holds the account it goes back to the seller and any price you have paid us is refunded; the fee is returned only if our agent had not yet taken custody.",
-          "After the hold period ends, the account is yours and the risk sits with you. This is why the hold periods are set by each platform's own recovery and review windows rather than picked for convenience.",
+          "If a platform suspends or bans a sold account before the deal completes, for a reason that pre-dates the sale, that is treated as the account being materially different from the listing — but raise it before the deal completes. Once a deal is closed it cannot be reopened, on either side, which is why we ask you to check the account properly before confirming. On a Fastest deal raised in time you are refunded in full. On a Safest deal raised in time, if our agent still holds the account and the seller has not confirmed a payment, it goes back to the seller; the fee is returned only if our agent had not yet taken custody.",
+          "After the deal completes, the account is yours and the risk sits with you. This is why a Fastest deal's holding period is set by each platform's own review windows rather than picked for convenience.",
         ],
       },
       {

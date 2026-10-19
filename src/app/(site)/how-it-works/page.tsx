@@ -11,7 +11,7 @@ import { platforms } from "@/data/platforms";
 export const metadata: Metadata = {
   title: "How it works",
   description:
-    "Both deal types, the handover checklist and the cooling-off period explained. How Channel Adda moves money and account ownership without either side taking a leap of faith.",
+    "Both deal types, the handover checklist and the holding period explained. How Channel Adda moves money and account ownership without either side taking a leap of faith.",
   alternates: { canonical: "/how-it-works" },
 };
 
@@ -30,9 +30,9 @@ export default function HowItWorksPage() {
       <Section className="border-y border-line bg-bg-subtle">
         <Container>
           <SectionHeading
-            eyebrow="Cooling-off"
+            eyebrow="Holding period"
             title="Why the wait is different on every platform"
-            description="The hold is not a policy we invented for comfort. It is set by how long each platform actually lets a previous owner take an account back."
+            description="On a Fastest deal you are a manager for the whole holding period before you become primary owner, and the seller is paid only after that. On YouTube it is Google's own wait before a manager can be made primary owner."
           />
 
           <div className="mt-9 overflow-x-auto rounded-card border border-line bg-surface sm:mt-12">
@@ -99,8 +99,8 @@ export default function HowItWorksPage() {
               className="mt-0.5 size-4 shrink-0 text-verified"
             />
             <span>
-              If the previous owner recovers the account inside that window, you
-              reopen the dispute, and it is decided on the record.
+              If anything goes wrong inside that window, you open a dispute and
+              it is decided on the record — your money is still with us.
             </span>
           </p>
         </Container>

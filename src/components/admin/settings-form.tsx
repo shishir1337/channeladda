@@ -333,7 +333,7 @@ export function SettingsForm({
           name="buyerFeeBpSafest"
           label="Buyer fee, Safest"
           unit="%"
-          hint="Paid up front. The price follows, to us, after the buyer inspects the channel."
+          hint="Paid up front, and all a Safest buyer pays us: the price goes to the seller directly."
           inputMode="decimal"
           value={safest}
           onChange={setSafest}
@@ -355,7 +355,7 @@ export function SettingsForm({
           name="sellerFeeBp"
           label="Seller fee"
           unit="%"
-          hint="Taken from the price on completion, on both kinds of deal."
+          hint="Taken from the price when a Fastest deal completes. Never on Safest, whose price goes to the seller directly."
           inputMode="decimal"
           value={seller}
           onChange={setSeller}

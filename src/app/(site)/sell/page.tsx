@@ -36,8 +36,8 @@ const steps = [
     body: "Accept, reject or counter. Everything stays inside Channel Adda, so the price you agreed is on record if anything is ever disputed.",
   },
   {
-    title: "Get paid in crypto",
-    body: "On a Fastest deal the buyer's money is with us before you hand anything over, and reaches your Channel Adda balance once they confirm. On a Safest deal you give the account to our agent first, the buyer pays the price to Channel Adda, and it reaches your balance when the transfer completes. No money passes between you and the buyer, so there is nobody to chase.",
+    title: "Get paid, either way",
+    body: "On a Fastest deal the buyer's money is with us before you hand anything over, and reaches your Channel Adda balance once they are primary owner. On a Safest deal you give the account to our agent first, the buyer pays you directly, and our agent hands it on only after you confirm the money arrived. Either way you never hand over an account you have not been paid for.",
   },
 ];
 
@@ -212,7 +212,7 @@ export default async function SellPage() {
               {
                 icon: WalletIcon,
                 title: "Paid in crypto",
-                body: "Payouts settle to your own Cryptomus wallet, usually within an hour of the cooling-off period ending.",
+                body: "Fastest payouts settle to your own Cryptomus wallet, usually within an hour of the deal completing.",
               },
             ].map((item) => (
               <div

@@ -164,10 +164,10 @@ export function TransferPanel({ platform }: { platform: Platform }) {
         ))}
       </ol>
       <p className="mt-5 rounded-xl border border-line bg-surface-2 p-4 text-xs leading-relaxed text-muted">
-        On a Fastest deal the seller is paid{" "}
+        On a Fastest deal you are a manager for{" "}
         <span className="font-semibold text-fg">{platform.holdDays} days</span>{" "}
-        after you confirm every step above — the window in which an old owner
-        could still reclaim the account.{" "}
+        before you are made primary owner, and the seller is paid only after
+        that.{" "}
         <Link
           href="/how-it-works"
           className="text-primary-text underline-offset-4 hover:underline"

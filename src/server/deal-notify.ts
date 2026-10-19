@@ -43,7 +43,7 @@ export function turnEmail(input: {
   href: string;
   /**
    * The buyer's account that receives ownership, for the person who will
-   * transfer to it: the seller on Fastest, our agent on either. Never put in
+   * transfer to it: the seller on Fastest, our agent on Safest. Never put in
    * an email to anybody else.
    */
   handoverTo?: string | null;
@@ -51,8 +51,8 @@ export function turnEmail(input: {
   const greeting = input.name ? `Hi ${input.name},` : "Hi there,";
   const mode =
     input.mode === "SAFEST"
-      ? "This is a Safest deal: our agent holds the channel, and the buyer pays the price to Channel Adda — never to the seller — once it is in our hands. We hold it until the channel is the buyer's."
-      : "This is a Fastest deal: Channel Adda holds the buyer's payment until they confirm they have the account, then pays the seller.";
+      ? "This is a Safest deal: our agent takes the channel first, the buyer then pays the seller directly, and once the seller confirms it arrived our agent makes the buyer the owner. Channel Adda takes only its fee."
+      : "This is a Fastest deal: Channel Adda holds the buyer's payment until they are the channel's primary owner, then pays the seller.";
 
   return {
     subject: `Your move: ${input.stepLabel} (${input.reference})`,
@@ -81,7 +81,7 @@ export function turnEmail(input: {
 /**
  * Telling the next person it is their turn.
  *
- * A deal is nine steps with two multi-day waits in the middle. Without this
+ * A deal is up to nine steps with a multi-day wait in the middle. Without this
  * the counterparty finds out it is their move only by happening to open the
  * dashboard, which for a seller waiting on a Google transfer could be days.
  *
@@ -144,8 +144,8 @@ export async function notifyNextActor(orderId: string): Promise<void> {
     });
 
     // And by email, because the notification row is the part that only
-    // reaches somebody already looking. A deal has two multi-day Google
-    // waits in it; a week of silence is the normal case this has to survive.
+    // reaches somebody already looking. A deal has a multi-day wait in it;
+    // a week of silence is the normal case this has to survive.
     //
     // Skipped entirely with no mail path configured: there is nothing to
     // send, and looking up an address to log a message nobody will read is
