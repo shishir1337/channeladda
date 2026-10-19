@@ -46,7 +46,7 @@ test("a payment window already past shows nothing — the sweep will close it", 
 
 test("a Safest deal waiting on Google counts down to our agent becoming primary owner", () => {
   expect(activeWait(deal({ holdUntil: ahead(5 * DAY) }))).toEqual({
-    label: "Google's wait ends, then our agent is made primary owner",
+    label: "Google's wait ends",
     until: ahead(5 * DAY),
   });
 });
@@ -61,7 +61,7 @@ test("a Fastest deal in its holding period counts down to the buyer becoming pri
       }),
     ),
   ).toEqual({
-    label: "Holding period ends, then the buyer is made primary owner",
+    label: "Holding period ends",
     until: ahead(3 * DAY),
   });
 });

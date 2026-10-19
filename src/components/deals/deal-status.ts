@@ -149,10 +149,10 @@ export function statusSentence(
 
     case "IN_CUSTODY":
       if (viewer === "buyer") {
-        return "Our agent holds the channel now, not the seller. Pay the seller the price directly, the way you agreed in this chat, then press Paid.";
+        return "Our agent holds the channel now, not the seller. Pay the seller the price directly, the way you agreed in the deal chat, then press Paid.";
       }
       if (viewer === "seller") {
-        return "Our agent holds the channel. The buyer pays you directly next, the way you agreed in this chat.";
+        return "Our agent holds the channel. The buyer pays you directly next, the way you agreed in the deal chat.";
       }
       return "You hold this channel. The buyer pays the seller directly next.";
 
@@ -216,7 +216,7 @@ export function statusSentence(
       return "The buyer has been refunded and nothing was transferred.";
 
     case "DISPUTED":
-      return "A moderator is reading the whole record: every step, when it was pressed, and this chat. Nothing moves until they decide, and we may message you for details.";
+      return "A moderator is reading the whole record: every step, when it was pressed, and the deal chat. Nothing moves until they decide, and we may message you for details.";
 
     default:
       return STATUS_LABELS[status];
@@ -280,9 +280,9 @@ const BY_OPEN_STEP: Partial<Record<string, Override>> = {
     short: "Buyer paying",
     sentence: {
       buyer:
-        "Our agent holds the channel now, not the seller. Pay the seller the price directly, the way you agreed in this chat, then press Paid.",
+        "Our agent holds the channel now, not the seller. Pay the seller the price directly, the way you agreed in the deal chat, then press Paid.",
       seller:
-        "Our agent holds the channel. The buyer pays you directly next, the way you agreed in this chat.",
+        "Our agent holds the channel. The buyer pays you directly next, the way you agreed in the deal chat.",
       agent: "You hold the channel. The buyer is paying the seller directly.",
     },
   },
@@ -293,7 +293,7 @@ const BY_OPEN_STEP: Partial<Record<string, Override>> = {
       buyer:
         "You have marked it paid. Once the seller confirms the money arrived, our agent makes you the owner.",
       seller:
-        "The buyer says they have paid you. When the money is in your account, press Received. If it has not arrived, say so in this chat.",
+        "The buyer says they have paid you. When the money is in your account, press Received. If it has not arrived, say so in the deal chat.",
       agent:
         "The buyer says they have paid. Waiting for the seller to confirm it arrived.",
     },
@@ -410,7 +410,7 @@ export const HOLD_NOTE: Readonly<Record<DealMode, string>> = {
   SAFEST:
     "Google makes a new manager wait, usually 7 days, before they can be made primary owner. There is nothing to do but wait — we email you the moment it ends.",
   FASTEST:
-    "The holding period: the buyer is a manager before they become primary owner, so nothing can be rushed. We email you the moment it ends.",
+    "The buyer stays a manager for the whole holding period before becoming primary owner. There is nothing to do until then — we email you the moment it ends.",
 };
 
 /**
@@ -434,7 +434,7 @@ const STEP_HELP: Readonly<Record<DealMode, Record<string, string>>> = {
     "Confirm primary ownership":
       "Our agent confirms they are primary owner. From here the channel is out of the seller's hands, and not yet in the buyer's.",
     "Pay the seller":
-      "The buyer pays the seller the price directly — crypto, bank, UPI, whatever the two of you agreed in this chat — then presses Paid. Put the transaction id or a screenshot in the chat: it is your proof.",
+      "The buyer pays the seller the price directly — crypto, bank, UPI, whatever the two of you agreed in the deal chat — then presses Paid. Put the transaction id or a screenshot in the chat: it is your proof.",
     "Confirm the payment arrived":
       "The seller presses Received once the money is in their account. Only then does our agent hand the channel over. If it has not arrived, say so in the chat and a moderator will look.",
     "Make the buyer the owner":
@@ -473,6 +473,32 @@ const CONFIRM_LABELS: Readonly<Record<string, string>> = {
   "Make the buyer primary owner": "I have made the buyer primary owner",
   "Release the seller's funds": "Release the funds",
 };
+
+/**
+ * The presses that decide where the money and the channel go, which ask
+ * once more before they count. Received above all: pressed by mistake, the
+ * seller's channel goes to a buyer who has not paid, and cannot come back.
+ */
+const CONFIRM_FIRST: Readonly<Record<string, string>> = {
+  "Pay the seller":
+    "Only once you have sent the money. The seller is asked to confirm it arrived, and the moment you press this is the record.",
+  "Confirm the payment arrived":
+    "Only if the money is in your account. Once you press it our agent hands the channel to the buyer, and it cannot come back to you.",
+};
+
+export function confirmFirst(label: string): string | undefined {
+  return CONFIRM_FIRST[label];
+}
+
+/** The second press, in words that say what is being sworn to. */
+const CONFIRM_YES: Readonly<Record<string, string>> = {
+  "Pay the seller": "Yes, I have sent it",
+  "Confirm the payment arrived": "Yes, it arrived",
+};
+
+export function confirmYes(label: string): string {
+  return CONFIRM_YES[label] ?? `Yes, ${confirmLabel(label)}`;
+}
 
 /** What the step's button says. */
 export function confirmLabel(label: string): string {

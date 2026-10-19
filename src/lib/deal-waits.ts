@@ -52,10 +52,10 @@ export type Wait = { label: string; until: Date };
 
 const HOUR = 3_600_000;
 
-/** What the end of each mode's hold opens. */
+/** Short: it sits in a narrow column, and the step card says what follows. */
 const HOLD_LABELS: Readonly<Record<DealMode, string>> = {
-  SAFEST: "Google's wait ends, then our agent is made primary owner",
-  FASTEST: "Holding period ends, then the buyer is made primary owner",
+  SAFEST: "Google's wait ends",
+  FASTEST: "Holding period ends",
 };
 
 export function activeWait(input: WaitInput): Wait | null {

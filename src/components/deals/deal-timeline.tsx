@@ -30,11 +30,14 @@ import { TextField } from "@/components/auth/fields";
 import {
   ACTOR_LABELS,
   actorLabel,
+  confirmFirst,
   confirmLabel,
+  confirmYes,
   HOLD_NOTE,
   stepHelp,
 } from "@/components/deals/deal-status";
 import { Button } from "@/components/ui/button";
+import { Price } from "@/components/ui/price";
 import { isTerminal } from "@/lib/deal-machine";
 import { cn } from "@/lib/utils";
 import { completeStep, endDeal } from "@/server/actions/deals";
@@ -286,6 +289,22 @@ function StepDetail({
         </p>
       ) : null}
 
+      {/* The one figure this step is about, so the buyer never has to work
+          it out from the deal page: what goes to the seller directly. */}
+      {state.mine &&
+      deal.mode === "SAFEST" &&
+      step.label === "Pay the seller" ? (
+        <div className="mt-3 flex max-w-sm items-baseline justify-between gap-3 border-y border-line py-2.5">
+          <span className="text-[0.8125rem] text-muted">
+            You pay the seller
+          </span>
+          <Price
+            usd={deal.priceUsd / 100}
+            className="text-base font-semibold text-fg tabular-nums"
+          />
+        </div>
+      ) : null}
+
       {state.frozen ? (
         <p className="mt-2 max-w-[62ch] text-[0.8125rem] leading-relaxed text-subtle">
           This step is where the deal stopped. It stays here until a moderator
@@ -336,6 +355,26 @@ function StepAction({
   const [approvedById, setApprovedById] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  // Paid and Received ask once more: they decide where the money and the
+  // channel go, and Received cannot be taken back.
+  const caution = confirmFirst(step.label);
+  const [armed, setArmed] = useState(false);
+  const label = confirmLabel(step.label);
+
+  const complete = () => {
+    setError(null);
+    startTransition(async () => {
+      const result = await completeStep(deal.id, step.position, {
+        ...(approvedById ? { approvedById } : {}),
+      });
+      if (!result.ok) {
+        setError(result.error);
+        setArmed(false);
+        return;
+      }
+      router.refresh();
+    });
+  };
 
   // Offered whenever the server says this step can need a second signature.
   // The server decides whether it is actually required for this price, so a
@@ -371,30 +410,54 @@ function StepAction({
       ) : null}
 
       <div>
-        <Button
-          type="button"
-          size="md"
-          className="w-full @sm:w-auto"
-          disabled={pending}
-          onClick={() => {
-            setError(null);
-            startTransition(async () => {
-              const result = await completeStep(deal.id, step.position, {
-                ...(approvedById ? { approvedById } : {}),
-              });
-              if (!result.ok) {
-                setError(result.error);
-                return;
-              }
-              router.refresh();
-            });
-          }}
-        >
-          <BusyLabel busy={pending} busyText="Saving…">
-            <CheckIcon aria-hidden="true" />
-            {confirmLabel(step.label)}
-          </BusyLabel>
-        </Button>
+        {caution && armed ? (
+          <div
+            role="alertdialog"
+            aria-label={`Confirm: ${label}`}
+            className="max-w-[62ch] rounded-lg border border-primary/40 bg-primary-soft/60 p-3"
+          >
+            <p className="text-[0.8125rem] leading-relaxed text-fg">
+              {caution}
+            </p>
+            <div className="mt-3 flex flex-col gap-2 @sm:flex-row @sm:flex-wrap">
+              <Button
+                type="button"
+                size="md"
+                className="w-full @sm:w-auto"
+                disabled={pending}
+                onClick={complete}
+              >
+                <BusyLabel busy={pending} busyText="Saving…">
+                  <CheckIcon aria-hidden="true" />
+                  {confirmYes(step.label)}
+                </BusyLabel>
+              </Button>
+              <Button
+                type="button"
+                size="md"
+                variant="ghost"
+                className="w-full @sm:w-auto"
+                disabled={pending}
+                onClick={() => setArmed(false)}
+              >
+                Not yet
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <Button
+            type="button"
+            size="md"
+            className="w-full @sm:w-auto"
+            disabled={pending}
+            onClick={caution ? () => setArmed(true) : complete}
+          >
+            <BusyLabel busy={pending} busyText="Saving…">
+              <CheckIcon aria-hidden="true" />
+              {label}
+            </BusyLabel>
+          </Button>
+        )}
 
         {error ? (
           <p

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 import {
+  confirmFirst,
   confirmLabel,
   dealHeadline,
   moneyNote,
@@ -63,6 +64,36 @@ test("paying the seller asks for the proof to go in the chat", () => {
 test("the two Safest payment buttons read exactly as the client asked", () => {
   expect(confirmLabel("Pay the seller")).toBe("Paid");
   expect(confirmLabel("Confirm the payment arrived")).toBe("Received");
+});
+
+test("the two presses that decide where the money and the channel go ask first", () => {
+  // A seller's Received sends their channel to the buyer for good; pressed by
+  // mistake before the money arrived, they would lose it unpaid.
+  expect(confirmFirst("Confirm the payment arrived")).toMatch(
+    /cannot come back/,
+  );
+  expect(confirmFirst("Pay the seller")).toMatch(/sent/);
+  expect(confirmFirst("Add the agent as manager")).toBeUndefined();
+});
+
+test("deal copy never says 'this chat': the deal page shows it too", () => {
+  for (const mode of ["SAFEST", "FASTEST"] as const) {
+    for (const step of templateFor(mode)) {
+      expect(stepHelp(mode, step.label) ?? "").not.toMatch(/this chat/);
+      for (const viewer of ["buyer", "seller", "agent"] as const) {
+        for (const status of Object.keys(STATUS_LABELS)) {
+          expect(
+            dealHeadline(
+              status as keyof typeof STATUS_LABELS,
+              mode,
+              viewer,
+              step.position,
+            ).sentence,
+          ).not.toMatch(/this chat/);
+        }
+      }
+    }
+  }
 });
 
 test("every step a person presses has a button that says what they are confirming", () => {
