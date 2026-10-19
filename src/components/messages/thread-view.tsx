@@ -493,7 +493,9 @@ export function ThreadView({
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    // On a phone the message box is pinned to the bottom of the screen, so
+    // the conversation keeps room under its last message for it.
+    <div className="flex min-h-0 flex-1 flex-col max-lg:pb-24">
       {/* The scrolling part. In the window-height view (see the thread page)
           only this moves; everywhere else it is simply the page. */}
       <div
@@ -590,9 +592,10 @@ export function ThreadView({
         </p>
       ) : (
         // On a computer the box stays at the bottom of the window while the
-        // conversation scrolls under it. Not on a phone: there, with an offer
-        // open, it could be taller than the screen and its top unreachable.
-        <div className="relative mt-6 lg:sticky lg:bottom-0 lg:z-10 lg:bg-bg lg:pb-5 lg:before:pointer-events-none lg:before:absolute lg:before:inset-x-0 lg:before:bottom-full lg:before:h-6 lg:before:bg-linear-to-t lg:before:from-bg lg:before:to-transparent">
+        // conversation scrolls under it. On a phone it is fixed to the bottom
+        // of the screen, as every messaging app does, and capped so an open
+        // offer form scrolls inside it rather than pushing its top off screen.
+        <div className="relative mt-6 max-lg:fixed max-lg:inset-x-0 max-lg:bottom-0 max-lg:z-30 max-lg:mt-0 max-lg:max-h-[70dvh] max-lg:overflow-y-auto max-lg:overscroll-contain max-lg:border-t max-lg:border-line max-lg:bg-bg/95 max-lg:px-3 max-lg:pt-2 max-lg:pb-[max(0.5rem,env(safe-area-inset-bottom))] max-lg:backdrop-blur-xl lg:sticky lg:bottom-0 lg:z-10 lg:bg-bg lg:pb-5 lg:before:pointer-events-none lg:before:absolute lg:before:inset-x-0 lg:before:bottom-full lg:before:h-6 lg:before:bg-linear-to-t lg:before:from-bg lg:before:to-transparent">
           {offering && offerComposer ? (
             <OfferComposerForm
               config={offerComposer}
@@ -600,7 +603,9 @@ export function ThreadView({
             />
           ) : null}
 
-          <div className="rounded-card border border-line bg-surface shadow-xs transition-[border-color,box-shadow] duration-150 not-focus-within:hover:border-line-strong focus-within:border-primary focus-within:ring-[3px] focus-within:ring-primary/20 has-[[aria-invalid=true]]:border-danger has-[[aria-invalid=true]]:ring-danger/15 dark:bg-surface-2">
+          {/* One row on a phone — attach, offer, the text, send — so the box
+              takes a line of the screen rather than three. */}
+          <div className="rounded-card border border-line bg-surface shadow-xs transition-[border-color,box-shadow] duration-150 not-focus-within:hover:border-line-strong focus-within:border-primary focus-within:ring-[3px] focus-within:ring-primary/20 has-[[aria-invalid=true]]:border-danger has-[[aria-invalid=true]]:ring-danger/15 max-lg:flex max-lg:flex-wrap max-lg:items-end max-lg:gap-0.5 max-lg:rounded-2xl max-lg:p-1 dark:bg-surface-2">
             <label htmlFor="composer" className="sr-only">
               Write a message
             </label>
@@ -617,11 +622,11 @@ export function ThreadView({
               }}
               placeholder="Ask about revenue, traffic sources, strikes…"
               aria-invalid={over}
-              className="block max-h-72 min-h-20 w-full resize-none bg-transparent px-3.5 pt-3 pb-1 text-base leading-6 field-sizing-content text-fg placeholder:text-subtle focus:outline-none sm:text-sm"
+              className="block max-h-72 min-h-20 w-full resize-none bg-transparent px-3.5 pt-3 pb-1 text-base leading-6 field-sizing-content text-fg placeholder:text-subtle focus:outline-none max-lg:order-2 max-lg:max-h-32 max-lg:min-h-11 max-lg:w-auto max-lg:min-w-0 max-lg:flex-1 max-lg:px-2 max-lg:py-2.5 sm:text-sm"
             />
 
             {attachment ? (
-              <div className="mx-2 mb-1 flex items-center gap-3 rounded-lg border border-line bg-surface-2 p-2">
+              <div className="mx-2 mb-1 flex items-center gap-3 rounded-lg border border-line bg-surface-2 p-2 max-lg:order-0 max-lg:mx-0 max-lg:basis-full">
                 {attachment.kind === "IMAGE" ? (
                   // biome-ignore lint/performance/noImgElement: a local preview of the file being sent, not a served image
                   <img
@@ -657,7 +662,7 @@ export function ThreadView({
               </div>
             ) : null}
 
-            <div className="flex flex-wrap items-center gap-1 px-2 pt-1 pb-2">
+            <div className="flex flex-wrap items-center gap-1 px-2 pt-1 pb-2 max-lg:contents">
               <input
                 ref={fileRef}
                 type="file"
@@ -674,6 +679,7 @@ export function ThreadView({
                 size="icon"
                 variant="ghost"
                 title="Photo or clip"
+                className="max-lg:order-1"
                 disabled={uploading || pending || attachment !== null}
                 onClick={() => fileRef.current?.click()}
               >
@@ -695,19 +701,30 @@ export function ThreadView({
                   variant="ghost"
                   aria-expanded={offering}
                   onClick={() => setOffering((was) => !was)}
-                  className="aria-expanded:bg-surface-2 aria-expanded:text-fg"
+                  title={
+                    offerComposer.mode === "price"
+                      ? "Offer a price"
+                      : "Make an offer"
+                  }
+                  className="aria-expanded:bg-surface-2 aria-expanded:text-fg max-lg:order-1 max-lg:size-11 max-lg:px-0"
                 >
                   <TagIcon aria-hidden="true" className="size-4" />
-                  {offerComposer.mode === "price"
-                    ? "Offer a price"
-                    : "Make an offer"}
+                  <span className="max-lg:sr-only">
+                    {offerComposer.mode === "price"
+                      ? "Offer a price"
+                      : "Make an offer"}
+                  </span>
                 </Button>
               ) : null}
               <p
                 className={cn(
                   "min-w-0 px-1.5 text-xs tabular-nums",
                   over ? "font-medium text-danger" : "text-subtle",
+                  // On a phone only a warning earns the room, on a line of
+                  // its own above the row.
                   !over && left >= 400 && "max-sm:hidden",
+                  "max-lg:order-0 max-lg:basis-full max-lg:pt-1",
+                  !over && left >= 400 && "max-lg:hidden",
                 )}
               >
                 {over
@@ -720,7 +737,7 @@ export function ThreadView({
                 type="button"
                 variant={hasSomething || pending ? "primary" : "secondary"}
                 title="Send (Ctrl+Enter)"
-                className="ml-auto"
+                className="ml-auto max-lg:order-3 max-lg:ml-0 max-lg:size-11 max-lg:rounded-xl max-lg:px-0"
                 disabled={
                   pending ||
                   uploading ||
@@ -737,7 +754,9 @@ export function ThreadView({
                 ) : (
                   <SendIcon aria-hidden="true" className="size-4" />
                 )}
-                <BusyLabel busy={pending} idle="Send" working="Sending…" />
+                <span className="max-lg:sr-only">
+                  <BusyLabel busy={pending} idle="Send" working="Sending…" />
+                </span>
               </Button>
             </div>
           </div>

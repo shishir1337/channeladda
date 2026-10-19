@@ -119,11 +119,12 @@ export function ThreadHeader({
 }) {
   const brand = channel ? platformMap[toPlatformId(channel.platform)] : null;
   return (
-    // Pinned under the app bar (h-14): in a long conversation the one thing
-    // that must not scroll away is who it is with and where the deal stands.
-    // Frosted rather than opaque, so the thread reads as passing beneath it.
-    <header className="sticky top-14 z-10 -mt-3 border-b border-line bg-bg/85 pt-3 pb-3 backdrop-blur-xl backdrop-saturate-150 lg:-mt-4 lg:pt-4">
-      {back ? (
+    // Pinned under the app bar (h-14) on a computer: in a long conversation
+    // the one thing that must not scroll away is who it is with and where the
+    // deal stands. Not on a phone, where every line it pinned was a line of
+    // conversation lost; there it scrolls away and the message box stays.
+    <header className="-mt-3 border-b border-line pt-1 pb-3 lg:sticky lg:top-14 lg:z-10 lg:-mt-4 lg:bg-bg/85 lg:pt-4 lg:backdrop-blur-xl lg:backdrop-saturate-150">
+      {back && !back.phoneOnly ? (
         <Link
           href={back.href}
           className={cn(
@@ -143,7 +144,18 @@ export function ThreadHeader({
           stands and the way to it, on the right. A second row for the
           status cost the conversation a line of every screen. */}
       <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-        <div className="flex min-w-0 items-center gap-3">
+        <div className="flex min-w-0 items-center gap-2.5 sm:gap-3">
+          {/* On a phone the way back sits beside the name rather than on a
+              line of its own; on a computer the inbox is already beside it. */}
+          {back?.phoneOnly ? (
+            <Link
+              href={back.href}
+              aria-label={back.label}
+              className="-ml-2 inline-flex size-11 shrink-0 items-center justify-center rounded-lg text-muted transition-colors duration-150 hover:bg-surface-2 hover:text-fg lg:hidden"
+            >
+              <ChevronLeftIcon aria-hidden="true" className="size-5" />
+            </Link>
+          ) : null}
           {people.length > 1 ? (
             <span className="flex shrink-0 -space-x-2">
               <span className="rounded-full ring-2 ring-bg">
@@ -154,10 +166,13 @@ export function ThreadHeader({
               </span>
             </span>
           ) : (
-            <Initials name={people[0] ?? ""} className="size-9 text-xs" />
+            <Initials
+              name={people[0] ?? ""}
+              className="size-8 text-xs sm:size-9"
+            />
           )}
           <div className="min-w-0">
-            <h1 className="text-base leading-6 font-semibold break-words text-fg">
+            <h1 className="truncate text-[0.9375rem] leading-6 font-semibold text-fg sm:text-base sm:break-words sm:whitespace-normal">
               {title}
             </h1>
             <Link
@@ -173,7 +188,7 @@ export function ThreadHeader({
               />
             </Link>
             {record ? (
-              <p className="text-xs leading-5 text-muted">{record}</p>
+              <p className="truncate text-xs leading-5 text-muted">{record}</p>
             ) : null}
           </div>
         </div>
