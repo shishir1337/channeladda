@@ -245,8 +245,9 @@ redirect rule doing the same is fine too.
 
 ## 5. The scheduled sweep
 
-**Not optional.** `POST /api/cron` expires abandoned deals, lapses old offers,
-deletes chat attachments past 48 hours and clears messages past 10 days.
+**Not optional.** `POST /api/cron` expires abandoned deals, tells the next person
+when a deal's waiting period ends, lapses old offers, deletes chat
+attachments past 48 hours and clears messages past 10 days.
 Without it a buyer can open a deal on any listing, walk away, and that listing
 is reserved for ever — for free, on every listing.
 
@@ -269,7 +270,7 @@ Check it works:
 ```bash
 curl -fsS -X POST http://127.0.0.1:3000/api/cron \
   -H "authorization: Bearer $CRON_SECRET"
-# {"ok":true,"reconciled":0,"deals":0,"offers":0,"acceptances":0,"media":0,"messages":0,"orphans":0}
+# {"ok":true,"reconciled":0,"deals":0,"holds":0,"offers":0,"acceptances":0,"media":0,"messages":0,"orphans":0}
 ```
 
 With no `CRON_SECRET` set the endpoint is **closed**, not open. It answers 401.
@@ -373,10 +374,18 @@ pm2 install pm2-logrotate
 cd /var/www/channeladda
 git pull
 pnpm install --frozen-lockfile
+pnpm deals:in-flight          # only when a change alters the deal steps; see below
 pnpm exec prisma migrate deploy
 pnpm build                    # pm2 restart alone does NOT pick up source changes
 pm2 restart channeladda
 ```
+
+A deal's steps are written when it opens, so a change to the steps of a
+deal (`src/lib/deal-templates.ts`) cannot apply to a deal already running.
+`pnpm deals:in-flight` lists every running deal opened under different
+steps; it reads only, and works before the migrations run. If it lists any,
+stop there — the site still runs the old code until the restart — and
+finish or end those deals from the staff desk first.
 
 `pnpm build` is the gate: `next.config.ts` sets
 `typescript: { ignoreBuildErrors: false }`, so a type error fails the deploy
