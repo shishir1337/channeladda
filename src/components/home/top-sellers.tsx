@@ -5,6 +5,7 @@ import {
   TimerIcon,
 } from "lucide-react";
 import Link from "next/link";
+import { ResellerBadge } from "@/components/app/reseller-badge";
 import { Badge } from "@/components/ui/badge";
 import { Price } from "@/components/ui/price";
 import { Container, Section, SectionHeading } from "@/components/ui/section";
@@ -66,6 +67,7 @@ export function TopSellers({ sellers }: { sellers: Seller[] }) {
                         aria-label="Verified seller"
                         className="size-4 shrink-0 text-verified"
                       />
+                      {seller.reseller ? <ResellerBadge /> : null}
                     </h3>
                     <p className="truncate text-xs text-subtle">
                       {seller.country} · Member since {seller.memberSince}

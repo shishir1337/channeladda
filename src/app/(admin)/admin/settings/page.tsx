@@ -112,6 +112,9 @@ export default async function AdminSettingsPage() {
           offerExpiryHours: settings.offerExpiryHours,
           minWithdrawalUsd: settings.minWithdrawalUsd,
           paymentWindowHours: settings.paymentWindowHours,
+          resellerPriceUsd: settings.resellerPriceUsd,
+          resellerDiscountBp: settings.resellerDiscountBp,
+          resellerPointsMultiplier: settings.resellerPointsMultiplier,
         }}
       />
 

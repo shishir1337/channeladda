@@ -6,6 +6,10 @@ export type Seller = {
   name: string;
   /** Completed deals as buyer and seller. Absent on the seed fixtures. */
   record?: TrackRecord;
+  /** Rating points: half the worth of completed deals, tripled for a reseller. */
+  points?: number;
+  /** Holds the Reseller badge right now. */
+  reseller?: boolean;
   initials: string;
   country: string;
   /** Out of 5, one decimal. */

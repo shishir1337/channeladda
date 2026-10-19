@@ -162,6 +162,8 @@ export type MonthFigures = {
   fees: {
     safest: { buyer: Figure; seller: Figure };
     fastest: { buyer: Figure; seller: Figure };
+    /** Reseller badge passes sold. */
+    badges: Figure;
     /**
      * Every fee above: the month's revenue. A fee is booked only when it is
      * earned, so a refund is never revenue given back — it is held money
@@ -190,6 +192,8 @@ export type MonthFigures = {
   };
   /** Members paying a deal out of their balance rather than by crypto. */
   spentFromBalances: Figure;
+  /** Members paying for the Reseller badge out of their balance. Positive. */
+  spentOnBadges: Figure;
   /** Withdrawals sent to members' own wallets. Positive. */
   payouts: Figure;
   adjustments: { credits: Figure; debits: Figure };
@@ -230,6 +234,8 @@ export async function monthFigures(
     payouts,
     credits,
     debits,
+    badges,
+    spentOnBadges,
   ] = await Promise.all([
     figure(rows(PLATFORM, { kind: "BUYER_FEE" }, onMode("SAFEST"))),
     figure(rows(PLATFORM, { kind: "SELLER_FEE" }, onMode("SAFEST"))),
@@ -246,6 +252,8 @@ export async function monthFigures(
     figure(rows(MEMBER, { kind: "WITHDRAWAL" }), true),
     figure(rows(MEMBER, { kind: "ADJUSTMENT", amountUsd: { gt: 0 } })),
     figure(rows(MEMBER, { kind: "ADJUSTMENT", amountUsd: { lt: 0 } }), true),
+    figure(rows(PLATFORM, { kind: "BADGE_FEE" })),
+    figure(rows(MEMBER, { kind: "BADGE_FEE" }), true),
   ]);
 
   const asOf = month.end < now ? month.end : now;
@@ -258,13 +266,15 @@ export async function monthFigures(
     safestBuyer.cents +
     safestSeller.cents +
     fastestBuyer.cents +
-    fastestSeller.cents;
+    fastestSeller.cents +
+    badges.cents;
 
   return {
     month,
     fees: {
       safest: { buyer: safestBuyer, seller: safestSeller },
       fastest: { buyer: fastestBuyer, seller: fastestSeller },
+      badges,
       net: earned,
     },
     deals: {
@@ -283,6 +293,7 @@ export async function monthFigures(
     },
     deposits: { topUps, dealPayments },
     spentFromBalances: spent,
+    spentOnBadges,
     payouts,
     adjustments: { credits, debits },
     closing: { asOf, heldForBuyers, memberBalances },

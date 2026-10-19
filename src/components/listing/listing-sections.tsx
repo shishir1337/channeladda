@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { pointsLabel, ResellerBadge } from "@/components/app/reseller-badge";
 import { TrackRecordStats } from "@/components/deals/track-record";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -248,6 +249,7 @@ export function SellerPanel({ seller }: { seller: Seller }) {
               aria-label="Verified seller"
               className="size-4 shrink-0 text-verified"
             />
+            {seller.reseller ? <ResellerBadge /> : null}
           </h3>
           <p className="mt-0.5 flex items-center gap-1.5 text-xs text-subtle">
             <StarIcon
@@ -258,7 +260,11 @@ export function SellerPanel({ seller }: { seller: Seller }) {
               {ratingLabel(seller.rating)}
             </span>
             <span>
-              ({seller.reviews} reviews) · {seller.country}
+              ({seller.reviews} reviews) ·{" "}
+              <span className="tnum text-muted">
+                {pointsLabel(seller.points ?? 0)}
+              </span>{" "}
+              · {seller.country}
             </span>
           </p>
         </div>

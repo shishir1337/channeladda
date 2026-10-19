@@ -25,6 +25,7 @@ import {
   Section,
   SplitBar,
 } from "@/components/app/kit";
+import { ResellerPanel } from "@/components/dashboard/reseller-panel";
 import {
   PayoutAddressForm,
   RequestPayout,
@@ -33,6 +34,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Price } from "@/components/ui/price";
 import { cn } from "@/lib/utils";
+import { ratingFor } from "@/server/reseller-status";
 import { requireUser } from "@/server/session";
 import { getSettings } from "@/server/settings";
 import { getWallet } from "@/server/wallet";
@@ -129,10 +131,11 @@ export default async function WalletPage({
   searchParams,
 }: PageProps<"/dashboard/wallet">) {
   const user = await requireUser("/dashboard/wallet");
-  const [wallet, settings, params] = await Promise.all([
+  const [wallet, settings, params, rating] = await Promise.all([
     getWallet(user.id),
     getSettings(),
     searchParams,
+    ratingFor(user.id),
   ]);
   const held = wallet.pendingWithdrawalUsd > 0;
 
@@ -140,7 +143,7 @@ export default async function WalletPage({
   // so somebody who had just paid landed on an unchanged page with no sign
   // it had worked. The credit arrives by webhook and may well land after
   // the redirect, so this says “on its way” rather than claiming it is in.
-  const justPaid = params.topped === "1";
+  const justPaid = params.topped === "1" || params.badge === "1";
 
   return (
     <>
@@ -363,6 +366,19 @@ export default async function WalletPage({
         <div className="mt-4">
           <PayoutAddressForm current={wallet.payoutAddress} />
         </div>
+      </Section>
+
+      {/* ---- the Reseller badge ------------------------------------------ */}
+      <Section id="reseller">
+        <ResellerPanel
+          priceUsd={settings.resellerPriceUsd}
+          discountBp={settings.resellerDiscountBp}
+          multiplier={settings.resellerPointsMultiplier}
+          active={rating.reseller}
+          endsAt={rating.endsAt ? rating.endsAt.toISOString() : null}
+          points={rating.points}
+          availableUsd={wallet.availableUsd}
+        />
       </Section>
 
       {/* ---- history ----------------------------------------------------- */}

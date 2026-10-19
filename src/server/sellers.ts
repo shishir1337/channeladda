@@ -2,6 +2,9 @@ import "server-only";
 import type { PlatformId } from "@/data/platforms";
 import type { Seller } from "@/data/sellers";
 import { db } from "@/lib/db";
+import { ratingPoints } from "@/lib/reseller";
+import { activeResellers } from "@/server/reseller-status";
+import { getSettings } from "@/server/settings";
 import { trackRecord } from "@/server/track-record";
 
 const PLATFORM_TO_ID = {
@@ -55,10 +58,22 @@ async function buildSeller(userId: string): Promise<Seller | null> {
         user.reviewsGot.length
       : null;
 
+  const [record, holders, settings] = await Promise.all([
+    trackRecord(user.id),
+    activeResellers([user.id]),
+    getSettings(),
+  ]);
+  const reseller = holders.has(user.id);
+
   return {
     slug: user.slug,
     name: user.name,
-    record: await trackRecord(user.id),
+    record,
+    points: ratingPoints({
+      worthCents: record.worthCents,
+      multiplier: reseller ? settings.resellerPointsMultiplier : 1,
+    }),
+    reseller,
     initials: initialsOf(user.name),
     country: user.country ?? "Global",
     rating: rating === null ? null : Math.round(rating * 10) / 10,

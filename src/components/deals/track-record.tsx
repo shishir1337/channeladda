@@ -1,3 +1,4 @@
+import { pointsLabel } from "@/components/app/reseller-badge";
 import { Price } from "@/components/ui/price";
 import type { TrackRecord } from "@/lib/track-record";
 import { cn } from "@/lib/utils";
@@ -66,12 +67,18 @@ export function TrackRecordStats({
   );
 }
 
-/** "12 deals · $84K · Safest 8 · Fastest 4", or plainly that there are none. */
+/**
+ * "750 points · 12 deals · $84K · Safest 8 · Fastest 4", or plainly that
+ * there are none.
+ */
 export function TrackRecordLine({
   record,
+  points,
   className,
 }: {
   record: TrackRecord;
+  /** Rating points, when known: what the deals are worth to their name. */
+  points?: number;
   className?: string;
 }) {
   if (record.deals === 0) {
@@ -83,6 +90,12 @@ export function TrackRecordLine({
   }
   return (
     <span className={cn("tnum", className)}>
+      {points !== undefined ? (
+        <>
+          <span className="font-medium text-fg">{pointsLabel(points)}</span>
+          {" · "}
+        </>
+      ) : null}
       <span className="font-medium text-fg">{deals(record.deals)}</span>
       {" · "}
       <Price usd={record.worthCents / 100} compact />

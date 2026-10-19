@@ -265,6 +265,13 @@ export default async function AdminMoneyPage({
       note: "Members paying a deal's opening payment out of their balance instead of by crypto. Moves their money into our hold or our fees.",
     },
     {
+      label: "Badges from balances",
+      cents: figures.spentOnBadges.cents,
+      count: plural(figures.spentOnBadges.count, "pass", "passes"),
+      icon: WalletIcon,
+      note: "Members buying the Reseller badge out of their balance — including badges paid by crypto, which arrive as a deposit and are spent on the pass at once.",
+    },
+    {
       label: "Payouts sent",
       cents: figures.payouts.cents,
       count: plural(figures.payouts.count, "payout"),
@@ -686,6 +693,24 @@ export default async function AdminMoneyPage({
                       </Td>
                     </Tr>
                   ))}
+                  <Tr>
+                    <Td>
+                      <span className="text-sm font-medium text-fg">
+                        Reseller badges
+                      </span>
+                      <span className="mt-1 block text-xs text-subtle tabular-nums">
+                        {plural(fees.badges.count, "pass", "passes")}
+                      </span>
+                    </Td>
+                    <Td numeric />
+                    <Td numeric />
+                    <Td numeric>
+                      <Amount
+                        cents={fees.badges.cents}
+                        caption={exactUsd(fees.badges.cents)}
+                      />
+                    </Td>
+                  </Tr>
                   <tr className="border-t border-line-strong bg-surface-2/50">
                     <Td className="font-semibold text-fg">Net</Td>
                     <Td numeric />

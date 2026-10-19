@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Reference } from "@/components/app/kit";
+import { ResellerBadge } from "@/components/app/reseller-badge";
 import { AgentInvite } from "@/components/deals/agent-invite";
 import { dealHeadline, STATUS_TONE } from "@/components/deals/deal-status";
 import { DealNextStep, RaiseDispute } from "@/components/deals/deal-timeline";
@@ -22,11 +23,13 @@ import { db } from "@/lib/db";
 import { dealPanelState } from "@/lib/deal-panel";
 import { templateFor } from "@/lib/deal-templates";
 import { fromCents } from "@/lib/listing-form";
+import { withResellerDiscount } from "@/lib/reseller";
 import { writesInClosedThread } from "@/lib/thread-rules";
 import { cn } from "@/lib/utils";
 import { loadPanelInput } from "@/server/deal-panel";
 import { getDealFor } from "@/server/deals";
 import { getThread, markThreadRead } from "@/server/messages";
+import { activeResellers, ratingFor } from "@/server/reseller-status";
 import { requireUser } from "@/server/session";
 import { getSettings } from "@/server/settings";
 import { threadFingerprint } from "@/server/thread-fingerprint";
@@ -129,12 +132,18 @@ export default async function ThreadPage({
         ? thread.buyerName
         : `${thread.buyerName} and ${thread.sellerName}`;
   // Each side sees the other's completed deals before agreeing to anything.
-  const otherRecord =
+  const otherId =
     thread.viewerRole === "buyer"
-      ? await trackRecord(thread.sellerId)
+      ? thread.sellerId
       : thread.viewerRole === "seller"
-        ? await trackRecord(thread.buyerId)
+        ? thread.buyerId
         : null;
+  const viewerIsReseller =
+    thread.viewerRole === "buyer" &&
+    (await activeResellers([user.id])).has(user.id);
+  const [otherRecord, otherRating] = otherId
+    ? await Promise.all([trackRecord(otherId), ratingFor(otherId)])
+    : [null, null];
   const closed = thread.closedAt !== null;
   // The message box is closed only to those the server would refuse: the
   // deal's agent and staff can still write in a closed conversation.
@@ -169,14 +178,30 @@ export default async function ThreadPage({
             ? [otherSide]
             : [thread.buyerName, thread.sellerName]
         }
-        title={otherSide}
+        title={
+          otherRating?.reseller ? (
+            <span className="inline-flex max-w-full items-center gap-2">
+              <span className="truncate">{otherSide}</span>
+              <ResellerBadge />
+            </span>
+          ) : (
+            otherSide
+          )
+        }
         listing={{
           href: `/listing/${thread.listingSlug}`,
           handle: thread.listingHandle,
           title: thread.listingTitle,
         }}
         channel={channelOf(thread.listingPlatform, thread.listingSourceUrl)}
-        record={otherRecord ? <TrackRecordLine record={otherRecord} /> : null}
+        record={
+          otherRecord ? (
+            <TrackRecordLine
+              record={otherRecord}
+              points={otherRating?.points}
+            />
+          ) : null
+        }
         actions={
           deal ? (
             <Button asChild variant="secondary" size="sm">
@@ -245,12 +270,13 @@ export default async function ThreadPage({
                       : panel.askingCents,
                   )}
                   // The rates only: the rest of the settings has no business
-                  // in the browser.
-                  fees={{
-                    buyerFeeBpSafest: settings.buyerFeeBpSafest,
-                    buyerFeeBpFastest: settings.buyerFeeBpFastest,
-                    sellerFeeBp: settings.sellerFeeBp,
-                  }}
+                  // in the browser. A Reseller badge holder's are already
+                  // discounted, so the quote is what the deal will cost.
+                  fees={withResellerDiscount(
+                    settings,
+                    { buyer: viewerIsReseller, seller: false },
+                    settings.resellerDiscountBp,
+                  )}
                   isOwnListing={false}
                   after="refresh"
                 />

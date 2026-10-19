@@ -270,7 +270,7 @@ Check it works:
 ```bash
 curl -fsS -X POST http://127.0.0.1:3000/api/cron \
   -H "authorization: Bearer $CRON_SECRET"
-# {"ok":true,"reconciled":0,"deals":0,"holds":0,"offers":0,"acceptances":0,"media":0,"messages":0,"orphans":0}
+# {"ok":true,"reconciled":0,"deals":0,"holds":0,"badges":0,"offers":0,"acceptances":0,"media":0,"messages":0,"orphans":0}
 ```
 
 With no `CRON_SECRET` set the endpoint is **closed**, not open. It answers 401.

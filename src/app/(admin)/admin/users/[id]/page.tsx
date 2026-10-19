@@ -60,6 +60,7 @@ import {
   ROLE_LABELS,
   ROLES,
 } from "@/server/admin-users";
+import { ratingFor } from "@/server/reseller-status";
 import { requireStaff } from "@/server/session";
 import { getWallet } from "@/server/wallet";
 
@@ -194,10 +195,11 @@ export default async function AdminUserPage({
   const targetIsStaff = STAFF_ROLES.includes(person.role);
   const canSeeMoney = MONEY_ROLES.includes(staff.role);
 
-  const [deals, wallet, withdrawals] = await Promise.all([
+  const [deals, wallet, withdrawals, rating] = await Promise.all([
     listUserDeals(person.id),
     canSeeMoney ? getWallet(person.id) : null,
     canSeeMoney ? listUserWithdrawals(person.id) : null,
+    ratingFor(person.id),
   ]);
 
   // Same rules the repository enforces, worked out here only so the page can
@@ -607,6 +609,20 @@ export default async function AdminUserPage({
                 <Badge variant={KYC_VARIANT[person.kycStatus]}>
                   {sentence(person.kycStatus)}
                 </Badge>
+              </Fact>
+              <Fact label="Rating points">
+                <span className="tabular-nums">
+                  {rating.points.toLocaleString("en-US")}
+                </span>
+              </Fact>
+              <Fact label="Reseller badge">
+                {rating.reseller && rating.endsAt
+                  ? `Until ${rating.endsAt.toLocaleDateString("en-GB", {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                    })}`
+                  : "No"}
               </Fact>
               {isCustodianRole(person.role) ? (
                 <Fact label="Deal level">{levelLabel(person.dealLevel)}</Fact>

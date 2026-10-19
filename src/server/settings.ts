@@ -2,6 +2,7 @@ import "server-only";
 
 import { db } from "@/lib/db";
 import { DEFAULT_FEES, type FeeSettings, MAX_FEE_BP } from "@/lib/fees";
+import { RESELLER_DEFAULTS } from "@/lib/reseller";
 
 /**
  * Platform settings.
@@ -29,6 +30,12 @@ export type PlatformSettings = FeeSettings & {
   minWithdrawalUsd: number;
   /** How long an unpaid deal holds its listing before it lapses. */
   paymentWindowHours: number;
+  /** Cents for 30 days of the Reseller badge. */
+  resellerPriceUsd: number;
+  /** Basis points the badge takes off every fee its holder pays. */
+  resellerDiscountBp: number;
+  /** How many times the holder's rating points count while it is active. */
+  resellerPointsMultiplier: number;
   /** When the scheduled sweep last finished. Null if it never has. */
   lastSweepAt: Date | null;
   /** What it did, per job: a count, or the error it hit. */
@@ -69,6 +76,9 @@ export async function getSettings(): Promise<PlatformSettings> {
       offerExpiryHours: true,
       minWithdrawalUsd: true,
       paymentWindowHours: true,
+      resellerPriceUsd: true,
+      resellerDiscountBp: true,
+      resellerPointsMultiplier: true,
       lastSweepAt: true,
       lastSweepResult: true,
       updatedAt: true,
@@ -89,6 +99,9 @@ export async function getSettings(): Promise<PlatformSettings> {
         offerExpiryHours: row.offerExpiryHours,
         minWithdrawalUsd: row.minWithdrawalUsd,
         paymentWindowHours: row.paymentWindowHours,
+        resellerPriceUsd: row.resellerPriceUsd,
+        resellerDiscountBp: row.resellerDiscountBp,
+        resellerPointsMultiplier: row.resellerPointsMultiplier,
         lastSweepAt: row.lastSweepAt,
         lastSweepResult:
           (row.lastSweepResult as Record<string, number | string> | null) ??
@@ -103,6 +116,9 @@ export async function getSettings(): Promise<PlatformSettings> {
         offerExpiryHours: DEFAULT_OFFER_EXPIRY_HOURS,
         minWithdrawalUsd: DEFAULT_MIN_WITHDRAWAL_USD,
         paymentWindowHours: DEFAULT_PAYMENT_WINDOW_HOURS,
+        resellerPriceUsd: RESELLER_DEFAULTS.priceUsd,
+        resellerDiscountBp: RESELLER_DEFAULTS.discountBp,
+        resellerPointsMultiplier: RESELLER_DEFAULTS.pointsMultiplier,
         lastSweepAt: null,
         lastSweepResult: null,
         updatedAt: null,
@@ -131,6 +147,10 @@ export type SettingsInput = {
   /** Dollars, as typed into the form. Stored as cents. */
   minWithdrawal: number;
   paymentWindowHours: number;
+  /** Dollars, as typed into the form. Stored as cents. */
+  resellerPrice: number;
+  resellerDiscountBp: number;
+  resellerPointsMultiplier: number;
 };
 
 export type SettingsError = { field: string; message: string };
@@ -214,6 +234,39 @@ export function validateSettings(input: SettingsInput): SettingsError[] {
     });
   }
 
+  // Free would hand every member the discount; a typo of $2,000 would
+  // quietly end the badge.
+  if (
+    !Number.isFinite(input.resellerPrice) ||
+    input.resellerPrice < 1 ||
+    input.resellerPrice > 1_000
+  ) {
+    errors.push({
+      field: "resellerPrice",
+      message: "Between $1 and $1,000 for 30 days.",
+    });
+  }
+  if (
+    !Number.isInteger(input.resellerDiscountBp) ||
+    input.resellerDiscountBp < 0 ||
+    input.resellerDiscountBp > 9_000
+  ) {
+    errors.push({
+      field: "resellerDiscountBp",
+      message: "Between 0% and 90%.",
+    });
+  }
+  if (
+    !Number.isInteger(input.resellerPointsMultiplier) ||
+    input.resellerPointsMultiplier < 1 ||
+    input.resellerPointsMultiplier > 10
+  ) {
+    errors.push({
+      field: "resellerPointsMultiplier",
+      message: "A whole number from 1 to 10.",
+    });
+  }
+
   return errors;
 }
 
@@ -232,6 +285,9 @@ export async function updateSettings(input: SettingsInput, actorId: string) {
       offerExpiryHours: true,
       minWithdrawalUsd: true,
       paymentWindowHours: true,
+      resellerPriceUsd: true,
+      resellerDiscountBp: true,
+      resellerPointsMultiplier: true,
     },
   });
 
@@ -244,6 +300,9 @@ export async function updateSettings(input: SettingsInput, actorId: string) {
     offerExpiryHours: input.offerExpiryHours,
     minWithdrawalUsd: Math.round(input.minWithdrawal * 100),
     paymentWindowHours: input.paymentWindowHours,
+    resellerPriceUsd: Math.round(input.resellerPrice * 100),
+    resellerDiscountBp: input.resellerDiscountBp,
+    resellerPointsMultiplier: input.resellerPointsMultiplier,
     updatedById: actorId,
   };
 

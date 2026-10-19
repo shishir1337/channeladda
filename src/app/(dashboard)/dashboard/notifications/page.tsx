@@ -3,6 +3,7 @@ import {
   CircleDollarSignIcon,
   FileTextIcon,
   GavelIcon,
+  GemIcon,
   MessageSquareIcon,
   StarIcon,
   TagIcon,
@@ -39,6 +40,7 @@ const ICONS: Record<NotificationKind, typeof BellIcon> = {
   PAYOUT: WalletIcon,
   DISPUTE: GavelIcon,
   REVIEW: StarIcon,
+  BADGE: GemIcon,
 };
 
 /** What each kind is, in the reader's terms rather than the schema's. */
@@ -50,6 +52,7 @@ const KINDS: Record<NotificationKind, string> = {
   PAYOUT: "Payout",
   DISPUTE: "Dispute",
   REVIEW: "Review",
+  BADGE: "Reseller badge",
 };
 
 /**

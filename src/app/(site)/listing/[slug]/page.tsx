@@ -22,9 +22,11 @@ import { Badge } from "@/components/ui/badge";
 import { Container } from "@/components/ui/section";
 import { platformMap } from "@/data/platforms";
 import { databaseGate } from "@/lib/db-gate";
+import { withResellerDiscount } from "@/lib/reseller";
 import { formatCompact } from "@/lib/utils";
 import { getListing, getSimilarListings } from "@/server/listings";
 import { heldByAcceptedOffer } from "@/server/offers";
+import { activeResellers } from "@/server/reseller-status";
 import { getSeller } from "@/server/sellers";
 import { getCurrentUser } from "@/server/session";
 import { getSettings } from "@/server/settings";
@@ -75,6 +77,18 @@ export default async function ListingPage({
     getSimilarListings(listing),
   ]);
   if (!seller) notFound();
+
+  // The rates this viewer would be charged: a Reseller badge holder's are
+  // already discounted, so the quote is what the deal will cost them. Only
+  // the three rates reach the browser, not the rest of the settings.
+  const viewerIsReseller = viewer
+    ? (await activeResellers([viewer.id])).has(viewer.id)
+    : false;
+  const fees = withResellerDiscount(
+    settings,
+    { buyer: viewerIsReseller, seller: false },
+    settings.resellerDiscountBp,
+  );
 
   // A seller browsing their own listing gets neither buy action.
   const isOwnListing =
@@ -217,7 +231,7 @@ export default async function ListingPage({
               <BuyPanel
                 listing={listing}
                 holdDays={platform.holdDays}
-                fees={settings}
+                fees={fees}
                 isOwnListing={isOwnListing}
                 heldOfferUsd={heldOfferUsd}
               />
@@ -259,7 +273,7 @@ export default async function ListingPage({
               <BuyPanel
                 listing={listing}
                 holdDays={platform.holdDays}
-                fees={settings}
+                fees={fees}
                 isOwnListing={isOwnListing}
                 heldOfferUsd={heldOfferUsd}
               />

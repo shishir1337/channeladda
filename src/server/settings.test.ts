@@ -10,6 +10,9 @@ const VALID: SettingsInput = {
   offerExpiryHours: 48,
   minWithdrawal: 20,
   paymentWindowHours: 48,
+  resellerPrice: 20,
+  resellerDiscountBp: 3000,
+  resellerPointsMultiplier: 3,
 };
 
 const fields = (input: SettingsInput) =>

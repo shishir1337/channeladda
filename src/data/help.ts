@@ -102,6 +102,18 @@ export const helpArticles: HelpArticle[] = [
     ],
   },
   {
+    slug: "rating-points-and-the-reseller-badge",
+    title: "Rating points and the Reseller badge",
+    category: "trust",
+    summary:
+      "How points are earned from deals, and what the Reseller badge adds.",
+    body: [
+      "Every deal that completes earns rating points for both sides: half of what the deal was worth, in US dollars. A $500 deal is 250 points for the buyer and 250 for the seller. Points come from completed deals only, so they cannot be typed in or bought one by one, and they show on your profile and to anyone you are dealing with.",
+      "The Reseller badge is bought 30 days at a time from your wallet, from your balance or with crypto. While it is active it shows beside your name, your rating points count three times — 250 becomes 750 — and every Channel Adda fee you pay is 30% lower, buying or selling. When it ends your points count once again and fees go back to normal; a deal keeps the fee it was opened at.",
+      "Paying while the badge is active adds 30 days on to the end, so nothing is lost by renewing early. We remind you three days before it ends.",
+    ],
+  },
+  {
     slug: "getting-paid",
     title: "Getting paid",
     category: "selling",

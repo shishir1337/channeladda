@@ -428,6 +428,9 @@ test(
         offerExpiryHours: 48,
         minWithdrawal: 3,
         paymentWindowHours: 48,
+        resellerPrice: 20,
+        resellerDiscountBp: 3000,
+        resellerPointsMultiplier: 3,
       },
       admin.id,
     );

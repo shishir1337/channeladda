@@ -4,6 +4,7 @@ import { purgeExpiredMedia, purgeOldMessages } from "@/server/chat-retention";
 import { announceEndedHolds, expireStaleDeals } from "@/server/deals";
 import { reconcileInvoices } from "@/server/invoices";
 import { expireOffers, releaseLapsedOfferReservations } from "@/server/offers";
+import { remindEndingPasses } from "@/server/reseller";
 import { recordSweep } from "@/server/settings";
 import { collectOrphanUploads } from "@/server/upload-access";
 
@@ -62,6 +63,8 @@ export async function POST(request: Request) {
     // A deal whose Google wait or holding period has run out: the next
     // person is told their step is open.
     ["holds", announceEndedHolds],
+    // A Reseller badge ending within three days: its holder is told once.
+    ["badges", () => remindEndingPasses()],
     ["offers", expireOffers],
     // An accepted offer nobody turned into a deal. Before this, accepting
     // one took the listing off the market for good.

@@ -40,6 +40,7 @@ import {
   notifyClosedOffers,
   releaseLapsedOfferReservations,
 } from "@/server/offers";
+import { dealFees } from "@/server/reseller-status";
 import { getSettings } from "@/server/settings";
 import { markUploadsAttached } from "@/server/upload-access";
 
@@ -306,10 +307,13 @@ export async function createDeal(input: {
     return { ok: false, reason: "not-live" };
   }
 
+  // Each side's Reseller badge takes its share off the fee that side pays.
+  // Recorded on the order as amounts, so a badge lapsing later never changes
+  // what this deal costs.
   const settings = await getSettings();
   const amounts = orderAmounts(
     offer ? offer.amountUsd : listing.priceUsd,
-    settings,
+    await dealFees(input.buyerId, listing.sellerId, settings),
     input.mode,
   );
   const steps = templateFor(input.mode);

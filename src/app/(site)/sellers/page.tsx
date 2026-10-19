@@ -1,6 +1,7 @@
 import { BadgeCheckIcon, StarIcon, TimerIcon } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { ResellerBadge } from "@/components/app/reseller-badge";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/page-header";
 import { Price } from "@/components/ui/price";
@@ -94,6 +95,7 @@ export default async function SellersPage() {
                           aria-label="Verified seller"
                           className="size-4 shrink-0 text-verified"
                         />
+                        {seller.reseller ? <ResellerBadge /> : null}
                       </h2>
                       <p className="mt-0.5 flex items-center gap-1.5 text-xs text-subtle">
                         <StarIcon

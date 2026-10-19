@@ -188,6 +188,10 @@ export function SettingsForm({
     /** Cents, as stored. Shown and typed in dollars. */
     minWithdrawalUsd: number;
     paymentWindowHours: number;
+    /** Cents, as stored. Shown and typed in dollars. */
+    resellerPriceUsd: number;
+    resellerDiscountBp: number;
+    resellerPointsMultiplier: number;
   };
 }) {
   const router = useRouter();
@@ -200,6 +204,9 @@ export function SettingsForm({
     offer: useId(),
     minWithdrawal: useId(),
     paymentWindow: useId(),
+    resellerPrice: useId(),
+    resellerDiscount: useId(),
+    resellerMultiplier: useId(),
   };
 
   const [safest, setSafest] = useState(formatRate(current.buyerFeeBpSafest));
@@ -217,6 +224,15 @@ export function SettingsForm({
   );
   const [minWithdrawal, setMinWithdrawal] = useState(
     String(current.minWithdrawalUsd / 100),
+  );
+  const [resellerPrice, setResellerPrice] = useState(
+    String(current.resellerPriceUsd / 100),
+  );
+  const [resellerDiscount, setResellerDiscount] = useState(
+    formatRate(current.resellerDiscountBp),
+  );
+  const [resellerMultiplier, setResellerMultiplier] = useState(
+    String(current.resellerPointsMultiplier),
   );
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saved, setSaved] = useState<string | null>(null);
@@ -287,6 +303,25 @@ export function SettingsForm({
         Math.round(Number(minWithdrawal) * 100) !== current.minWithdrawalUsd ||
         Number(paymentWindow) !== current.paymentWindowHours,
     },
+    {
+      label: "Reseller badge, 30 days",
+      from: usd(current.resellerPriceUsd / 100),
+      to: usd(Number(resellerPrice) || 0),
+      changed:
+        Math.round(Number(resellerPrice) * 100) !== current.resellerPriceUsd,
+    },
+    {
+      label: "Reseller fee discount",
+      from: `${formatRate(current.resellerDiscountBp)}%`,
+      to: `${resellerDiscount}%`,
+      changed: toBp(resellerDiscount) !== current.resellerDiscountBp,
+    },
+    {
+      label: "Reseller points multiplier",
+      from: `${current.resellerPointsMultiplier}x`,
+      to: `${resellerMultiplier}x`,
+      changed: Number(resellerMultiplier) !== current.resellerPointsMultiplier,
+    },
   ]
     .filter((row) => row.changed)
     .map(({ label, from, to }) => ({ label, from, to }));
@@ -310,6 +345,9 @@ export function SettingsForm({
             offerExpiryHours: Number(offerHours),
             minWithdrawal: Number(minWithdrawal),
             paymentWindowHours: Number(paymentWindow),
+            resellerPrice: Number(resellerPrice),
+            resellerDiscountBp: toBp(resellerDiscount),
+            resellerPointsMultiplier: Number(resellerMultiplier),
           });
           if (!result.ok) {
             setErrors(result.errors);
@@ -436,6 +474,44 @@ export function SettingsForm({
           value={minWithdrawal}
           onChange={setMinWithdrawal}
           error={errors.minWithdrawal}
+        />
+      </Group>
+
+      <Group
+        title="Reseller badge"
+        info="Bought 30 days at a time, from the balance or by crypto. While it lasts it shows beside the holder's name, multiplies their rating points, and takes the discount off every fee they pay. A deal keeps the fee it was opened at."
+      >
+        <SettingRow
+          id={ids.resellerPrice}
+          name="resellerPrice"
+          label="Price for 30 days"
+          unit="USD"
+          inputMode="decimal"
+          value={resellerPrice}
+          onChange={setResellerPrice}
+          error={errors.resellerPrice}
+        />
+        <SettingRow
+          id={ids.resellerDiscount}
+          name="resellerDiscountBp"
+          label="Fee discount"
+          unit="%"
+          tip="Taken off the buyer fee when they buy and the seller fee when they sell."
+          inputMode="decimal"
+          value={resellerDiscount}
+          onChange={setResellerDiscount}
+          error={errors.resellerDiscountBp}
+        />
+        <SettingRow
+          id={ids.resellerMultiplier}
+          name="resellerPointsMultiplier"
+          label="Points multiplier"
+          unit="x"
+          tip="How many times their rating points count while the badge is active. Back to once when it ends."
+          inputMode="numeric"
+          value={resellerMultiplier}
+          onChange={setResellerMultiplier}
+          error={errors.resellerPointsMultiplier}
         />
       </Group>
 

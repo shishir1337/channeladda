@@ -59,7 +59,7 @@ function isUniqueViolation(error: unknown): boolean {
 }
 
 /** Statuses in which a withdrawal still has a claim on the balance. */
-const PENDING_WITHDRAWAL: readonly WithdrawalStatus[] = [
+export const PENDING_WITHDRAWAL: readonly WithdrawalStatus[] = [
   "REQUESTED",
   "APPROVED",
 ];

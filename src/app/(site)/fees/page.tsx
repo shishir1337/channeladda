@@ -6,7 +6,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Price } from "@/components/ui/price";
 import { Container, Section, SectionHeading } from "@/components/ui/section";
 import { buyerTotal, formatRate, sellerPayout } from "@/lib/fees";
-import { getFeeSettings } from "@/server/settings";
+import { getFeeSettings, getSettings } from "@/server/settings";
 
 export async function generateMetadata(): Promise<Metadata> {
   const fees = await getFeeSettings();
@@ -37,7 +37,7 @@ const notCharged = [
 ];
 
 export default async function FeesPage() {
-  const fees = await getFeeSettings();
+  const [fees, badge] = await Promise.all([getFeeSettings(), getSettings()]);
 
   return (
     <>
@@ -120,6 +120,22 @@ export default async function FeesPage() {
                 "Channel Adda earns",
               ]}
             />
+            <p className="max-w-2xl text-sm leading-relaxed text-muted">
+              <span className="font-semibold text-fg">
+                Reseller badge holders pay{" "}
+                {formatRate(badge.resellerDiscountBp)}% less.
+              </span>{" "}
+              The badge costs $
+              {(badge.resellerPriceUsd / 100).toLocaleString("en-US")} for 30
+              days, from your wallet, and takes the discount off every fee you
+              pay while it lasts — buying or selling.{" "}
+              <Link
+                href="/help/rating-points-and-the-reseller-badge"
+                className="font-medium text-fg underline decoration-line-strong underline-offset-4 hover:decoration-fg"
+              >
+                How it works
+              </Link>
+            </p>
           </div>
         </Container>
       </Section>

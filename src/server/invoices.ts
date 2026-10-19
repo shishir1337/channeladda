@@ -8,6 +8,7 @@ import { recordAudit } from "@/server/audit";
 import { classifyStatus, lookupInvoice } from "@/server/cryptomus";
 import { recordOpeningPayment, recordStrayPricePayment } from "@/server/deals";
 import { notifyStaff } from "@/server/notifications";
+import { settleBadgePayment } from "@/server/reseller";
 import { creditDeposit } from "@/server/wallet";
 
 /**
@@ -141,7 +142,8 @@ function isUniqueViolation(error: unknown): boolean {
 
 /** A reference the processor will echo back. Unique, and ours to read. */
 export function newReference(purpose: InvoicePurpose): string {
-  const prefix = purpose === "TOPUP" ? "TOPUP" : "DEAL";
+  const prefix =
+    purpose === "TOPUP" ? "TOPUP" : purpose === "BADGE" ? "BADGE" : "DEAL";
   return `${prefix}-${randomBytes(9).toString("base64url")}`;
 }
 
@@ -349,7 +351,17 @@ async function reconcileOne(invoice: {
     return false;
   }
 
-  if (invoice.purpose === "TOPUP") {
+  if (invoice.purpose === "BADGE") {
+    if (confirmed.paidAmountUsd === null || confirmed.paidAmountUsd <= 0) {
+      return false;
+    }
+    // Into the balance, then spent on the pass: the webhook's own path.
+    await settleBadgePayment(
+      invoice.reference,
+      confirmed.paidAmountUsd,
+      confirmed.payerCurrency ?? "USDT",
+    );
+  } else if (invoice.purpose === "TOPUP") {
     if (confirmed.paidAmountUsd === null || confirmed.paidAmountUsd <= 0) {
       return false;
     }
@@ -421,7 +433,10 @@ async function reconcileOne(invoice: {
   await recordAudit({
     actorId: null,
     action: "payment.reconciled",
-    entity: invoice.purpose === "TOPUP" ? "user" : "order",
+    entity:
+      invoice.purpose === "TOPUP" || invoice.purpose === "BADGE"
+        ? "user"
+        : "order",
     entityId: invoice.orderId ?? invoice.userId,
     after: { reference: invoice.reference, status: confirmed.status },
   });

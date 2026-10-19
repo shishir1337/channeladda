@@ -116,6 +116,7 @@ enum LedgerKind {
   WITHDRAWAL
   ADJUSTMENT
   DEPOSIT // wallet top-up
+  BADGE_FEE // a Reseller badge pass: debited from the member, earned by the platform
 }
 
 /// What a chat attachment is. Decided from the file's own bytes, never from
@@ -133,6 +134,7 @@ enum NotificationKind {
   PAYOUT
   DISPUTE
   REVIEW
+  BADGE // the Reseller badge: about to end
 }
 
 // ---------------------------------------------------------------- accounts
@@ -215,6 +217,7 @@ model User {
   twoFactors     TwoFactor[]
   invoices       Invoice[]
   uploads        Upload[]
+  resellerPasses ResellerPass[]
 
   @@index([slug])
   @@index([role])
@@ -931,6 +934,7 @@ enum InvoicePurpose {
   DEAL // the opening payment: the whole amount on Fastest, the admin fee on Safest
   DEAL_PRICE // legacy: a Safest price paid to us; no longer raised, credited to the buyer if paid
   TOPUP
+  BADGE // a Reseller badge pass, credited to the balance and spent on the pass
 }
 
 /// An invoice raised with the payment processor.
@@ -981,8 +985,16 @@ model PlatformSettings {
   /// is more work and carries the funds, so it may be priced higher.
   buyerFeeBpSafest  Int @default(300)
   buyerFeeBpFastest Int @default(300)
-  /// Deducted from the price before the seller is credited, in both modes.
+  /// Deducted from the price before a Fastest seller is credited. A Safest
+  /// price goes to the seller directly, so it carries none.
   sellerFeeBp       Int @default(0)
+
+  /// The Reseller badge: what 30 days cost (cents), the share it takes off
+  /// every fee its holder pays (basis points), and how many times their
+  /// rating points count while it is active.
+  resellerPriceUsd         Int @default(2000)
+  resellerDiscountBp       Int @default(3000)
+  resellerPointsMultiplier Int @default(3)
 
   /// How many Safest channels one agent may hold at once. Google caps how many
   /// channels an account can own, and a locked agent account freezes each deal
@@ -1016,4 +1028,31 @@ model PlatformSettings {
   updatedAt   DateTime @updatedAt
   updatedById String?
   updatedBy   User?    @relation("SettingsEditor", fields: [updatedById], references: [id])
+}
+
+/// How a Reseller badge pass was paid for.
+enum PassPaidVia {
+  BALANCE // from the member's Channel Adda balance
+  CRYPTOMUS // by an invoice, credited to the balance and spent on the pass at once
+}
+
+/// Thirty days of the Reseller badge. A member holds the badge while any
+/// pass covers now; a new pass starts where the last one ends, so paying
+/// early extends rather than overlaps.
+model ResellerPass {
+  id         String      @id @default(cuid())
+  userId     String
+  user       User        @relation(fields: [userId], references: [id])
+  startsAt   DateTime
+  endsAt     DateTime
+  /// What was paid, in cents: the price on the day it was bought.
+  amountUsd  Int
+  /// One name per payment, so a retried click or callback buys one pass.
+  reference  String      @unique
+  paidVia    PassPaidVia
+  /// When the holder was told this pass, their last, was about to end.
+  remindedAt DateTime?
+  createdAt  DateTime    @default(now())
+
+  @@index([userId, endsAt])
 }

@@ -8,6 +8,7 @@ import {
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { pointsLabel, ResellerBadge } from "@/components/app/reseller-badge";
 import { ListingCard } from "@/components/home/listing-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -103,6 +104,7 @@ export default async function SellerPage({
                     aria-label="Verified seller"
                     className="size-6 shrink-0 text-verified"
                   />
+                  {seller.reseller ? <ResellerBadge /> : null}
                 </h1>
                 <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted">
                   <span className="flex items-center gap-1">
@@ -115,6 +117,10 @@ export default async function SellerPage({
                     </span>
                   </span>
                   <span className="tnum">({seller.reviews} reviews)</span>
+                  <span aria-hidden="true">·</span>
+                  <span className="tnum font-medium text-fg">
+                    {pointsLabel(seller.points ?? 0)}
+                  </span>
                   <span aria-hidden="true">·</span>
                   <span>{seller.country}</span>
                   <span aria-hidden="true">·</span>
@@ -188,9 +194,10 @@ export default async function SellerPage({
               className="mt-0.5 size-4 shrink-0 text-verified"
             />
             <span>
-              Every rating here comes from a deal that completed. A review can
-              only be written by a buyer whose deal completed, so there is no
-              way to buy reputation on Channel Adda.
+              Every review here comes from a deal that completed, so a review
+              cannot be bought. Rating points are half the worth of completed
+              deals, bought or sold; a Reseller badge holder&apos;s count three
+              times while their badge lasts.
             </span>
           </p>
         </Container>

@@ -13,6 +13,7 @@ import {
   markApplied,
   noteCallback,
 } from "@/server/invoices";
+import { settleBadgePayment } from "@/server/reseller";
 import { creditDeposit } from "@/server/wallet";
 
 /**
@@ -147,7 +148,7 @@ async function handleTopUp(
   // somebody's deposit in a stranger's withdrawable balance.
   const invoice = await db.invoice.findUnique({
     where: { reference },
-    select: { userId: true },
+    select: { userId: true, purpose: true },
   });
   if (!invoice) {
     console.warn(`[cryptomus] top-up ${reference} has no invoice`);
@@ -168,6 +169,14 @@ async function handleTopUp(
 
   // Credited at what actually arrived, not at what was asked for: an
   // overpayment is still the payer's money.
+  if (invoice.purpose === "BADGE") {
+    await settleBadgePayment(
+      reference,
+      confirmed.paidAmountUsd,
+      confirmed.payerCurrency ?? "USDT",
+    );
+    return "applied";
+  }
   await creditDeposit(
     user.id,
     confirmed.paidAmountUsd,
@@ -183,7 +192,9 @@ async function handle(
   outcome: ReturnType<typeof classifyStatus>,
   payload: Record<string, unknown>,
 ): Promise<"applied" | "ignored" | "unconfirmed"> {
-  if (orderId.startsWith("TOPUP-")) {
+  // A Reseller badge is paid the same way: into the balance, then spent on
+  // the pass.
+  if (orderId.startsWith("TOPUP-") || orderId.startsWith("BADGE-")) {
     return handleTopUp(orderId, outcome);
   }
 

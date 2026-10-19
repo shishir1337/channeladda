@@ -6,6 +6,7 @@ import {
   CircleDollarSignIcon,
   FileTextIcon,
   GavelIcon,
+  GemIcon,
   MessageSquareIcon,
   StarIcon,
   TagIcon,
@@ -47,6 +48,7 @@ const ICONS: Record<NotificationKind, typeof BellIcon> = {
   PAYOUT: WalletIcon,
   DISPUTE: GavelIcon,
   REVIEW: StarIcon,
+  BADGE: GemIcon,
 };
 
 /** "3 days" beats a date: half these readers are not reading in English. */
