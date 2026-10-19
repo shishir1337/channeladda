@@ -48,6 +48,8 @@ const MESSAGES: Record<repo.DealFailure, string> = {
   "handed-over":
     "Ownership has already been handed to the account you gave, so it can no longer be changed. Message the agent in the chat if something is wrong.",
   "bad-handover": "That account does not look right for this platform.",
+  "out-of-level":
+    "This deal's price is outside that person's level. Level 1 runs deals under $10,000, level 2 from $10,000 to under $100,000, level 3 from $100,000.",
   "pay-in-checkout":
     "The price is paid to Channel Adda from this page, by crypto or from your balance. The step completes on its own when the money arrives.",
   "price-not-paid":
@@ -168,13 +170,17 @@ export async function completeStep(
   return { ok: true, message: "Done." };
 }
 
-/** An agent taking the next job off the queue. */
+/**
+ * Somebody who runs deals taking the next job off the queue: an agent, a
+ * moderator, or the superadmin (who passes every `requireRole`). The deal's
+ * level is checked in `assignAgent`.
+ */
 export async function claimDeal(
   orderId: string,
   agentEmail: string,
   agentBrand: string,
 ): Promise<DealResult> {
-  const user = await requireRole("AGENT");
+  const user = await requireRole("AGENT", "MODERATOR");
   // The agent's stored identity wins over whatever was typed. It used to be
   // typed per deal, so one agent reached different sellers under different
   // names — and a seller told to invite the wrong address as owner hands

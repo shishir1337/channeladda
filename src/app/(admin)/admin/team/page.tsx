@@ -33,6 +33,8 @@ import {
 import { Avatar } from "@/components/app/user-menu";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import type { UserRole } from "@/generated/prisma/enums";
+import { isCustodianRole, levelLabel } from "@/lib/custody-roles";
 import { cn } from "@/lib/utils";
 import {
   INVITABLE_ROLES,
@@ -106,10 +108,10 @@ function Load({
   holds: number;
   cap: number;
 }) {
-  if (role !== "AGENT") {
+  if (!isCustodianRole(role as UserRole)) {
     return (
       <span className="text-subtle">
-        &mdash;<span className="sr-only">not an agent</span>
+        &mdash;<span className="sr-only">does not run deals</span>
       </span>
     );
   }
@@ -153,7 +155,8 @@ export default async function AdminTeamPage() {
   const [{ members, maxHoldsPerAgent, activeSuperadmins }, invites] =
     await Promise.all([listTeam(), listPendingInvites()]);
 
-  const agents = members.filter((member) => member.role === "AGENT");
+  // Everyone who runs deals: agents, moderators and the superadmin.
+  const agents = members.filter((member) => isCustodianRole(member.role));
   const atCap = agents.filter(
     (agent) => !agent.banned && agent.holds >= maxHoldsPerAgent,
   );
@@ -208,7 +211,7 @@ export default async function AdminTeamPage() {
           icon={UsersIcon}
         />
         <Stat
-          label="Agents free"
+          label="Free to take a deal"
           value={available.length}
           tone={
             available.length === 0 && agents.length > 0 ? "danger" : "neutral"
@@ -218,9 +221,9 @@ export default async function AdminTeamPage() {
           // Safest deal is a finding, not a definition.
           note={
             agents.length === 0
-              ? "No agents. Safest deals cannot be taken at all."
+              ? "Nobody runs deals. Safest deals cannot be taken at all."
               : available.length === 0
-                ? "Every agent is at the cap. No Safest deal can be picked up."
+                ? "Everyone who runs deals is at the cap. No Safest deal can be picked up."
                 : undefined
           }
         />
@@ -324,7 +327,7 @@ export default async function AdminTeamPage() {
         id="people"
         title="With access"
         count={members.length}
-        info="Open an account to change what somebody can reach, set an agent's transfer identity, or suspend them."
+        info="Open an account to change what somebody can reach, set the deal level and transfer identity of anyone who runs deals, or suspend them."
       >
         {members.length === 0 ? (
           <EmptyState
@@ -334,7 +337,7 @@ export default async function AdminTeamPage() {
           />
         ) : (
           <TableCard>
-            <table className="w-full min-w-[46rem] border-collapse">
+            <table className="w-full min-w-[54rem] border-collapse">
               <caption className="sr-only">
                 Everyone with access: role, channels held against the cap,
                 two-factor, when they joined, and whether they are suspended.
@@ -343,6 +346,7 @@ export default async function AdminTeamPage() {
                 <tr>
                   <Th>Person</Th>
                   <Th>Role</Th>
+                  <Th>Deal level</Th>
                   <Th numeric>Holding</Th>
                   <Th numeric>Live deals</Th>
                   <Th>Two-factor</Th>
@@ -379,6 +383,23 @@ export default async function AdminTeamPage() {
                       <Badge variant={ROLE_VARIANT[member.role]}>
                         {ROLE_LABELS[member.role]}
                       </Badge>
+                    </Td>
+                    <Td>
+                      {isCustodianRole(member.role) ? (
+                        <span
+                          className={cn(
+                            "text-[0.8125rem] whitespace-nowrap",
+                            member.dealLevel ? "text-fg" : "text-subtle",
+                          )}
+                        >
+                          {levelLabel(member.dealLevel)}
+                        </span>
+                      ) : (
+                        <span className="text-subtle">
+                          &mdash;
+                          <span className="sr-only">does not run deals</span>
+                        </span>
+                      )}
                     </Td>
                     <Td numeric>
                       <Load

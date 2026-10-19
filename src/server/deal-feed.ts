@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { OrderStatus } from "@/generated/prisma/enums";
+import { CUSTODIAN_ROLES } from "@/lib/custody-roles";
 import { db } from "@/lib/db";
 import type { DealActor } from "@/lib/deal-machine";
 
@@ -208,7 +209,10 @@ export async function listDealsNeedingReassignment(limit = 50) {
         ],
       },
       agent: {
-        OR: [{ bannedAt: { not: null } }, { role: { not: "AGENT" } }],
+        OR: [
+          { bannedAt: { not: null } },
+          { role: { notIn: [...CUSTODIAN_ROLES] } },
+        ],
       },
     },
     orderBy: { createdAt: "asc" },
@@ -224,6 +228,8 @@ export async function listDealsNeedingReassignment(limit = 50) {
       paymentRef: true,
       custodyAt: true,
       buyerPaidAt: true,
+      // Who may take it over depends on its size (deal levels).
+      priceUsd: true,
       agent: { select: { id: true, name: true, email: true } },
       listing: { select: { title: true } },
     },

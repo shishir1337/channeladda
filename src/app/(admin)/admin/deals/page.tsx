@@ -60,6 +60,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Pagination } from "@/components/ui/pagination";
 import type { OrderStatus } from "@/generated/prisma/enums";
+import { isCustodianRole, levelLabel, withinLevel } from "@/lib/custody-roles";
 import { db } from "@/lib/db";
 import { cn } from "@/lib/utils";
 import {
@@ -182,7 +183,8 @@ export default async function AdminDealsPage({
   // arriving at the bare path from a bookmark or from a link in the activity
   // feed must not get a 404 for a page that is theirs.
   const viewer = await requireAdminArea();
-  const isAgent = viewer.role === "AGENT" || viewer.role === "SUPERADMIN";
+  // Agents, moderators and the superadmin all run deals; levels decide which.
+  const isAgent = isCustodianRole(viewer.role);
   const isFinance = viewer.role === "FINANCE" || viewer.role === "SUPERADMIN";
   const isStaff = viewer.role !== "AGENT";
   // Whether an invoice could exist at all, so a missing one is not blamed
@@ -236,6 +238,7 @@ export default async function AdminDealsPage({
     mine,
     identity,
     assignable,
+    me,
   ] = await Promise.all([
     // Staff only, and not fetched otherwise. The platform-wide trail used
     // to be queried for everybody and then hidden from agents with a CSS
@@ -269,10 +272,25 @@ export default async function AdminDealsPage({
           },
         })
       : Promise.resolve([]),
-    mineOnly ? listDealsForAgent(viewer.id) : Promise.resolve([]),
+    mineOnly || isAgent ? listDealsForAgent(viewer.id) : Promise.resolve([]),
     isAgent ? agentIdentity(viewer.id) : Promise.resolve(null),
     isStaff ? listAssignableAgents() : Promise.resolve(null),
+    isAgent
+      ? db.user.findUnique({
+          where: { id: viewer.id },
+          select: { dealLevel: true },
+        })
+      : Promise.resolve(null),
   ]);
+  const myLevel = me?.dealLevel ?? null;
+  // A moderator sees their own deals here once they are running any; an
+  // agent always does, since it is the whole of their desk.
+  const showMine = mineOnly || (isAgent && mine.length > 0);
+  /** Who may run a deal at this price: the assign list, filtered by level. */
+  const runnersFor = (priceCents: number) =>
+    (assignable?.agents ?? []).filter((agent) =>
+      withinLevel(agent.dealLevel, agent.role, priceCents),
+    );
 
   const oldestUnheld = needingAgent.at(0)?.createdAt;
   const oldestUnpaid = awaitingPayment.at(0)?.createdAt;
@@ -300,7 +318,7 @@ export default async function AdminDealsPage({
 
   // As many columns as there are figures, so a desk with three queues does
   // not leave a hole where a fourth would be.
-  const figures = 2 + (isFinance ? 1 : 0) + (mineOnly ? 1 : 0);
+  const figures = 2 + (isFinance ? 1 : 0) + (showMine ? 1 : 0);
 
   return (
     <>
@@ -362,7 +380,7 @@ export default async function AdminDealsPage({
             info="Opening payments not yet cleared."
           />
         ) : null}
-        {mineOnly ? (
+        {showMine ? (
           <Stat
             label="Yours"
             value={mine.length}
@@ -428,7 +446,7 @@ export default async function AdminDealsPage({
                 {assignable ? (
                   <AssignAgent
                     orderId={order.id}
-                    agents={assignable.agents}
+                    agents={runnersFor(order.priceUsd)}
                     currentAgentId={order.agent?.id ?? null}
                   />
                 ) : null}
@@ -549,7 +567,7 @@ export default async function AdminDealsPage({
         </Section>
       ) : null}
 
-      {mineOnly ? (
+      {showMine ? (
         <Section
           id="mine"
           title="Your deals"
@@ -646,8 +664,8 @@ export default async function AdminDealsPage({
                 claim form on these, and this is why. */}
             {isAgent ? null : (
               <p className="mt-2">
-                An agent claims this from their own queue. You can still end it
-                below.
+                Whoever runs deals at this price claims it, or you can give it
+                to one of them. You can still end it below.
               </p>
             )}
           </>
@@ -686,11 +704,27 @@ export default async function AdminDealsPage({
                     }
                   />
                   {isAgent ? (
-                    <ClaimDeal
+                    withinLevel(myLevel, viewer.role, order.priceUsd) ? (
+                      <ClaimDeal
+                        orderId={order.id}
+                        defaultEmail={identity?.email ?? viewer.email}
+                        defaultBrand={
+                          identity?.brand ?? "Channel Adda Transfers"
+                        }
+                        locked={identity !== null}
+                      />
+                    ) : (
+                      <p className="mt-2 text-xs text-subtle">
+                        Outside your level ({levelLabel(myLevel).toLowerCase()}
+                        ).
+                      </p>
+                    )
+                  ) : null}
+                  {assignable && isStaff ? (
+                    <AssignAgent
                       orderId={order.id}
-                      defaultEmail={identity?.email ?? viewer.email}
-                      defaultBrand={identity?.brand ?? "Channel Adda Transfers"}
-                      locked={identity !== null}
+                      agents={runnersFor(order.priceUsd)}
+                      currentAgentId={null}
                     />
                   ) : null}
                   <EndDeal

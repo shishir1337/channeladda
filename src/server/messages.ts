@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { OfferStatus, Platform } from "@/generated/prisma/enums";
+import { isCustodianRole } from "@/lib/custody-roles";
 import { db } from "@/lib/db";
 import { MAX_MESSAGE } from "@/lib/messages";
 import {
@@ -373,10 +374,15 @@ export async function roleInThread(
 ): Promise<ThreadRole | null> {
   if (row.buyerId === viewer.id) return "buyer";
   if (row.sellerId === viewer.id) return "seller";
-  if (isStaff(viewer)) return "staff";
-  if (viewer.role === "AGENT" && (await agentOnThread(viewer.id, row.id))) {
+  // Before staff: a moderator running this thread's deal is its agent here,
+  // who writes as themselves and acts on the deal, not a reader of it.
+  if (
+    isCustodianRole(viewer.role) &&
+    (await agentOnThread(viewer.id, row.id))
+  ) {
     return "agent";
   }
+  if (isStaff(viewer)) return "staff";
   return null;
 }
 
@@ -416,7 +422,8 @@ export async function listThreads(
   // An agent's inbox is the conversations of the deals they are running, by
   // the same rule as reading one — re-read from the database for the same
   // reason.
-  const asAgent = viewer.role === "AGENT" && (await stillAnAgent(viewer.id));
+  const asAgent =
+    isCustodianRole(viewer.role) && (await stillAnAgent(viewer.id));
 
   const rows = await db.conversation.findMany({
     where: {

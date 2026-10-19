@@ -14,11 +14,13 @@ import { Callout, Card, CardBody, CardHeader } from "@/components/app/kit";
 import { TextArea, TextField } from "@/components/auth/fields";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import type { KycStatus, UserRole } from "@/generated/prisma/enums";
+import type { DealLevel, KycStatus, UserRole } from "@/generated/prisma/enums";
+import { DEAL_LEVELS, isCustodianRole, levelLabel } from "@/lib/custody-roles";
 import { cn } from "@/lib/utils";
 import {
   resetUserTwoFactor,
   setAgentIdentity,
+  setDealLevel,
   setUserBanned,
   setUserKyc,
   setUserRole,
@@ -300,6 +302,7 @@ export function UserControls({
   maxHolds,
   agentEmail,
   agentBrand,
+  dealLevel,
 }: {
   userId: string;
   currentRole: UserRole;
@@ -323,6 +326,8 @@ export function UserControls({
   maxHolds: number;
   agentEmail: string | null;
   agentBrand: string | null;
+  /** Which deals they may run; only meaningful on someone who runs deals. */
+  dealLevel: DealLevel | null;
 }) {
   const [role, setRole] = useState<UserRole>(currentRole);
   const [roleArmed, setRoleArmed] = useState(false);
@@ -350,7 +355,8 @@ export function UserControls({
   const grave = GRAVE.includes(role);
   // Removing access from somebody who is holding channels is the case that
   // quietly breaks deals: the role goes, the custody does not.
-  const orphaning = currentRole === "AGENT" && role !== "AGENT" && holds > 0;
+  const orphaning =
+    isCustodianRole(currentRole) && !isCustodianRole(role) && holds > 0;
 
   return (
     <>
@@ -433,7 +439,7 @@ export function UserControls({
                     {consequences[role]}
                   </span>
                 </p>
-                {role === "AGENT" ? (
+                {isCustodianRole(role) && role !== "SUPERADMIN" ? (
                   <p className="mt-2 pl-5.5 text-muted">
                     They may hold up to {maxHolds}{" "}
                     {maxHolds === 1 ? "channel" : "channels"} at once, which is
@@ -520,8 +526,12 @@ export function UserControls({
         </Card>
       ) : null}
 
-      {/* Only an agent has one, and only a superadmin sets it. */}
-      {canSetRole && currentRole === "AGENT" ? (
+      {/* Only somebody who runs deals has these, and only a superadmin
+          sets them here. They can change their own identity themselves. */}
+      {canSetRole && isCustodianRole(currentRole) ? (
+        <DealLevelControl userId={userId} level={dealLevel} />
+      ) : null}
+      {canSetRole && isCustodianRole(currentRole) ? (
         <AgentIdentity
           userId={userId}
           email={agentEmail}
@@ -531,6 +541,101 @@ export function UserControls({
         />
       ) : null}
     </>
+  );
+}
+
+/**
+ * Which deals this person may run, by agreed price.
+ *
+ * The owner's levels are strict bands: level 1 takes only deals under
+ * $10,000, level 2 only $10,000 to under $100,000, level 3 only $100,000 and
+ * up. "Any size" is how agents worked before levels, and the superadmin is
+ * never limited whatever is set here.
+ */
+function DealLevelControl({
+  userId,
+  level: stored,
+}: {
+  userId: string;
+  level: DealLevel | null;
+}) {
+  const [level, setLevel] = useState<DealLevel | null>(stored);
+  const [note, setNote] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+  const dirty = level !== stored;
+  const options: { value: DealLevel | null; detail: string }[] = [
+    ...DEAL_LEVELS.map((value) => ({
+      value,
+      detail:
+        value === "UNDER_10K"
+          ? "Deals under $10,000, and nothing larger."
+          : value === "UNDER_100K"
+            ? "Deals from $10,000 to under $100,000 only."
+            : "Deals of $100,000 and up only.",
+    })),
+    { value: null, detail: "No limit. How agents worked before levels." },
+  ];
+
+  return (
+    <Card>
+      <CardHeader
+        as="h2"
+        title="Deal level"
+        info="Which deals they can claim or be given, by the agreed price. Deals they already run are not affected by a change."
+      />
+      <CardBody>
+        <fieldset className="min-w-0" disabled={pending}>
+          <legend className="sr-only">Deal level</legend>
+          <Choices>
+            {options.map((option) => (
+              <Choice
+                key={option.value ?? "any"}
+                name="dealLevel"
+                value={option.value ?? "any"}
+                checked={level === option.value}
+                locked={pending}
+                onSelect={() => {
+                  setLevel(option.value);
+                  setNote(null);
+                  setError(null);
+                }}
+                title={levelLabel(option.value)}
+                tag={
+                  option.value === stored ? (
+                    <Badge size="sm">Current</Badge>
+                  ) : null
+                }
+                detail={option.detail}
+              />
+            ))}
+          </Choices>
+        </fieldset>
+        <Button
+          type="button"
+          size="sm"
+          variant={dirty ? "primary" : "secondary"}
+          className="mt-3"
+          disabled={pending || !dirty}
+          onClick={() => {
+            setNote(null);
+            setError(null);
+            startTransition(async () => {
+              const result = await setDealLevel(userId, level);
+              if (result.ok) setNote(result.message);
+              else setError(result.error);
+            });
+          }}
+        >
+          <Swap
+            busy={pending}
+            idle={dirty ? "Save level" : "Saved"}
+            working="Saving…"
+          />
+        </Button>
+        <Outcome note={note} error={error} />
+      </CardBody>
+    </Card>
   );
 }
 

@@ -49,6 +49,7 @@ import type {
   UserRole,
   WithdrawalStatus,
 } from "@/generated/prisma/enums";
+import { isCustodianRole, levelLabel } from "@/lib/custody-roles";
 import { cn } from "@/lib/utils";
 import {
   getUserDetail,
@@ -607,7 +608,10 @@ export default async function AdminUserPage({
                   {sentence(person.kycStatus)}
                 </Badge>
               </Fact>
-              {person.role === "AGENT" ? (
+              {isCustodianRole(person.role) ? (
+                <Fact label="Deal level">{levelLabel(person.dealLevel)}</Fact>
+              ) : null}
+              {isCustodianRole(person.role) ? (
                 <Fact
                   label="Channels held"
                   tone={
@@ -659,6 +663,7 @@ export default async function AdminUserPage({
             maxHolds={person.maxHolds}
             agentEmail={person.agentEmail}
             agentBrand={person.agentBrand}
+            dealLevel={person.dealLevel}
           />
           {isSuperadmin || isSelf ? null : (
             <p className="flex items-start gap-2 px-1 text-xs leading-relaxed text-subtle">

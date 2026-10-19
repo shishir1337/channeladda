@@ -1,5 +1,6 @@
 import "server-only";
 
+import { isCustodianRole } from "@/lib/custody-roles";
 import { db } from "@/lib/db";
 import { keyFromUrl, urlForKey } from "@/lib/upload-keys";
 import type { CurrentUser } from "@/server/session";
@@ -97,7 +98,7 @@ export async function canReadUpload(
       return true;
     }
     return (
-      user.role === "AGENT" &&
+      isCustodianRole(user.role) &&
       (await agentOnThread(user.id, message.conversationId))
     );
   }

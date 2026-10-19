@@ -1,7 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import type { KycStatus, UserRole } from "@/generated/prisma/enums";
+import type { DealLevel, KycStatus, UserRole } from "@/generated/prisma/enums";
+import { DEAL_LEVELS, levelLabel } from "@/lib/custody-roles";
 import * as repo from "@/server/admin-users";
 import { recordAudit } from "@/server/audit";
 import { requireRole, requireStaff, requireSuperadmin } from "@/server/session";
@@ -30,7 +31,7 @@ const FAILURES: Record<repo.GuardFailure, string> = {
   outranked: "Only a superadmin can do that to a staff account.",
   "no-change": "That is already the case.",
   "not-an-agent":
-    "Only a transfer agent has a transfer identity. Make them an agent first.",
+    "Only somebody who runs deals — an agent, a moderator or the superadmin — has a transfer identity or a deal level.",
 };
 
 export async function setUserRole(
@@ -372,6 +373,90 @@ export async function setAgentIdentity(
   return {
     ok: true,
     message: `New deals will tell sellers to invite ${trimmedEmail}.`,
+  };
+}
+
+/**
+ * The same, set by the person themselves: an agent or moderator changing the
+ * address they take channels on, without asking the superadmin to.
+ *
+ * Applies to deals they take from now on. A deal already running keeps the
+ * address its seller was given, who may have sent the invite already.
+ */
+export async function setMyAgentIdentity(
+  email: string,
+  brand: string,
+): Promise<AdminUserActionResult> {
+  // The superadmin passes every requireRole too.
+  const me = await requireRole("AGENT", "MODERATOR");
+
+  const trimmedEmail = email.trim().toLowerCase();
+  const trimmedBrand = brand.trim();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+    return { ok: false, error: "That is not an email address." };
+  }
+  if (trimmedBrand.length < 2) {
+    return {
+      ok: false,
+      error: "Give the name the seller sees beside the address.",
+    };
+  }
+
+  const result = await repo.setAgentIdentity({
+    userId: me.id,
+    email: trimmedEmail,
+    brand: trimmedBrand,
+  });
+  if (!result.ok) return { ok: false, error: FAILURES[result.reason] };
+
+  await recordAudit({
+    actorId: me.id,
+    action: "user.agent_identity_self",
+    entity: "user",
+    entityId: me.id,
+    before: result.before,
+    after: result.after,
+  });
+
+  revalidatePath("/dashboard/security");
+  revalidatePath("/admin/team");
+  return {
+    ok: true,
+    message: `Saved. Sellers on deals you take from now on invite ${trimmedEmail}.`,
+  };
+}
+
+/**
+ * Which deals somebody may run, by agreed price. Superadmin-only, like
+ * a role: it decides who holds which channels.
+ */
+export async function setDealLevel(
+  userId: string,
+  level: DealLevel | null,
+): Promise<AdminUserActionResult> {
+  const actor = await requireSuperadmin();
+  if (level !== null && !DEAL_LEVELS.includes(level)) {
+    return { ok: false, error: "Pick one of the three levels." };
+  }
+
+  const result = await repo.setDealLevel({ userId, level });
+  if (!result.ok) return { ok: false, error: FAILURES[result.reason] };
+
+  await recordAudit({
+    actorId: actor.id,
+    action: "user.deal_level",
+    entity: "user",
+    entityId: userId,
+    before: { dealLevel: result.before },
+    after: { dealLevel: result.after },
+  });
+
+  revalidatePath("/admin/team");
+  revalidatePath(`/admin/users/${userId}`);
+  revalidatePath("/admin/deals");
+  return {
+    ok: true,
+    message: `Now ${levelLabel(level).toLowerCase()}. Deals they already run are not affected.`,
   };
 }
 

@@ -15,6 +15,7 @@ import { TextArea, TextField } from "@/components/auth/fields";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { DealMode, OrderStatus } from "@/generated/prisma/enums";
+import { levelLabel } from "@/lib/custody-roles";
 import { movesHeldMoney } from "@/lib/outcomes";
 import { cn } from "@/lib/utils";
 import {
@@ -369,22 +370,29 @@ export function AssignAgent({
   const [message, setMessage] = useState<string | null>(null);
   const [ok, setOk] = useState(false);
   const [pending, startTransition] = useTransition();
+  // The same control hands out a deal nobody holds and moves one somebody
+  // can no longer act on; only the words differ.
+  const fresh = currentAgentId === null || currentAgentId === undefined;
 
   return (
     <ControlBox
-      title="Move it to another agent"
-      hint="The new agent is invited as channel owner. Ownership does not move until the seller accepts that invitation, so tell them it is coming."
+      title={fresh ? "Give it to someone" : "Move it to another agent"}
+      hint={
+        fresh
+          ? "Only people whose level covers this deal's price are listed. The seller is told the address to invite as soon as it is assigned."
+          : "The new agent is invited as channel owner. Ownership does not move until the seller accepts that invitation, so tell them it is coming."
+      }
     >
       {choices.length === 0 ? (
         <p className="mt-2 text-[0.8125rem] text-muted">
-          There is no other active agent to give it to. Invite one from the Team
-          page first.
+          Nobody whose level covers this deal is free to take it. Set levels, or
+          invite somebody, from the Team page.
         </p>
       ) : null}
       <div className="mt-3 grid gap-3 sm:grid-cols-3 sm:items-end">
         <div>
           <label htmlFor={ids.agent} className={labelClass}>
-            New agent
+            {fresh ? "Runs the deal" : "New agent"}
             <span className="ml-0.5 text-danger">*</span>
           </label>
           <div className="relative mt-1.5">
@@ -403,10 +411,11 @@ export function AssignAgent({
               }}
               className={cn(inputClass, "cursor-pointer appearance-none pr-9")}
             >
-              <option value="">Choose an agent…</option>
+              <option value="">Choose who runs it…</option>
               {choices.map((agent) => (
                 <option key={agent.id} value={agent.id} disabled={agent.atCap}>
-                  {agent.name} — holding {agent.holds}
+                  {agent.name} · {levelLabel(agent.dealLevel)} — holding{" "}
+                  {agent.holds}
                   {agent.atCap ? " (at their limit)" : ""}
                 </option>
               ))}
@@ -461,7 +470,7 @@ export function AssignAgent({
       >
         <SteadyLabel
           pending={pending}
-          idle="Reassign this deal"
+          idle={fresh ? "Assign this deal" : "Reassign this deal"}
           busy="Assigning…"
         />
       </Button>

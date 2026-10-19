@@ -7,6 +7,7 @@ import type {
   Platform,
   UserRole,
 } from "@/generated/prisma/enums";
+import { isCustodianRole, withinLevel } from "@/lib/custody-roles";
 import { db } from "@/lib/db";
 import {
   AGENT_HOLDS,
@@ -95,7 +96,9 @@ export type DealFailure =
   /** The buyer's handover account can no longer change: it has been used. */
   | "handed-over"
   /** Not a valid account for this platform (`parseHandoverTo`). */
-  | "bad-handover";
+  | "bad-handover"
+  /** The deal's price is outside the level of whoever would run it. */
+  | "out-of-level";
 
 export type DealOutcome<T = Record<never, never>> =
   | ({ ok: true } & T)
@@ -1103,12 +1106,21 @@ async function roleOnDeal(
   if (
     parties.agentId &&
     userId === parties.agentId &&
-    user.role === "AGENT" &&
+    isCustodianRole(user.role) &&
     !user.bannedAt
   ) {
     return "agent";
   }
   return STAFF_ROLES.includes(user.role) ? "staff" : null;
+}
+
+/** Holds a staff desk and is not banned, by the database's account. */
+async function isStaffMember(userId: string): Promise<boolean> {
+  const user = await db.user.findUnique({
+    where: { id: userId },
+    select: { role: true, bannedAt: true },
+  });
+  return Boolean(user && !user.bannedAt && STAFF_ROLES.includes(user.role));
 }
 
 /** Which `Order` timestamp a completed step stamps, if any. */
@@ -1173,6 +1185,7 @@ export async function assignAgent(input: {
       sellerId: true,
       agentId: true,
       conversationId: true,
+      priceUsd: true,
     },
   });
 
@@ -1181,10 +1194,14 @@ export async function assignAgent(input: {
 
   const assignee = await db.user.findUnique({
     where: { id: input.agentId },
-    select: { role: true, bannedAt: true, name: true },
+    select: { role: true, bannedAt: true, name: true, dealLevel: true },
   });
-  if (assignee?.role !== "AGENT" || assignee.bannedAt) {
+  if (!assignee || !isCustodianRole(assignee.role) || assignee.bannedAt) {
     return { ok: false, reason: "wrong-actor" };
+  }
+  // The owner's levels: a moderator takes only the deals of their own size.
+  if (!withinLevel(assignee.dealLevel, assignee.role, order.priceUsd)) {
+    return { ok: false, reason: "out-of-level" };
   }
 
   // Staff may place anyone. An agent may take an unclaimed deal for
@@ -1777,8 +1794,17 @@ export async function resolveDeal(input: {
   if (!order) return { ok: false, reason: "not-found" };
   if (isTerminal(order.status)) return { ok: false, reason: "terminal" };
 
-  const actor = await roleOnDeal(order, input.byUserId);
-  if (!actor) return { ok: false, reason: "wrong-actor" };
+  const onDeal = await roleOnDeal(order, input.byUserId);
+  if (!onDeal) return { ok: false, reason: "wrong-actor" };
+  // A moderator or the superadmin running a deal as its agent is still
+  // staff: the owner has nobody else to hand its dispute to. They act as
+  // staff for anything only staff may do, and as the agent otherwise.
+  const actor: DealActor =
+    onDeal === "agent" &&
+    !canTransition(order.mode, order.status, input.to, "agent") &&
+    (await isStaffMember(input.byUserId))
+      ? "staff"
+      : onDeal;
   if (!canTransition(order.mode, order.status, input.to, actor)) {
     return { ok: false, reason: "wrong-actor" };
   }

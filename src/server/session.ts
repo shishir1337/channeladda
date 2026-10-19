@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import type { UserRole } from "@/generated/prisma/enums";
 import { auth } from "@/lib/auth";
+import { isCustodianRole } from "@/lib/custody-roles";
 
 /**
  * Who is asking.
@@ -88,10 +89,13 @@ export async function requireAdminArea(): Promise<CurrentUser> {
   return user;
 }
 
-/** The agent desk: taking custody of channels and running transfers. */
+/**
+ * The agent desk: taking custody of channels and running transfers.
+ * Agents, moderators and the superadmin all run deals (`CUSTODIAN_ROLES`).
+ */
 export async function requireAgent(): Promise<CurrentUser> {
   const user = await requireUser();
-  if (user.role !== "AGENT" && user.role !== "SUPERADMIN") notFound();
+  if (!isCustodianRole(user.role)) notFound();
   return user;
 }
 

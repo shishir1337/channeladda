@@ -24,8 +24,10 @@ import {
   Ring,
 } from "@/components/app/kit";
 import { TwoFactorSetup } from "@/components/auth/two-factor-setup";
+import { MyDeskIdentity } from "@/components/deals/my-desk-identity";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { isCustodianRole } from "@/lib/custody-roles";
 import { db } from "@/lib/db";
 import { requireUser } from "@/server/session";
 
@@ -48,18 +50,25 @@ type Icon = ComponentType<SVGProps<SVGSVGElement>>;
 export default async function SecurityPage() {
   const user = await requireUser("/dashboard/security");
 
-  const [account, twoFactorEnabled] = await Promise.all([
+  const [account, me] = await Promise.all([
     db.account.findFirst({
       where: { userId: user.id, providerId: "credential" },
       select: { id: true },
     }),
-    db.user
-      .findUnique({
-        where: { id: user.id },
-        select: { twoFactorEnabled: true },
-      })
-      .then((row) => row?.twoFactorEnabled ?? false),
+    db.user.findUnique({
+      where: { id: user.id },
+      select: {
+        twoFactorEnabled: true,
+        agentEmail: true,
+        agentBrand: true,
+        dealLevel: true,
+      },
+    }),
   ]);
+  const twoFactorEnabled = me?.twoFactorEnabled ?? false;
+  // Agents, moderators and the superadmin run deals and keep their own
+  // access email here rather than asking the superadmin to change it.
+  const runsDeals = isCustodianRole(user.role);
 
   const privileged = user.role !== "USER";
 
@@ -171,6 +180,16 @@ export default async function SecurityPage() {
             hasPassword={account !== null}
           />
         </div>
+
+        {runsDeals ? (
+          <div id="deal-desk" className="scroll-mt-24">
+            <MyDeskIdentity
+              email={me?.agentEmail ?? null}
+              brand={me?.agentBrand ?? null}
+              level={me?.dealLevel ?? null}
+            />
+          </div>
+        ) : null}
 
         {/* ---- money safety ---------------------------------------------- */}
         <Card>

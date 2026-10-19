@@ -3,12 +3,14 @@ import "server-only";
 import { createHash, randomBytes } from "node:crypto";
 import { hashPassword } from "better-auth/crypto";
 import type {
+  DealLevel,
   DealMode,
   KycStatus,
   OrderStatus,
   UserRole,
   WithdrawalStatus,
 } from "@/generated/prisma/enums";
+import { isCustodianRole } from "@/lib/custody-roles";
 import { db } from "@/lib/db";
 import { AGENT_HOLDS, TERMINAL_STATUSES } from "@/lib/deal-machine";
 import { getSettings } from "@/server/settings";
@@ -210,6 +212,7 @@ export type UserDetail = UserRow & {
   /** An agent's stored transfer identity, or null on anyone else. */
   agentEmail: string | null;
   agentBrand: string | null;
+  dealLevel: DealLevel | null;
   /** Safest channels this person is holding right now, and the cap. */
   holds: number;
   maxHolds: number;
@@ -231,6 +234,7 @@ export async function getUserDetail(id: string): Promise<UserDetail | null> {
       twoFactorEnabled: true,
       agentEmail: true,
       agentBrand: true,
+      dealLevel: true,
       kycStatus: true,
       createdAt: true,
       _count: {
@@ -285,6 +289,7 @@ export async function getUserDetail(id: string): Promise<UserDetail | null> {
     twoFactorEnabled: row.twoFactorEnabled,
     agentEmail: row.agentEmail,
     agentBrand: row.agentBrand,
+    dealLevel: row.dealLevel,
     holds,
     maxHolds: settings.maxHoldsPerAgent,
   };
@@ -321,6 +326,8 @@ export type TeamMember = {
   createdAt: Date;
   agentEmail: string | null;
   agentBrand: string | null;
+  /** Which deals they may run, on anyone who runs deals. */
+  dealLevel: DealLevel | null;
   /** Safest channels held right now. Only meaningful on an agent. */
   holds: number;
   /** Deals assigned and not finished, in either mode. */
@@ -359,6 +366,7 @@ export async function listTeam(): Promise<Team> {
       createdAt: true,
       agentEmail: true,
       agentBrand: true,
+      dealLevel: true,
     },
   });
 
@@ -414,6 +422,7 @@ export async function listTeam(): Promise<Team> {
       createdAt: member.createdAt,
       agentEmail: member.agentEmail,
       agentBrand: member.agentBrand,
+      dealLevel: member.dealLevel,
       holds: holdsBy.get(member.id) ?? 0,
       liveDeals: liveBy.get(member.id) ?? 0,
     })),
@@ -481,10 +490,12 @@ export async function setUserRole(input: {
     where: { id: target.id },
     data: {
       role: input.role,
-      // A transfer identity belongs to an agent. Leaving it behind on a
-      // demoted account would put a stale address in front of the next
-      // seller who was told to invite it.
-      ...(input.role === "AGENT" ? {} : { agentEmail: null, agentBrand: null }),
+      // A transfer identity belongs to somebody who runs deals. Leaving it
+      // behind on an account that no longer can would put a stale address
+      // in front of the next seller who was told to invite it.
+      ...(isCustodianRole(input.role)
+        ? {}
+        : { agentEmail: null, agentBrand: null, dealLevel: null }),
     },
   });
 
@@ -899,7 +910,9 @@ export async function setAgentIdentity(input: {
     select: { id: true, role: true, agentEmail: true, agentBrand: true },
   });
   if (!target) return { ok: false, reason: "not-found" };
-  if (target.role !== "AGENT") return { ok: false, reason: "not-an-agent" };
+  if (!isCustodianRole(target.role)) {
+    return { ok: false, reason: "not-an-agent" };
+  }
   if (target.agentEmail === email && target.agentBrand === brand) {
     return { ok: false, reason: "no-change" };
   }
@@ -935,11 +948,39 @@ export async function agentIdentity(userId: string): Promise<AgentIdentity> {
   return { email: row.agentEmail, brand: row.agentBrand };
 }
 
-/** Agents who can be given a deal, with their stored identity and load. */
+/** Which deals somebody who runs deals may take; null takes any size. */
+export async function setDealLevel(input: {
+  userId: string;
+  level: DealLevel | null;
+}): Promise<
+  | { ok: true; before: DealLevel | null; after: DealLevel | null }
+  | { ok: false; reason: GuardFailure }
+> {
+  const target = await db.user.findUnique({
+    where: { id: input.userId },
+    select: { id: true, role: true, dealLevel: true },
+  });
+  if (!target) return { ok: false, reason: "not-found" };
+  if (!isCustodianRole(target.role)) {
+    return { ok: false, reason: "not-an-agent" };
+  }
+  if (target.dealLevel === input.level) {
+    return { ok: false, reason: "no-change" };
+  }
+  await db.user.update({
+    where: { id: target.id },
+    data: { dealLevel: input.level },
+  });
+  return { ok: true, before: target.dealLevel, after: input.level };
+}
+
+/** People who can be given a deal, with their stored identity and load. */
 export type AssignableAgent = {
   id: string;
   name: string;
   email: string;
+  role: UserRole;
+  dealLevel: DealLevel | null;
   agentEmail: string | null;
   agentBrand: string | null;
   holds: number;
@@ -960,11 +1001,13 @@ export async function listAssignableAgents(): Promise<{
   return {
     maxHoldsPerAgent,
     agents: members
-      .filter((member) => member.role === "AGENT" && !member.banned)
+      .filter((member) => isCustodianRole(member.role) && !member.banned)
       .map((member) => ({
         id: member.id,
         name: member.name,
         email: member.email,
+        role: member.role,
+        dealLevel: member.dealLevel,
         agentEmail: member.agentEmail,
         agentBrand: member.agentBrand,
         holds: member.holds,

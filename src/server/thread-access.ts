@@ -1,5 +1,6 @@
 import "server-only";
 
+import { isCustodianRole } from "@/lib/custody-roles";
 import { db } from "@/lib/db";
 import { TERMINAL_STATUSES } from "@/lib/deal-machine";
 
@@ -42,11 +43,14 @@ export async function agentOnThread(
   return running > 0;
 }
 
-/** Holds the AGENT role and is not banned, by the database's account. */
+/**
+ * Holds a role that runs deals — agent, moderator or superadmin — and is not
+ * banned, by the database's account.
+ */
 export async function stillAnAgent(userId: string): Promise<boolean> {
   const user = await db.user.findUnique({
     where: { id: userId },
     select: { role: true, bannedAt: true },
   });
-  return user?.role === "AGENT" && !user.bannedAt;
+  return Boolean(user && isCustodianRole(user.role) && !user.bannedAt);
 }
