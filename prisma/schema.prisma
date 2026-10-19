@@ -556,13 +556,15 @@ model Order {
   buyerPaymentRef   String?
   handoverAt        DateTime? // the buyer confirmed the channel is theirs (Safest 9, Fastest 5)
 
-  confirmedAt DateTime? // buyer pressed confirm
+  confirmedAt    DateTime? // buyer pressed confirm
   /// The end of the deal's one hold — Google's wait before our agent is made
   /// primary owner (Safest), the holding period before the buyer is
   /// (Fastest). No step can be done before it.
-  holdUntil   DateTime?
-  completedAt DateTime?
-  cancelledAt DateTime?
+  holdUntil      DateTime?
+  /// When the next person was told the hold had ended (`announceEndedHolds`).
+  holdNotifiedAt DateTime?
+  completedAt    DateTime?
+  cancelledAt    DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

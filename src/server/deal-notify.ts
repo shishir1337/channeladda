@@ -103,6 +103,7 @@ export async function notifyNextActor(orderId: string): Promise<void> {
         agentId: true,
         conversationId: true,
         handoverTo: true,
+        holdUntil: true,
         listing: { select: { title: true } },
         steps: {
           where: { completedAt: null },
@@ -114,6 +115,11 @@ export async function notifyNextActor(orderId: string): Promise<void> {
     });
 
     if (!order) return;
+
+    // While the deal's hold runs the next step exists but cannot be taken,
+    // so "your move" would be a lie. The sweep that sees the hold end
+    // (`announceEndedHolds`) calls this again, and then it is true.
+    if (order.holdUntil && order.holdUntil > new Date()) return;
 
     const next = order.steps[0];
     if (!next) return;

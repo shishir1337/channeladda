@@ -1284,7 +1284,7 @@ export async function advanceStep(input: {
         data: {
           ...(template.entersStatus ? { status: template.entersStatus } : {}),
           ...(stamp ? { [stamp]: now } : {}),
-          ...(startsHold ? { holdUntil } : {}),
+          ...(startsHold ? { holdUntil, holdNotifiedAt: null } : {}),
           ...(completing ? { completedAt: now } : {}),
         },
       });
@@ -1569,6 +1569,62 @@ async function expireStale(scope: { listingId?: string }): Promise<number> {
   }
 
   return expired;
+}
+
+/**
+ * Telling the next person that a deal's hold has ended.
+ *
+ * Google's wait on Safest and the holding period on Fastest end with nobody
+ * pressing anything, and while they run nobody is told it is their move —
+ * so without this the seller found out their step had opened only by
+ * happening to look, days later. Each ended hold is announced once: in the
+ * conversation, and to the next person by notification and email.
+ *
+ * A paused deal is left alone: a dispute freezes every step, and telling
+ * someone to act on one would be telling them to do what will be refused.
+ */
+export async function announceEndedHolds(): Promise<number> {
+  const now = new Date();
+  const ended = await db.order.findMany({
+    where: {
+      holdUntil: { lte: now },
+      holdNotifiedAt: null,
+      status: { notIn: [...TERMINAL_STATUSES, "DISPUTED"] },
+    },
+    select: { id: true, conversationId: true },
+  });
+
+  let announced = 0;
+  for (const order of ended) {
+    const told = await db.$transaction(async (tx) => {
+      // Compare-and-set, so two sweeps overlapping announce it once.
+      const took = await tx.order.updateMany({
+        where: {
+          id: order.id,
+          holdNotifiedAt: null,
+          holdUntil: { lte: now },
+          status: { notIn: [...TERMINAL_STATUSES, "DISPUTED"] },
+        },
+        data: { holdNotifiedAt: now },
+      });
+      if (took.count !== 1) return false;
+      if (order.conversationId) {
+        await postEvent(tx, {
+          conversationId: order.conversationId,
+          kind: "EVENT",
+          event: { type: "hold-ended" },
+          senderId: null,
+          orderId: order.id,
+          at: now,
+        });
+      }
+      return true;
+    });
+    if (!told) continue;
+    await notifyNextActor(order.id);
+    announced += 1;
+  }
+  return announced;
 }
 
 /**

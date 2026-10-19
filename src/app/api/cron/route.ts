@@ -1,7 +1,7 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import { after } from "next/server";
 import { purgeExpiredMedia, purgeOldMessages } from "@/server/chat-retention";
-import { expireStaleDeals } from "@/server/deals";
+import { announceEndedHolds, expireStaleDeals } from "@/server/deals";
 import { reconcileInvoices } from "@/server/invoices";
 import { expireOffers, releaseLapsedOfferReservations } from "@/server/offers";
 import { recordSweep } from "@/server/settings";
@@ -59,6 +59,9 @@ export async function POST(request: Request) {
     // deal was abandoned and expires it.
     ["reconciled", reconcileInvoices],
     ["deals", expireStaleDeals],
+    // A deal whose Google wait or holding period has run out: the next
+    // person is told their step is open.
+    ["holds", announceEndedHolds],
     ["offers", expireOffers],
     // An accepted offer nobody turned into a deal. Before this, accepting
     // one took the listing off the market for good.
