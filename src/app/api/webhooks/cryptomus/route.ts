@@ -13,7 +13,7 @@ import {
   markApplied,
   noteCallback,
 } from "@/server/invoices";
-import { settleBadgePayment } from "@/server/reseller";
+import { reportRefundedDeposit, settleBadgePayment } from "@/server/reseller";
 import { creditDeposit } from "@/server/wallet";
 
 /**
@@ -138,8 +138,14 @@ export async function POST(request: Request) {
  */
 async function handleTopUp(
   reference: string,
+  status: string,
   outcome: ReturnType<typeof classifyStatus>,
 ): Promise<"applied" | "ignored" | "unconfirmed"> {
+  // Sent back after it reached the balance: finance's to correct.
+  if (outcome === "refunded") {
+    await reportRefundedDeposit(reference, status);
+    return "ignored";
+  }
   if (outcome !== "settled") return "ignored";
 
   // From the invoice we wrote when it was raised. This used to slice eight
@@ -195,7 +201,7 @@ async function handle(
   // A Reseller badge is paid the same way: into the balance, then spent on
   // the pass.
   if (orderId.startsWith("TOPUP-") || orderId.startsWith("BADGE-")) {
-    return handleTopUp(orderId, outcome);
+    return handleTopUp(orderId, status, outcome);
   }
 
   // The invoice row says whose deal a reference belongs to. Each payment

@@ -22,6 +22,7 @@ import { emptyRecord } from "@/lib/track-record";
 import { ratingLabel } from "@/lib/utils";
 import { getSellerListings } from "@/server/listings";
 import { getSeller, getSellerSlugs } from "@/server/sellers";
+import { getSettings } from "@/server/settings";
 
 /** Marketplace data changes constantly; Prisma queries are invisible to Next's
  *  cache detection, so revalidation is declared explicitly. */
@@ -54,7 +55,10 @@ export default async function SellerPage({
   if (gate) return gate;
 
   const { slug } = await params;
-  const seller = await getSeller(slug);
+  const [seller, { resellerPointsMultiplier }] = await Promise.all([
+    getSeller(slug),
+    getSettings(),
+  ]);
   if (!seller) notFound();
 
   const active = await getSellerListings(seller.slug);
@@ -196,8 +200,8 @@ export default async function SellerPage({
             <span>
               Every review here comes from a deal that completed, so a review
               cannot be bought. Rating points are half the worth of completed
-              deals, bought or sold; a Reseller badge holder&apos;s count three
-              times while their badge lasts.
+              deals, bought or sold; a Reseller badge holder&apos;s count{" "}
+              {resellerPointsMultiplier} times while their badge lasts.
             </span>
           </p>
         </Container>

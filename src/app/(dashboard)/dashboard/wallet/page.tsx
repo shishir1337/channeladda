@@ -3,6 +3,7 @@ import {
   BanknoteIcon,
   CircleCheckIcon,
   CoinsIcon,
+  GemIcon,
   InfoIcon,
   LockIcon,
   PlusIcon,
@@ -33,6 +34,7 @@ import {
 } from "@/components/dashboard/wallet-panels";
 import { Badge } from "@/components/ui/badge";
 import { Price } from "@/components/ui/price";
+import type { LedgerKind } from "@/generated/prisma/enums";
 import { cn } from "@/lib/utils";
 import { ratingFor } from "@/server/reseller-status";
 import { requireUser } from "@/server/session";
@@ -54,7 +56,8 @@ type Icon = ComponentType<SVGProps<SVGSVGElement>>;
  * carries a title and, behind its (i), a sentence explaining why the number
  * moved.
  */
-const KINDS: Record<string, { title: string; meaning: string; icon: Icon }> = {
+type KindWords = { title: string; meaning: string; icon: Icon };
+const KINDS: Record<string, KindWords> = {
   DEPOSIT: {
     title: "You added funds",
     meaning: "A top-up you paid in crypto. Your balance is held in US dollars.",
@@ -63,7 +66,7 @@ const KINDS: Record<string, { title: string; meaning: string; icon: Icon }> = {
   ESCROW_HOLD: {
     title: "Paid into a deal",
     meaning:
-      "Taken from your balance to pay a deal — the opening payment, or a Safest deal's price. Channel Adda holds it until the deal finishes.",
+      "Taken from your balance to pay a deal's opening payment — the whole amount on Fastest, our fee on Safest. Channel Adda holds it until the deal finishes.",
     icon: LockIcon,
   },
   ESCROW_RELEASE: {
@@ -101,7 +104,13 @@ const KINDS: Record<string, { title: string; meaning: string; icon: Icon }> = {
     meaning: "Staff changed your balance by hand. The note says why.",
     icon: SlidersHorizontalIcon,
   },
-};
+  BADGE_FEE: {
+    title: "Reseller badge, 30 days",
+    meaning:
+      "Paid from your balance for 30 days of the Reseller badge. A badge paid with crypto shows here too, after the payment that funded it.",
+    icon: GemIcon,
+  },
+} satisfies Record<LedgerKind, KindWords>;
 
 /** Unambiguous in every locale: "17 Oct 2026" rather than 17/10 or 10/17. */
 function longDate(date: Date) {
@@ -378,6 +387,7 @@ export default async function WalletPage({
           endsAt={rating.endsAt ? rating.endsAt.toISOString() : null}
           points={rating.points}
           availableUsd={wallet.availableUsd}
+          sellerFeeBp={settings.sellerFeeBp}
         />
       </Section>
 

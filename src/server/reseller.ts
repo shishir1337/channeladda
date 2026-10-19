@@ -6,6 +6,7 @@ import { nextPassPeriod, RESELLER_DAYS } from "@/lib/reseller";
 import { isSerializationFailure } from "@/lib/serialization-failure";
 import { recordAudit } from "@/server/audit";
 import { canSendMail, sendMail } from "@/server/mailer";
+import { notifyStaff } from "@/server/notifications";
 import { getSettings } from "@/server/settings";
 import { creditDeposit, PENDING_WITHDRAWAL } from "@/server/wallet";
 
@@ -21,15 +22,25 @@ export {
  * Cryptomus, and the reminder before it ends.
  *
  * There is one way to buy a pass — spending the balance — and Cryptomus
- * reaches it by first crediting what arrived as a deposit. So a payment that
- * can no longer buy one (the price went up in between, or it arrived short)
- * is simply the member's money in their balance, never lost and never half a
- * pass.
+ * reaches it by first crediting what arrived as a deposit, then buying at
+ * the price its invoice asked. So a settled payment that cannot buy one (it
+ * arrived short of the invoice) is simply the member's money in their
+ * balance, and they are told so; a payment Cryptomus never settles is the
+ * money desk's to look at, as any other invoice is.
  */
 
 type BuyOutcome =
   | { ok: true; endsAt: Date; already: boolean }
-  | { ok: false; reason: "insufficient" };
+  /**
+   * `busy`: the database kept losing a serialisable race to other writes —
+   * not to this member running short. Worth trying again; never a refusal.
+   */
+  | { ok: false; reason: "insufficient" | "busy" };
+
+/** How many times a purchase that lost a serialisable race is tried again. */
+const ATTEMPTS = 6;
+
+const pause = (ms: number) => new Promise((done) => setTimeout(done, ms));
 
 class PassAbort extends Error {}
 
@@ -53,6 +64,11 @@ export async function buyResellerPass(input: {
   userId: string;
   reference: string;
   via: PassPaidVia;
+  /**
+   * What to charge, in cents, when it is not today's price: a crypto badge
+   * is charged what its invoice asked, never a price raised since.
+   */
+  priceUsd?: number;
 }): Promise<BuyOutcome> {
   const existing = await db.resellerPass.findUnique({
     where: { reference: input.reference },
@@ -65,11 +81,11 @@ export async function buyResellerPass(input: {
     return { ok: true, endsAt: existing.endsAt, already: true };
   }
 
-  const { resellerPriceUsd: price } = await getSettings();
+  const price = input.priceUsd ?? (await getSettings()).resellerPriceUsd;
   const now = new Date();
-  let endsAt: Date;
-  try {
-    endsAt = await db.$transaction(
+
+  const attempt = () =>
+    db.$transaction(
       async (tx) => {
         const [sum, pending] = await Promise.all([
           tx.ledgerEntry.aggregate({
@@ -124,22 +140,33 @@ export async function buyResellerPass(input: {
       },
       { isolationLevel: "Serializable" },
     );
-  } catch (error) {
-    if (error instanceof PassAbort)
-      return { ok: false, reason: "insufficient" };
-    // The same reference won a race to the insert: that pass is this one.
-    if (isUniqueViolation(error)) {
-      const won = await db.resellerPass.findUnique({
-        where: { reference: input.reference },
-        select: { endsAt: true },
-      });
-      if (won) return { ok: true, endsAt: won.endsAt, already: true };
+
+  let endsAt: Date | null = null;
+  for (let tries = 1; endsAt === null; tries++) {
+    try {
+      endsAt = await attempt();
+    } catch (error) {
+      if (error instanceof PassAbort) {
+        return { ok: false, reason: "insufficient" };
+      }
+      // The same reference won a race to the insert: that pass is this one.
+      if (isUniqueViolation(error)) {
+        const won = await db.resellerPass.findUnique({
+          where: { reference: input.reference },
+          select: { endsAt: true },
+        });
+        if (won) return { ok: true, endsAt: won.endsAt, already: true };
+      }
+      // Serialisable conflicts are not about this member's money: Postgres
+      // locks index pages, so two strangers buying at once collide. Read
+      // again and decide again, which is what the isolation level is for.
+      if (isSerializationFailure(error)) {
+        if (tries >= ATTEMPTS) return { ok: false, reason: "busy" };
+        await pause(15 * tries + Math.floor(Math.random() * 25));
+        continue;
+      }
+      throw error;
     }
-    // A lost serialisable race means somebody else spent the balance first.
-    if (isSerializationFailure(error)) {
-      return { ok: false, reason: "insufficient" };
-    }
-    throw error;
   }
 
   await recordAudit({
@@ -155,7 +182,12 @@ export async function buyResellerPass(input: {
 /**
  * A badge invoice that Cryptomus says is paid — from the webhook or the
  * sweep, either or both. What arrived is credited to the balance, then the
- * pass is bought from it under the invoice's own name.
+ * pass is bought from it under the invoice's own name, at the price the
+ * invoice asked (or today's, if it has come down since).
+ *
+ * Throws when the database stays too busy to finish, so the webhook answers
+ * 500 and is delivered again, and the sweep leaves the invoice open: a paid
+ * badge is retried, never quietly left undelivered.
  */
 export async function settleBadgePayment(
   reference: string,
@@ -164,21 +196,102 @@ export async function settleBadgePayment(
 ): Promise<"bought" | "already" | "credited-only" | "unknown"> {
   const invoice = await db.invoice.findUnique({
     where: { reference },
-    select: { userId: true, purpose: true },
+    select: { userId: true, purpose: true, amountUsd: true },
   });
   if (invoice?.purpose !== "BADGE") return "unknown";
 
   const bought = await db.resellerPass.count({ where: { reference } });
   if (bought > 0) return "already";
 
+  const { resellerPriceUsd } = await getSettings();
+  const price = Math.min(invoice.amountUsd, resellerPriceUsd);
+
   await creditDeposit(invoice.userId, paidUsd, reference, asset);
+  // Short of what was asked: it is theirs, in their balance, and it does not
+  // borrow the rest from money they had for something else.
+  if (paidUsd < price) {
+    await tellPaymentKept(invoice.userId);
+    return "credited-only";
+  }
+
   const pass = await buyResellerPass({
     userId: invoice.userId,
     reference,
     via: "CRYPTOMUS",
+    priceUsd: price,
   });
-  if (!pass.ok) return "credited-only";
+  if (!pass.ok) {
+    if (pass.reason === "busy") {
+      throw new Error(`Badge ${reference}: the database stayed busy.`);
+    }
+    await tellPaymentKept(invoice.userId);
+    return "credited-only";
+  }
   return pass.already ? "already" : "bought";
+}
+
+/** A badge payment that could not buy the badge is in the balance. */
+async function tellPaymentKept(userId: string) {
+  await db.notification.create({
+    data: {
+      userId,
+      kind: "BADGE",
+      title: "Your payment is in your balance",
+      body: "It did not cover the Reseller badge, so nothing was bought. The money is in your balance, to spend or withdraw.",
+      href: "/dashboard/wallet#reseller",
+    },
+  });
+}
+
+/**
+ * A top-up or badge payment the processor sent back after it reached the
+ * member's balance.
+ *
+ * Nothing is clawed back automatically — the money may already be spent on
+ * a deal or the badge, and a balance pushed below zero is a debt nobody
+ * agreed to. It goes in front of finance instead, once, with the member it
+ * concerns, to correct on the money desk.
+ */
+export async function reportRefundedDeposit(
+  reference: string,
+  status: string,
+): Promise<boolean> {
+  const invoice = await db.invoice.findUnique({
+    where: { reference },
+    select: { userId: true, purpose: true, amountUsd: true },
+  });
+  if (
+    !invoice ||
+    (invoice.purpose !== "TOPUP" && invoice.purpose !== "BADGE")
+  ) {
+    return false;
+  }
+  const seen = await db.auditLog.count({
+    where: {
+      action: "payment.refunded_by_processor",
+      entityId: invoice.userId,
+      after: { path: ["reference"], equals: reference },
+    },
+  });
+  if (seen > 0) return false;
+
+  await recordAudit({
+    actorId: null,
+    action: "payment.refunded_by_processor",
+    entity: "user",
+    entityId: invoice.userId,
+    after: { reference, status, purpose: invoice.purpose },
+  });
+  const what =
+    invoice.purpose === "BADGE" ? "Reseller badge payment" : "top-up";
+  await notifyStaff(["FINANCE"], (staffId) => ({
+    userId: staffId,
+    kind: "PAYOUT",
+    title: `Refunded by the processor: ${reference}`,
+    body: `A ${what} was refunded in Cryptomus after it reached the member's balance. Check their balance and correct it on the money desk.`,
+    href: `/admin/users/${invoice.userId}`,
+  }));
+  return true;
 }
 
 const REMIND_DAYS = 3;
@@ -194,6 +307,9 @@ export async function remindEndingPasses(
   now: Date = new Date(),
 ): Promise<number> {
   const soon = new Date(now.getTime() + REMIND_DAYS * 86_400_000);
+  const { resellerPointsMultiplier: times, resellerDiscountBp } =
+    await getSettings();
+  const discount = `${resellerDiscountBp / 100}%`;
   const ending = await db.resellerPass.findMany({
     where: { endsAt: { gt: now, lte: soon }, remindedAt: null },
     select: {
@@ -226,7 +342,7 @@ export async function remindEndingPasses(
         userId: pass.userId,
         kind: "BADGE",
         title: `Your Reseller badge ends on ${day}`,
-        body: "Extend it to keep your points tripled and your fee discount.",
+        body: `Extend it to keep your points counting ${times}x and your ${discount} fee discount.`,
         href: "/dashboard/wallet#reseller",
       },
     });
@@ -238,7 +354,7 @@ export async function remindEndingPasses(
           body: [
             pass.user.name ? `Hi ${pass.user.name},` : "Hi there,",
             "",
-            `Your Reseller badge ends on ${day}. After that your rating points count once instead of three times, and deals are charged our full fee again.`,
+            `Your Reseller badge ends on ${day}. After that your rating points count once instead of ${times} times, and the ${discount} discount on our fees ends.`,
             "",
             "You can extend it by 30 days from your wallet, from your balance or with crypto. Paying early adds the days on to the end.",
           ].join("\n"),

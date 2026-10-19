@@ -46,6 +46,7 @@ import { Button } from "@/components/ui/button";
 import { Price } from "@/components/ui/price";
 import type {
   KycStatus,
+  LedgerKind,
   UserRole,
   WithdrawalStatus,
 } from "@/generated/prisma/enums";
@@ -95,7 +96,8 @@ const LEDGER_KIND: Record<string, string> = {
   REFUND: "Refund",
   WITHDRAWAL: "Withdrawal",
   ADJUSTMENT: "Adjusted by staff",
-};
+  BADGE_FEE: "Reseller badge",
+} satisfies Record<LedgerKind, string>;
 
 const WITHDRAWAL_STATUS: Record<
   WithdrawalStatus,

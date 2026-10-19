@@ -87,6 +87,7 @@ export function ResellerPanel({
   endsAt,
   points,
   availableUsd,
+  sellerFeeBp,
 }: {
   /** Cents for 30 days. */
   priceUsd: number;
@@ -98,6 +99,8 @@ export function ResellerPanel({
   /** Rating points as they stand, with the badge applied while active. */
   points: number;
   availableUsd: number;
+  /** The seller fee: with none, the discount only ever applies to buying. */
+  sellerFeeBp: number;
 }) {
   const router = useRouter();
   const [nonce, setNonce] = useState(newNonce);
@@ -153,8 +156,8 @@ export function ResellerPanel({
             Your rating points count {multiplier}x while it lasts
           </Benefit>
           <Benefit>
-            {discountBp / 100}% off every Channel Adda fee you pay, buying or
-            selling
+            {discountBp / 100}% off every Channel Adda fee you pay
+            {sellerFeeBp > 0 ? ", buying or selling" : " when you buy"}
           </Benefit>
         </ul>
 

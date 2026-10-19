@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { db } from "@/lib/db";
 import { createInvoice, isConfigured } from "@/server/cryptomus";
 import { newReference, recordInvoice } from "@/server/invoices";
 import { buyResellerPass } from "@/server/reseller";
@@ -52,7 +53,9 @@ export async function buyResellerFromBalance(
     return {
       ok: false,
       error:
-        "Your available balance does not cover it. Top up, or pay with crypto instead.",
+        result.reason === "busy"
+          ? "We could not finish that just now. Nothing was charged — try again."
+          : "Your available balance does not cover it. Top up, or pay with crypto instead.",
     };
   }
   revalidatePath("/dashboard/wallet");
@@ -73,15 +76,29 @@ export async function startResellerCheckout(): Promise<ResellerResult> {
   }
 
   const { resellerPriceUsd } = await getSettings();
-  const reference = newReference("BADGE");
   const base = siteUrl();
   try {
-    await recordInvoice({
-      reference,
-      purpose: "BADGE",
-      amountUsd: resellerPriceUsd,
-      userId: user.id,
+    const open = await db.invoice.findFirst({
+      where: {
+        userId: user.id,
+        purpose: "BADGE",
+        amountUsd: resellerPriceUsd,
+        appliedAt: null,
+        settledAt: null,
+        createdAt: { gt: new Date(Date.now() - 50 * 60_000) },
+      },
+      orderBy: { createdAt: "desc" },
+      select: { reference: true },
     });
+    const reference = open?.reference ?? newReference("BADGE");
+    if (!open) {
+      await recordInvoice({
+        reference,
+        purpose: "BADGE",
+        amountUsd: resellerPriceUsd,
+        userId: user.id,
+      });
+    }
     const invoice = await createInvoice({
       amountUsd: resellerPriceUsd,
       orderId: reference,

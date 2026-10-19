@@ -25,6 +25,7 @@ import {
 } from "@/components/app/kit";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import type { LedgerKind } from "@/generated/prisma/enums";
 import { cn } from "@/lib/utils";
 import {
   CREDIT_WINDOW_HOURS,
@@ -52,7 +53,8 @@ const KIND_LABEL: Record<string, string> = {
   REFUND: "Refund",
   WITHDRAWAL: "Payout sent",
   ADJUSTMENT: "Correction",
-};
+  BADGE_FEE: "Reseller badge",
+} satisfies Record<LedgerKind, string>;
 
 /**
  * Correcting a member's balance by hand.

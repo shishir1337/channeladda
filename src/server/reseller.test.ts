@@ -7,6 +7,7 @@ import {
   buyResellerPass,
   ratingFor,
   remindEndingPasses,
+  reportRefundedDeposit,
   resellerStatus,
   settleBadgePayment,
 } from "@/server/reseller";
@@ -272,9 +273,13 @@ test(
 );
 
 test(
-  "a Cryptomus payment that no longer covers the price stays in the balance",
+  "a crypto badge is charged what its invoice asked, and never takes other money",
   withCleanDb(async () => {
+    // The price went up between checkout and the payment landing. The
+    // member paid what they were asked; the difference must not come out
+    // of money they had for something else.
     const member = await seedUser();
+    await creditDeposit(member.id, 1_000, "sale-money", "USDT");
     await recordInvoice({
       reference: "BADGE-abc",
       purpose: "BADGE",
@@ -289,11 +294,90 @@ test(
     const { clearSettingsCache } = await import("@/server/settings");
     clearSettingsCache();
 
-    expect(await settleBadgePayment("BADGE-abc", 2_000, "USDT")).toBe(
+    expect(await settleBadgePayment("BADGE-abc", 2_000, "USDT")).toBe("bought");
+    expect(await balanceOf(member.id)).toBe(1_000);
+    expect((await resellerStatus(member.id)).active).toBe(true);
+  }),
+);
+
+test(
+  "a crypto payment short of its invoice stays in the balance, and buys nothing",
+  withCleanDb(async () => {
+    const member = await seedUser();
+    await creditDeposit(member.id, 1_000, "sale-money", "USDT");
+    await recordInvoice({
+      reference: "BADGE-abc",
+      purpose: "BADGE",
+      amountUsd: 2_000,
+      userId: member.id,
+    });
+
+    expect(await settleBadgePayment("BADGE-abc", 1_500, "USDT")).toBe(
       "credited-only",
     );
-    expect(await balanceOf(member.id)).toBe(2_000);
+    expect(await balanceOf(member.id)).toBe(2_500);
     expect((await resellerStatus(member.id)).active).toBe(false);
+    // And they hear where their money went.
+    expect(await db.notification.count({ where: { userId: member.id } })).toBe(
+      1,
+    );
+  }),
+);
+
+test(
+  "two strangers buying at the same moment both get their badge",
+  withCleanDb(async () => {
+    // A lost serialisable race between two different members' purchases
+    // was taken for a short balance, so a paid crypto badge went
+    // undelivered and its invoice was closed.
+    for (let round = 0; round < 4; round++) {
+      const a = await seedUser();
+      const b = await seedUser();
+      await creditDeposit(b.id, 2_000, `dep-${round}`, "USDT");
+      await recordInvoice({
+        reference: `BADGE-race-${round}`,
+        purpose: "BADGE",
+        amountUsd: 2_000,
+        userId: a.id,
+      });
+      const [settled, bought] = await Promise.all([
+        settleBadgePayment(`BADGE-race-${round}`, 2_000, "USDT"),
+        buyResellerPass({
+          userId: b.id,
+          reference: `bal-${round}`,
+          via: "BALANCE",
+        }),
+      ]);
+      expect(settled, `round ${round}`).toBe("bought");
+      expect(bought, `round ${round}`).toMatchObject({ ok: true });
+    }
+  }),
+);
+
+test(
+  "a badge or top-up the processor refunds is put in front of finance, once",
+  withCleanDb(async () => {
+    const member = await seedUser();
+    const finance = await seedUser("FINANCE");
+    await recordInvoice({
+      reference: "BADGE-abc",
+      purpose: "BADGE",
+      amountUsd: 2_000,
+      userId: member.id,
+    });
+    await settleBadgePayment("BADGE-abc", 2_000, "USDT");
+
+    await reportRefundedDeposit("BADGE-abc", "refund_paid");
+    await reportRefundedDeposit("BADGE-abc", "refund_paid");
+
+    expect(await db.notification.count({ where: { userId: finance.id } })).toBe(
+      1,
+    );
+    expect(
+      await db.auditLog.count({
+        where: { action: "payment.refunded_by_processor", entityId: member.id },
+      }),
+    ).toBe(1);
   }),
 );
 

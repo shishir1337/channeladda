@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { templateFor } from "@/lib/deal-templates";
 import { balanceOf, createDeal, recordOpeningPayment } from "@/server/deals";
 import { reconcileInvoice } from "@/server/invoices";
-import { seedListing, withCleanDb } from "@/test/db";
+import { seedListing, seedUser, withCleanDb } from "@/test/db";
 import { runStep } from "@/test/deal-steps";
 
 // Cryptomus as observed against the live API on 2026-10-17: asking for an
@@ -95,6 +95,7 @@ vi.mock("@/server/cryptomus", async (original) => {
 
 const { startPayment } = await import("@/server/actions/payments");
 const { startTopUp } = await import("@/server/actions/wallet");
+const { startResellerCheckout } = await import("@/server/actions/reseller");
 const { POST } = await import("@/app/api/webhooks/cryptomus/route");
 
 beforeEach(() => {
@@ -373,5 +374,22 @@ test(
     expect(fake.lastSuccessUrl.endsWith("/dashboard/wallet?topped=1")).toBe(
       true,
     );
+  }),
+);
+
+test(
+  "a second badge checkout within the hour reuses the open invoice",
+  withCleanDb(async () => {
+    // Every press used to raise a new invoice for the sweep to chase.
+    const member = await seedUser();
+    fake.buyerId = member.id;
+    expect((await startResellerCheckout()).ok).toBe(true);
+    expect((await startResellerCheckout()).ok).toBe(true);
+    expect(
+      await db.invoice.count({
+        where: { userId: member.id, purpose: "BADGE" },
+      }),
+    ).toBe(1);
+    expect(fake.created).toHaveLength(1);
   }),
 );

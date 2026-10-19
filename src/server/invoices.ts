@@ -8,7 +8,7 @@ import { recordAudit } from "@/server/audit";
 import { classifyStatus, lookupInvoice } from "@/server/cryptomus";
 import { recordOpeningPayment, recordStrayPricePayment } from "@/server/deals";
 import { notifyStaff } from "@/server/notifications";
-import { settleBadgePayment } from "@/server/reseller";
+import { reportRefundedDeposit, settleBadgePayment } from "@/server/reseller";
 import { creditDeposit } from "@/server/wallet";
 
 /**
@@ -334,17 +334,8 @@ async function reconcileOne(invoice: {
           via: "reconcile",
         });
       } else {
-        await recordAudit({
-          actorId: null,
-          action: "payment.refunded_by_processor",
-          entity: "user",
-          entityId: invoice.userId,
-          after: {
-            reference: invoice.reference,
-            status: confirmed.status,
-            via: "reconcile",
-          },
-        });
+        // A top-up or badge payment: finance's to correct, once.
+        await reportRefundedDeposit(invoice.reference, confirmed.status);
       }
       await markApplied(invoice.reference);
     }
