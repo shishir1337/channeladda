@@ -1,7 +1,12 @@
 import "server-only";
 
 import { platformMap } from "@/data/platforms";
-import type { DealMode, OrderStatus, UserRole } from "@/generated/prisma/enums";
+import type {
+  DealMode,
+  OrderStatus,
+  Platform,
+  UserRole,
+} from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
 import {
   AGENT_HOLDS,
@@ -17,13 +22,18 @@ import {
 } from "@/lib/deal-templates";
 import { activeWait, OWNER_WAIT_DAYS, type Wait } from "@/lib/deal-waits";
 import { orderAmounts } from "@/lib/fees";
+import { parseHandoverTo } from "@/lib/handover-target";
 import { keptFee, requiredHold } from "@/lib/holds";
 import { movesHeldMoney } from "@/lib/outcomes";
 import { isSerializationFailure } from "@/lib/serialization-failure";
 import { keyFromUrl } from "@/lib/upload-keys";
 import { recordAudit } from "@/server/audit";
 import { ensureConversation, postEvent } from "@/server/chat-events";
-import { notifyDealEnded, notifyNextActor } from "@/server/deal-notify";
+import {
+  notifyDealEnded,
+  notifyHandoverChanged,
+  notifyNextActor,
+} from "@/server/deal-notify";
 import { notifyStaff } from "@/server/notifications";
 import {
   heldByAcceptedOffer,
@@ -81,7 +91,11 @@ export type DealFailure =
    * be, so nothing is paid out or refunded until staff have looked.
    */
   | "books-mismatch"
-  | "bad-proof";
+  | "bad-proof"
+  /** The buyer's handover account can no longer change: it has been used. */
+  | "handed-over"
+  /** Not a valid account for this platform (`parseHandoverTo`). */
+  | "bad-handover";
 
 export type DealOutcome<T = Record<never, never>> =
   | ({ ok: true } & T)
@@ -238,6 +252,12 @@ export async function createDeal(input: {
   mode: DealMode;
   /** The buyer ticked the revenue-risk box at checkout. */
   acceptedRevenueRisk?: boolean;
+  /**
+   * The buyer's account that receives ownership, already checked by
+   * `parseHandoverTo`. Required of a buyer by `startDeal`; optional here so
+   * deals opened by staff tools and older tests stay valid.
+   */
+  handoverTo?: string | null;
 }): Promise<DealOutcome<{ orderId: string; reference: string }>> {
   const listing = await db.listing.findUnique({
     where: { id: input.listingId },
@@ -414,6 +434,7 @@ export async function createDeal(input: {
             revenueRiskAcceptedAt: input.acceptedRevenueRisk
               ? new Date()
               : null,
+            handoverTo: input.handoverTo ?? null,
             steps: {
               create: steps.map((step) => ({
                 position: step.position,
@@ -2197,6 +2218,15 @@ export type DealView = {
   nextStep: DealStepView | null;
   /** The clock the deal is waiting on right now, if one is running. */
   wait: Wait | null;
+  /**
+   * The buyer's account that receives ownership. Null for a Safest seller,
+   * who hands the channel to our agent and never to the buyer, and for a
+   * deal opened before it was asked for.
+   */
+  handoverTo: string | null;
+  /** Whether the buyer may still correct it: the step using it is not done. */
+  handoverOpen: boolean;
+  platform: Platform;
 };
 
 /**
@@ -2230,6 +2260,7 @@ export async function getDealFor(
       agentBrand: true,
       conversationId: true,
       createdAt: true,
+      handoverTo: true,
       listing: { select: { title: true, slug: true, platform: true } },
       buyer: { select: { name: true } },
       seller: { select: { name: true } },
@@ -2298,5 +2329,96 @@ export async function getDealFor(
       ? null
       : (steps.find((s) => s.completedAt === null) ?? null),
     wait,
+    handoverTo:
+      viewerRole === "seller" && order.mode === "SAFEST"
+        ? null
+        : order.handoverTo,
+    handoverOpen: handoverStillOpen(order.mode, order.status, order.steps),
+    platform: order.listing.platform,
   };
+}
+
+/**
+ * Until the step that uses the buyer's handover account is done, the buyer
+ * may correct it. After that a change would only point at somewhere the
+ * channel is not.
+ */
+function handoverStillOpen(
+  mode: DealMode,
+  status: OrderStatus,
+  steps: { position: number; completedAt: Date | null }[],
+): boolean {
+  if (isTerminal(status)) return false;
+  const uses = templateFor(mode).find((step) => step.handsOver)?.position;
+  const used = steps.find((step) => step.position === uses)?.completedAt;
+  return !used;
+}
+
+/**
+ * The buyer correcting the account that receives ownership.
+ *
+ * Theirs alone to change, and only while nobody has used it yet. Whoever
+ * transfers next — the seller on Fastest, our agent on Safest — hears at
+ * once, because an address they already sent an invite to is the one thing
+ * they must not miss changing.
+ */
+export async function updateHandoverTo(input: {
+  orderId: string;
+  byUserId: string;
+  raw: string;
+}): Promise<DealOutcome> {
+  const order = await db.order.findUnique({
+    where: { id: input.orderId },
+    select: {
+      id: true,
+      reference: true,
+      mode: true,
+      status: true,
+      buyerId: true,
+      sellerId: true,
+      agentId: true,
+      conversationId: true,
+      handoverTo: true,
+      listing: { select: { platform: true, title: true } },
+      steps: { select: { position: true, completedAt: true } },
+    },
+  });
+  if (!order) return { ok: false, reason: "not-found" };
+  if (order.buyerId !== input.byUserId) {
+    return { ok: false, reason: "wrong-actor" };
+  }
+  if (isTerminal(order.status)) return { ok: false, reason: "terminal" };
+  if (!handoverStillOpen(order.mode, order.status, order.steps)) {
+    return { ok: false, reason: "handed-over" };
+  }
+
+  const parsed = parseHandoverTo(order.listing.platform, input.raw);
+  if (!parsed.ok) return { ok: false, reason: "bad-handover" };
+  if (parsed.value === order.handoverTo) return { ok: true };
+
+  await db.order.update({
+    where: { id: order.id },
+    data: { handoverTo: parsed.value },
+  });
+  await recordAudit({
+    actorId: input.byUserId,
+    action: "deal.handover_changed",
+    entity: "order",
+    entityId: order.id,
+    before: { handoverTo: order.handoverTo },
+    after: { handoverTo: parsed.value },
+  });
+
+  const recipientId = order.mode === "FASTEST" ? order.sellerId : order.agentId;
+  if (recipientId) {
+    await notifyHandoverChanged({
+      userId: recipientId,
+      orderId: order.id,
+      conversationId: order.conversationId,
+      reference: order.reference,
+      listingTitle: order.listing.title,
+      handoverTo: parsed.value,
+    });
+  }
+  return { ok: true };
 }

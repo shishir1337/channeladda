@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import type { DealMode } from "@/generated/prisma/enums";
+import { db } from "@/lib/db";
+import { parseHandoverTo } from "@/lib/handover-target";
 import { agentIdentity } from "@/server/admin-users";
 import * as repo from "@/server/deals";
 import { requireRole, requireUser } from "@/server/session";
@@ -43,6 +45,9 @@ const MESSAGES: Record<repo.DealFailure, string> = {
   "not-disputed":
     "A deal is finished by its last step, not from here. Dispute it first if it is stuck.",
   "bad-proof": "Attach an uploaded file or an https link.",
+  "handed-over":
+    "Ownership has already been handed to the account you gave, so it can no longer be changed. Message the agent in the chat if something is wrong.",
+  "bad-handover": "That account does not look right for this platform.",
   "pay-in-checkout":
     "The price is paid to Channel Adda from this page, by crypto or from your balance. The step completes on its own when the money arrives.",
   "price-not-paid":
@@ -67,6 +72,7 @@ export async function startDeal(
   listingId: string,
   mode: DealMode,
   acceptedRevenueRisk = false,
+  handoverTo = "",
 ): Promise<DealResult & { orderId?: string }> {
   const user = await requireUser();
 
@@ -89,11 +95,23 @@ export async function startDeal(
     };
   }
 
+  // Asked before paying, so whoever transfers the account never has to ask
+  // the buyer for it — and checked against the platform, because a mistyped
+  // Google address hands a channel to a stranger.
+  const listing = await db.listing.findUnique({
+    where: { id: listingId },
+    select: { platform: true },
+  });
+  if (!listing) return fail("not-found");
+  const target = parseHandoverTo(listing.platform, handoverTo);
+  if (!target.ok) return { ok: false, error: target.error };
+
   const result = await repo.createDeal({
     listingId,
     buyerId: user.id,
     mode,
     acceptedRevenueRisk: true,
+    handoverTo: target.value,
   });
 
   if (!result.ok) return fail(result.reason);
@@ -105,6 +123,22 @@ export async function startDeal(
     message: `Deal ${result.reference} opened.`,
     orderId: result.orderId,
   };
+}
+
+/** The buyer correcting the account that receives ownership. */
+export async function changeHandoverTo(
+  orderId: string,
+  value: string,
+): Promise<DealResult> {
+  const user = await requireUser();
+  const result = await repo.updateHandoverTo({
+    orderId,
+    byUserId: user.id,
+    raw: value,
+  });
+  if (!result.ok) return fail(result.reason);
+  refresh(orderId);
+  return { ok: true, message: "Saved. Whoever transfers it has been told." };
 }
 
 /**

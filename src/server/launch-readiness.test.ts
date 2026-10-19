@@ -190,9 +190,9 @@ test(
     expect(await db.order.count()).toBe(0);
 
     fake.emailVerified = true;
-    expect(await startDeal(listing.id, "FASTEST", true)).toMatchObject({
-      ok: true,
-    });
+    expect(
+      await startDeal(listing.id, "FASTEST", true, "buyer@gmail.com"),
+    ).toMatchObject({ ok: true });
   }),
 );
 

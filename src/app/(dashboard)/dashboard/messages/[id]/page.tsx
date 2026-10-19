@@ -6,6 +6,7 @@ import { Reference } from "@/components/app/kit";
 import { AgentInvite } from "@/components/deals/agent-invite";
 import { dealHeadline, STATUS_TONE } from "@/components/deals/deal-status";
 import { DealNextStep, RaiseDispute } from "@/components/deals/deal-timeline";
+import { HandoverAccount } from "@/components/deals/handover-account";
 import { PayNow } from "@/components/deals/pay-now";
 import { TrackRecordLine } from "@/components/deals/track-record";
 import { StartDeal } from "@/components/listing/start-deal";
@@ -230,6 +231,7 @@ export default async function ThreadPage({
                 <StartDeal
                   listingId={thread.listingId}
                   listingSlug={thread.listingSlug}
+                  platform={thread.listingPlatform}
                   // The held price when one was agreed, as createDeal will use.
                   price={fromCents(
                     panel.kind === "start-deal"
@@ -266,6 +268,14 @@ export default async function ThreadPage({
                   <DealNextStep deal={deal} staffIds={staffIds} />
                   {/* "The address to invite is on this page": it is, here too. */}
                   <AgentInvite deal={deal} />
+                  <HandoverAccount
+                    dealId={deal.id}
+                    viewerRole={deal.viewerRole}
+                    mode={deal.mode}
+                    platform={deal.platform}
+                    handoverTo={deal.handoverTo}
+                    open={deal.handoverOpen}
+                  />
                   {deal.nextStep ? <RaiseDispute deal={deal} /> : null}
                 </div>
               ) : null}

@@ -5,9 +5,10 @@ import { useRouter } from "next/navigation";
 import { useId, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Price } from "@/components/ui/price";
-import type { DealMode } from "@/generated/prisma/enums";
+import type { DealMode, Platform } from "@/generated/prisma/enums";
 import { useSession } from "@/lib/auth-client";
 import { buyerTotal, type FeeSettings } from "@/lib/fees";
+import { handoverTarget, parseHandoverTo } from "@/lib/handover-target";
 import { cn } from "@/lib/utils";
 import { startDeal } from "@/server/actions/deals";
 
@@ -46,6 +47,7 @@ const MODES = [
 export function StartDeal({
   listingId,
   listingSlug,
+  platform,
   price,
   fees,
   isOwnListing,
@@ -53,6 +55,8 @@ export function StartDeal({
 }: {
   listingId: string;
   listingSlug: string;
+  /** Decides what the buyer is asked for: a Google account, a username… */
+  platform: Platform;
   price: number;
   fees: FeeSettings;
   isOwnListing: boolean;
@@ -73,6 +77,10 @@ export function StartDeal({
   // worse position than one that never claimed it.
   const [acceptedRisk, setAcceptedRisk] = useState(false);
   const riskId = useId();
+  const handoverId = useId();
+  const target = handoverTarget(platform);
+  const [handoverTo, setHandoverTo] = useState("");
+  const [handoverError, setHandoverError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -171,6 +179,52 @@ export function StartDeal({
         ) : null}
       </dl>
 
+      {/* Asked here, before paying, so whoever transfers the account never
+          has to come back and ask for it. */}
+      <div className="mt-4">
+        <label
+          htmlFor={handoverId}
+          className="block text-[0.8125rem] font-medium text-fg"
+        >
+          {target.label}
+        </label>
+        <input
+          id={handoverId}
+          type={platform === "TELEGRAM" ? "text" : "email"}
+          inputMode={platform === "TELEGRAM" ? "text" : "email"}
+          autoComplete={platform === "TELEGRAM" ? "username" : "email"}
+          autoCapitalize="none"
+          spellCheck={false}
+          value={handoverTo}
+          placeholder={target.placeholder}
+          onChange={(e) => {
+            setHandoverTo(e.target.value);
+            if (handoverError) setHandoverError(null);
+          }}
+          onBlur={() => {
+            if (!handoverTo.trim()) return;
+            const parsed = parseHandoverTo(platform, handoverTo);
+            setHandoverError(parsed.ok ? null : parsed.error);
+          }}
+          aria-invalid={handoverError ? true : undefined}
+          aria-describedby={`${handoverId}-hint`}
+          disabled={pending}
+          className={cn(
+            "mt-1.5 h-11 w-full rounded-lg border bg-surface px-3 text-sm text-fg shadow-xs transition-colors duration-150 placeholder:text-subtle hover:border-line-strong focus-visible:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:opacity-60 dark:bg-surface-2",
+            handoverError ? "border-danger" : "border-line",
+          )}
+        />
+        <p
+          id={`${handoverId}-hint`}
+          className={cn(
+            "mt-1.5 text-xs leading-relaxed",
+            handoverError ? "text-danger" : "text-subtle",
+          )}
+        >
+          {handoverError ?? target.hint}
+        </p>
+      </div>
+
       <label
         htmlFor={riskId}
         className="mt-4 flex gap-2.5 text-xs leading-relaxed text-muted"
@@ -200,8 +254,19 @@ export function StartDeal({
             return;
           }
           setError(null);
+          const parsed = parseHandoverTo(platform, handoverTo);
+          if (!parsed.ok) {
+            setHandoverError(parsed.error);
+            document.getElementById(handoverId)?.focus();
+            return;
+          }
           startTransition(async () => {
-            const result = await startDeal(listingId, mode, acceptedRisk);
+            const result = await startDeal(
+              listingId,
+              mode,
+              acceptedRisk,
+              parsed.value,
+            );
             if (!result.ok) {
               setError(result.error);
               return;

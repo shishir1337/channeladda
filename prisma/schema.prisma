@@ -530,6 +530,12 @@ model Order {
   /// Buyer acknowledged that ad revenue does not transfer.
   revenueRiskAcceptedAt DateTime?
 
+  /// The buyer's own account that receives ownership: a Google account for
+  /// YouTube, an @username for Telegram, and so on (`@/lib/handover-target`).
+  /// Named before paying, so the person who transfers never has to ask.
+  /// Shown only to the buyer, the agent, staff and a Fastest seller.
+  handoverTo String?
+
   feePaidAt         DateTime? // opening payment cleared
   custodyAt         DateTime? // safest: agent confirmed it owns the channel
   buyerPaidAt       DateTime? // safest: the price reached Channel Adda (set by the system)

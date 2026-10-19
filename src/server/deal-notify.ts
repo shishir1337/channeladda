@@ -41,6 +41,12 @@ export function turnEmail(input: {
   stepLabel: string;
   mode: "SAFEST" | "FASTEST";
   href: string;
+  /**
+   * The buyer's account that receives ownership, for the person who will
+   * transfer to it: the seller on Fastest, our agent on either. Never put in
+   * an email to anybody else.
+   */
+  handoverTo?: string | null;
 }) {
   const greeting = input.name ? `Hi ${input.name},` : "Hi there,";
   const mode =
@@ -56,6 +62,13 @@ export function turnEmail(input: {
       `It is your turn on ${input.listingTitle} (${input.reference}).`,
       "",
       `What is needed: ${input.stepLabel}`,
+      ...(input.handoverTo
+        ? [
+            "",
+            `Give ownership to this account: ${input.handoverTo}`,
+            "The buyer named it before paying. Use exactly this one.",
+          ]
+        : []),
       "",
       mode,
       "",
@@ -89,6 +102,7 @@ export async function notifyNextActor(orderId: string): Promise<void> {
         sellerId: true,
         agentId: true,
         conversationId: true,
+        handoverTo: true,
         listing: { select: { title: true } },
         steps: {
           where: { completedAt: null },
@@ -146,11 +160,72 @@ export async function notifyNextActor(orderId: string): Promise<void> {
           stepLabel: next.label,
           mode: order.mode as "SAFEST" | "FASTEST",
           href: `${siteUrl()}${href}`,
+          // Only to whoever will transfer to it. A Safest seller hands the
+          // channel to our agent, so the buyer's account is none of theirs.
+          handoverTo:
+            next.actor === "agent" ||
+            (next.actor === "seller" && order.mode === "FASTEST")
+              ? order.handoverTo
+              : null,
         }),
       });
     }
   } catch (error) {
     console.error(`[deal-notify] ${orderId}`, error);
+  }
+}
+
+/**
+ * The buyer corrected the account that receives ownership. Told to whoever
+ * transfers to it, by notification and by email, at once: they may have an
+ * invite to the old address ready to send. Best effort, as above.
+ */
+export async function notifyHandoverChanged(input: {
+  userId: string;
+  orderId: string;
+  conversationId: string | null;
+  reference: string;
+  listingTitle: string;
+  handoverTo: string;
+}): Promise<void> {
+  try {
+    const href = dealHref({
+      id: input.orderId,
+      conversationId: input.conversationId,
+    });
+    // The address itself stays out of the notification row: those are
+    // listed and previewed, and it belongs only on the deal and in email.
+    await db.notification.create({
+      data: {
+        userId: input.userId,
+        kind: "ORDER",
+        title: `The buyer changed their account — ${input.reference}`,
+        body: `Check it on the deal before transferring ${input.listingTitle}.`,
+        href,
+      },
+    });
+    if (!canSendMail()) return;
+    const person = await db.user.findUnique({
+      where: { id: input.userId },
+      select: { email: true, name: true },
+    });
+    if (!person?.email) return;
+    await sendMail({
+      to: person.email,
+      subject: `The buyer changed the account to make owner (${input.reference})`,
+      body: [
+        person.name ? `Hi ${person.name},` : "Hi there,",
+        "",
+        `The buyer on ${input.listingTitle} (${input.reference}) corrected the account that receives ownership.`,
+        "",
+        `Give ownership to this account: ${input.handoverTo}`,
+        "",
+        "If you already invited the old one, remove that invite first.",
+      ].join("\n"),
+      link: `${siteUrl()}${href}`,
+    });
+  } catch (error) {
+    console.error(`[deal-notify] handover ${input.orderId}`, error);
   }
 }
 

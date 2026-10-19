@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Price } from "@/components/ui/price";
 import type { Listing } from "@/data/listings";
+import type { Platform } from "@/generated/prisma/enums";
 import type { FeeSettings } from "@/lib/fees";
 
 /**
@@ -81,6 +82,8 @@ export function BuyPanel({
         <StartDeal
           listingId={listing.id}
           listingSlug={listing.slug}
+          // The page's listing keys platforms in lower case; deals in upper.
+          platform={listing.platform.toUpperCase() as Platform}
           price={heldOfferUsd ?? listing.price}
           fees={fees}
           isOwnListing={isOwnListing}

@@ -27,6 +27,7 @@ import {
   STATUS_TONE,
 } from "@/components/deals/deal-status";
 import { DealSteps, RaiseDispute } from "@/components/deals/deal-timeline";
+import { HandoverAccount } from "@/components/deals/handover-account";
 import { PayNow } from "@/components/deals/pay-now";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -217,6 +218,16 @@ export default async function DealPage({
         <div className="mt-4 flex min-w-0 flex-col gap-4 lg:mt-0">
           {/* The account the seller invites. Never shown to the buyer. */}
           <AgentInvite deal={deal} />
+          {/* The buyer's account that receives ownership, for whoever
+              transfers to it. */}
+          <HandoverAccount
+            dealId={deal.id}
+            viewerRole={deal.viewerRole}
+            mode={deal.mode}
+            platform={deal.platform}
+            handoverTo={deal.handoverTo}
+            open={deal.handoverOpen}
+          />
 
           {/* ---- the money --------------------------------------------- */}
           <Card>
