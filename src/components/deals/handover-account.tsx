@@ -85,7 +85,7 @@ export function HandoverAccount({
             id={`${inputId}-heading`}
             className="min-w-0 flex-1 text-sm leading-6 font-semibold text-fg"
           >
-            {buyer ? "Ownership goes to" : "Give ownership to this account"}
+            {buyer ? "Ownership goes to" : "The buyer's account"}
           </h2>
           {buyer && open && handoverTo && !editing ? (
             <Button
@@ -173,7 +173,7 @@ export function HandoverAccount({
                   ? open
                     ? "Whoever transfers the account uses exactly this. You can correct it until they do."
                     : "It is in use now, so it can no longer change. If something is wrong, say so in the chat."
-                  : "The buyer named it before paying. Use exactly this account, nothing they write in the chat instead."}
+                  : "The buyer named it before paying. Use exactly this account at each step, nothing they write in the chat instead."}
               </p>
             </>
           )}

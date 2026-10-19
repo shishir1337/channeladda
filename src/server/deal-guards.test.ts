@@ -481,7 +481,8 @@ test(
 test(
   "a refunded fastest deal leaves the platform holding nothing",
   withCleanDb(async () => {
-    const { orderId, staff } = await runTo("FASTEST", 4);
+    // Paid, before the seller has given the buyer any access.
+    const { orderId, staff } = await runTo("FASTEST", 2);
     await resolveDeal({
       orderId,
       to: "REFUNDED",

@@ -8,6 +8,7 @@ const order = {
   buyerFeeUsd: 300,
   priceUsd: 10_000,
   buyerPaidAt: null,
+  buyerPaymentRef: null,
   custodyAt: null,
 };
 
@@ -38,6 +39,13 @@ test("safest holds only the fee, even once the buyer has paid the seller", () =>
   // that money is ours to hold.
   const paidTheSeller = { ...order, buyerPaidAt: new Date() };
   expect(requiredHold(paidTheSeller)).toBe(300);
+});
+
+test("a safest deal whose price was paid to us before the change still holds it", () => {
+  // Until staff decide it: returning it must give the price back.
+  expect(requiredHold({ ...order, buyerPaymentRef: "DEAL-price" })).toBe(
+    10_300,
+  );
 });
 
 test("safest keeps its fee once custody is reached", () => {

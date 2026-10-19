@@ -100,9 +100,11 @@ test(
 
     const toSeller = mail.sent.filter((m) => m.to === seller.email);
     expect(toSeller).toHaveLength(1);
+    // Their step is adding it as a manager, so that is what it says.
     expect(toSeller[0]?.body).toContain(
-      "Give ownership to this account: buyer.owner@gmail.com",
+      "Add this account as a manager: buyer.owner@gmail.com",
     );
+    expect(toSeller[0]?.body).not.toContain("Give ownership");
   }),
 );
 

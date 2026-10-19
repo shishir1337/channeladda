@@ -3,8 +3,9 @@
  *
  * A deal's steps are written when it opens, so a deal opened before a
  * template changed keeps the old steps while the code reads the new ones by
- * position, and the two disagree about who does what. Run this on the
- * server after pulling and before restarting:
+ * position, and the two disagree about who does what — so the code refuses
+ * every step on such a deal, and staff can only end it from a dispute. Run
+ * this on the server after pulling and before restarting:
  *
  *   pnpm deals:in-flight
  *
@@ -51,7 +52,7 @@ async function main() {
   }
   if (old.length > 0) {
     console.log(
-      "\nThese cannot continue under the new steps. Finish or end them from the staff desk before restarting, or tell the developer.",
+      "\nAfter the restart nobody can press a step on these: staff can only end them from a dispute. Finish them before restarting if you can, or tell the developer.",
     );
     process.exitCode = 1;
   }

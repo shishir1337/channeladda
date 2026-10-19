@@ -15,7 +15,11 @@ import {
   isTerminal,
   TERMINAL_STATUSES,
 } from "@/lib/deal-machine";
-import { OPENING_STATUS, templateFor } from "@/lib/deal-templates";
+import {
+  OPENING_STATUS,
+  templateFor,
+  usesCurrentSteps,
+} from "@/lib/deal-templates";
 import { activeWait, holdDaysFor, type Wait } from "@/lib/deal-waits";
 import { orderAmounts } from "@/lib/fees";
 import { parseHandoverTo } from "@/lib/handover-target";
@@ -80,6 +84,10 @@ export type DealFailure =
   | "price-not-paid"
   /** The seller said the money arrived: the channel cannot go back to them. */
   | "already-paid"
+  /** Fastest: the seller has not made the buyer primary owner yet. */
+  | "not-handed-over"
+  /** Opened under an earlier template: its steps are not the code's. */
+  | "old-steps"
   /** The deal's hold — Google's wait, or the holding period — is running. */
   | "on-hold"
   /**
@@ -872,9 +880,14 @@ export async function recordStrayPricePayment(
 ): Promise<PaymentOutcome> {
   const order = await db.order.findUnique({
     where: { id: orderId },
-    select: { id: true, buyerId: true, status: true },
+    select: { id: true, buyerId: true, status: true, buyerPaymentRef: true },
   });
   if (!order) throw new Error(`No such order: ${orderId}`);
+
+  // Applied to the deal before the price went to the seller directly: the
+  // old flow held it, and it is still held. A retried callback for it is a
+  // retry, not money to credit a second time.
+  if (order.buyerPaymentRef === ref) return "already-applied";
 
   // Credited for what the invoice asked, and only against one of this
   // deal's own: the amount is not ours to guess.
@@ -1162,15 +1175,13 @@ export async function advanceStep(input: {
       buyerFeeUsd: true,
       totalUsd: true,
       paymentRef: true,
-      buyerPaidAt: true,
+      buyerPaymentRef: true,
       holdUntil: true,
       conversationId: true,
       listing: { select: { platform: true } },
       steps: {
-        where: { completedAt: null },
         orderBy: { position: "asc" },
-        take: 1,
-        select: { position: true },
+        select: { position: true, label: true, completedAt: true },
       },
     },
   });
@@ -1201,9 +1212,23 @@ export async function advanceStep(input: {
   const actor = await roleOnDeal(order, input.userId);
   if (!actor) return { ok: false, reason: "wrong-actor" };
 
+  // A deal opened before its mode's steps changed still carries the old
+  // ones, and the template is read by position: the old "Pay the price to
+  // Channel Adda" would be completed as the new "Pay the seller", and an old
+  // Fastest deal would reach its payout without the holding period. Such a
+  // deal is staff's to finish, from a dispute.
+  if (
+    !usesCurrentSteps(
+      order.mode,
+      order.steps.map((step) => step.label),
+    )
+  ) {
+    return { ok: false, reason: "old-steps" };
+  }
+
   // Only the lowest incomplete step is available. Nothing is skipped and
   // nothing is redone.
-  const next = order.steps[0]?.position;
+  const next = order.steps.find((step) => step.completedAt === null)?.position;
   if (next !== input.position) return { ok: false, reason: "wrong-step" };
 
   const template = templateFor(order.mode).find(
@@ -1394,7 +1419,7 @@ type CompletableOrder = {
   buyerFeeUsd: number;
   totalUsd: number;
   paymentRef: string | null;
-  buyerPaidAt: Date | null;
+  buyerPaymentRef: string | null;
 };
 
 /**
@@ -1571,6 +1596,21 @@ async function expireStale(scope: { listingId?: string }): Promise<number> {
   return expired;
 }
 
+/** Whether the template step carrying this flag is done on this deal. */
+async function stepDone(
+  orderId: string,
+  mode: DealMode,
+  flag: "handsOver" | "usesHandover",
+): Promise<boolean> {
+  const step = templateFor(mode).find((s) => s[flag]);
+  if (!step) return false;
+  return (
+    (await db.transferStep.count({
+      where: { orderId, position: step.position, completedAt: { not: null } },
+    })) > 0
+  );
+}
+
 /**
  * Telling the next person that a deal's hold has ended.
  *
@@ -1742,6 +1782,17 @@ export async function resolveDeal(input: {
     return { ok: false, reason: "in-custody" };
   }
 
+  // Paying a Fastest seller from a dispute before they have made the buyer
+  // primary owner would leave them with the money and the channel both. The
+  // Safest guard above is the same rule from the other side.
+  if (
+    input.to === "COMPLETED" &&
+    order.mode === "FASTEST" &&
+    !(await stepDone(order.id, "FASTEST", "handsOver"))
+  ) {
+    return { ok: false, reason: "not-handed-over" };
+  }
+
   // Handing the channel back once the **seller** has said the buyer's
   // payment arrived would leave the seller holding the money and the asset
   // both. That one is an outright refusal, dispute or not, because it is the
@@ -1767,19 +1818,13 @@ export async function resolveDeal(input: {
   // moderator sees what each side claims and the decision is on the record.
   // What a single staff member must not be able to do is reverse either one
   // with one click from a running deal.
-  // On a Fastest deal the seller's handover is the other claim a refund
-  // reverses. It stamps nothing on the order, so it is read from the step.
-  const handsOverStep = templateFor(order.mode).find((s) => s.handsOver);
+  // On a Fastest deal the seller giving the buyer access is the other claim
+  // a refund reverses: adding them as manager, and later making them primary
+  // owner. Neither stamps the order, so they are read from the steps.
   const sellerHandedOver =
-    input.to === "REFUNDED" && handsOverStep
-      ? (await db.transferStep.count({
-          where: {
-            orderId: order.id,
-            position: handsOverStep.position,
-            completedAt: { not: null },
-          },
-        })) > 0
-      : false;
+    input.to === "REFUNDED" &&
+    ((await stepDone(order.id, order.mode, "usesHandover")) ||
+      (await stepDone(order.id, order.mode, "handsOver")));
 
   const reversingSomethingClaimed =
     (input.to === "RETURNED_TO_SELLER" && order.buyerPaidAt !== null) ||

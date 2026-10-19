@@ -1,5 +1,6 @@
 import "server-only";
 
+import type { DealMode } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
 import type { DealActor } from "@/lib/deal-machine";
 import { templateFor } from "@/lib/deal-templates";
@@ -47,6 +48,8 @@ export function turnEmail(input: {
    * an email to anybody else.
    */
   handoverTo?: string | null;
+  /** What this step does with it (`handoverAction`). */
+  handoverAction?: string | null;
 }) {
   const greeting = input.name ? `Hi ${input.name},` : "Hi there,";
   const mode =
@@ -65,7 +68,7 @@ export function turnEmail(input: {
       ...(input.handoverTo
         ? [
             "",
-            `Give ownership to this account: ${input.handoverTo}`,
+            `${input.handoverAction ?? "Give ownership to this account"}: ${input.handoverTo}`,
             "The buyer named it before paying. Use exactly this one.",
           ]
         : []),
@@ -76,6 +79,26 @@ export function turnEmail(input: {
     ].join("\n"),
     link: input.href,
   };
+}
+
+/**
+ * What a step does with the buyer's account, for the email that names it,
+ * or null for a step that does not touch it — which is then not sent it.
+ *
+ * "Give ownership to this account" on the step that only adds a manager
+ * invited a Fastest seller to hand the channel over before the holding
+ * period; on a platform with no wait of its own nothing would stop them.
+ */
+export function handoverAction(
+  mode: DealMode,
+  position: number,
+): string | null {
+  const step = templateFor(mode).find((s) => s.position === position);
+  if (!step || !(step.usesHandover || step.handsOver)) return null;
+  if (!step.handsOver) return "Add this account as a manager";
+  return mode === "FASTEST"
+    ? "Make this account the primary owner"
+    : "Make this account the owner";
 }
 
 /**
@@ -156,6 +179,10 @@ export async function notifyNextActor(orderId: string): Promise<void> {
       where: { id: userId },
       select: { email: true, name: true },
     });
+    // Only to whoever will transfer to it, and only on a step that uses it.
+    // A Safest seller hands the channel to our agent, so the buyer's account
+    // is none of theirs.
+    const action = handoverAction(order.mode as DealMode, next.position);
     if (person?.email) {
       await sendMail({
         to: person.email,
@@ -166,13 +193,8 @@ export async function notifyNextActor(orderId: string): Promise<void> {
           stepLabel: next.label,
           mode: order.mode as "SAFEST" | "FASTEST",
           href: `${siteUrl()}${href}`,
-          // Only to whoever will transfer to it. A Safest seller hands the
-          // channel to our agent, so the buyer's account is none of theirs.
-          handoverTo:
-            next.actor === "agent" ||
-            (next.actor === "seller" && order.mode === "FASTEST")
-              ? order.handoverTo
-              : null,
+          handoverTo: action ? order.handoverTo : null,
+          handoverAction: action,
         }),
       });
     }

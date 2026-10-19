@@ -130,7 +130,7 @@ test(
 test(
   "before the seller has acted, a fastest refund is still one decision",
   withCleanDb(async () => {
-    const o = await runTo("FASTEST", 4);
+    const o = await runTo("FASTEST", 2);
 
     expect(
       await resolveDeal({

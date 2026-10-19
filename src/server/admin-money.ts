@@ -402,7 +402,7 @@ export async function holdMismatches(): Promise<HoldMismatch[]> {
       buyerFeeUsd: true,
       priceUsd: true,
       paymentRef: true,
-      buyerPaidAt: true,
+      buyerPaymentRef: true,
     },
   });
 

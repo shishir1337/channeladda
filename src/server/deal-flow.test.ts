@@ -412,7 +412,8 @@ test(
 test(
   "a refunded fastest deal reverses the hold",
   withCleanDb(async () => {
-    const { orderId, staff, listing } = await runTo("FASTEST", 4);
+    // Paid, before the seller has given the buyer any access.
+    const { orderId, staff, listing } = await runTo("FASTEST", 2);
 
     expect(
       await resolveDeal({

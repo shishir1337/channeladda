@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { DealMode, OrderStatus } from "@/generated/prisma/enums";
 import { levelLabel } from "@/lib/custody-roles";
+import { ENDINGS, type Ending, type EndingTo } from "@/lib/deal-endings";
 import { movesHeldMoney } from "@/lib/outcomes";
 import { cn } from "@/lib/utils";
 import {
@@ -472,88 +473,6 @@ export function AssignAgent({
   );
 }
 
-type EndingTo =
-  | "DISPUTED"
-  | "RETURNED_TO_SELLER"
-  | "REFUNDED"
-  | "CANCELLED"
-  | "COMPLETED";
-
-type Ending = {
-  to: EndingTo;
-  label: string;
-  /** Plain words for what happens to the channel and to the money. */
-  consequence: (mode?: DealMode) => string;
-  /** How it is worth treating: a pause, something final, or a payout. */
-  weight: "pause" | "final" | "money";
-  /** False when this mode cannot reach it at all — still offered, see below. */
-  applies?: (mode?: DealMode) => boolean;
-};
-
-/**
- * Pausing comes first because it is the way into the other four on a deal that
- * is still running: finishing one is the last step's job, and `resolveDeal`
- * only decides a deal that is actually in dispute.
- *
- * Which endings are legal from here is decided by the transition table, not by
- * this list, so an illegal one comes back as a refusal rather than being
- * hidden — staff get told why instead of wondering where a button went. What
- * this list does add is the warning before the refusal: an outcome the mode
- * can never reach is marked as such, with the reason, so the refusal is not a
- * surprise.
- */
-const ENDINGS: readonly Ending[] = [
-  {
-    to: "DISPUTED",
-    label: "Pause it for review",
-    weight: "pause",
-    consequence: () =>
-      "Freezes the deal and marks it disputed. Nothing moves until a moderator decides it, and all four outcomes below stay open. Reversible in the sense that it decides nothing.",
-  },
-  {
-    to: "RETURNED_TO_SELLER",
-    label: "Return the channel to the seller",
-    weight: "final",
-    applies: (mode) => mode !== "FASTEST",
-    consequence: (mode) =>
-      mode === "FASTEST"
-        ? "Safest only. On a Fastest deal the agent never owns the channel, so there is nothing to hand back."
-        : "The agent gives ownership back to the seller and the buyer ends up with no channel. Anything we hold goes back to the buyer's balance, except the admin fee once our agent has taken custody — that is kept for the work.",
-  },
-  {
-    to: "REFUNDED",
-    label: "Refund the buyer",
-    weight: "money",
-    applies: (mode) => mode !== "SAFEST",
-    consequence: (mode) =>
-      mode === "SAFEST"
-        ? "Fastest only. On a Safest deal, return the channel to the seller instead: that refunds whatever we are holding for the buyer."
-        : "Returns the price and the fee we are holding to the buyer. The seller is paid nothing.",
-  },
-  {
-    to: "CANCELLED",
-    label: "Cancel the deal",
-    weight: "final",
-    consequence: (mode) =>
-      mode === "FASTEST"
-        ? "Ends it and frees the listing. If the buyer has paid, everything we are holding — price and fee — goes back to their balance."
-        : mode === "SAFEST"
-          ? "Ends it and frees the listing. Before our agent holds the channel, the admin fee goes back to the buyer. Once the agent holds it, this is refused — return the channel instead."
-          : "Ends it and frees the listing, returning whatever we are holding for the buyer.",
-  },
-  {
-    to: "COMPLETED",
-    label: "Decide it in the seller's favour",
-    weight: "money",
-    consequence: (mode) =>
-      mode === "FASTEST"
-        ? "Marks the deal complete and credits the seller's wallet with the money we are holding. This pays out."
-        : mode === "SAFEST"
-          ? "Marks the deal complete and releases what we are holding: the price to the seller's wallet once the buyer has paid it, and the admin fee to us."
-          : "Marks the deal complete. On a Fastest deal this also credits the seller's wallet with the money we are holding.",
-  },
-];
-
 const WEIGHT_TAG: Record<
   Ending["weight"],
   { label: string; variant: ComponentProps<typeof Badge>["variant"] }
@@ -591,8 +510,8 @@ export function EndDeal({
   /** Whether the opening payment cleared. Needed to describe a dispute. */
   paid?: boolean;
   /**
-   * Safest: whether the price has reached us. Until it has, deciding for the
-   * seller would hand over the channel for the fee alone, so the server
+   * Safest: whether the buyer has pressed Paid. Until they have, finishing
+   * the deal would hand them the channel for the fee alone, so the server
    * refuses it and this says so first.
    */
   pricePaid?: boolean;

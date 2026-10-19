@@ -38,6 +38,10 @@ const MESSAGES: Record<repo.DealFailure, string> = {
     "One side says this already happened, so reversing it is a decision, not a correction. Pause it for review first — then it can be decided with both accounts of it on the record.",
   "on-hold":
     "The waiting period is still running, so this step is not open yet. The chat shows when it ends, and we email you the moment it does.",
+  "not-handed-over":
+    "The seller has not made the buyer primary owner yet, so paying them now would leave them with the money and the channel both. Refund the buyer, or wait for the handover.",
+  "old-steps":
+    "This deal was opened under our earlier steps, so its steps cannot be done from here. Channel Adda will finish it with you — say so in the chat.",
   "already-paid":
     "The seller has said the buyer's payment arrived, so the channel cannot go back to them — they would keep the money and the channel both. Decide it for the buyer instead.",
   "in-custody":
