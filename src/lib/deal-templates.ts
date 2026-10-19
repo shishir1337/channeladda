@@ -170,3 +170,22 @@ const FASTEST_STEPS: readonly StepTemplate[] = Object.freeze([
 export function templateFor(mode: DealMode): readonly StepTemplate[] {
   return mode === "FASTEST" ? FASTEST_STEPS : SAFEST_STEPS;
 }
+
+/**
+ * Whether a deal's seeded steps are this template's, label for label.
+ *
+ * Steps are written when a deal opens, so a deal opened under an earlier
+ * template keeps its old steps while the step machine reads the new ones by
+ * position — the two disagree about who does what. `pnpm deals:in-flight`
+ * uses this to find any such deal before a deploy changes a template.
+ */
+export function usesCurrentSteps(
+  mode: DealMode,
+  labels: readonly string[],
+): boolean {
+  const current = templateFor(mode);
+  return (
+    labels.length === current.length &&
+    current.every((step, index) => labels[index] === step.label)
+  );
+}

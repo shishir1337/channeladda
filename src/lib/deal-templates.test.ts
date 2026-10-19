@@ -1,7 +1,40 @@
 import { expect, test } from "vitest";
 import type { DealMode, OrderStatus } from "@/generated/prisma/enums";
 import { canTransition } from "@/lib/deal-machine";
-import { OPENING_STATUS, templateFor } from "@/lib/deal-templates";
+import {
+  OPENING_STATUS,
+  templateFor,
+  usesCurrentSteps,
+} from "@/lib/deal-templates";
+
+test("a deal seeded with the steps of an earlier template is told apart", () => {
+  // A deal's steps are written when it is opened, so one opened before the
+  // client's flows of 2026-10-20 still carries the old ones and cannot be
+  // run under the new.
+  const current = templateFor("SAFEST").map((s) => s.label);
+  expect(usesCurrentSteps("SAFEST", current)).toBe(true);
+  expect(
+    usesCurrentSteps("SAFEST", [
+      "Pay the admin fee",
+      "Invite the agent as channel owner",
+      "Accept and confirm custody",
+      "Hold 1 complete, ownership verified",
+      "Inspect the channel",
+      "Pay the price to Channel Adda",
+      "Transfer ownership to the buyer",
+      "Hold 2 complete, ownership verified",
+    ]),
+  ).toBe(false);
+  // The same labels in another order is still the wrong template.
+  expect(
+    usesCurrentSteps(
+      "FASTEST",
+      templateFor("FASTEST")
+        .map((s) => s.label)
+        .reverse(),
+    ),
+  ).toBe(false);
+});
 
 test("safest has the nine steps the client confirmed, in order", () => {
   const steps = templateFor("SAFEST");

@@ -12,6 +12,7 @@
     "db:migrate": "prisma migrate deploy",
     "db:studio": "prisma studio",
     "create:admin": "tsx --conditions=react-server scripts/create-admin.ts",
+    "deals:in-flight": "tsx --conditions=react-server scripts/deals-in-flight.ts",
     "postinstall": "prisma generate",
     "test": "vitest run",
     "verify:integrations": "tsx --conditions=react-server scripts/verify-integrations.ts",
