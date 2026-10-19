@@ -145,11 +145,13 @@ export function OfferForm({
         value={amount}
         onChange={(e) => setAmount(e.target.value)}
         placeholder={String(Math.round(askingPrice * 0.9))}
+        aria-invalid={tooLow || undefined}
+        aria-describedby={tooLow ? `${amountId}-error` : undefined}
         className={cn(siteInput, "tnum mt-2")}
         required
       />
       {tooLow ? (
-        <p className="mt-2 text-sm text-danger">
+        <p id={`${amountId}-error`} className="mt-2 text-sm text-danger">
           That is less than half the asking price and will be refused.
         </p>
       ) : null}

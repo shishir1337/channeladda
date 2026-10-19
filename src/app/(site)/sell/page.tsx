@@ -53,7 +53,7 @@ export default async function SellPage() {
       <PageHeader
         crumbs={[{ label: "Home", href: "/" }, { label: "Sell" }]}
         title="Your channel is an asset. Cash it out safely."
-        description="List for free, put your account in front of active buyers, and let a supervised handover prove you are dealing with someone serious. We only earn when your deal completes."
+        description="List for free, put your account in front of active buyers, and let a supervised handover prove you are dealing with someone serious. We earn a fee on deals, never on listings."
         actions={
           <Button asChild size="lg">
             <Link href="/signup?next=%2Fdashboard%2Flistings%2Fnew">
@@ -114,7 +114,11 @@ export default async function SellPage() {
             <div className="max-w-xl">
               <SectionHeading
                 title="What you actually take home"
-                description="No listing fee and no monthly cost. A success fee is deducted only when a deal completes, and the buyer pays their own fee on top of your asking price."
+                description={
+                  fees.sellerFeeBp > 0
+                    ? "No listing fee and no monthly cost. A success fee is deducted only when a Fastest deal completes, and the buyer pays their own fee on top of your asking price."
+                    : "No listing fee, no monthly cost and no seller fee. The buyer pays their own fee on top of your asking price."
+                }
               />
               <Button asChild variant="secondary" size="md" className="mt-7">
                 <Link href="/fees">See the full fee breakdown</Link>

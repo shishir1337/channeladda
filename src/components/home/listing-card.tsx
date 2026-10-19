@@ -6,6 +6,7 @@ import { Price } from "@/components/ui/price";
 import type { Listing } from "@/data/listings";
 import { platformMap } from "@/data/platforms";
 import { countOf } from "@/lib/plural";
+import { revenueLine } from "@/lib/revenue-line";
 import { cn, formatCompact } from "@/lib/utils";
 
 /**
@@ -41,6 +42,7 @@ export function ListingCard({
   const platform = platformMap[listing.platform];
   const PlatformIcon = platform.icon;
   const tag = listing.tag ? tagStyles[listing.tag] : null;
+  const revenue = revenueLine(listing);
 
   return (
     <article
@@ -110,7 +112,7 @@ export function ListingCard({
           <h3 className="min-w-0 truncate text-[0.9375rem] font-semibold text-fg">
             <Link
               href={`/listing/${listing.slug}`}
-              className="after:absolute after:inset-0 after:rounded-card focus-visible:outline-none"
+              className="after:absolute after:inset-0 after:rounded-card focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-primary focus-visible:after:ring-offset-2 focus-visible:after:ring-offset-bg"
             >
               {listing.handle}
             </Link>
@@ -141,14 +143,13 @@ export function ListingCard({
         </dl>
 
         <p className="mt-3 flex items-center gap-1.5 truncate text-[0.8125rem] text-subtle">
-          {listing.monthlyRevenue > 0 ? (
+          {revenue.kind === "revenue" ? (
             <span className="text-muted">
-              <Price
-                usd={listing.monthlyRevenue}
-                className="font-medium text-fg"
-              />{" "}
-              a month
+              <Price usd={revenue.usd} className="font-medium text-fg" /> a
+              month
             </span>
+          ) : revenue.kind === "monetized" ? (
+            <span className="text-muted">Monetized</span>
           ) : (
             <span>Not monetized</span>
           )}

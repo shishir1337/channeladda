@@ -8,6 +8,7 @@ import { Container, Section } from "@/components/ui/section";
 import { soldAgoLabel } from "@/data/listings";
 import { platformMap } from "@/data/platforms";
 import { databaseGate } from "@/lib/db-gate";
+import { countOf } from "@/lib/plural";
 import { formatCompact } from "@/lib/utils";
 import { getRecentlySold } from "@/server/listings";
 
@@ -65,7 +66,7 @@ export default async function SoldPage() {
           />
           <Stat
             label="Median close"
-            value={medianDays === null ? "—" : `${medianDays} days`}
+            value={medianDays === null ? "—" : countOf(medianDays, "day")}
           />
         </dl>
       </PageHeader>
@@ -119,7 +120,7 @@ export default async function SoldPage() {
 
                         <span className="hidden shrink-0 items-center gap-1.5 text-xs text-subtle sm:flex sm:w-28">
                           <TimerIcon aria-hidden="true" className="size-3.5" />
-                          {item.daysToClose} days
+                          {countOf(item.daysToClose, "day")}
                         </span>
 
                         <span className="ml-auto shrink-0 text-right">
@@ -149,9 +150,8 @@ export default async function SoldPage() {
                 Every one of these was supervised by an agent
               </h2>
               <p className="mt-2.5 text-sm leading-relaxed text-muted">
-                The buyer confirmed the handover before the deal closed, and
-                nobody was asked to hand over an account they had not been paid
-                for.
+                The buyer confirmed the handover before the deal closed, and at
+                every step either the money or the account was held by us.
               </p>
             </div>
             <Button asChild size="lg" className="shrink-0">

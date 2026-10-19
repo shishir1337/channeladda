@@ -18,7 +18,7 @@ import { getFeeSettings } from "@/server/settings";
 export const metadata: Metadata = {
   title: "Affiliate programme",
   description:
-    "Earn 20% of the Channel Adda fee on every completed deal from buyers and sellers you refer, for twelve months. Paid in crypto, tracked on the order.",
+    "Earn 20% of the Channel Adda fee on every completed deal from buyers and sellers you refer, for twelve months. Paid in crypto. The programme is not open yet.",
   alternates: { canonical: "/affiliates" },
 };
 
@@ -36,7 +36,7 @@ const steps = [
   {
     icon: BanknoteIcon,
     title: "You earn on completion",
-    body: "You get 20% of the Channel Adda fee on every deal they complete. Nothing on a deal that falls through, same as us.",
+    body: "You get 20% of the Channel Adda fee on every deal they complete. Nothing on a deal that falls through.",
   },
 ];
 

@@ -94,8 +94,10 @@ export default async function SellerPage({
                   {seller.reseller ? <ResellerBadge /> : null}
                 </h1>
                 <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted">
+                  {/* The rating takes its own line on a phone, so the
+                      separators never dangle at a line's end. */}
                   {seller.rating !== null ? (
-                    <span className="flex items-center gap-1.5">
+                    <span className="flex basis-full items-center gap-1.5 sm:basis-auto">
                       <Stars rating={seller.rating} />
                       <span className="tnum font-semibold text-fg">
                         {seller.rating.toFixed(1)}
@@ -105,12 +107,14 @@ export default async function SellerPage({
                       </span>
                     </span>
                   ) : (
-                    <span>
+                    <span className="basis-full sm:basis-auto">
                       <span className="font-medium text-fg">New</span> · no
                       reviews yet
                     </span>
                   )}
-                  <span aria-hidden="true">·</span>
+                  <span aria-hidden="true" className="hidden sm:inline">
+                    ·
+                  </span>
                   <span className="tnum font-medium text-fg">
                     {pointsLabel(seller.points ?? 0)}
                   </span>

@@ -41,11 +41,11 @@ export default async function HelpArticlePage({
   const article = helpArticleMap[slug];
   if (!article) notFound();
 
-  // Read only by the articles that quote a setting, and never fatal: these
-  // pages are prerendered, and a build without a database still gets the
-  // figures the code ships with.
+  // Read only by the articles that quote a setting. Not caught: a failed
+  // regeneration keeps the last good page, where a fallback would cache the
+  // shipped defaults over the admin's figures.
   const quotes = article.body.some((p) => p.includes("{"));
-  const settings = quotes ? await getSettings().catch(() => null) : null;
+  const settings = quotes ? await getSettings() : null;
   const values = badgeValues({
     resellerPointsMultiplier:
       settings?.resellerPointsMultiplier ?? RESELLER_DEFAULTS.pointsMultiplier,

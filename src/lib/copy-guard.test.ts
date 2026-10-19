@@ -24,6 +24,7 @@ const BANNED: readonly RegExp[] = [
   /then,? to (channel adda|us) once/i,
   /safest deal[^.]*money is with us/i,
   /money,? and on safest the account too/i,
+  /(account|channel), and the price too/i,
   // The Fastest hold that ran after the handover, and Safest's two holds.
   /recovery hold/i,
   // A Safest buyer pays the seller directly, so this is only true of

@@ -28,7 +28,7 @@ import { withResellerDiscount } from "@/lib/reseller";
 import { formatCompact } from "@/lib/utils";
 import {
   getListing,
-  getProofLabels,
+  getProofCount,
   getSimilarListings,
 } from "@/server/listings";
 import { heldByAcceptedOffer } from "@/server/offers";
@@ -78,10 +78,10 @@ export default async function ListingPage({
   if (!listing) notFound();
 
   const platform = platformMap[listing.platform];
-  const [seller, similar, proofLabels] = await Promise.all([
+  const [seller, similar, proofCount] = await Promise.all([
     getSeller(listing.sellerSlug),
     getSimilarListings(listing),
-    getProofLabels(listing.id),
+    getProofCount(listing.id),
   ]);
   if (!seller) notFound();
 
@@ -210,7 +210,7 @@ export default async function ListingPage({
               <MetricsPanel listing={listing} platform={platform} />
               <MonetizationNotice listing={listing} />
               <TransferPanel platform={platform} />
-              <ProofPanel labels={proofLabels} />
+              <ProofPanel count={proofCount} />
               <SellerPanel seller={seller} />
 
               {listing.reserved ? null : (
@@ -255,6 +255,7 @@ export default async function ListingPage({
           has a deal to start, so neither gets the bar. */}
       {isOwnListing || (listing.reserved && !heldOfferUsd) ? null : (
         <ListingBuyBar
+          label={heldOfferUsd ? "Your accepted offer" : "Asking price"}
           price={heldOfferUsd ?? listing.price}
           wasPrice={heldOfferUsd ? undefined : listing.wasPrice}
           targetId="buy"

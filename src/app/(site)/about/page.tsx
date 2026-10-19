@@ -6,7 +6,7 @@ import { Container, Section } from "@/components/ui/section";
 import { platforms } from "@/data/platforms";
 import { databaseGate } from "@/lib/db-gate";
 import { getPlatformCounts } from "@/server/listings";
-import { getSellers } from "@/server/sellers";
+import { getSellerSlugs } from "@/server/sellers";
 
 /** Counts from the marketplace itself, refreshed like the pages they echo. */
 export const revalidate = 60;
@@ -24,9 +24,10 @@ export default async function AboutPage() {
 
   // These were the sample data's totals — 9,140 listings beside a
   // marketplace showing 43 — so they are read from the database now.
+  // The same sellers /sellers lists, counted rather than built.
   const [counts, sellers] = await Promise.all([
     getPlatformCounts(),
-    getSellers(),
+    getSellerSlugs(),
   ]);
   const live = Object.values(counts).reduce((sum, n) => sum + n, 0);
   const stats = [

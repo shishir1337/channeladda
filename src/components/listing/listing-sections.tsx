@@ -179,32 +179,26 @@ export function TransferPanel({ platform }: { platform: Platform }) {
   );
 }
 
-export function ProofPanel({ labels }: { labels: string[] }) {
+export function ProofPanel({ count }: { count: number }) {
   return (
     <Panel title="Seller proof" id="proof">
-      {labels.length ? (
+      {count ? (
         <>
-          <p className="text-sm leading-relaxed text-muted">
-            {countOf(labels.length, "screenshot")} uploaded by the seller and
-            checked by our moderation team before this listing went live. The
-            screenshots are shared with the buyer once a deal opens.
+          <p className="flex items-center gap-2.5 rounded-lg border border-line bg-bg-subtle px-3 py-2.5 text-sm">
+            <ImageIcon
+              aria-hidden="true"
+              className="size-4 shrink-0 text-subtle"
+            />
+            <span className="font-medium text-fg">
+              {countOf(count, "screenshot")}
+            </span>
+            <span className="text-subtle">checked by a moderator</span>
           </p>
-          <ul className="mt-4 grid gap-2 sm:grid-cols-2">
-            {labels.map((label, i) => (
-              <li
-                // Captions can repeat; their order is the seller's.
-                // biome-ignore lint/suspicious/noArrayIndexKey: see above.
-                key={i}
-                className="flex items-center gap-2.5 rounded-lg border border-line bg-bg-subtle px-3 py-2.5 text-sm text-fg"
-              >
-                <ImageIcon
-                  aria-hidden="true"
-                  className="size-4 shrink-0 text-subtle"
-                />
-                <span className="min-w-0 truncate">{label}</span>
-              </li>
-            ))}
-          </ul>
+          <p className="mt-3 text-sm leading-relaxed text-muted">
+            Uploaded by the seller and checked by our moderation team before
+            this listing went live. The screenshots are not published; ask the
+            seller about anything you want to see before you start a deal.
+          </p>
         </>
       ) : (
         <p className="text-sm leading-relaxed text-muted">

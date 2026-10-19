@@ -11,10 +11,13 @@ import { cn } from "@/lib/utils";
  * rail, so this never shows there.
  */
 export function ListingBuyBar({
+  label,
   price,
   wasPrice,
   targetId,
 }: {
+  /** "Asking price", or what this viewer's accepted offer is called. */
+  label: string;
   /** Dollars: the asking price, or the offer this viewer had accepted. */
   price: number;
   wasPrice?: number;
@@ -46,7 +49,7 @@ export function ListingBuyBar({
     >
       <div className="flex items-center gap-3 px-4 py-3">
         <div className="min-w-0 flex-1">
-          <p className="text-xs text-subtle">Asking price</p>
+          <p className="text-xs text-subtle">{label}</p>
           <p className="flex items-baseline gap-2">
             <Price
               usd={price}

@@ -256,10 +256,20 @@ export async function queryListings(f: ListingFilters): Promise<QueryResult> {
   const all = Object.values(frag);
   const where = whereFrom(all);
 
+  // Facet counts: rebuild the filter set with the counted dimension lifted.
+  const without = (key: keyof typeof frag) =>
+    whereFrom(
+      Object.entries(frag)
+        .filter(([k]) => k !== key)
+        .map(([, v]) => v),
+    );
+
   const [total, priceAgg] = await Promise.all([
     db.listing.count({ where }),
+    // The range the price filter describes: what the other filters leave,
+    // so /browse/telegram quotes Telegram's spread, not the marketplace's.
     db.listing.aggregate({
-      where: { status: "LIVE" },
+      where: without("price"),
       _min: { priceUsd: true },
       _max: { priceUsd: true },
     }),
@@ -275,14 +285,6 @@ export async function queryListings(f: ListingFilters): Promise<QueryResult> {
     skip: (page - 1) * PAGE_SIZE,
     take: PAGE_SIZE,
   });
-
-  // Facet counts: rebuild the filter set with the counted dimension lifted.
-  const without = (key: keyof typeof frag) =>
-    whereFrom(
-      Object.entries(frag)
-        .filter(([k]) => k !== key)
-        .map(([, v]) => v),
-    );
 
   const [platformGroups, nicheGroups, countryGroups] = await Promise.all([
     db.listing.groupBy({
@@ -349,20 +351,16 @@ export async function getListing(slug: string): Promise<Listing | null> {
 }
 
 /**
- * What the seller's proof screenshots show, by their captions.
+ * How many proof screenshots the seller uploaded.
  *
  * The listing page used to fill this section with the same three sample
  * images for every listing on a platform, under a line saying the seller had
- * uploaded them. The screenshots themselves stay private to the seller and
- * the buyers dealing on the listing; the captions are what a visitor may see.
+ * uploaded them. Only the count is public: the screenshots are private, and
+ * so are their captions, which sellers write for a moderator and which can
+ * describe an account settings page down to the owner's email.
  */
-export async function getProofLabels(listingId: string): Promise<string[]> {
-  const rows = await db.listingProof.findMany({
-    where: { listingId },
-    orderBy: { uploadedAt: "asc" },
-    select: { label: true },
-  });
-  return rows.map((row) => row.label);
+export async function getProofCount(listingId: string): Promise<number> {
+  return db.listingProof.count({ where: { listingId } });
 }
 
 export async function getListingSlugs(): Promise<string[]> {

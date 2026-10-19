@@ -1,10 +1,14 @@
 import { expect, test } from "vitest";
 import { db } from "@/lib/db";
-import { getProofLabels } from "@/server/listings";
+import { getProofCount } from "@/server/listings";
 import { seedListing, withCleanDb } from "@/test/db";
 
+// Only the count is public. A caption was written for a moderator — the
+// form asks for "the account settings page", which can carry an owner's
+// email — so it never reaches a visitor.
+
 test(
-  "a listing's proof is what its seller uploaded, in the order they uploaded it",
+  "a listing's proof is counted from what its seller uploaded",
   withCleanDb(async () => {
     const { listing } = await seedListing();
     const other = await seedListing();
@@ -15,14 +19,12 @@ test(
           url: "/uploads/proof/a.png",
           label: "Studio analytics, last 90 days",
           fileHash: "a",
-          uploadedAt: new Date("2026-10-01T10:00:00Z"),
         },
         {
           listingId: listing.id,
           url: "/uploads/proof/b.png",
-          label: "AdSense payouts, 2026",
+          label: "Account settings, owner@example.test",
           fileHash: "b",
-          uploadedAt: new Date("2026-10-01T10:05:00Z"),
         },
         {
           listingId: other.listing.id,
@@ -33,10 +35,7 @@ test(
       ],
     });
 
-    expect(await getProofLabels(listing.id)).toEqual([
-      "Studio analytics, last 90 days",
-      "AdSense payouts, 2026",
-    ]);
+    expect(await getProofCount(listing.id)).toBe(2);
   }),
 );
 
@@ -44,6 +43,6 @@ test(
   "a listing with no proof has none, rather than sample artwork",
   withCleanDb(async () => {
     const { listing } = await seedListing();
-    expect(await getProofLabels(listing.id)).toEqual([]);
+    expect(await getProofCount(listing.id)).toBe(0);
   }),
 );

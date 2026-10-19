@@ -51,10 +51,10 @@ export function TextField({
         }
         className={cn(
           // 16px base avoids iOS zooming the field on focus.
-          "mt-2 h-11 w-full rounded-[10px] border bg-surface px-3.5 text-base text-fg shadow-xs transition-[border-color,box-shadow] duration-150 placeholder:text-subtle hover:border-line-strong focus:ring-[3px] focus:outline-none sm:text-[0.9375rem] dark:bg-surface-2 app:mt-1.5 app:px-3 app:pointer-fine:h-9 app:rounded-lg app:sm:text-sm",
+          "mt-2 h-11 w-full rounded-[10px] border bg-surface px-3.5 text-base text-fg shadow-xs transition-[border-color,box-shadow] duration-150 placeholder:text-subtle focus:ring-[3px] focus:outline-none sm:text-[0.9375rem] dark:bg-surface-2 app:mt-1.5 app:px-3 app:pointer-fine:h-9 app:rounded-lg app:sm:text-sm",
           error
             ? "border-danger focus:border-danger focus:ring-danger/15"
-            : "border-line focus:border-primary focus:ring-primary/20",
+            : "border-line hover:border-line-strong focus:border-primary focus:ring-primary/20",
         )}
         {...props}
       />
@@ -119,10 +119,10 @@ export function PasswordField({
               .join(" ") || undefined
           }
           className={cn(
-            "h-11 w-full rounded-[10px] border bg-surface pr-12 pl-3.5 text-base text-fg shadow-xs transition-[border-color,box-shadow] duration-150 placeholder:text-subtle hover:border-line-strong focus:ring-[3px] focus:outline-none sm:text-[0.9375rem] dark:bg-surface-2 app:pl-3 app:pointer-fine:h-9 app:rounded-lg app:sm:text-sm",
+            "h-11 w-full rounded-[10px] border bg-surface pr-12 pl-3.5 text-base text-fg shadow-xs transition-[border-color,box-shadow] duration-150 placeholder:text-subtle focus:ring-[3px] focus:outline-none sm:text-[0.9375rem] dark:bg-surface-2 app:pl-3 app:pointer-fine:h-9 app:rounded-lg app:sm:text-sm",
             error
               ? "border-danger focus:border-danger focus:ring-danger/15"
-              : "border-line focus:border-primary focus:ring-primary/20",
+              : "border-line hover:border-line-strong focus:border-primary focus:ring-primary/20",
           )}
           {...props}
         />
@@ -205,10 +205,10 @@ export function TextArea({
             .join(" ") || undefined
         }
         className={cn(
-          "mt-2 w-full resize-y rounded-[10px] border bg-surface px-3.5 py-2.5 text-base leading-relaxed text-fg shadow-xs transition-[border-color,box-shadow] duration-150 placeholder:text-subtle hover:border-line-strong focus:ring-[3px] focus:outline-none sm:text-[0.9375rem] dark:bg-surface-2 app:mt-1.5 app:px-3 app:py-2 app:rounded-lg app:sm:text-sm",
+          "mt-2 w-full resize-y rounded-[10px] border bg-surface px-3.5 py-2.5 text-base leading-relaxed text-fg shadow-xs transition-[border-color,box-shadow] duration-150 placeholder:text-subtle focus:ring-[3px] focus:outline-none sm:text-[0.9375rem] dark:bg-surface-2 app:mt-1.5 app:px-3 app:py-2 app:rounded-lg app:sm:text-sm",
           error
             ? "border-danger focus:border-danger focus:ring-danger/15"
-            : "border-line focus:border-primary focus:ring-primary/20",
+            : "border-line hover:border-line-strong focus:border-primary focus:ring-primary/20",
         )}
         {...props}
       />

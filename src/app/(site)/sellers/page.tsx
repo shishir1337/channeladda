@@ -64,7 +64,9 @@ export default async function SellersPage() {
 
       <Section>
         <Container>
-          <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {/* min-w-0 on each item: a grid track is never narrower than its
+              content's nowrap lines, which pushed cards off a 360px screen. */}
+          <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 [&>li]:min-w-0">
             {topSellers.map((seller) => (
               <li key={seller.slug}>
                 <article className="lift-card group relative flex h-full flex-col rounded-card border border-line bg-surface p-5 hover:border-line-strong">
@@ -131,7 +133,7 @@ export default async function SellersPage() {
                     </div>
                   </dl>
 
-                  <p className="mt-4 flex items-center gap-1.5 text-[0.8125rem] text-muted">
+                  <p className="mt-4 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[0.8125rem] text-muted">
                     <TimerIcon
                       aria-hidden="true"
                       className="size-3.5 text-subtle"

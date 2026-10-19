@@ -34,7 +34,7 @@ export function SellerCta() {
               <p className="mt-4 max-w-lg text-[0.9375rem] leading-relaxed text-muted sm:text-base">
                 List for free, put your account in front of active buyers, and
                 let a supervised handover prove you are serious. No listing fee
-                — we only earn when your deal completes.
+                — we earn a fee on deals, never on listings.
               </p>
 
               <ul className="mt-6 flex flex-wrap gap-x-5 gap-y-2.5">

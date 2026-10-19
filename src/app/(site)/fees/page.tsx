@@ -33,7 +33,7 @@ const notCharged = [
   "Publishing a listing",
   "Editing or pausing a listing",
   "Messaging or making offers",
-  "A deal that falls through",
+  "A deal that falls through before our agent takes custody",
 ];
 
 export default async function FeesPage() {

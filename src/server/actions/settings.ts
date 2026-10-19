@@ -41,12 +41,16 @@ export async function saveSettings(
   for (const path of [
     "/fees",
     "/sell",
+    "/affiliates",
+    "/how-it-works",
+    "/",
     "/admin/settings",
     "/dashboard/wallet",
   ]) {
     revalidatePath(path);
   }
   revalidatePath("/listing/[slug]", "page");
+  revalidatePath("/help/[slug]", "page");
   revalidatePath("/dashboard/listings/[id]", "page");
 
   return { ok: true, message: "Saved. New sales use these rates from now on." };

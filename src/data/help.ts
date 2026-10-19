@@ -96,8 +96,8 @@ export const helpArticles: HelpArticle[] = [
     summary:
       "The one-time code you place in your bio or description, and why we check it more than once.",
     body: [
-      "We generate a one-time code and ask you to paste it into your channel description or profile bio. Our system then reads the live account and checks the code is there. A screenshot can be edited; a live read cannot.",
-      "We check the code when you submit it, and a moderator checks the live account again before the listing goes public. Leave the code up until it is approved: a code that was there three weeks ago proves nothing about today.",
+      "We generate a one-time code and ask you to paste it into your channel description or profile bio. On YouTube our system reads the live channel and checks the code is there; on every other platform a moderator opens the live account and looks. A screenshot can be edited; the live account cannot.",
+      "A moderator checks the live account before the listing goes public, even where the code was read automatically. Leave the code up until it is approved: a code that was there three weeks ago proves nothing about today.",
       "You can remove the code once the listing is approved.",
     ],
   },

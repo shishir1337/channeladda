@@ -133,15 +133,15 @@ export const faqs = [
   },
   {
     q: "How do you verify that a seller really owns the account?",
-    a: "Sellers place a one-time Channel Adda verification code in the account description or bio, and our system checks it live. On top of that we require KYC, proof screenshots of the analytics and monetization dashboards, and manual admin approval before a listing goes public.",
+    a: "Sellers place a one-time Channel Adda verification code in the account description or bio, and we check it on the live account: automatically on YouTube, by a moderator on every other platform. On top of that we require KYC, proof screenshots of the analytics and monetization dashboards, and manual admin approval before a listing goes public.",
   },
   {
     q: "What fees does Channel Adda charge?",
-    a: "Buyers pay a platform fee, set by us and shown in full on every listing and on the fees page before you commit. On a Fastest deal the price comes to us too; on a Safest deal you pay it to the seller directly, once our agent holds the account. Sellers pay a success fee on a Fastest deal, taken from the price when it completes; there is no cost to create an account or publish a listing.",
+    a: "Buyers pay a platform fee, set by us and shown in full on every listing and on the fees page before you commit. On a Fastest deal the price comes to us too; on a Safest deal you pay it to the seller directly, once our agent holds the account. If a seller fee is set, the fees page shows it, and it is taken from the price when a Fastest deal completes; there is no cost to create an account or publish a listing.",
   },
   {
     q: "What happens if a transfer goes wrong?",
-    a: "Open a dispute from the order page and the deal freezes where it stands while our moderation team reviews the order-linked chat, proof uploads and transfer log. What a decision can recover depends on the deal: on a Fastest deal we are holding your payment and can return it in full. On a Safest deal we are holding the account, and the price too once you have paid it, so a decision can return the channel to the seller and the price to you. The admin fee is kept once our agent has held the account.",
+    a: "Open a dispute from the order page and the deal freezes where it stands while our moderation team reviews the order-linked chat, proof uploads and transfer log. What a decision can recover depends on the deal: on a Fastest deal we are holding your payment and can return it in full. On a Safest deal we are holding the account, so a decision can return it to the seller, or move it to you if the record shows you paid. We never hold a Safest price — you pay it to the seller directly — so we cannot refund it. The admin fee is kept once our agent has held the account.",
   },
   {
     q: "Can I negotiate the listed price?",
