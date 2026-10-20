@@ -43,3 +43,12 @@ test("a converted amount stays whole once it is large, as listing prices are", (
   if (!bdt) throw new Error("BDT missing from the currency list");
   expect(formatIn(bdt, 816.8)).not.toMatch(/[.,]\d{2}$/);
 });
+
+test("a compact amount renders: $74K, not a crash", () => {
+  // Found on the sold page right after the two-decimals change: a compact
+  // figure kept the two-decimal minimum against its one-decimal maximum, and
+  // Intl threw "maximumFractionDigits value is out of range".
+  expect(formatIn(usd, 74_000, { compact: true })).toBe("$74K");
+  expect(formatIn(usd, 43_775, { compact: true })).toBe("$43.8K");
+  expect(formatIn(usd, 2_220, { compact: true })).toBe("$2,220.00");
+});

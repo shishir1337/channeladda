@@ -149,8 +149,14 @@ export function formatIn(
   const numberOpts: Intl.NumberFormatOptions = {
     maximumFractionDigits,
     minimumFractionDigits: showCents ? 2 : 0,
+    // A compact figure ("$43.8K") is a summary, not an amount to the cent, and
+    // Intl throws when the minimum is left above its one-decimal maximum.
     ...(opts?.compact && amount >= 10_000
-      ? { notation: "compact" as const, maximumFractionDigits: 1 }
+      ? {
+          notation: "compact" as const,
+          minimumFractionDigits: 0,
+          maximumFractionDigits: 1,
+        }
       : {}),
   };
 
