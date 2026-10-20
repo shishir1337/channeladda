@@ -52,7 +52,7 @@ export const ENDINGS: readonly Ending[] = [
     applies: (mode) => mode !== "FASTEST",
     consequence: (mode) =>
       mode === "FASTEST"
-        ? "Safest only. On a Fastest deal the agent never owns the channel, so there is nothing to hand back."
+        ? "Safest only. A Fastest deal is refunded instead, and our agent leaves the channel with the seller."
         : "The agent gives ownership back to the seller and the buyer ends up with no channel. The admin fee goes back to the buyer unless our agent has taken custody, when it is kept for the work. We never held the price: what the buyer paid the seller directly is between them. Refused once the seller has pressed Received.",
   },
   {
@@ -63,7 +63,7 @@ export const ENDINGS: readonly Ending[] = [
     consequence: (mode) =>
       mode === "SAFEST"
         ? "Fastest only. On a Safest deal we hold only the admin fee; return the channel to the seller instead."
-        : "Returns the price and the fee we are holding to the buyer. The seller is paid nothing.",
+        : "Returns the price and the fee we are holding to the buyer, and our agent removes the buyer and themselves from the channel. The seller is paid nothing. Refused once our agent holds the channel: the seller has been paid by then, so finish the deal instead.",
   },
   {
     to: "CANCELLED",
@@ -71,7 +71,7 @@ export const ENDINGS: readonly Ending[] = [
     weight: "final",
     consequence: (mode) =>
       mode === "FASTEST"
-        ? "Ends it and frees the listing. If the buyer has paid, everything we are holding — price and fee — goes back to their balance."
+        ? "Ends it and frees the listing. If the buyer has paid, everything we are holding — price and fee — goes back to their balance. Refused once our agent holds the channel."
         : mode === "SAFEST"
           ? "Ends it and frees the listing. Before our agent holds the channel, the admin fee goes back to the buyer. Once the agent holds it, this is refused — return the channel instead."
           : "Ends it and frees the listing, returning whatever we are holding for the buyer.",
@@ -82,7 +82,7 @@ export const ENDINGS: readonly Ending[] = [
     weight: "money",
     consequence: (mode) =>
       mode === "FASTEST"
-        ? "Marks the deal complete and credits the seller's wallet with the money we are holding. This pays out, so it is refused until the seller has made the buyer primary owner."
+        ? "Marks the deal complete: our agent makes the buyer primary owner. The seller was paid when our agent became primary owner, so nothing more is paid out here. Refused until our agent holds the channel."
         : mode === "SAFEST"
           ? "Marks the deal complete: our agent hands the channel to the buyer, and the admin fee becomes ours. We never held the price, so nobody is paid it from here. Refused until the buyer has pressed Paid."
           : "Marks the deal complete. On a Fastest deal this also credits the seller's wallet with the money we are holding.",

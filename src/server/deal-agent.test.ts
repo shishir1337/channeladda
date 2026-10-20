@@ -94,12 +94,12 @@ test(
 );
 
 test(
-  "holds count only safest orders the agent is still holding",
+  "holds count the channels the agent still has, in either mode",
   withCleanDb(async () => {
     const agent = await seedUser("AGENT");
 
-    // One per holding state, plus a completed one and a Fastest one, which
-    // tie up no channel.
+    // One per Safest holding state, plus a completed one, which ties up no
+    // channel.
     for (const status of [...HOLDING, "COMPLETED" as OrderStatus]) {
       const { orderId } = await dealFor("SAFEST");
       await db.order.update({
@@ -107,13 +107,18 @@ test(
         data: { agentId: agent.id, status },
       });
     }
-    const fastest = await dealFor("FASTEST");
-    await db.order.update({
-      where: { id: fastest.orderId },
-      data: { agentId: agent.id, status: "AWAITING_HANDOVER" },
-    });
+    // A Fastest agent owns the channel too, from the seller's invite until
+    // they hand it to the buyer: invited as owner during the holding period
+    // counts, a finished one does not.
+    for (const status of ["AWAITING_HANDOVER", "COMPLETED"] as const) {
+      const fastest = await dealFor("FASTEST");
+      await db.order.update({
+        where: { id: fastest.orderId },
+        data: { agentId: agent.id, status },
+      });
+    }
 
-    expect(await holdsFor(agent.id)).toBe(HOLDING.length);
+    expect(await holdsFor(agent.id)).toBe(HOLDING.length + 1);
   }),
 );
 

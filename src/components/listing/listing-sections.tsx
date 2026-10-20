@@ -163,10 +163,11 @@ export function TransferPanel({ platform }: { platform: Platform }) {
         ))}
       </ol>
       <p className="mt-5 rounded-xl border border-line bg-bg-subtle p-4 text-[0.8125rem] leading-relaxed text-muted">
-        On a Fastest deal you are a manager for{" "}
-        <span className="font-semibold text-fg">{platform.holdDays} days</span>{" "}
-        before you are made primary owner, and the seller is paid only after
-        that.{" "}
+        On a Fastest deal our agent takes the channel from the seller. You are
+        invited as owner for{" "}
+        <span className="font-semibold text-fg">{platform.holdDays} days</span>,
+        then our agent becomes primary owner, the seller is paid, and our agent
+        makes you primary owner.{" "}
         <Link
           href="/how-it-works"
           className="font-medium text-fg underline underline-offset-4 decoration-line-strong hover:decoration-fg"

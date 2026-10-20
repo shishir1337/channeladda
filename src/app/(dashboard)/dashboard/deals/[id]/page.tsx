@@ -29,6 +29,7 @@ import {
 import { DealSteps, RaiseDispute } from "@/components/deals/deal-timeline";
 import { HandoverAccount } from "@/components/deals/handover-account";
 import { PayNow } from "@/components/deals/pay-now";
+import { PayToCard } from "@/components/deals/pay-to";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Price } from "@/components/ui/price";
@@ -79,6 +80,7 @@ export default async function DealPage({
     deal.mode,
     viewer,
     deal.nextStep?.position ?? null,
+    deal.platform,
   );
   const sentence = headline.sentence;
 
@@ -149,12 +151,15 @@ export default async function DealPage({
                 </Link>
               </Button>
             ) : null}
-            <Button asChild variant="ghost" size="md">
-              <Link href={`/listing/${deal.listingSlug}`}>
-                View the listing
-                <ExternalLinkIcon aria-hidden="true" />
-              </Link>
-            </Button>
+            {/* A sold listing's page is a 404: nothing to send them to. */}
+            {deal.listingOnSale ? (
+              <Button asChild variant="ghost" size="md">
+                <Link href={`/listing/${deal.listingSlug}`}>
+                  View the listing
+                  <ExternalLinkIcon aria-hidden="true" />
+                </Link>
+              </Button>
+            ) : null}
           </>
         }
       />
@@ -214,6 +219,8 @@ export default async function DealPage({
             form together can be taller than a laptop viewport, and a stuck
             column that tall hides its own end. */}
         <div className="mt-4 flex min-w-0 flex-col gap-4 lg:mt-0">
+          {/* Safest only: where the buyer pays the seller directly. */}
+          <PayToCard deal={deal} />
           {/* The account the seller invites. Never shown to the buyer. */}
           <AgentInvite deal={deal} />
           {/* The buyer's account that receives ownership, for whoever

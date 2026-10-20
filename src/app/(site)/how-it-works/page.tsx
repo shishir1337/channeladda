@@ -30,7 +30,7 @@ export default function HowItWorksPage() {
         <Container>
           <SectionHeading
             title="Why the wait is different on every platform"
-            description="On a Fastest deal you are a manager for the whole holding period before you become primary owner, and the seller is paid only after that. On YouTube it is Google's own wait before a manager can be made primary owner."
+            description="On a Fastest deal our agent takes the account from the seller and you are invited as owner for the whole holding period. Then our agent becomes primary owner, the seller is paid, and our agent makes you primary owner. On YouTube it is Google's own 7-day wait before a new owner can be made primary owner."
           />
 
           <div className="mt-8 overflow-x-auto rounded-card border border-line bg-surface sm:mt-10">

@@ -68,14 +68,14 @@ export const platforms: Platform[] = [
     blurb:
       "Monetized and faceless YouTube channels with verified watch time, revenue history and a clean strike record. Every channel is checked for ownership before it is listed, and we confirm whether it sits on a Brand Account before a sale can start.",
     transferNote:
-      "A Brand Account channel moves cleanly: you are invited as a manager, then promoted to primary owner once Google’s waiting period passes. Channels on a personal Google account cannot be transferred this way, so we flag them separately.",
+      "A Brand Account channel moves cleanly: the seller invites our agent as owner, and after Google’s 7-day waiting period our agent becomes primary owner and transfers the channel to you. Channels on a personal Google account cannot be transferred this way, so we flag them separately.",
     holdDays: 7,
     transferSteps: [
-      "Seller invites your Google account as a channel manager",
-      "Google’s waiting period passes before ownership can move",
-      "Seller promotes you to primary owner of the Brand Account",
+      "Seller invites our agent’s Google account as an owner",
+      "Google’s 7-day waiting period passes before ownership can move",
+      "Seller makes our agent primary owner of the Brand Account",
+      "Our agent makes your Google account primary owner and removes the seller",
       "You change the recovery email and phone, then enable 2FA",
-      "Seller is removed from the channel permissions entirely",
     ],
     ownershipCheck: {
       place: "your channel description",

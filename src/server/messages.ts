@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { OfferStatus, Platform } from "@/generated/prisma/enums";
+import { OPENING_MESSAGE } from "@/lib/chat-opening";
 import { isCustodianRole } from "@/lib/custody-roles";
 import { db } from "@/lib/db";
 import { MAX_MESSAGE } from "@/lib/messages";
@@ -95,6 +96,12 @@ export type Thread = {
   listingPlatform: Platform;
   /** The account's own page, as the seller gave it; checked before it is linked. */
   listingSourceUrl: string | null;
+  /**
+   * Whether the listing's public page exists: on sale or reserved. A sold
+   * listing's page is a 404, which the buyer who just bought it was sent to
+   * from their own deal chat.
+   */
+  listingOnSale: boolean;
   buyerId: string;
   sellerId: string;
   buyerName: string;
@@ -135,19 +142,18 @@ function isStaff(user: CurrentUser) {
  * leave a seller with three threads, and staff reviewing a dispute should have
  * one place to read the whole history.
  */
-/**
- * What a new thread starts with.
- *
- * Deliberately a real question rather than "hi": it is sent as the buyer, and
- * a seller who opens their inbox should find something they can answer in one
- * reply instead of an opener that costs a round trip.
- */
-export const OPENING_MESSAGE =
-  "Hi — I'm interested in this one. Is it still available, and is there anything about the account or the handover I should know before I make an offer?";
+// What a new thread starts with; shared with the listing page, which offers
+// it to the buyer to edit.
+export { OPENING_MESSAGE };
 
 export async function openConversation(input: {
   listingId: string;
   buyerId: string;
+  /**
+   * Write the standard opener as the buyer. False when the buyer's own
+   * question follows at once, through `sendMessage` — see `askSeller`.
+   */
+  opening?: boolean;
 }): Promise<
   { ok: true; id: string } | { ok: false; reason: "not-found" | "own-listing" }
 > {
@@ -180,12 +186,16 @@ export async function openConversation(input: {
         // as a question rather than as an empty row. An empty thread tells
         // the seller somebody looked and nothing more, and it gives the buyer
         // a blank box to work out what to say into.
-        messages: {
-          create: {
-            senderId: input.buyerId,
-            body: OPENING_MESSAGE,
-          },
-        },
+        ...(input.opening === false
+          ? {}
+          : {
+              messages: {
+                create: {
+                  senderId: input.buyerId,
+                  body: OPENING_MESSAGE,
+                },
+              },
+            }),
       },
       select: { id: true },
     });
@@ -217,6 +227,48 @@ export async function openConversation(input: {
 }
 
 /**
+ * A buyer asking the seller something, in their own words.
+ *
+ * The listing's "Ask the seller a question" used to post the standard opener
+ * on one click, before the buyer could change a word of it. The question now
+ * goes through `sendMessage` like any other message, so contact details are
+ * filtered out of it, and it lands in the thread whether that thread is new
+ * or the one they already have.
+ */
+export async function askSeller(input: {
+  listingId: string;
+  buyer: CurrentUser;
+  question: string;
+}): Promise<
+  | { ok: true; id: string }
+  | {
+      ok: false;
+      reason: "not-found" | "own-listing" | SendFailure;
+    }
+> {
+  // Checked before the thread exists, so a refused question leaves no
+  // empty thread in the seller's inbox.
+  const question = input.question.trim();
+  if (!question) return { ok: false, reason: "empty" };
+  if (question.length > MAX_MESSAGE) return { ok: false, reason: "too-long" };
+
+  const opened = await openConversation({
+    listingId: input.listingId,
+    buyerId: input.buyer.id,
+    opening: false,
+  });
+  if (!opened.ok) return opened;
+
+  const sent = await sendMessage({
+    conversationId: opened.id,
+    sender: input.buyer,
+    body: question,
+  });
+  if (!sent.ok) return { ok: false, reason: sent.reason };
+  return { ok: true, id: opened.id };
+}
+
+/**
  * Read a thread, if this person is allowed to.
  *
  * Not being a participant returns null rather than an error: a stranger
@@ -244,6 +296,7 @@ export async function getThread(
           priceUsd: true,
           platform: true,
           sourceUrl: true,
+          status: true,
         },
       },
       buyer: { select: { id: true, name: true } },
@@ -294,6 +347,8 @@ export async function getThread(
     listingPrice: row.listing.priceUsd,
     listingPlatform: row.listing.platform,
     listingSourceUrl: row.listing.sourceUrl,
+    listingOnSale:
+      row.listing.status === "LIVE" || row.listing.status === "RESERVED",
     buyerId: row.buyerId,
     sellerId: row.sellerId,
     buyerName: row.buyer.name,
@@ -562,17 +617,16 @@ export async function countFlaggedThreads(): Promise<number> {
   return db.conversation.count({ where: { flaggedAt: { not: null } } });
 }
 
+type SendFailure =
+  | "not-allowed"
+  | "bad-attachment"
+  | "empty"
+  | "too-long"
+  | "closed";
+
 export type SendResult =
   | { ok: true; redactedKinds: RedactionKind[] }
-  | {
-      ok: false;
-      reason:
-        | "not-allowed"
-        | "bad-attachment"
-        | "empty"
-        | "too-long"
-        | "closed";
-    };
+  | { ok: false; reason: SendFailure };
 
 /**
  * Post a message.

@@ -38,7 +38,9 @@ const STATUS: Record<
   RESERVED: {
     label: "Reserved",
     variant: "info",
-    note: "An offer was accepted and the buyer is paying.",
+    // Reserved from the moment a deal opens until it ends, offer or not, so
+    // "the buyer is paying" was wrong for most of it.
+    note: "A deal is running for this listing. It stays off the market until the deal ends.",
   },
   SOLD: {
     label: "Sold",

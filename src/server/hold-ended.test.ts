@@ -29,10 +29,11 @@ async function inHold(mode: "SAFEST" | "FASTEST") {
     data: { agentId: seeded.agent.id },
   });
   await recordOpeningPayment(created.orderId, `pay-${created.orderId}`, "USDT");
-  const confirmer = mode === "SAFEST" ? seeded.agent : seeded.buyer;
+  // The seller invites our agent; our agent's step starts the hold, in both
+  // modes.
   for (const [position, userId] of [
     [2, seeded.seller.id],
-    [3, confirmer.id],
+    [3, seeded.agent.id],
   ] as const) {
     const done = await advanceStep({
       orderId: created.orderId,
@@ -97,14 +98,14 @@ test(
 );
 
 test(
-  "when the holding period ends, the Fastest seller is told to make the buyer primary owner",
+  "when the holding period ends, the Fastest seller is told to make our agent primary owner",
   withCleanDb(async () => {
     const { orderId, seller } = await inHold("FASTEST");
     await passHold(orderId);
     expect(await announceEndedHolds()).toBe(1);
     expect(
       (await turns(seller.id)).filter((t) =>
-        t.title.startsWith("Make the buyer primary owner"),
+        t.title.startsWith("Make the agent primary owner"),
       ),
     ).toHaveLength(1);
   }),

@@ -167,13 +167,13 @@ export function ClaimDeal({
   return (
     <ControlBox
       title="Take this deal"
-      hint="You become the agent of record. On a Safest deal that means you personally own the channel until you transfer it on."
+      hint="You become the agent of record. On both kinds of deal the seller invites you as owner, and you personally own the channel until you transfer it on to the buyer."
     >
       <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
         <TextField
           id={ids.email}
           name="agentEmail"
-          label="Google account to invite"
+          label="Account the seller invites"
           hint={
             locked
               ? "Your transfer identity, set by a superadmin."
@@ -423,7 +423,7 @@ export function AssignAgent({
         <TextField
           id={ids.email}
           name="agentEmail"
-          label="Google account to invite"
+          label="Account the seller invites"
           hint={locked ? "Their stored identity." : undefined}
           value={email}
           onChange={(e) => setEmail(e.target.value)}

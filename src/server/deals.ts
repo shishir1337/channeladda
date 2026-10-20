@@ -6,12 +6,14 @@ import type {
   Platform,
   UserRole,
 } from "@/generated/prisma/enums";
+import { money } from "@/lib/chat-events";
 import { isCustodianRole, withinLevel } from "@/lib/custody-roles";
 import { db } from "@/lib/db";
 import {
   AGENT_HOLDS,
   canTransition,
   type DealActor,
+  FASTEST_AGENT_HOLDS,
   isTerminal,
   TERMINAL_STATUSES,
 } from "@/lib/deal-machine";
@@ -25,6 +27,7 @@ import { orderAmounts } from "@/lib/fees";
 import { parseHandoverTo } from "@/lib/handover-target";
 import { keptFee, requiredHold } from "@/lib/holds";
 import { movesHeldMoney } from "@/lib/outcomes";
+import { BUYER_PAYS_AFTER_STEP, payToVisibleTo } from "@/lib/pay-to";
 import { isSerializationFailure } from "@/lib/serialization-failure";
 import { keyFromUrl } from "@/lib/upload-keys";
 import { recordAudit } from "@/server/audit";
@@ -34,7 +37,7 @@ import {
   notifyHandoverChanged,
   notifyNextActor,
 } from "@/server/deal-notify";
-import { notifyStaff } from "@/server/notifications";
+import { notify, notifyStaff } from "@/server/notifications";
 import {
   heldByAcceptedOffer,
   notifyClosedOffers,
@@ -85,8 +88,12 @@ export type DealFailure =
   | "price-not-paid"
   /** The seller said the money arrived: the channel cannot go back to them. */
   | "already-paid"
-  /** Fastest: the seller has not made the buyer primary owner yet. */
+  /** Fastest: our agent is not primary owner yet, so the seller is unpaid. */
   | "not-handed-over"
+  /** Fastest: the seller was paid when our agent became primary owner. */
+  | "seller-paid"
+  /** The step brings our agent in, and nobody has been assigned yet. */
+  | "no-agent"
   /** Opened under an earlier template: its steps are not the code's. */
   | "old-steps"
   /** The deal's hold — Google's wait, or the holding period — is running. */
@@ -985,36 +992,39 @@ const STEP_TIMESTAMP: Partial<
     // us, so these two moments are the whole record of it.
     6: "buyerPaidAt",
     7: "sellerConfirmedAt",
-    9: "handoverAt",
+    8: "handoverAt",
   },
-  FASTEST: { 5: "handoverAt" },
+  // Our agent becoming primary owner, which pays the seller, and the
+  // channel reaching the buyer.
+  FASTEST: { 5: "custodyAt", 6: "handoverAt" },
 };
 
 /**
- * How many channels this agent is holding right now.
+ * How many channels this agent is holding right now, in either mode.
  *
- * Only Safest counts. A Fastest agent supervises the handover and never takes
- * the channel, so they tie up nothing that has to be given back.
+ * A Fastest agent owns the channel too, from the seller's invite until they
+ * hand it to the buyer, so both count against the same cap.
  */
 export async function holdsFor(agentId: string): Promise<number> {
-  return db.order.count({
-    where: {
-      agentId,
-      mode: "SAFEST",
-      // A dispute does not hand the channel back. DISPUTED is not in
-      // AGENT_HOLDS and a buyer may dispute for free, so leaving it out let
-      // an agent at their cap take as many channels again as they had
-      // disputes — while still owning the first lot.
-      OR: [
-        { status: { in: [...AGENT_HOLD_STATUSES] } },
-        { status: "DISPUTED", custodyAt: { not: null } },
-      ],
-    },
-  });
+  return db.order.count({ where: { agentId, ...HELD_CHANNEL } });
 }
 
-/** The same list the transition table uses, so the two cannot drift. */
-const AGENT_HOLD_STATUSES = AGENT_HOLDS;
+/**
+ * The orders whose channel an agent holds, as a Prisma filter. The same
+ * lists the transition table uses, so the two cannot drift.
+ *
+ * A dispute does not hand the channel back. DISPUTED is in neither list and
+ * a buyer may dispute for free, so leaving it out let an agent at their cap
+ * take as many channels again as they had disputes — while still owning the
+ * first lot.
+ */
+const HELD_CHANNEL = {
+  OR: [
+    { mode: "SAFEST" as const, status: { in: [...AGENT_HOLDS] } },
+    { mode: "FASTEST" as const, status: { in: [...FASTEST_AGENT_HOLDS] } },
+    { status: "DISPUTED" as const, custodyAt: { not: null } },
+  ],
+};
 
 /**
  * Put an agent on a deal.
@@ -1088,17 +1098,13 @@ export async function assignAgent(input: {
         const held = await tx.order.count({
           where: {
             agentId: input.agentId,
-            mode: "SAFEST",
-            // Same rule as countHeld: a disputed channel is still held.
-            OR: [
-              { status: { in: [...AGENT_HOLD_STATUSES] } },
-              { status: "DISPUTED", custodyAt: { not: null } },
-            ],
+            // Same rule as holdsFor: a disputed channel is still held.
+            ...HELD_CHANNEL,
             // Reassigning this very order is not a new channel to hold.
             id: { not: order.id },
           },
         });
-        if (order.mode === "SAFEST" && held >= settings.maxHoldsPerAgent) {
+        if (held >= settings.maxHoldsPerAgent) {
           throw new DealAbort("cap-reached");
         }
 
@@ -1180,8 +1186,11 @@ export async function advanceStep(input: {
       totalUsd: true,
       paymentRef: true,
       buyerPaymentRef: true,
+      custodyAt: true,
       holdUntil: true,
       conversationId: true,
+      reference: true,
+      sellerPayTo: true,
       listing: { select: { platform: true } },
       steps: {
         orderBy: { position: "asc" },
@@ -1240,6 +1249,12 @@ export async function advanceStep(input: {
   );
   if (!template) return { ok: false, reason: "wrong-step" };
   if (template.actor !== actor) return { ok: false, reason: "wrong-actor" };
+
+  // The seller cannot invite an agent who is not there yet. Until one is
+  // assigned the step shows that Channel Adda is assigning one.
+  if (template.needsAgent && !order.agentId) {
+    return { ok: false, reason: "no-agent" };
+  }
 
   if (
     template.entersStatus &&
@@ -1319,6 +1334,10 @@ export async function advanceStep(input: {
       });
       if (moved.count !== 1) throw new DealAbort("wrong-step");
 
+      // Fastest: our agent is primary owner, so the channel is out of the
+      // seller's hands and the buyer's money is theirs now — before the deal
+      // ends, which is our agent handing the channel on.
+      if (template.paysSeller) await settleHold(tx, order);
       if (completing) await completeOrder(tx, order);
 
       // The record, in the conversation: the step, by whoever did it, and
@@ -1350,6 +1369,13 @@ export async function advanceStep(input: {
             senderId: null,
           });
         }
+        if (template.paysSeller) {
+          await postEvent(tx, {
+            ...line(1),
+            event: { type: "seller-paid" },
+            senderId: null,
+          });
+        }
         if (completing) {
           await postEvent(tx, {
             ...line(2),
@@ -1369,6 +1395,46 @@ export async function advanceStep(input: {
   // were in had finished. Everyone on it does now.
   if (completing) {
     await notifyDealEnded(order.id, RESOLUTION_LABELS.COMPLETED);
+  }
+  // Our agent has verified the channel and the buyer pays the seller next.
+  // A seller who never said where is reminded — once, because this step
+  // completes once — or the buyer arrives at their turn with nowhere to
+  // send it.
+  if (
+    order.mode === "SAFEST" &&
+    input.position === BUYER_PAYS_AFTER_STEP &&
+    !order.sellerPayTo
+  ) {
+    const title = "The buyer is ready to pay you — add where to be paid";
+    const body =
+      "Our agent has verified the channel and the buyer pays you next. Say where they should send the money, on the deal.";
+    await notify({
+      userId: order.sellerId,
+      kind: "ORDER",
+      title,
+      body,
+      href: order.conversationId
+        ? `/dashboard/messages/${order.conversationId}`
+        : `/dashboard/deals/${order.id}`,
+      email: { subject: title, body },
+    });
+  }
+
+  // For a Fastest seller this is the end of their deal: the money has
+  // landed. By email too, because it is the one thing they were waiting for.
+  if (template.paysSeller) {
+    const title = `You have been paid for ${order.reference}`;
+    const body = `${money(order.priceUsd - order.sellerFeeUsd)} is in your Channel Adda wallet. Our agent makes the buyer primary owner next.`;
+    await notify({
+      userId: order.sellerId,
+      kind: "ORDER",
+      title,
+      body,
+      href: order.conversationId
+        ? `/dashboard/messages/${order.conversationId}`
+        : `/dashboard/deals/${order.id}`,
+      email: { subject: title, body },
+    });
   }
 
   await recordAudit({
@@ -1424,6 +1490,7 @@ type CompletableOrder = {
   totalUsd: number;
   paymentRef: string | null;
   buyerPaymentRef: string | null;
+  custodyAt: Date | null;
 };
 
 /**
@@ -1439,6 +1506,22 @@ type CompletableOrder = {
  * the wallet phase that does.
  */
 async function completeOrder(tx: Tx, order: CompletableOrder) {
+  await settleHold(tx, order);
+  await tx.listing.update({
+    where: { id: order.listingId },
+    data: { status: "SOLD" },
+  });
+}
+
+/**
+ * Paying out whatever the platform still holds for a deal: the seller's
+ * price, our fee, and any seller fee.
+ *
+ * Completion runs this, and so does a Fastest deal's custody step, which
+ * pays the seller before the deal ends. Whichever comes second finds nothing
+ * held and writes nothing, so a seller can never be paid twice.
+ */
+async function settleHold(tx: Tx, order: CompletableOrder) {
   // Everything paid in is released at once, so it has to be exactly what the
   // deal says was paid in. A deal whose books disagree stops here rather than
   // crediting a seller from money that never arrived.
@@ -1446,11 +1529,7 @@ async function completeOrder(tx: Tx, order: CompletableOrder) {
   if ((await platformHoldFor(tx, order.id)) !== held) {
     throw new DealAbort("books-mismatch");
   }
-
-  await tx.listing.update({
-    where: { id: order.listingId },
-    data: { status: "SOLD" },
-  });
+  if (held === 0) return;
 
   // The seller is paid from the hold only when the price is in it: on
   // Fastest. A Safest buyer paid the seller directly, so there the hold is
@@ -1786,15 +1865,22 @@ export async function resolveDeal(input: {
     return { ok: false, reason: "in-custody" };
   }
 
-  // Paying a Fastest seller from a dispute before they have made the buyer
-  // primary owner would leave them with the money and the channel both. The
-  // Safest guard above is the same rule from the other side.
+  // Paying a Fastest seller from a dispute before our agent is primary
+  // owner would leave them with the money and the channel both. The Safest
+  // guard above is the same rule from the other side.
   if (
     input.to === "COMPLETED" &&
     order.mode === "FASTEST" &&
-    !(await stepDone(order.id, "FASTEST", "handsOver"))
+    !order.custodyAt
   ) {
     return { ok: false, reason: "not-handed-over" };
+  }
+
+  // A Fastest seller was paid when our agent became primary owner. There is
+  // nothing left to refund: the deal can only be finished, by our agent
+  // handing the channel to the buyer.
+  if (input.to === "REFUNDED" && order.mode === "FASTEST" && order.custodyAt) {
+    return { ok: false, reason: "seller-paid" };
   }
 
   // Handing the channel back once the **seller** has said the buyer's
@@ -2081,6 +2167,7 @@ export type DealListRow = {
    */
   waitingUntil: Date | null;
   createdAt: Date;
+  platform: Platform;
 };
 
 /**
@@ -2107,7 +2194,7 @@ export async function listDealsFor(userId: string): Promise<DealListRow[]> {
       agentId: true,
       holdUntil: true,
       createdAt: true,
-      listing: { select: { title: true } },
+      listing: { select: { title: true, platform: true } },
       buyer: { select: { name: true } },
       seller: { select: { name: true } },
       steps: {
@@ -2121,6 +2208,16 @@ export async function listDealsFor(userId: string): Promise<DealListRow[]> {
 
   const now = new Date();
   return orders.map((order) => {
+    const open = order.steps[0];
+    // The seller's step that brings our agent in waits on Channel Adda
+    // until an agent is assigned: there is nobody for the seller to invite.
+    const waitsForAgent =
+      open !== undefined &&
+      !order.agentId &&
+      Boolean(
+        templateFor(order.mode).find((s) => s.position === open.position)
+          ?.needsAgent,
+      );
     const side =
       order.buyerId === userId
         ? ("buyer" as const)
@@ -2140,7 +2237,9 @@ export async function listDealsFor(userId: string): Promise<DealListRow[]> {
       side,
       awaiting: isTerminal(order.status)
         ? null
-        : ((order.steps[0]?.actor as DealActor) ?? null),
+        : waitsForAgent
+          ? "staff"
+          : ((open?.actor as DealActor) ?? null),
       openStep: isTerminal(order.status)
         ? null
         : (order.steps[0]?.position ?? null),
@@ -2149,6 +2248,7 @@ export async function listDealsFor(userId: string): Promise<DealListRow[]> {
           ? order.holdUntil
           : null,
       createdAt: order.createdAt,
+      platform: order.listing.platform,
     };
   });
 }
@@ -2194,6 +2294,8 @@ export type DealView = {
   holdUntil: Date | null;
   listingTitle: string;
   listingSlug: string;
+  /** The listing's public page exists: on sale or reserved, not sold. */
+  listingOnSale: boolean;
   buyerName: string;
   sellerName: string;
   agentName: string | null;
@@ -2222,6 +2324,17 @@ export type DealView = {
    */
   handoverInUse: boolean;
   platform: Platform;
+  /**
+   * Safest only: where the buyer pays the seller, in the seller's words.
+   * Null when this viewer may not see it yet — the buyer, before their turn
+   * to pay — as well as when nothing has been said.
+   */
+  sellerPayTo: string | null;
+  sellerPayToAt: Date | null;
+  /** Changed after the buyer could see it: the buyer is warned. */
+  payToChangedWhileVisible: boolean;
+  /** The buyer's turn to pay the seller has come (it stays come). */
+  buyerPayStepReached: boolean;
 };
 
 /**
@@ -2256,7 +2369,12 @@ export async function getDealFor(
       conversationId: true,
       createdAt: true,
       handoverTo: true,
-      listing: { select: { title: true, slug: true, platform: true } },
+      sellerPayTo: true,
+      sellerPayToAt: true,
+      sellerPayToChangedAt: true,
+      listing: {
+        select: { title: true, slug: true, platform: true, status: true },
+      },
       buyer: { select: { name: true } },
       seller: { select: { name: true } },
       agent: { select: { name: true } },
@@ -2278,6 +2396,18 @@ export async function getDealFor(
     paymentWindowHours,
     now: new Date(),
   });
+
+  // The seller's payment details, for whoever may see them by now. The
+  // buyer's turn is read from the step, not the status, because it stays
+  // reached through a dispute or an ending.
+  const payStepDoneAt =
+    order.mode === "SAFEST"
+      ? (order.steps.find((s) => s.position === BUYER_PAYS_AFTER_STEP)
+          ?.completedAt ?? null)
+      : null;
+  const canSeePayTo =
+    order.mode === "SAFEST" &&
+    payToVisibleTo(viewerRole, payStepDoneAt !== null);
 
   const steps: DealStepView[] = order.steps.map((s) => ({
     position: s.position,
@@ -2302,6 +2432,8 @@ export async function getDealFor(
     holdUntil: order.holdUntil,
     listingTitle: order.listing.title,
     listingSlug: order.listing.slug,
+    listingOnSale:
+      order.listing.status === "LIVE" || order.listing.status === "RESERVED",
     buyerName: order.buyer.name,
     sellerName: order.seller.name,
     agentName: order.agent?.name ?? null,
@@ -2322,13 +2454,21 @@ export async function getDealFor(
       ? null
       : (steps.find((s) => s.completedAt === null) ?? null),
     wait,
-    handoverTo:
-      viewerRole === "seller" && order.mode === "SAFEST"
-        ? null
-        : order.handoverTo,
+    // Only our agent hands the channel to the buyer, in both modes, so the
+    // seller has no use for the buyer's account — and it would be a way to
+    // reach them off the platform.
+    handoverTo: viewerRole === "seller" ? null : order.handoverTo,
     handoverOpen: handoverStillOpen(order.mode, order.status, order.steps),
     handoverInUse: handoverStillNeeded(order.mode, order.status, order.steps),
     platform: order.listing.platform,
+    sellerPayTo: canSeePayTo ? order.sellerPayTo : null,
+    sellerPayToAt: canSeePayTo ? order.sellerPayToAt : null,
+    payToChangedWhileVisible:
+      canSeePayTo &&
+      payStepDoneAt !== null &&
+      order.sellerPayToChangedAt !== null &&
+      order.sellerPayToChangedAt > payStepDoneAt,
+    buyerPayStepReached: payStepDoneAt !== null,
   };
 }
 
@@ -2362,10 +2502,9 @@ function handoverStillNeeded(
 /**
  * The buyer correcting the account that receives ownership.
  *
- * Theirs alone to change, and only while nobody has used it yet. Whoever
- * transfers next — the seller on Fastest, our agent on Safest — hears at
- * once, because an address they already sent an invite to is the one thing
- * they must not miss changing.
+ * Theirs alone to change, and only while nobody has used it yet. Our agent,
+ * who invites it in both modes, hears at once, because an address they
+ * already sent an invite to is the one thing they must not miss changing.
  */
 export async function updateHandoverTo(input: {
   orderId: string;
@@ -2414,7 +2553,9 @@ export async function updateHandoverTo(input: {
     after: { handoverTo: parsed.value },
   });
 
-  const recipientId = order.mode === "FASTEST" ? order.sellerId : order.agentId;
+  // Our agent invites the buyer's account in both modes, so it is our agent
+  // who must not miss a change.
+  const recipientId = order.agentId;
   if (recipientId) {
     await notifyHandoverChanged({
       userId: recipientId,

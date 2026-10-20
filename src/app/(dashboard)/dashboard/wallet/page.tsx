@@ -66,7 +66,7 @@ const KINDS: Record<string, KindWords> = {
   ESCROW_HOLD: {
     title: "Paid into a deal",
     meaning:
-      "Taken from your balance to pay a deal's opening payment — the whole amount on Fastest, our fee on Safest. Channel Adda holds it until the deal finishes.",
+      "Taken from your balance to pay a deal's opening payment — the whole amount on Fastest, our fee on Safest. Channel Adda holds it until it is paid out or returned.",
     icon: LockIcon,
   },
   ESCROW_RELEASE: {
@@ -291,10 +291,10 @@ export default async function WalletPage({
             className="mt-[0.1875rem] size-3.5 shrink-0 text-subtle"
           />
           <p className="max-w-[72ch]">
-            A Fastest sale reaches this balance when its transfer completes. A
-            Safest buyer pays you directly, so it never comes through here.
-            Until then a Fastest buyer&rsquo;s payment is held by Channel Adda
-            and listed under{" "}
+            A Fastest sale reaches this balance once our agent holds the
+            account. A Safest buyer pays you directly, so it never comes through
+            here. Until then a Fastest buyer&rsquo;s payment is held by Channel
+            Adda and listed under{" "}
             <strong className="font-semibold text-fg">
               Held for your sales
             </strong>

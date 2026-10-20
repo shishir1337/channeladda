@@ -579,7 +579,7 @@ export function DisputeCase({
         <p className="mt-0.5 max-w-[72ch] text-xs leading-relaxed text-muted">
           {dispute.mode === "SAFEST"
             ? "Safest: we hold only the admin fee — the price went from the buyer to the seller directly. Returning the channel gives it back to the seller (refused once they pressed Received); finishing the deal hands it to the buyer. The admin fee is kept once our agent has taken custody."
-            : "Fastest: we hold the money, so deciding it either way moves money — the buyer back, or the seller paid."}
+            : "Fastest: until our agent is primary owner we hold the money, so deciding it either way moves money — the buyer back, or the seller paid. After that the seller has been paid, and the only outcome is finishing it."}
         </p>
         {financesCall && !canMoveMoney ? (
           <Callout

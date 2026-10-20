@@ -46,6 +46,33 @@ export async function startConversation(
   return { ok: true, conversationId: result.id };
 }
 
+/**
+ * Ask a seller about a listing, in the buyer's own words. Opens the thread
+ * the first time, and adds to it after.
+ */
+export async function askSellerQuestion(
+  listingId: string,
+  question: string,
+): Promise<StartResult> {
+  const user = await requireUser();
+  const result = await repo.askSeller({ listingId, buyer: user, question });
+  if (!result.ok) {
+    const errors = {
+      "not-found": "That listing is no longer here.",
+      "own-listing": "This is your own listing.",
+      empty: "Write your question first.",
+      "too-long": `Keep it under ${repo.MAX_MESSAGE.toLocaleString("en-US")} characters.`,
+      closed: "This conversation has been closed by Channel Adda.",
+      "not-allowed": "You cannot message the seller about this listing.",
+      "bad-attachment": "That attachment could not be used.",
+    } as const;
+    return { ok: false, error: errors[result.reason] };
+  }
+
+  revalidatePath("/dashboard/messages");
+  return { ok: true, conversationId: result.id };
+}
+
 export async function postMessage(
   conversationId: string,
   body: string,

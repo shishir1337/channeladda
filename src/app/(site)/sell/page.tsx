@@ -37,7 +37,7 @@ const steps = [
   },
   {
     title: "Get paid, either way",
-    body: "On a Fastest deal the buyer's money is with us before you hand anything over, and reaches your Channel Adda balance once they are primary owner. On a Safest deal you give the account to our agent first, the buyer pays you directly, and our agent hands it on only after you confirm the money arrived. Either way you never hand over an account you have not been paid for.",
+    body: "On a Fastest deal the buyer's money is with us before you hand anything over, and reaches your Channel Adda balance once our agent holds it. On a Safest deal you give the account to our agent first, the buyer pays you directly, and our agent hands it on only after you confirm the money arrived. Either way you never hand over an account you have not been paid for.",
   },
 ];
 
@@ -116,7 +116,7 @@ export default async function SellPage() {
                 title="What you actually take home"
                 description={
                   fees.sellerFeeBp > 0
-                    ? "No listing fee and no monthly cost. A success fee is deducted only when a Fastest deal completes, and the buyer pays their own fee on top of your asking price."
+                    ? "No listing fee and no monthly cost. A success fee is deducted only when a Fastest sale is paid out, and the buyer pays their own fee on top of your asking price."
                     : "No listing fee, no monthly cost and no seller fee. The buyer pays their own fee on top of your asking price."
                 }
               />
@@ -214,7 +214,7 @@ export default async function SellPage() {
               {
                 icon: WalletIcon,
                 title: "Paid in crypto",
-                body: "A Fastest sale reaches your Channel Adda balance when the deal completes, and you withdraw it to your own crypto wallet through Cryptomus.",
+                body: "A Fastest sale reaches your Channel Adda balance once our agent holds the account, and you withdraw it to your own crypto wallet through Cryptomus.",
               },
             ].map((item) => (
               <div

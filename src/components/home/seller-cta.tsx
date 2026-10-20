@@ -17,7 +17,7 @@ const sellerSteps = [
   {
     step: "3",
     title: "Get paid, either way",
-    body: "On a Fastest deal the money lands in your Channel Adda wallet once the buyer is primary owner, and you withdraw it to your own crypto wallet. On a Safest deal the buyer pays you directly once our agent holds the account — and it moves to them only after you confirm the money arrived.",
+    body: "On a Fastest deal the money lands in your Channel Adda wallet once our agent holds the account, and you withdraw it to your own crypto wallet. On a Safest deal the buyer pays you directly once our agent holds the account — and our agent transfers it to them only after you confirm the money arrived.",
   },
 ];
 

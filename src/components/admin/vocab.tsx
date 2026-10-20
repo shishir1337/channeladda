@@ -55,22 +55,22 @@ export const ORDER_STATUS: Record<
     note: "The buyer owes the opening payment. Nothing has moved yet.",
   },
   AGENT_VERIFYING: {
-    label: "Adding the buyer",
+    label: "Handing over to us",
     variant: "info",
     whose: "seller",
-    note: "Fastest. We hold the money while the seller adds the buyer as a manager and the buyer confirms it.",
+    note: "Fastest. We hold the money while the seller invites the agent as owner and the agent invites the buyer.",
   },
   AWAITING_CUSTODY: {
     label: "Awaiting custody",
     variant: "info",
     whose: "seller",
-    note: "Safest. The seller adds the agent as manager, Google's wait runs, then the seller makes the agent primary owner.",
+    note: "Safest. The seller invites the agent as owner, Google's wait runs, the seller makes the agent primary owner, and the agent verifies the channel.",
   },
   IN_CUSTODY: {
     label: "In custody",
     variant: "primary",
     whose: "buyer",
-    note: "Safest. The agent owns the channel while the buyer pays the seller directly and the seller confirms it arrived.",
+    note: "The agent owns the channel. Safest: the buyer pays the seller directly and the seller confirms it arrived. Fastest: the seller has been paid, and the agent makes the buyer primary owner.",
   },
   AWAITING_BUYER_PAYMENT: {
     label: "Awaiting buyer payment",
@@ -82,13 +82,13 @@ export const ORDER_STATUS: Record<
     label: "Awaiting handover",
     variant: "primary",
     whose: "transfer",
-    note: "Safest: the agent is making the buyer the owner. Fastest: the holding period, then the seller makes the buyer primary owner.",
+    note: "Safest: the agent is transferring the channel to the buyer. Fastest: the holding period, then the seller makes the agent primary owner.",
   },
   AWAITING_RELEASE: {
     label: "Awaiting release",
     variant: "primary",
     whose: "agent",
-    note: "Fastest. The buyer is primary owner and the seller has not been paid yet.",
+    note: "Fastest, from the earlier steps: the buyer is primary owner and the seller has not been paid yet. No new deal reaches this.",
   },
   DISPUTED: {
     label: "Disputed",
@@ -162,13 +162,13 @@ export const DEAL_MODE: Record<
     label: "Safest",
     escrow: "channel escrowed",
     blurb:
-      "The buyer pays us the admin fee, an agent becomes the channel's primary owner after Google's wait, the buyer pays the seller directly, and once the seller confirms it arrived the agent makes the buyer the owner. We never hold the price.",
+      "The buyer pays us the admin fee, an agent becomes the channel's primary owner after Google's wait and verifies it, the buyer pays the seller directly, and once the seller confirms it arrived the agent transfers it to the buyer. We never hold the price.",
   },
   FASTEST: {
     label: "Fastest",
     escrow: "money escrowed",
     blurb:
-      "The buyer pays price plus fee to us. The seller adds the buyer as manager, the holding period runs, the seller makes the buyer primary owner, and we credit the seller's wallet once the agent has checked.",
+      "The buyer pays price plus fee to us. The seller invites the agent as owner, the agent invites the buyer and the holding period runs, the seller makes the agent primary owner — which credits the seller's wallet — and the agent makes the buyer primary owner.",
   },
 };
 

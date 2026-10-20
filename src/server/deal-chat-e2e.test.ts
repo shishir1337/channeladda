@@ -195,19 +195,20 @@ test(
     expect((await kinds(id)).seller).toBe("step:mine");
     await step(4, "seller");
     await step(5, "agent");
-    // Our agent holds the channel: the buyer pays the seller directly, the
-    // way they agreed in this chat, and presses Paid.
+    // Our agent holds the channel and has verified it: the buyer pays the
+    // seller directly, to the details the seller gave on the deal, and
+    // presses Paid.
     expect((await kinds(id)).buyer).toBe("step:mine");
     await step(6, "buyer");
     expect((await kinds(id)).seller).toBe("step:mine");
     await step(7, "seller");
+    // Our agent's transfer ends the deal: the buyer presses nothing after
+    // paying the seller.
     expect((await kinds(id)).agent).toBe("step:mine");
-    await step(8, "agent");
-    expect((await kinds(id)).buyer).toBe("step:mine");
     const done = await advanceStep({
       orderId: order.id,
-      position: 9,
-      userId: buyer.id,
+      position: 8,
+      userId: agent.id,
     });
     if (!done.ok) throw new Error(done.reason);
 
@@ -221,7 +222,7 @@ test(
 );
 
 test(
-  "a Fastest deal from the seller's price to release",
+  "a Fastest deal from the seller's price to the buyer's primary ownership",
   withCleanDb(async () => {
     const { listing, buyer, seller, agent } = await seedListing();
     const staff = await seedUser("MODERATOR");
@@ -282,30 +283,31 @@ test(
       }
     };
 
-    // The seller adds the buyer as manager and the buyer confirms it.
+    // The seller invites our agent as owner, and our agent invites the buyer.
     await run([
       [2, "seller"],
-      [3, "buyer"],
+      [3, "agent"],
     ]);
 
-    // The holding period: making the buyer primary owner is the seller's
+    // The holding period: making our agent primary owner is the seller's
     // step, and not yet theirs.
     expect((await kinds(id)).seller).toBe("step:theirs");
     expect((await lastLine(id)).body).toMatch(/^Waiting period until/);
 
     await passHold(deal.orderId);
     expect((await kinds(id)).seller).toBe("step:mine");
-    await run([
-      [4, "seller"],
-      [5, "buyer"],
-    ]);
+    await run([[4, "seller"]]);
+    // Our agent confirms primary ownership, which pays the seller, then
+    // makes the buyer primary owner.
     expect((await kinds(id)).agent).toBe("step:mine");
-    const released = await advanceStep({
+    await run([[5, "agent"]]);
+    expect((await lastLine(id)).body).toMatch(/seller has been paid/);
+    const handedOver = await advanceStep({
       orderId: deal.orderId,
       position: 6,
       userId: agent.id,
     });
-    if (!released.ok) throw new Error(released.reason);
+    if (!handedOver.ok) throw new Error(handedOver.reason);
 
     expect(await kinds(id)).toEqual({
       buyer: "finished",

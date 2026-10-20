@@ -11,13 +11,13 @@ const LEGAL: [DealMode, OrderStatus, OrderStatus, DealActor][] = [
   ["SAFEST", "AWAITING_PAYMENT", "AWAITING_CUSTODY", "system"],
   ["SAFEST", "AWAITING_CUSTODY", "IN_CUSTODY", "agent"],
   ["SAFEST", "IN_CUSTODY", "AWAITING_HANDOVER", "seller"],
-  ["SAFEST", "AWAITING_HANDOVER", "COMPLETED", "buyer"],
+  ["SAFEST", "AWAITING_HANDOVER", "COMPLETED", "agent"],
   ["SAFEST", "IN_CUSTODY", "RETURNED_TO_SELLER", "staff"],
   ["FASTEST", "AWAITING_PAYMENT", "AGENT_VERIFYING", "system"],
-  ["FASTEST", "AGENT_VERIFYING", "AWAITING_HANDOVER", "buyer"],
-  ["FASTEST", "AWAITING_HANDOVER", "AWAITING_RELEASE", "buyer"],
-  ["FASTEST", "AWAITING_RELEASE", "COMPLETED", "agent"],
-  ["FASTEST", "AWAITING_RELEASE", "REFUNDED", "staff"],
+  ["FASTEST", "AGENT_VERIFYING", "AWAITING_HANDOVER", "agent"],
+  ["FASTEST", "AWAITING_HANDOVER", "IN_CUSTODY", "agent"],
+  ["FASTEST", "IN_CUSTODY", "COMPLETED", "agent"],
+  ["FASTEST", "AWAITING_HANDOVER", "REFUNDED", "staff"],
 ];
 
 test.each(LEGAL)("%s allows %s to %s by %s", (mode, from, to, actor) => {
@@ -34,12 +34,39 @@ test("only the seller says the safest price arrived", () => {
   }
 });
 
-test("only the buyer finishes a deal by confirming the channel is theirs", () => {
+test("our agent finishes a safest deal by transferring the channel", () => {
+  // The owner's process ends with our agent's transfer; the buyer presses
+  // nothing after paying the seller.
+  for (const actor of ["buyer", "seller", "system"] as const) {
+    expect(
+      canTransition("SAFEST", "AWAITING_HANDOVER", "COMPLETED", actor),
+    ).toBe(false);
+  }
+});
+
+test("after the buyer pays, our agent runs a fastest deal and nobody else", () => {
+  // The owner's process: our agent invites the buyer, takes primary
+  // ownership, and hands it to the buyer. The seller's two steps move no
+  // status, and the buyer presses nothing after paying.
+  const moves = [
+    ["AGENT_VERIFYING", "AWAITING_HANDOVER"],
+    ["AWAITING_HANDOVER", "IN_CUSTODY"],
+    ["IN_CUSTODY", "COMPLETED"],
+  ] as const;
+  for (const [from, to] of moves) {
+    for (const actor of ["buyer", "seller", "system"] as const) {
+      expect(canTransition("FASTEST", from, to, actor)).toBe(false);
+    }
+  }
+});
+
+test("a fastest deal cannot be refunded once our agent holds the channel", () => {
+  // The seller was paid when our agent became primary owner.
+  expect(canTransition("FASTEST", "IN_CUSTODY", "REFUNDED", "staff")).toBe(
+    false,
+  );
   expect(
-    canTransition("SAFEST", "AWAITING_HANDOVER", "COMPLETED", "agent"),
-  ).toBe(false);
-  expect(
-    canTransition("FASTEST", "AGENT_VERIFYING", "AWAITING_HANDOVER", "agent"),
+    canTransition("FASTEST", "IN_CUSTODY", "RETURNED_TO_SELLER", "staff"),
   ).toBe(false);
 });
 

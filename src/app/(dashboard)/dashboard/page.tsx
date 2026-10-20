@@ -1,4 +1,5 @@
 import {
+  ArrowLeftRightIcon,
   ArrowUpRightIcon,
   CompassIcon,
   EyeIcon,
@@ -35,12 +36,14 @@ import {
   StatGrid,
 } from "@/components/app/kit";
 import { statusMeta } from "@/components/dashboard/listing-status";
+import { dealHeadline } from "@/components/deals/deal-status";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Price } from "@/components/ui/price";
 import type { ListingStatus, OfferStatus } from "@/generated/prisma/enums";
 import { cn } from "@/lib/utils";
 import { getBuyerSummary, getSellerSummary } from "@/server/dashboard";
+import { listDealsFor } from "@/server/deals";
 import { getOffersForBuyer, getOffersForSeller } from "@/server/offers";
 import { getMyListings } from "@/server/seller-listings";
 import { requireUser } from "@/server/session";
@@ -133,12 +136,13 @@ const LISTING_EVENT: Record<ListingStatus, string> = {
 export default async function DashboardPage() {
   const user = await requireUser("/dashboard");
 
-  const [selling, buying, received, made, listings] = await Promise.all([
+  const [selling, buying, received, made, listings, deals] = await Promise.all([
     getSellerSummary(user.id),
     getBuyerSummary(user.id),
     getOffersForSeller(user.id),
     getOffersForBuyer(user.id),
     getMyListings(user.id),
+    listDealsFor(user.id),
   ]);
 
   const now = new Date();
@@ -151,6 +155,33 @@ export default async function DashboardPage() {
    * thing a person actually came to do.
    */
   const tasks: Task[] = [
+    // A deal step that is this person's to do, as buyer, seller or the agent
+    // running it. Left out, the overview said "all caught up" to an agent
+    // with a deal waiting on them, and to every buyer and seller too.
+    ...deals
+      .filter(
+        (deal) =>
+          deal.awaiting !== null &&
+          deal.awaiting === deal.side &&
+          deal.waitingUntil === null,
+      )
+      .map((deal) => ({
+        id: `deal-${deal.id}`,
+        href: `/dashboard/deals/${deal.id}`,
+        icon: ArrowLeftRightIcon,
+        what: <>Your move on {deal.listingTitle}</>,
+        detail: `${deal.reference} — ${
+          dealHeadline(
+            deal.status,
+            deal.mode,
+            deal.side,
+            deal.openStep,
+            deal.platform,
+          ).label
+        }`,
+        cta: "Open the deal",
+        since: deal.createdAt,
+      })),
     ...received
       .filter((offer) => offer.awaiting === "seller")
       .map((offer) => ({
@@ -399,9 +430,9 @@ export default async function DashboardPage() {
           <>
             <p>Lifetime totals. Your spendable balance lives in the wallet.</p>
             <p className="mt-1.5">
-              A Fastest sale reaches your balance when its transfer completes;
-              until then the wallet shows it as held. A Safest buyer pays you
-              directly, so that money never comes through here.
+              A Fastest sale reaches your balance once our agent holds the
+              account; until then the wallet shows it as held. A Safest buyer
+              pays you directly, so that money never comes through here.
             </p>
           </>
         }

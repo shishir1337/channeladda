@@ -67,12 +67,13 @@ export function PayNow({
             This is our fee to start, and the only payment Channel Adda takes.
             Once our agent holds the channel, you pay the seller the price of{" "}
             <Price usd={priceUsd / 100} className="font-medium text-fg" />{" "}
-            directly, the way you agree in the chat.
+            directly, to the details the seller gives on this deal.
           </>
         ) : (
           <>
-            The channel price and our fee together. We hold all of it until you
-            are the channel&rsquo;s primary owner.
+            The channel price and our fee together. We hold all of it until our
+            agent has taken the channel from the seller, and our agent then
+            makes you primary owner.
           </>
         )}
       </p>

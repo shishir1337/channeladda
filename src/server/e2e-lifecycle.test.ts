@@ -95,7 +95,7 @@ test(
 
     expect(order.status).toBe("COMPLETED");
     expect(order.steps.every((s) => s.completedAt !== null)).toBe(true);
-    expect(order.steps).toHaveLength(9);
+    expect(order.steps).toHaveLength(8);
     // The buyer's Paid and the seller's Received are the record of the price.
     expect(order.buyerPaidAt).not.toBeNull();
     expect(order.sellerConfirmedAt).not.toBeNull();

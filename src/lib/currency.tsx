@@ -137,10 +137,14 @@ export function formatIn(
   const amount = usd * currency.rate;
   // Cents only where they say something. Every non-compact price used to be
   // whole units, so a $10 listing quoted its Safest fee as "$0" and the buyer
-  // was then invoiced $0.30. Large amounts stay whole: a listing price with
-  // trailing cents is noise, and high-rate currencies would show a lot of it.
+  // was then invoiced $0.30. A dollar amount is exact — it is what is
+  // charged, or what a wallet holds — so it keeps its cents at any size:
+  // "$817" against a charge of $816.80 read as a mistake. A converted amount
+  // is an estimate, and stays whole once it is large: a high-rate currency
+  // would show a lot of noise after the point.
   const hasCents = Math.round(amount * 100) % 100 !== 0;
-  const showCents = amount < 100 && hasCents;
+  const exact = currency.rate === 1;
+  const showCents = hasCents && (exact || amount < 100);
   const maximumFractionDigits = showCents ? 2 : 0;
 
   const numberOpts: Intl.NumberFormatOptions = {

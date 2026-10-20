@@ -1,10 +1,12 @@
 import "server-only";
 
 import type { DealMode } from "@/generated/prisma/enums";
+import { CUSTODIAN_ROLES, withinLevel } from "@/lib/custody-roles";
 import { db } from "@/lib/db";
 import type { DealActor } from "@/lib/deal-machine";
 import { templateFor } from "@/lib/deal-templates";
 import { canSendMail, sendMail } from "@/server/mailer";
+import { notify } from "@/server/notifications";
 
 /**
  * Where a notification about a deal takes somebody: its conversation, where
@@ -44,8 +46,8 @@ export function turnEmail(input: {
   href: string;
   /**
    * The buyer's account that receives ownership, for the person who will
-   * transfer to it: the seller on Fastest, our agent on Safest. Never put in
-   * an email to anybody else.
+   * transfer to it: our agent, in both modes. Never put in an email to
+   * anybody else.
    */
   handoverTo?: string | null;
   /** What this step does with it (`handoverAction`). */
@@ -54,8 +56,8 @@ export function turnEmail(input: {
   const greeting = input.name ? `Hi ${input.name},` : "Hi there,";
   const mode =
     input.mode === "SAFEST"
-      ? "This is a Safest deal: our agent takes the channel first, the buyer then pays the seller directly, and once the seller confirms it arrived our agent makes the buyer the owner. Channel Adda takes only its fee."
-      : "This is a Fastest deal: Channel Adda holds the buyer's payment until they are the channel's primary owner, then pays the seller.";
+      ? "This is a Safest deal: our agent takes the channel first and verifies it, the buyer then pays the seller directly, and once the seller confirms it arrived our agent transfers it to the buyer. Channel Adda takes only its fee."
+      : "This is a Fastest deal: Channel Adda holds the buyer's payment while our agent takes the channel from the seller. Once our agent is primary owner the seller is paid, and our agent makes the buyer primary owner.";
 
   return {
     subject: `Your move: ${input.stepLabel} (${input.reference})`,
@@ -95,10 +97,10 @@ export function handoverAction(
 ): string | null {
   const step = templateFor(mode).find((s) => s.position === position);
   if (!step || !(step.usesHandover || step.handsOver)) return null;
-  if (!step.handsOver) return "Add this account as a manager";
+  if (!step.handsOver) return "Invite this account as an owner";
   return mode === "FASTEST"
     ? "Make this account the primary owner"
-    : "Make this account the owner";
+    : "Transfer ownership to this account";
 }
 
 /**
@@ -127,6 +129,7 @@ export async function notifyNextActor(orderId: string): Promise<void> {
         conversationId: true,
         handoverTo: true,
         holdUntil: true,
+        priceUsd: true,
         listing: { select: { title: true } },
         steps: {
           where: { completedAt: null },
@@ -146,6 +149,18 @@ export async function notifyNextActor(orderId: string): Promise<void> {
 
     const next = order.steps[0];
     if (!next) return;
+
+    // The seller's next move is to invite our agent, and there is no agent
+    // yet: telling them it is their move sent them looking for an address
+    // that was not there. Whoever can take the deal is asked instead, and
+    // the seller hears when the agent joins (`assignAgent` calls this again).
+    const template = templateFor(order.mode as DealMode).find(
+      (s) => s.position === next.position,
+    );
+    if (template?.needsAgent && !order.agentId) {
+      await askForAgent(order);
+      return;
+    }
 
     const recipients: Partial<Record<DealActor, string | null>> = {
       buyer: order.buyerId,
@@ -180,8 +195,8 @@ export async function notifyNextActor(orderId: string): Promise<void> {
       select: { email: true, name: true },
     });
     // Only to whoever will transfer to it, and only on a step that uses it.
-    // A Safest seller hands the channel to our agent, so the buyer's account
-    // is none of theirs.
+    // Sellers hand the channel to our agent in both modes, so the buyer's
+    // account is none of theirs.
     const action = handoverAction(order.mode as DealMode, next.position);
     if (person?.email) {
       await sendMail({
@@ -200,6 +215,36 @@ export async function notifyNextActor(orderId: string): Promise<void> {
     }
   } catch (error) {
     console.error(`[deal-notify] ${orderId}`, error);
+  }
+}
+
+/**
+ * A paid deal that nobody is running yet, put in front of everyone who could
+ * run it: the agents and moderators whose level covers its price, and the
+ * superadmin. By email too — the buyer has paid and the seller is waiting.
+ */
+async function askForAgent(order: {
+  id: string;
+  reference: string;
+  priceUsd: number;
+  listing: { title: string };
+}): Promise<void> {
+  const people = await db.user.findMany({
+    where: { role: { in: [...CUSTODIAN_ROLES] }, bannedAt: null },
+    select: { id: true, role: true, dealLevel: true },
+  });
+  const title = `${order.reference} needs an agent`;
+  const body = `${order.listing.title} is paid and waiting. Take it on the deal desk so the seller can invite you.`;
+  for (const person of people) {
+    if (!withinLevel(person.dealLevel, person.role, order.priceUsd)) continue;
+    await notify({
+      userId: person.id,
+      kind: "ORDER",
+      title,
+      body,
+      href: "/admin/deals",
+      email: { subject: title, body },
+    });
   }
 }
 

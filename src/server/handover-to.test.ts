@@ -5,8 +5,8 @@ import { templateFor } from "@/lib/deal-templates";
 import { seedListing, withCleanDb } from "@/test/db";
 
 // The client's ask: the buyer says which of their accounts receives
-// ownership before they pay, and the seller is emailed it once the payment
-// clears, so on a Fastest deal they know exactly whom to promote.
+// ownership before they pay. Our agent invites it and hands the channel to
+// it, in both modes, so our agent is the one told it — the seller never is.
 
 const mail = vi.hoisted(() => ({
   sent: [] as { to: string; subject: string; body: string }[],
@@ -44,6 +44,18 @@ async function opened(mode: DealMode, handoverTo = "buyer.owner@gmail.com") {
   });
   if (!created.ok) throw new Error(created.reason);
   return { ...seeded, orderId: created.orderId };
+}
+
+/** With our agent on the deal, as staff assign one once it is paid. */
+async function withAgent(orderId: string, agentId: string) {
+  await db.order.update({
+    where: { id: orderId },
+    data: {
+      agentId,
+      agentEmail: "transfers@channeladda.test",
+      agentBrand: "Channel Adda Transfers",
+    },
+  });
 }
 
 async function pay(orderId: string) {
@@ -93,63 +105,75 @@ test(
 // ---------------------------------------------------------- telling them
 
 test(
-  "once a Fastest payment clears, the seller is emailed whom to make owner",
+  "on a Fastest deal our agent is emailed the account at the step that invites it",
   withCleanDb(async () => {
-    const { orderId, seller } = await opened("FASTEST");
+    const { orderId, seller, agent } = await opened("FASTEST");
+    await withAgent(orderId, agent.id);
     await pay(orderId);
+    const { advanceStep } = await import("@/server/deals");
+    const invited = await advanceStep({
+      orderId,
+      position: 2,
+      userId: seller.id,
+    });
+    expect(invited).toEqual({ ok: true });
 
-    const toSeller = mail.sent.filter((m) => m.to === seller.email);
-    expect(toSeller).toHaveLength(1);
-    // Their step is adding it as a manager, so that is what it says.
-    expect(toSeller[0]?.body).toContain(
-      "Add this account as a manager: buyer.owner@gmail.com",
+    const toAgent = mail.sent.filter((m) => m.to === agent.email);
+    expect(toAgent).toHaveLength(1);
+    // Their step is inviting it, so that is what it says.
+    expect(toAgent[0]?.body).toContain(
+      "Invite this account as an owner: buyer.owner@gmail.com",
     );
-    expect(toSeller[0]?.body).not.toContain("Give ownership");
+    expect(toAgent[0]?.body).not.toContain("Give ownership");
   }),
 );
 
-test(
-  "a Safest seller hands the channel to our agent, never to the buyer, so is not told it",
-  withCleanDb(async () => {
-    const { orderId, seller } = await opened("SAFEST");
-    await pay(orderId);
+test.each(["SAFEST", "FASTEST"] as const)(
+  "a %s seller hands the channel to our agent, never to the buyer, so is not told it",
+  (mode) =>
+    withCleanDb(async () => {
+      const { orderId, seller, agent } = await opened(mode);
+      await withAgent(orderId, agent.id);
+      await pay(orderId);
 
-    const toSeller = mail.sent.filter((m) => m.to === seller.email);
-    expect(toSeller.length).toBeGreaterThan(0);
-    for (const m of toSeller) {
-      expect(m.body).not.toContain("buyer.owner@gmail.com");
-    }
-  }),
+      const toSeller = mail.sent.filter((m) => m.to === seller.email);
+      expect(toSeller.length).toBeGreaterThan(0);
+      for (const m of toSeller) {
+        expect(m.body).not.toContain("buyer.owner@gmail.com");
+      }
+    })(),
 );
 
 // ----------------------------------------------------------- who can see it
 
 test(
-  "the deal view shows it to the people who transfer, and hides it from a Safest seller",
+  "the deal view shows it to the buyer and our agent, and hides it from the seller",
   withCleanDb(async () => {
     const { getDealFor } = await import("@/server/deals");
 
-    const fastest = await opened("FASTEST");
-    expect(
-      (await getDealFor(fastest.seller.id, fastest.orderId))?.handoverTo,
-    ).toBe("buyer.owner@gmail.com");
-    expect(
-      (await getDealFor(fastest.buyer.id, fastest.orderId))?.handoverTo,
-    ).toBe("buyer.owner@gmail.com");
-
-    const safest = await opened("SAFEST");
-    expect(
-      (await getDealFor(safest.seller.id, safest.orderId))?.handoverTo,
-    ).toBeNull();
+    for (const mode of ["FASTEST", "SAFEST"] as const) {
+      const deal = await opened(mode);
+      await withAgent(deal.orderId, deal.agent.id);
+      expect(
+        (await getDealFor(deal.seller.id, deal.orderId))?.handoverTo,
+      ).toBeNull();
+      expect((await getDealFor(deal.buyer.id, deal.orderId))?.handoverTo).toBe(
+        "buyer.owner@gmail.com",
+      );
+      expect((await getDealFor(deal.agent.id, deal.orderId))?.handoverTo).toBe(
+        "buyer.owner@gmail.com",
+      );
+    }
   }),
 );
 
 // ------------------------------------------------------------ correcting it
 
 test(
-  "the buyer can correct it until ownership has been handed over, and the seller hears",
+  "the buyer can correct it until our agent has used it, and our agent hears",
   withCleanDb(async () => {
-    const { orderId, buyer, seller } = await opened("FASTEST");
+    const { orderId, buyer, agent } = await opened("FASTEST");
+    await withAgent(orderId, agent.id);
     await pay(orderId);
     mail.sent.length = 0;
     const { updateHandoverTo } = await import("@/server/deals");
@@ -166,12 +190,12 @@ test(
     ).toBe("fixed.typo@gmail.com");
     expect(
       mail.sent.some(
-        (m) => m.to === seller.email && m.body.includes("fixed.typo@gmail.com"),
+        (m) => m.to === agent.email && m.body.includes("fixed.typo@gmail.com"),
       ),
     ).toBe(true);
 
-    // The seller adding the buyer as manager is the step that uses it.
-    // After that, a change would only point somewhere the channel is not.
+    // Our agent inviting the buyer is the step that uses it. After that, a
+    // change would only point somewhere the channel is not.
     const uses = templateFor("FASTEST").find((s) => s.usesHandover);
     await db.transferStep.updateMany({
       where: { orderId, position: { lte: uses?.position ?? 0 } },
@@ -190,10 +214,11 @@ test(
 test(
   "it can no longer change once it is used, but stays in view until the handover",
   withCleanDb(async () => {
-    // Fastest uses the account twice: the seller adds it as manager, then
-    // after the holding period makes it primary owner. Locked from the
-    // first, it must still be on the seller's screen for the second.
-    const { orderId, buyer, seller } = await opened("FASTEST");
+    // Fastest uses the account twice: our agent invites it, then after the
+    // holding period makes it primary owner. Locked from the first, it must
+    // still be on our agent's screen for the second.
+    const { orderId, buyer, agent } = await opened("FASTEST");
+    await withAgent(orderId, agent.id);
     await pay(orderId);
     const { getDealFor } = await import("@/server/deals");
     const done = async (upTo: number) =>
@@ -202,12 +227,12 @@ test(
         data: { completedAt: new Date() },
       });
 
-    await done(2);
-    const added = await getDealFor(seller.id, orderId);
-    expect(added).toMatchObject({ handoverOpen: false, handoverInUse: true });
-    expect(added?.handoverTo).toBe("buyer.owner@gmail.com");
+    await done(3);
+    const invited = await getDealFor(agent.id, orderId);
+    expect(invited).toMatchObject({ handoverOpen: false, handoverInUse: true });
+    expect(invited?.handoverTo).toBe("buyer.owner@gmail.com");
 
-    await done(4);
+    await done(6);
     expect(await getDealFor(buyer.id, orderId)).toMatchObject({
       handoverOpen: false,
       handoverInUse: false,

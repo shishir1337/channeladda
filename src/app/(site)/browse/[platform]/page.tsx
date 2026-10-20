@@ -122,10 +122,10 @@ export default async function PlatformBrowsePage({
                 {p.transferNote}
               </p>
               <p className="mt-4 text-[0.9375rem] leading-relaxed text-muted sm:text-base">
-                On a Fastest deal you are a manager for{" "}
-                <span className="font-semibold text-fg">{p.holdDays} days</span>{" "}
-                before you become primary owner, and we hold your payment
-                through all of it — the seller is paid only after the handover.
+                On a Fastest deal we hold your payment while our agent takes the
+                account from the seller: you are invited as owner for{" "}
+                <span className="font-semibold text-fg">{p.holdDays} days</span>
+                , then the seller is paid and our agent makes you primary owner.
                 On a Safest deal our agent holds the account itself, and you pay
                 the seller only once it is in our hands.
               </p>

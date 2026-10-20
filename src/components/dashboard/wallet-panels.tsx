@@ -20,6 +20,7 @@ import {
 } from "@/components/app/kit";
 import { TextField } from "@/components/auth/fields";
 import { Button } from "@/components/ui/button";
+import { PAYOUT_NETWORKS } from "@/lib/payout-address";
 import { cn } from "@/lib/utils";
 import {
   requestPayout,
@@ -257,7 +258,7 @@ export function TopUp() {
   );
 }
 
-const NETWORKS = ["TRON", "ETH", "BSC", "POLYGON", "BTC", "SOL"];
+const NETWORKS = PAYOUT_NETWORKS;
 
 export function PayoutAddressForm({
   current,
@@ -437,9 +438,13 @@ export function RequestPayout({
           name="amount"
           label="Amount in US dollars"
           hint={
-            minimumUsd > 0
-              ? `Between ${minLabel} and ${maxLabel}.`
-              : `You can take out up to ${maxLabel}.`
+            // Below the minimum there is no range to state: "Between $20.00
+            // and $0.00" read as a broken sum.
+            minimumUsd > 0 && belowMinimum
+              ? `The smallest payout is ${minLabel}.`
+              : minimumUsd > 0
+                ? `Between ${minLabel} and ${maxLabel}.`
+                : `You can take out up to ${maxLabel}.`
           }
           inputMode="decimal"
           value={amount}

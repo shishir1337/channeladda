@@ -18,8 +18,8 @@ import { startDeal } from "@/server/actions/deals";
  * The two modes are not tiers of service, they are two different things the
  * buyer is trusting, and the copy says which: in Safest the channel sits with
  * a Channel Adda agent before the buyer pays the seller directly; in Fastest
- * the buyer pays us everything up front and the seller hands the channel
- * over to them. Either way the figure they will be asked for now is on
+ * the buyer pays us everything up front and our agent takes the channel
+ * from the seller and hands it on to them. Either way the figure they will be asked for now is on
  * screen before they commit.
  */
 const MODES = [
@@ -29,7 +29,7 @@ const MODES = [
     icon: ShieldCheckIcon,
     holds: "We hold the channel",
     blurb:
-      "Our agent takes ownership of the channel first. Then you pay the seller directly, and once they confirm it arrived, our agent makes you the owner.",
+      "Our agent takes ownership of the channel first and verifies it. Then you pay the seller directly, and once they confirm it arrived, our agent transfers the channel to you.",
     upfrontNote: "Up front you pay our fee only",
   },
   {
@@ -38,7 +38,7 @@ const MODES = [
     icon: ZapIcon,
     holds: "We hold the money",
     blurb:
-      "You pay us the full amount up front. The seller makes you a manager and, after the holding period, primary owner, with our agent watching. We pay the seller once you are primary owner.",
+      "You pay us the full amount up front. Our agent takes the channel from the seller and invites you as owner, and after the holding period makes you primary owner. The seller is paid once our agent holds the channel.",
     upfrontNote: "Up front you pay the price and our fee",
   },
 ];

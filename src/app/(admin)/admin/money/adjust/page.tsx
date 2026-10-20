@@ -5,6 +5,7 @@ import {
 } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { MoneyAdjustForm } from "@/components/admin/money-adjust-form";
 import { exactUsd, linkClass } from "@/components/admin/money-parts";
 import { elapsed } from "@/components/admin/vocab";
@@ -77,6 +78,13 @@ export default async function AdminAdjustPage({
     query ? findMember(query) : Promise.resolve(null),
     listRecentAdjustments(25),
   ]);
+
+  // Found by email, the page moves to the account id: the search form is a
+  // GET, and an email address in the address bar ends up in the browser's
+  // history and the server's logs.
+  if (member && query.includes("@")) {
+    redirect(`/admin/money/adjust?member=${encodeURIComponent(member.id)}`);
+  }
 
   const isSelf = member?.id === staff.id;
   const isStaffAccount = member !== null && member.role !== "USER";
@@ -154,7 +162,7 @@ export default async function AdminAdjustPage({
                 id="member"
                 name="member"
                 type="search"
-                defaultValue={query}
+                defaultValue={member ? member.email : query}
                 autoComplete="off"
                 placeholder="name@example.com"
                 className={cn(inputClass, "pr-3 pl-9")}
@@ -347,7 +355,7 @@ export default async function AdminAdjustPage({
                     </Td>
                     <Td className="align-top">
                       <Link
-                        href={`/admin/money/adjust?member=${encodeURIComponent(row.member.email)}`}
+                        href={`/admin/money/adjust?member=${encodeURIComponent(row.member.id)}`}
                         className={cn(linkClass, "text-[0.8125rem]")}
                       >
                         {row.member.name}

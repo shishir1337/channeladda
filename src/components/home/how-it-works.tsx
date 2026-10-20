@@ -23,17 +23,17 @@ const steps = [
   {
     icon: LockIcon,
     title: "Choose how to pay",
-    body: "Fastest: your crypto payment goes to Channel Adda, not the seller, and the seller starts the transfer knowing it is secured. Safest: you pay our fee, an agent takes the account into our hands, and only then do you pay the seller directly.",
+    body: "Fastest: your crypto payment goes to Channel Adda, not the seller, and the seller hands the account to our agent knowing it is secured. Safest: you pay our fee, an agent takes the account into our hands, and only then do you pay the seller directly.",
   },
   {
     icon: HandshakeIcon,
-    title: "Supervised handover",
-    body: "Credentials, recovery email and 2FA move across with an agent watching the order-linked chat and proof uploads.",
+    title: "Our agent hands it over",
+    body: "Our agent takes the account from the seller, checks it, and hands it to you, with every step recorded in the deal chat.",
   },
   {
     icon: BanknoteIcon,
-    title: "You confirm, the deal closes",
-    body: "On a Fastest deal we hold the money and pay the seller once you are primary owner. On a Safest deal our agent holds the account, and makes you the owner once the seller confirms your payment arrived.",
+    title: "The account is yours, the deal closes",
+    body: "On a Fastest deal we pay the seller once our agent holds the account, and our agent then makes you primary owner. On a Safest deal our agent holds the account and transfers it to you once the seller confirms your payment arrived.",
   },
 ];
 
@@ -42,13 +42,13 @@ const modes = [
     id: "fastest",
     icon: ZapIcon,
     name: "Fastest",
-    tagline: "The account comes straight to you",
-    release: "When you are primary owner",
+    tagline: "Paid up front, handed over by our agent",
+    release: "When our agent holds the account",
     accent: false,
     points: [
-      "We hold your money until you are the account's primary owner",
-      "You are a manager through the holding period, then primary owner",
-      "The seller transfers the account to you directly, with an agent watching",
+      "We hold your money until our agent has the account from the seller",
+      "Our agent invites you as owner, and makes you primary owner after the holding period",
+      "The seller hands the account to our agent, never straight to a stranger",
       "Ownership code verified before the listing goes up",
     ],
   },

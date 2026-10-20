@@ -54,7 +54,25 @@ export const AGENT_HOLDS: readonly OrderStatus[] = Object.freeze([
   "AWAITING_HANDOVER",
 ]);
 
-/** Every state in which a Fastest buyer's money is sitting with the platform. */
+/**
+ * Every state in which a Fastest agent has, or is about to have, the
+ * channel: invited by the seller, an owner through the holding period, then
+ * primary owner until they hand it to the buyer. The per-agent cap counts
+ * these beside `AGENT_HOLDS`, for the same reason — the agent's account owns
+ * the channel.
+ */
+export const FASTEST_AGENT_HOLDS: readonly OrderStatus[] = Object.freeze([
+  "AGENT_VERIFYING",
+  "AWAITING_HANDOVER",
+  "IN_CUSTODY",
+]);
+
+/**
+ * Every state in which a Fastest buyer's money is sitting with the platform:
+ * until our agent is primary owner, when it is paid to the seller.
+ * `AWAITING_RELEASE` is only reachable by a deal opened before the owner's
+ * process of 2026-10-20, and still holds the money.
+ */
 export const PLATFORM_HOLDS: readonly OrderStatus[] = Object.freeze([
   "AGENT_VERIFYING",
   "AWAITING_HANDOVER",
@@ -72,7 +90,7 @@ type Transition = {
 const TRANSITIONS: readonly Transition[] = Object.freeze([
   // ---- Safest: the agent takes the channel, the buyer pays the seller
   // directly while we hold it, the seller says the money arrived, and the
-  // agent hands it to the buyer, who confirms.
+  // agent transfers it to the buyer, which ends the deal.
   {
     mode: "SAFEST",
     from: "AWAITING_PAYMENT",
@@ -97,12 +115,14 @@ const TRANSITIONS: readonly Transition[] = Object.freeze([
     mode: "SAFEST",
     from: "AWAITING_HANDOVER",
     to: "COMPLETED",
-    actors: ["buyer"],
+    actors: ["agent"],
   },
 
-  // ---- Fastest: the platform takes the money, the seller adds the buyer as
-  // a manager, the holding period runs, the seller makes the buyer primary
-  // owner, and the platform pays out once our agent has checked.
+  // ---- Fastest: the platform takes the money, the seller invites our agent
+  // as owner, our agent invites the buyer and the holding period runs, the
+  // seller makes our agent primary owner — which pays the seller — and our
+  // agent makes the buyer primary owner. The seller's two steps move no
+  // status, and the buyer presses nothing after paying.
   {
     mode: "FASTEST",
     from: "AWAITING_PAYMENT",
@@ -113,17 +133,17 @@ const TRANSITIONS: readonly Transition[] = Object.freeze([
     mode: "FASTEST",
     from: "AGENT_VERIFYING",
     to: "AWAITING_HANDOVER",
-    actors: ["buyer"],
+    actors: ["agent"],
   },
   {
     mode: "FASTEST",
     from: "AWAITING_HANDOVER",
-    to: "AWAITING_RELEASE",
-    actors: ["buyer"],
+    to: "IN_CUSTODY",
+    actors: ["agent"],
   },
   {
     mode: "FASTEST",
-    from: "AWAITING_RELEASE",
+    from: "IN_CUSTODY",
     to: "COMPLETED",
     actors: ["agent"],
   },

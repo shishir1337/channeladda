@@ -1,6 +1,7 @@
 import { expect, test } from "vitest";
 import { db } from "@/lib/db";
 import {
+  askSeller,
   OPENING_MESSAGE,
   openConversation,
   sendMessage,
@@ -178,5 +179,84 @@ test(
     });
     expect(latest.body).not.toContain("555 0100");
     expect(latest.redactedAt).not.toBeNull();
+  }),
+);
+
+// ------------------------------------------------ asking in the buyer's words
+
+test(
+  "the buyer's own question opens the thread, in their words",
+  withCleanDb(async () => {
+    // "Ask the seller a question" used to send a fixed opener on one click,
+    // which the buyer could not change before it went.
+    const { listing, buyer } = await seedListing();
+    const asked = await askSeller({
+      listingId: listing.id,
+      buyer: asUser(buyer.id),
+      question: "  Is most of the audience in the US?  ",
+    });
+    if (!asked.ok) throw new Error(asked.reason);
+
+    const messages = await db.message.findMany({
+      where: { conversationId: asked.id },
+    });
+    expect(messages.map((m) => m.body)).toEqual([
+      "Is most of the audience in the US?",
+    ]);
+    expect(messages[0].senderId).toBe(buyer.id);
+  }),
+);
+
+test(
+  "a question with contact details is filtered like any other message",
+  withCleanDb(async () => {
+    const { listing, buyer } = await seedListing();
+    const asked = await askSeller({
+      listingId: listing.id,
+      buyer: asUser(buyer.id),
+      question: "Call me on 01712345678 to talk price",
+    });
+    if (!asked.ok) throw new Error(asked.reason);
+    const [message] = await db.message.findMany({
+      where: { conversationId: asked.id },
+    });
+    expect(message.body).not.toContain("01712345678");
+  }),
+);
+
+test(
+  "an empty question opens nothing",
+  withCleanDb(async () => {
+    const { listing, buyer } = await seedListing();
+    expect(
+      await askSeller({
+        listingId: listing.id,
+        buyer: asUser(buyer.id),
+        question: "   ",
+      }),
+    ).toEqual({ ok: false, reason: "empty" });
+    expect(await db.conversation.count()).toBe(0);
+  }),
+);
+
+test(
+  "asking again in an existing thread adds the question to it",
+  withCleanDb(async () => {
+    const { listing, buyer } = await seedListing();
+    const first = await askSeller({
+      listingId: listing.id,
+      buyer: asUser(buyer.id),
+      question: "First question",
+    });
+    const second = await askSeller({
+      listingId: listing.id,
+      buyer: asUser(buyer.id),
+      question: "Second question",
+    });
+    if (!first.ok || !second.ok) throw new Error("setup");
+    expect(second.id).toBe(first.id);
+    expect(
+      await db.message.count({ where: { conversationId: first.id } }),
+    ).toBe(2);
   }),
 );

@@ -414,6 +414,7 @@ export async function holdMismatches(): Promise<HoldMismatch[]> {
       priceUsd: true,
       paymentRef: true,
       buyerPaymentRef: true,
+      custodyAt: true,
     },
   });
 

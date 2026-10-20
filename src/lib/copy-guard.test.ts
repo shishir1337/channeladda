@@ -31,6 +31,19 @@ const BANNED: readonly RegExp[] = [
   // Fastest and must never be said of both.
   /(?<!fastest deal )you pay channel adda, never the seller/i,
   /\bhold [12]\b/i,
+  // The owner's processes of 2026-10-20: our agent takes the channel from
+  // the seller in both modes and hands it on, and the buyer presses nothing
+  // after paying. The seller never adds the buyer or makes them primary
+  // owner, and a Safest buyer pays the details the seller put on the deal.
+  /seller (adds|makes|invites) (you|the buyer)( a| as)? (a )?manager/i,
+  // "You" here can be our agent, whom the seller does make primary owner.
+  /seller (makes|promotes) the buyer (to )?primary owner/i,
+  /makes you primary owner and removes their own email/i,
+  /release the seller's funds/i,
+  /agent makes (you|the buyer) the owner/i,
+  /you confirm twice/i,
+  /the channel is mine/i,
+  /the way you agreed? in the (deal )?chat/i,
 ];
 
 const ROOT = join(__dirname, "..");

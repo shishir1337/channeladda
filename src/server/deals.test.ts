@@ -15,7 +15,7 @@ async function openDeal(mode: "SAFEST" | "FASTEST" = "SAFEST") {
 }
 
 test(
-  "creating a safest deal reserves the listing and seeds nine steps",
+  "creating a safest deal reserves the listing and seeds eight steps",
   withCleanDb(async () => {
     const { listing, buyer, orderId, reference } = await openDeal("SAFEST");
 
@@ -32,7 +32,7 @@ test(
     expect(order.priceUsd).toBe(10_000);
     expect(order.buyerFeeUsd).toBe(300);
     expect(order.totalUsd).toBe(300);
-    expect(order.steps).toHaveLength(9);
+    expect(order.steps).toHaveLength(8);
     expect(order.steps[5].label).toBe("Pay the seller");
     expect(reference).toMatch(/^CA-\d{5}$/);
 

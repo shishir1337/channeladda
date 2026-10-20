@@ -99,7 +99,16 @@ async function openDeal(mode: "SAFEST" | "FASTEST") {
 test(
   "your-move notifications open the conversation",
   withCleanDb(async () => {
-    const { order, seller } = await openDeal("SAFEST");
+    const { order, seller, agent } = await openDeal("SAFEST");
+    // With an agent on the deal, so the seller's step is theirs to take.
+    await db.order.update({
+      where: { id: order.id },
+      data: {
+        agentId: agent.id,
+        agentEmail: "transfers@channeladda.test",
+        agentBrand: "Channel Adda Transfers",
+      },
+    });
     await recordOpeningPayment(order.id, `pay-${order.id}`, "USDT");
 
     const turn = await db.notification.findFirstOrThrow({
@@ -179,13 +188,21 @@ test(
 test(
   "paying from the balance tells the seller it is their move",
   withCleanDb(async () => {
-    const { order, buyer, seller } = await openDeal("SAFEST");
+    const { order, buyer, seller, agent } = await openDeal("SAFEST");
+    await db.order.update({
+      where: { id: order.id },
+      data: {
+        agentId: agent.id,
+        agentEmail: "transfers@channeladda.test",
+        agentBrand: "Channel Adda Transfers",
+      },
+    });
     await creditDeposit(buyer.id, order.totalUsd, `dep-${order.id}`, "USDT");
     expect(await payFromWallet(order.id, buyer.id)).toEqual({ ok: true });
 
     const turn = await db.notification.findFirst({
       where: { userId: seller.id, kind: "ORDER" },
     });
-    expect(turn?.title).toContain("Add the agent as manager");
+    expect(turn?.title).toContain("Invite the agent as owner");
   }),
 );

@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { parseHandoverTo } from "@/lib/handover-target";
 import { agentIdentity } from "@/server/admin-users";
 import * as repo from "@/server/deals";
+import { type PayToFailure, saveSellerPayTo } from "@/server/pay-to";
 import { requireRole, requireUser } from "@/server/session";
 
 /**
@@ -39,7 +40,11 @@ const MESSAGES: Record<repo.DealFailure, string> = {
   "on-hold":
     "The waiting period is still running, so this step is not open yet. The chat shows when it ends, and we email you the moment it does.",
   "not-handed-over":
-    "The seller has not made the buyer primary owner yet, so paying them now would leave them with the money and the channel both. Refund the buyer, or wait for the handover.",
+    "Our agent is not primary owner yet, so paying the seller now would leave them with the money and the channel both. Refund the buyer, or wait until our agent holds the channel.",
+  "seller-paid":
+    "The seller was paid when our agent became primary owner, so there is nothing left to refund. Finish the deal: our agent hands the channel to the buyer.",
+  "no-agent":
+    "Channel Adda is still assigning an agent to this deal. You will be told the account to invite as soon as they join.",
   "old-steps":
     "This deal was opened under our earlier steps, so its steps cannot be done from here. Channel Adda will finish it with you — say so in the chat.",
   "already-paid":
@@ -330,4 +335,34 @@ export async function endDeal(
     COMPLETED: "Deal completed.",
   } as const;
   return { ok: true, message: messages[to] };
+}
+
+const PAY_TO_MESSAGES: Record<PayToFailure, string> = {
+  "not-found": "That deal is no longer available.",
+  "wrong-actor": "Only the seller says where they are paid.",
+  "not-safest":
+    "On a Fastest deal Channel Adda pays you into your wallet, so there is nothing to add here.",
+  terminal: "This deal is already closed.",
+  locked:
+    "The buyer has already recorded paying you, so these details can no longer change.",
+  empty: "Say where the buyer should send the money.",
+  "too-long": "Keep it under 500 characters.",
+  "has-link":
+    "Payment details cannot include a web address. Write the account or wallet details out instead.",
+};
+
+/** A Safest seller saying where the buyer should pay them. */
+export async function savePayTo(
+  orderId: string,
+  text: string,
+): Promise<DealResult> {
+  const user = await requireUser();
+  const result = await saveSellerPayTo({ orderId, userId: user.id, text });
+  if (!result.ok) return { ok: false, error: PAY_TO_MESSAGES[result.reason] };
+
+  refresh(orderId);
+  return {
+    ok: true,
+    message: "Saved. The buyer sees this when it is their turn to pay you.",
+  };
 }

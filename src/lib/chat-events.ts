@@ -38,11 +38,17 @@ export type ChatEvent =
   | { type: "step-done"; name: string; label: string }
   | { type: "hold-started"; until: Date }
   | { type: "hold-ended" }
+  // Fastest: our agent is primary owner, so the seller has been paid. No
+  // amount: the buyer reads this line too, and the seller's fee is theirs.
+  | { type: "seller-paid" }
+  // Safest: the seller said where to be paid. Never the details themselves:
+  // this line is shown in previews.
+  | { type: "pay-to-saved"; name: string; changed: boolean }
   | { type: "dispute-raised"; name: string }
   | { type: "deal-ended"; outcome: string };
 
 /** $2,000 for whole dollars, $99.50 when there are cents. */
-function money(cents: number): string {
+export function money(cents: number): string {
   const whole = cents % 100 === 0;
   return (cents / 100).toLocaleString("en-US", {
     style: "currency",
@@ -97,6 +103,12 @@ export function eventText(event: ChatEvent): string {
       })}. The next step opens then`;
     case "hold-ended":
       return "The waiting period is over. The next step is open";
+    case "pay-to-saved":
+      return event.changed
+        ? `${who(event.name)} changed where to be paid`
+        : `${who(event.name)} added where to be paid`;
+    case "seller-paid":
+      return "Our agent is primary owner, so the seller has been paid. Our agent makes the buyer primary owner next";
     case "dispute-raised":
       return `${who(event.name)} raised a dispute. The deal is paused while Channel Adda looks at it`;
     case "deal-ended":

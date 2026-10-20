@@ -38,16 +38,16 @@ export const helpArticles: HelpArticle[] = [
     summary:
       "Where your payment sits between checkout and payout, and what triggers a refund.",
     body: [
-      "On a Fastest deal you pay it all to us up front, never to the seller, and the seller hands the account to you directly while our agent watches; we pay the seller once you are primary owner. On a Safest deal we hold the account instead — one of our agents takes ownership of it before you pay anything but our fee — and only then do you pay the seller the price directly, the way you agree in the deal chat.",
+      "On a Fastest deal you pay it all to us up front, never to the seller. The seller hands the account to our agent, our agent invites you as owner, and after the holding period we pay the seller and our agent makes you primary owner. On a Safest deal we hold the account instead — one of our agents takes ownership of it before you pay anything but our fee — and only then do you pay the seller the price directly, to the details the seller gives on the deal.",
       "Either way the gap is deliberate. Handing over a login is not the same as losing access forever: on several platforms a previous owner can attempt account recovery for days or weeks afterwards. Something has to sit between the two sides until that window closes — on a Fastest deal it is your money, on a Safest deal it is the account itself.",
       "If the handover fails at any point, you open a dispute and the deal freezes where it stands. Nothing moves until a moderator has read the order record and decided. What that can recover: on a Fastest deal we are holding your money and can return it. On a Safest deal we are holding the account: if you paid the seller and they will not confirm it, the moderator decides on the record — when you pressed Paid, and the proof in the chat — and our agent can hand you the account. Our admin fee is kept once an agent has held the account — it paid for that work.",
     ],
     steps: [
       "You pay Channel Adda — the whole amount on a Fastest deal, only our fee on a Safest deal",
-      "The seller adds you (Fastest) or our agent (Safest) to the account, working a platform-specific checklist",
-      "The waiting period passes, then ownership moves on",
-      "On a Safest deal you pay the seller directly once our agent holds the account, and they confirm it arrived",
-      "You confirm you have full control. On a Fastest deal that is when we pay the seller",
+      "The seller invites our agent as owner, and on a Fastest deal our agent invites you",
+      "The waiting period passes, and our agent becomes primary owner",
+      "On a Fastest deal that is when we pay the seller. On a Safest deal our agent verifies the account, you pay the seller directly, and they confirm it arrived",
+      "Our agent transfers the account to you, and the deal completes",
     ],
   },
   {
@@ -62,13 +62,12 @@ export const helpArticles: HelpArticle[] = [
   },
   {
     slug: "confirming-a-handover",
-    title: "Confirming a handover safely",
+    title: "Checking a handover safely",
     category: "buying",
-    summary:
-      "What to check before you press confirm, at each of the steps that ask you to.",
+    summary: "What to check once our agent has transferred the account to you.",
     body: [
-      "Confirming means you have full, uncontested control of the account. Before you press it, work through the checklist on your order — it is different for every platform, because every platform transfers ownership differently.",
-      "On a Fastest deal you confirm twice: once you are a manager, which starts the holding period — from three days on Telegram to twenty-one on Instagram — and once you are primary owner, which is what pays the seller. You keep the right to open a dispute until the deal completes.",
+      "Our agent does the transfer, so there is no button for you to press. Once the account is yours, check you have full, uncontested control by working through the checklist on your order — it is different for every platform, because every platform transfers ownership differently. If anything is wrong, say so in the deal chat straight away.",
+      "On a Fastest deal you are an owner through the holding period — from three days on Telegram to twenty-one on Instagram — so you can look around the account before it is yours. You keep the right to open a dispute until the deal completes.",
     ],
     steps: [
       "Change the recovery email to one only you control",
@@ -119,7 +118,7 @@ export const helpArticles: HelpArticle[] = [
     category: "selling",
     summary: "Payout timing, the seller fee, and withdrawal security.",
     body: [
-      "On a Fastest deal the buyer paid us, so we pay you. While the deal runs, the price shows in your wallet under Held for your sales; once the buyer is primary owner and our agent has checked, the sale amount, less the seller fee if one is set (check /fees), lands in your Channel Adda balance, and you withdraw it to your own crypto wallet once our finance team approves the payout. On a Safest deal the buyer pays you directly, the way you agree in the deal chat, once our agent holds the account — press Received when it arrives, and only then does the account move to them.",
+      "On a Fastest deal the buyer paid us, so we pay you. While the deal runs, the price shows in your wallet under Held for your sales; once our agent holds the account, the sale amount, less the seller fee if one is set (check /fees), lands in your Channel Adda balance, and you withdraw it to your own crypto wallet once our finance team approves the payout. On a Safest deal the buyer pays you directly, to the details you give on the deal, once our agent holds the account — press Received when it arrives, and only then does our agent transfer it to them.",
       "For your own protection, adding or changing a payout address locks withdrawals for 24 hours and sends you an email. Address-change attacks are the most common way marketplace sellers lose money, and this delay is what stops them.",
     ],
   },

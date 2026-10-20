@@ -306,11 +306,11 @@ test(
 test(
   "a stuck handover after the seller was paid is decided for the buyer",
   withCleanDb(async () => {
-    const { orderId, staff, seller, actors } = await runTo("SAFEST", 9);
-    // The seller said the money arrived and our agent has made the buyer
-    // the owner, but the buyer says it never arrived. The channel cannot go
-    // back — the seller has been paid — so the dispute ends for the buyer,
-    // with the channel still ours to hand on.
+    const { orderId, staff, seller, actors } = await runTo("SAFEST", 8);
+    // The seller said the money arrived, but our agent's transfer to the
+    // buyer is stuck. The channel cannot go back — the seller has been
+    // paid — so the dispute ends for the buyer, with the channel still ours
+    // to hand on.
     await resolveDeal({
       orderId,
       to: "DISPUTED",

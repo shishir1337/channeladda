@@ -877,6 +877,9 @@ export function ListingForm({
                     type="button"
                     onClick={() => set("platform", p.id)}
                     aria-pressed={chosen}
+                    // The mark and the tick are hidden, and the name is a
+                    // truncated span: said outright so the button is named.
+                    aria-label={p.name}
                     style={tintStyle(p.tint)}
                     className={cn(
                       "group/platform relative inline-flex h-12 cursor-pointer items-center gap-2.5 rounded-lg border pr-3 pl-2 text-sm font-medium shadow-xs transition-[border-color,background-color,color,box-shadow] duration-200 pointer-fine:h-11",
@@ -1219,21 +1222,29 @@ export function ListingForm({
               <p className="text-xs font-medium text-muted">
                 On a Fastest deal
               </p>
-              <dl className="mt-2 grid gap-px overflow-hidden rounded-lg border border-line bg-line sm:grid-cols-3">
+              <dl
+                className={cn(
+                  "mt-2 grid gap-px overflow-hidden rounded-lg border border-line bg-line",
+                  fees.sellerFeeBp > 0 ? "sm:grid-cols-3" : "sm:grid-cols-2",
+                )}
+              >
                 <div className="bg-surface px-3.5 py-3 dark:bg-surface-2">
                   <dt className="text-xs text-subtle">Buyer pays</dt>
                   <dd className="mt-1 text-lg leading-6 font-semibold tracking-[-0.01em] text-fg tabular-nums">
                     {money(preview.total)}
                   </dd>
                 </div>
-                <div className="bg-surface px-3.5 py-3 dark:bg-surface-2">
-                  <dt className="text-xs text-subtle">
-                    Channel Adda fee ({formatRate(fees.sellerFeeBp)}%)
-                  </dt>
-                  <dd className="mt-1 text-lg leading-6 font-semibold tracking-[-0.01em] text-muted tabular-nums">
-                    −{money(preview.sellerFee)}
-                  </dd>
-                </div>
+                {/* No fee, no cell: "fee (0%) −$0" read as a charge. */}
+                {fees.sellerFeeBp > 0 ? (
+                  <div className="bg-surface px-3.5 py-3 dark:bg-surface-2">
+                    <dt className="text-xs text-subtle">
+                      Channel Adda fee ({formatRate(fees.sellerFeeBp)}%)
+                    </dt>
+                    <dd className="mt-1 text-lg leading-6 font-semibold tracking-[-0.01em] text-muted tabular-nums">
+                      −{money(preview.sellerFee)}
+                    </dd>
+                  </div>
+                ) : null}
                 <div className="bg-surface px-3.5 py-3 dark:bg-surface-2">
                   <dt className="text-xs text-subtle">
                     Into your Channel Adda balance
@@ -1244,17 +1255,16 @@ export function ListingForm({
                 </div>
               </dl>
               <p className="mt-2.5 text-xs leading-relaxed text-subtle">
-                Fastest: the buyer pays Channel Adda up front, you hand the
-                account over with an agent watching, and your balance is
-                credited once the buyer confirms.
+                Fastest: the buyer pays Channel Adda up front, you invite our
+                agent as owner, and your balance is credited as soon as our
+                agent is primary owner.
               </p>
               <p className="mt-2.5 border-t border-line pt-2.5 text-xs leading-relaxed text-subtle">
                 On a <span className="font-medium text-muted">Safest</span> deal
-                the buyer pays Channel Adda the {money(safest.total)} admin fee
-                first, our agent takes the account from you, and then the buyer
-                pays the {money(priceNumber)} to Channel Adda as well. You
-                receive the same {money(safest.payout)} into your balance when
-                the transfer completes.
+                the buyer pays Channel Adda only the {money(safest.total)} admin
+                fee. Our agent takes the account from you and verifies it, the
+                buyer pays you the {money(priceNumber)} directly, and once you
+                confirm it arrived our agent transfers the account to them.
               </p>
             </div>
           ) : (

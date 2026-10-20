@@ -196,11 +196,15 @@ test(
 );
 
 test(
-  "an unassigned agent cannot act on a deal",
+  "an unassigned agent cannot act on a deal, and nobody can invite them",
   withCleanDb(async () => {
-    const { orderId, actors } = await runTo("SAFEST", 3, {
+    const { orderId, actors } = await runTo("SAFEST", 2, {
       assignAgent: false,
     });
+    // The seller would be inviting nobody: the step waits for an agent.
+    expect(
+      await advanceStep({ orderId, position: 2, userId: actors.seller }),
+    ).toMatchObject({ ok: false, reason: "no-agent" });
     expect(
       await advanceStep({ orderId, position: 3, userId: actors.agent }),
     ).toMatchObject({ ok: false, reason: "wrong-actor" });
@@ -234,11 +238,11 @@ test(
 );
 
 test(
-  "fastest: the buyer confirming manager access starts the holding period",
+  "fastest: our agent inviting the buyer starts the holding period",
   withCleanDb(async () => {
     const { orderId, actors } = await runTo("FASTEST", 3);
     expect(
-      await advanceStep({ orderId, position: 3, userId: actors.buyer }),
+      await advanceStep({ orderId, position: 3, userId: actors.agent }),
     ).toMatchObject({ ok: true });
 
     const order = await db.order.findUniqueOrThrow({ where: { id: orderId } });
@@ -247,7 +251,7 @@ test(
       Date.now() + 6.99 * 86_400_000,
     );
 
-    // The seller hands over primary ownership only once it is over.
+    // The seller makes our agent primary owner only once it is over.
     expect(
       await advanceStep({ orderId, position: 4, userId: actors.seller }),
     ).toMatchObject({ ok: false, reason: "on-hold" });
@@ -259,9 +263,11 @@ test(
 );
 
 test(
-  "fastest: the seller is paid as soon as the agent releases, with no hold after the handover",
+  "fastest: the seller is paid once our agent is primary owner, before the buyer is",
   withCleanDb(async () => {
     const { orderId, actors, seller } = await runTo("FASTEST", 6);
+    expect(await balanceOf(seller.id)).toBe(10_000);
+    // Our agent handing the channel on ends the deal and pays nothing more.
     expect(
       await advanceStep({ orderId, position: 6, userId: actors.agent }),
     ).toMatchObject({ ok: true });
@@ -521,7 +527,7 @@ test(
     expect((await getDealFor(seller.id, orderId))?.agentEmail).toBe(
       "transfers@channeladda.test",
     );
-    expect(asBuyer?.steps).toHaveLength(9);
+    expect(asBuyer?.steps).toHaveLength(8);
     expect(asBuyer?.totalUsd).toBe(300);
 
     expect((await getDealFor(seller.id, orderId))?.viewerRole).toBe("seller");

@@ -12,7 +12,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const fees = await getFeeSettings();
   return {
     title: "Pricing & fees",
-    description: `Buyers pay ${formatRate(fees.buyerFeeBpSafest)}% on top of the listing price. ${fees.sellerFeeBp > 0 ? `Sellers pay ${formatRate(fees.sellerFeeBp)}% when a Fastest deal completes.` : "Sellers pay nothing."} No listing fee and no monthly cost.`,
+    description: `Buyers pay ${formatRate(fees.buyerFeeBpSafest)}% on top of the listing price. ${fees.sellerFeeBp > 0 ? `Sellers pay ${formatRate(fees.sellerFeeBp)}% when a Fastest sale is paid out.` : "Sellers pay nothing."} No listing fee and no monthly cost.`,
     alternates: { canonical: "/fees" },
   };
 }
@@ -73,7 +73,7 @@ export default async function FeesPage() {
               </p>
               <p className="mt-4 text-[0.9375rem] leading-relaxed text-muted">
                 {fees.sellerFeeBp > 0
-                  ? "Deducted from the sale price when a Fastest deal completes. A Safest buyer pays you directly, so there is nothing to deduct it from."
+                  ? "Deducted from the sale price when a Fastest sale is paid out. A Safest buyer pays you directly, so there is nothing to deduct it from."
                   : "Sellers pay nothing: a Fastest seller receives the full sale price, and a Safest buyer pays you directly."}{" "}
                 Free to list, free to edit, and nothing owed if the account does
                 not sell.
@@ -95,7 +95,7 @@ export default async function FeesPage() {
               mode="FASTEST"
               fees={fees}
               title="Fastest — the money passes through us"
-              note="You pay Channel Adda the price and the fee together. We pay the seller once you are the account's primary owner."
+              note="You pay Channel Adda the price and the fee together. We pay the seller once our agent holds the account, and our agent then makes you primary owner."
               columns={[
                 "Sale price",
                 "Buyer fee",

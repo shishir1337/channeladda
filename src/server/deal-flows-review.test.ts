@@ -191,7 +191,7 @@ test(
 );
 
 test(
-  "a Fastest refund once the seller has made the buyer a manager needs a dispute",
+  "a Fastest refund once our agent has invited the buyer needs a dispute",
   withCleanDb(async () => {
     // The buyer has had access to the channel; giving the money back on one
     // click would reverse what both sides did without hearing the seller.
@@ -200,7 +200,7 @@ test(
       orderId,
       "FASTEST",
       { buyer: buyer.id, seller: seller.id, agent: agent.id },
-      3,
+      4,
     );
     expect(
       await resolveDeal({
@@ -214,7 +214,7 @@ test(
 );
 
 test(
-  "a Fastest dispute cannot pay the seller before they have made the buyer primary owner",
+  "a Fastest dispute cannot pay the seller before our agent is primary owner",
   withCleanDb(async () => {
     // The seller would be paid and still own the channel.
     const { orderId, buyer, seller, agent, finance } = await paid("FASTEST");
@@ -243,15 +243,22 @@ test(
 );
 
 test("each step that uses the buyer's account says what to do with it", () => {
-  // "Give ownership to this account" at the step that only adds a manager
-  // invited a seller to hand the channel over before the holding period.
-  expect(handoverAction("FASTEST", 2)).toBe("Add this account as a manager");
-  expect(handoverAction("FASTEST", 4)).toBe(
+  // "Give ownership to this account" at the step that only invites the
+  // buyer would have read as handing the channel over before the holding
+  // period. Both steps are our agent's.
+  expect(handoverAction("FASTEST", 3)).toBe("Invite this account as an owner");
+  expect(handoverAction("FASTEST", 6)).toBe(
     "Make this account the primary owner",
   );
-  expect(handoverAction("SAFEST", 8)).toBe("Make this account the owner");
-  // Steps that do not touch it are not sent it.
-  expect(handoverAction("SAFEST", 3)).toBeNull();
-  expect(handoverAction("SAFEST", 5)).toBeNull();
-  expect(handoverAction("FASTEST", 6)).toBeNull();
+  expect(handoverAction("SAFEST", 8)).toBe(
+    "Transfer ownership to this account",
+  );
+  // Steps that do not touch it — every one of the seller's among them —
+  // are not sent it.
+  for (const position of [2, 4, 5]) {
+    expect(handoverAction("FASTEST", position)).toBeNull();
+  }
+  for (const position of [2, 3, 4, 5, 6, 7]) {
+    expect(handoverAction("SAFEST", position)).toBeNull();
+  }
 });

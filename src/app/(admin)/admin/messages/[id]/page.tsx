@@ -44,7 +44,9 @@ export default async function AdminThreadPage({
           people={[thread.buyerName, thread.sellerName]}
           title={`${thread.buyerName} and ${thread.sellerName}`}
           listing={{
-            href: `/listing/${thread.listingSlug}`,
+            href: thread.listingOnSale
+              ? `/listing/${thread.listingSlug}`
+              : null,
             handle: thread.listingHandle,
             title: thread.listingTitle,
           }}

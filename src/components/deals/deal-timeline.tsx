@@ -33,12 +33,13 @@ import {
   confirmFirst,
   confirmLabel,
   confirmYes,
-  HOLD_NOTE,
+  holdNote,
   stepHelp,
 } from "@/components/deals/deal-status";
 import { Button } from "@/components/ui/button";
 import { Price } from "@/components/ui/price";
 import { isTerminal } from "@/lib/deal-machine";
+import { templateFor } from "@/lib/deal-templates";
 import { cn } from "@/lib/utils";
 import { completeStep, endDeal } from "@/server/actions/deals";
 import type { DealStepView, DealView } from "@/server/deals";
@@ -82,7 +83,15 @@ function stepState(deal: DealView, step: DealStepView) {
     frozen,
     heldUntil,
     mine: !frozen && !heldUntil && step.actor === deal.viewerRole,
-    help: stepHelp(deal.mode, step.label),
+    help: stepHelp(deal.mode, step.label, deal.platform),
+    // The seller's step that brings our agent in, with no agent yet: there
+    // is nobody to invite, and the server refuses the press.
+    awaitingAgent:
+      !deal.agentName &&
+      Boolean(
+        templateFor(deal.mode).find((s) => s.position === step.position)
+          ?.needsAgent,
+      ),
     // Step 1 is completed by the payment clearing and by nothing else, so
     // the buyer gets the payment panel rather than a button the server will
     // refuse.
@@ -322,7 +331,7 @@ function StepDetail({
             })}
             .
           </span>{" "}
-          {HOLD_NOTE[deal.mode]}
+          {holdNote(deal.mode, deal.platform)}
         </Note>
       ) : null}
 
@@ -333,6 +342,11 @@ function StepDetail({
             no button for it, so nobody can record a payment that has not
             arrived.
           </Note>
+        ) : state.awaitingAgent ? (
+          <Note icon={ClockIcon}>
+            Channel Adda is assigning an agent to this deal. The account to
+            invite appears here as soon as they join, and we tell you by email.
+          </Note>
         ) : (
           <StepAction deal={deal} step={step} staffIds={staffIds} />
         )
@@ -340,6 +354,14 @@ function StepDetail({
     </>
   );
 }
+
+/**
+ * A step's button. Its label can be long — "I have made the agent primary
+ * owner" — and the chat's side column is narrow, so it wraps inside the
+ * button instead of running out of both ends of it.
+ */
+const STEP_BUTTON =
+  "h-auto min-h-11 w-full py-2 text-center whitespace-normal text-balance @sm:w-auto app:pointer-fine:h-auto app:pointer-fine:min-h-9";
 
 function StepAction({
   deal,
@@ -355,9 +377,9 @@ function StepAction({
   const [approvedById, setApprovedById] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-  // Paid and Received ask once more: they decide where the money and the
-  // channel go, and Received cannot be taken back.
-  const caution = confirmFirst(step.label);
+  // The presses that decide where the money and the channel go ask once
+  // more: Paid, Received, and our agent's custody and transfer.
+  const caution = confirmFirst(deal.mode, step.label);
   const [armed, setArmed] = useState(false);
   const label = confirmLabel(step.label);
 
@@ -423,7 +445,7 @@ function StepAction({
               <Button
                 type="button"
                 size="md"
-                className="w-full @sm:w-auto"
+                className={STEP_BUTTON}
                 disabled={pending}
                 onClick={complete}
               >
@@ -448,7 +470,7 @@ function StepAction({
           <Button
             type="button"
             size="md"
-            className="w-full @sm:w-auto"
+            className={STEP_BUTTON}
             disabled={pending}
             onClick={caution ? () => setArmed(true) : complete}
           >

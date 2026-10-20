@@ -9,6 +9,7 @@ import { dealHeadline, STATUS_TONE } from "@/components/deals/deal-status";
 import { DealNextStep, RaiseDispute } from "@/components/deals/deal-timeline";
 import { HandoverAccount } from "@/components/deals/handover-account";
 import { PayNow } from "@/components/deals/pay-now";
+import { PayToCard } from "@/components/deals/pay-to";
 import { TrackRecordLine } from "@/components/deals/track-record";
 import { StartDeal } from "@/components/listing/start-deal";
 import { channelOf, ThreadHeader } from "@/components/messages/chat-parts";
@@ -191,7 +192,7 @@ export default async function ThreadPage({
           )
         }
         listing={{
-          href: `/listing/${thread.listingSlug}`,
+          href: thread.listingOnSale ? `/listing/${thread.listingSlug}` : null,
           handle: thread.listingHandle,
           title: thread.listingTitle,
         }}
@@ -228,6 +229,7 @@ export default async function ThreadPage({
                     deal.mode,
                     deal.viewerRole,
                     deal.nextStep?.position ?? null,
+                    deal.platform,
                   ).label
                 }
               </Badge>
@@ -293,7 +295,10 @@ export default async function ThreadPage({
               ) : panel.kind === "step" && deal ? (
                 <div className="flex flex-col gap-3">
                   <DealNextStep deal={deal} staffIds={staffIds} />
-                  {/* "The address to invite is on this page": it is, here too. */}
+                  {/* Safest: where the buyer pays the seller directly, which
+                      the chat itself cannot carry. */}
+                  <PayToCard deal={deal} />
+                  {/* "The account to invite is on this page": it is, here too. */}
                   <AgentInvite deal={deal} />
                   <HandoverAccount
                     dealId={deal.id}
@@ -306,6 +311,10 @@ export default async function ThreadPage({
                   />
                   {deal.nextStep ? <RaiseDispute deal={deal} /> : null}
                 </div>
+              ) : panel.kind === "waiting-for-payment" && deal ? (
+                // A Safest seller can say where to be paid from the moment the
+                // deal opens, rather than at the step that needs it.
+                <PayToCard deal={deal} />
               ) : null}
             </DealPanel>
           </div>

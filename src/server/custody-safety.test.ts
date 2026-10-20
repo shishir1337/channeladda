@@ -87,9 +87,10 @@ test(
 test(
   "staff can still complete a deal they have disputed",
   withCleanDb(async () => {
-    // The power resolveDeal exists for is intact: a moderator adjudicating a
-    // dispute can finish the deal in the seller's favour.
-    const o = await runTo("FASTEST", 5);
+    // The power resolveDeal exists for is intact: staff adjudicating a
+    // dispute can finish the deal once our agent holds the channel, which on
+    // Fastest is also when the seller was paid.
+    const o = await runTo("FASTEST", 6);
     await resolveDeal({
       orderId: o.orderId,
       to: "DISPUTED",
@@ -135,16 +136,17 @@ test(
 );
 
 test(
-  "refunding after a handover is not a one-click action",
+  "refunding once the buyer has been given access is not a one-click action",
   withCleanDb(async () => {
-    // The mirror image, and it had no guard at all. The buyer confirms they
-    // own the channel, then disputes: a full refund left them with the
-    // channel and every cent, and the seller with neither.
-    const o = await runTo("FASTEST", 6);
-    const mid = await db.order.findUniqueOrThrow({
-      where: { id: o.orderId },
+    // The mirror image, and it once had no guard at all. Our agent has
+    // invited the buyer as owner, then the buyer disputes: a full refund in
+    // one click could leave them with access and every cent, and the seller
+    // with neither.
+    const o = await runTo("FASTEST", 4);
+    const step = await db.transferStep.findFirstOrThrow({
+      where: { orderId: o.orderId, position: 3 },
     });
-    expect(mid.handoverAt).not.toBeNull();
+    expect(step.completedAt).not.toBeNull();
 
     const result = await resolveDeal({
       orderId: o.orderId,
@@ -217,18 +219,12 @@ test(
 // ------------------------------------- a guard must not become a dead end
 
 test(
-  "a disputed fastest deal can still be refunded after handover",
+  "a disputed fastest deal can still be refunded during the holding period",
   withCleanDb(async () => {
-    // The guard against refunding a buyer who already holds the channel fired
-    // on AWAITING_RELEASE — which is the only state a Fastest refund is
-    // reachable from, and it always carries handoverAt, because the same
-    // write sets both. So "refund the buyer" was dead code: a buyer whose
-    // seller recovered the channel after handover had no route to their
-    // money, and the remaining outcomes either paid the seller in full or
-    // refunded the fee alone.
-    const o = await runTo("FASTEST", 6);
-    const mid = await db.order.findUniqueOrThrow({ where: { id: o.orderId } });
-    expect(mid.handoverAt).not.toBeNull();
+    // The guard against refunding a buyer who already has access must not
+    // be a dead end: a buyer whose seller took the channel back during the
+    // holding period needs a route to their money, which is still with us.
+    const o = await runTo("FASTEST", 4);
 
     await resolveDeal({
       orderId: o.orderId,
@@ -250,12 +246,10 @@ test(
 );
 
 test(
-  "refunding a handed-over deal still needs a dispute, not one click",
+  "once the seller has been paid there is no refund, dispute or not",
   withCleanDb(async () => {
-    // The protection that guard was reaching for: a single staff member must
-    // not be able to reverse a completed handover straight from the live
-    // state. It is an adjudication, so it goes through a dispute and leaves
-    // a record.
+    // Our agent became primary owner and the seller was paid from the hold:
+    // a refund would pay the buyer from money that has already gone.
     const o = await runTo("FASTEST", 6);
 
     const result = await resolveDeal({
@@ -265,7 +259,7 @@ test(
       note: "buyer asked",
     });
 
-    expect(result).toMatchObject({ ok: false, reason: "needs-dispute" });
+    expect(result).toMatchObject({ ok: false });
     expect(await balanceOf(o.buyer.id)).toBe(0);
   }),
 );
@@ -281,8 +275,9 @@ test(
     // around all of it — every staff role collapses to one "staff" actor, so
     // a moderator could raise a dispute on a $10,000 deal and then decide it
     // in the seller's favour, landing the whole escrow in a wallet with no
-    // finance involvement and no second approval.
-    const o = await runTo("FASTEST", 5);
+    // finance involvement and no second approval. Before our agent holds the
+    // channel nobody may do it; after, it is still finance's.
+    const o = await runTo("FASTEST", 6);
     const moderator = await seedUser("MODERATOR");
 
     await resolveDeal({
@@ -301,7 +296,8 @@ test(
       }),
     ).toMatchObject({ ok: false, reason: "needs-finance" });
 
-    expect(await balanceOf(o.seller.id)).toBe(0);
+    // Paid at custody, and paid nothing more.
+    expect(await balanceOf(o.seller.id)).toBe(10_000);
   }),
 );
 
@@ -333,7 +329,7 @@ test(
 test(
   "finance can, and so can a superadmin",
   withCleanDb(async () => {
-    const o = await runTo("FASTEST", 5);
+    const o = await runTo("FASTEST", 6);
     const finance = await seedUser("FINANCE");
     await resolveDeal({
       orderId: o.orderId,

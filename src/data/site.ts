@@ -121,11 +121,11 @@ export const serviceMap = Object.fromEntries(
 export const faqs = [
   {
     q: "How does Channel Adda protect my money?",
-    a: "Every purchase is supervised. On a Safest deal one of our agents takes ownership of the account first, and only then do you pay the seller directly — so the seller cannot take it back or sell it twice — and the account moves to you once they confirm your payment. On a Fastest deal you pay us up front and we release it to the seller only once you are the account's primary owner. Either way, nobody hands over anything on trust.",
+    a: "Every purchase is supervised. On a Safest deal one of our agents takes ownership of the account first, and only then do you pay the seller directly — so the seller cannot take it back or sell it twice — and the account moves to you once they confirm your payment. On a Fastest deal you pay us up front, our agent takes the account from the seller, and we pay the seller only once our agent holds it. Either way, nobody hands over anything on trust.",
   },
   {
     q: "What is the difference between a Fastest and a Safest deal?",
-    a: "Safest means we hold the account: one of our agents takes ownership of it first, you pay the seller directly once it is verifiably in our hands, and when the seller confirms the payment arrived our agent makes you the owner. You pay us only our fee. Fastest means we hold the money: you pay us the price and our fee together, the seller makes you a manager and, after the holding period, primary owner, and we pay the seller once you are. You choose on every listing; there is no price threshold.",
+    a: "Safest means we hold the account: one of our agents takes ownership of it first, you pay the seller directly once it is verifiably in our hands, and when the seller confirms the payment arrived our agent transfers it to you. You pay us only our fee. Fastest means we hold the money: you pay us the price and our fee together, the seller hands the account to our agent, our agent invites you as owner, and after the holding period we pay the seller and our agent makes you primary owner. You choose on every listing; there is no price threshold.",
   },
   {
     q: "Which payment methods do you accept?",

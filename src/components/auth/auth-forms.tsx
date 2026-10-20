@@ -83,7 +83,10 @@ export function SignInForm({ next }: { next?: string }) {
         // `refresh` so server components pick up the new session cookie.
         // safeNext, not startsWith("/"): "//host" starts with a slash too,
         // and is somebody else's site.
-        router.push(safeNext(next, "/"));
+        // The dashboard, as Google sign-in already did: the page says
+        // "sign in to pick up an order, answer an offer, or check on a
+        // payout", and all three live there, not on the home page.
+        router.push(safeNext(next));
         router.refresh();
       }}
     >

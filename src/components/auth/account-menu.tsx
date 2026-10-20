@@ -55,6 +55,13 @@ export function AccountMenu({ className }: { className?: string }) {
     user.role === "MODERATOR" ||
     user.role === "FINANCE" ||
     user.role === "SUPERADMIN";
+  // An agent's desk is the deal desk alone; without this link their only
+  // way there was typing the address.
+  const staffLink = isStaff
+    ? { href: "/admin", label: "Staff area" }
+    : user.role === "AGENT"
+      ? { href: "/admin/deals", label: "Deal desk" }
+      : null;
 
   return (
     <DropdownMenu.Root>
@@ -122,13 +129,13 @@ export function AccountMenu({ className }: { className?: string }) {
             </Link>
           </DropdownMenu.Item>
 
-          {isStaff ? (
+          {staffLink ? (
             <>
               <DropdownMenu.Separator className="my-1.5 h-px bg-line" />
               <DropdownMenu.Item asChild>
-                <Link href="/admin" className={itemClass}>
+                <Link href={staffLink.href} className={itemClass}>
                   <ShieldIcon aria-hidden="true" className="size-4" />
-                  Staff area
+                  {staffLink.label}
                 </Link>
               </DropdownMenu.Item>
             </>

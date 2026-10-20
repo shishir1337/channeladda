@@ -116,12 +116,11 @@ export function BuyPanel({
           Nobody can be left short
         </p>
         <p className="mt-1.5 text-[0.8125rem] leading-relaxed text-muted">
-          On a Fastest deal you pay Channel Adda, never the seller: you are a
-          manager for{" "}
-          <span className="font-medium text-fg">{holdDays} days</span> before
-          you become primary owner, and only then is the seller paid. On a
-          Safest deal our agent holds the channel first, and you pay the seller
-          directly only once it is in our hands.
+          On a Fastest deal you pay Channel Adda, never the seller, and the
+          seller is paid only once our agent holds the channel, after a{" "}
+          <span className="font-medium text-fg">{holdDays}-day</span> holding
+          period. On a Safest deal our agent holds the channel first, and you
+          pay the seller directly only once it is in our hands.
         </p>
       </div>
 

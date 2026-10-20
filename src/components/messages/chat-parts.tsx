@@ -106,7 +106,8 @@ export function ThreadHeader({
   /** One name for the other side; two when the reader is neither side. */
   people: string[];
   title: ReactNode;
-  listing: { href: string; handle: string; title: string };
+  /** `href` is null once the listing's page is gone — sold, or removed. */
+  listing: { href: string | null; handle: string; title: string };
   /**
    * The account itself, on its own platform: a link checked by
    * `channelLink`, never the raw URL the seller typed.
@@ -175,18 +176,24 @@ export function ThreadHeader({
             <h1 className="truncate text-[0.9375rem] leading-6 font-semibold text-fg sm:text-base sm:break-words sm:whitespace-normal">
               {title}
             </h1>
-            <Link
-              href={listing.href}
-              className="group inline-flex max-w-full items-center gap-1 text-[0.8125rem] leading-5 text-muted transition-colors duration-150 hover:text-fg"
-            >
-              <span className="truncate">
+            {listing.href ? (
+              <Link
+                href={listing.href}
+                className="group inline-flex max-w-full items-center gap-1 text-[0.8125rem] leading-5 text-muted transition-colors duration-150 hover:text-fg"
+              >
+                <span className="truncate">
+                  {listing.handle} · {listing.title}
+                </span>
+                <ArrowUpRightIcon
+                  aria-hidden="true"
+                  className="size-3.5 shrink-0 text-subtle transition duration-150 group-hover:translate-x-px group-hover:-translate-y-px group-hover:text-fg"
+                />
+              </Link>
+            ) : (
+              <p className="truncate text-[0.8125rem] leading-5 text-muted">
                 {listing.handle} · {listing.title}
-              </span>
-              <ArrowUpRightIcon
-                aria-hidden="true"
-                className="size-3.5 shrink-0 text-subtle transition duration-150 group-hover:translate-x-px group-hover:-translate-y-px group-hover:text-fg"
-              />
-            </Link>
+              </p>
+            )}
             {record ? (
               <p className="truncate text-xs leading-5 text-muted">{record}</p>
             ) : null}

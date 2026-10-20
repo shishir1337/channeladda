@@ -18,6 +18,19 @@ test("a whole amount is not given cents it does not have", () => {
   expect(formatIn(usd, 4_500)).toBe("$4,500");
 });
 
-test("large amounts stay whole, as listing prices are", () => {
-  expect(formatIn(usd, 103.5)).toBe("$104");
+test("a dollar amount keeps its cents at any size: what is charged is what is shown", () => {
+  // Found paying a Fastest deal in the browser: "You pay now $817" against a
+  // price of $800 and a fee of $16.80, and a wallet reading "$190" that held
+  // $190.10. Dollar amounts here are exact, so the cents are the truth.
+  expect(formatIn(usd, 816.8)).toBe("$816.80");
+  expect(formatIn(usd, 190.1)).toBe("$190.10");
+  expect(formatIn(usd, 103.5)).toBe("$103.50");
+});
+
+test("a converted amount stays whole once it is large, as listing prices are", () => {
+  // Converted figures are approximate, and a high-rate currency would show
+  // a lot of noise after the point.
+  const bdt = currencies.find((c) => c.code === "BDT");
+  if (!bdt) throw new Error("BDT missing from the currency list");
+  expect(formatIn(bdt, 816.8)).not.toMatch(/[.,]\d{2}$/);
 });

@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { checkPayoutAddress } from "@/lib/payout-address";
 import { safeNext } from "@/lib/safe-next";
 import { createInvoice, isConfigured } from "@/server/cryptomus";
 import { newReference, recordInvoice } from "@/server/invoices";
@@ -139,12 +140,10 @@ export async function savePayoutAddress(
 
   const trimmed = address.trim();
   const chain = network.trim().toUpperCase();
-  if (trimmed.length < 20 || trimmed.length > 120) {
-    return { ok: false, error: "That does not look like a wallet address." };
-  }
-  if (!/^[A-Z0-9]{3,20}$/.test(chain)) {
-    return { ok: false, error: "Pick a network." };
-  }
+  // In the network's own format, not just of a plausible length: a payout
+  // to a mistyped address is gone for good.
+  const checked = checkPayoutAddress(chain, trimmed);
+  if (!checked.ok) return checked;
 
   const { locked } = await repo.setPayoutAddress(user.id, trimmed, chain);
 

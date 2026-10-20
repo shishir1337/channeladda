@@ -30,6 +30,18 @@ test("fastest holds the total", () => {
   );
 });
 
+test("fastest holds nothing once our agent is primary owner", () => {
+  // That is the moment the seller is paid: the whole hold was settled then.
+  expect(
+    requiredHold({
+      ...order,
+      mode: "FASTEST",
+      totalUsd: 10_300,
+      custodyAt: new Date(),
+    }),
+  ).toBe(0);
+});
+
 test("safest holds the fee", () => {
   expect(requiredHold(order)).toBe(300);
 });
@@ -51,7 +63,8 @@ test("a safest deal whose price was paid to us before the change still holds it"
 test("safest keeps its fee once custody is reached", () => {
   expect(keptFee(order)).toBe(0);
   expect(keptFee({ ...order, custodyAt: new Date() })).toBe(300);
-  // Fastest never stamps custody, and never keeps a fee on a deal that
-  // did not happen.
+  // A Fastest deal never keeps a fee on a deal that did not happen. Once our
+  // agent holds the channel the fee was booked with the seller's payment,
+  // so there is nothing left to keep.
   expect(keptFee({ ...order, mode: "FASTEST", custodyAt: new Date() })).toBe(0);
 });
