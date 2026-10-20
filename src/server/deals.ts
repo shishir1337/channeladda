@@ -18,6 +18,7 @@ import {
   TERMINAL_STATUSES,
 } from "@/lib/deal-machine";
 import {
+  awaitsAgent,
   OPENING_STATUS,
   templateFor,
   usesCurrentSteps,
@@ -2168,6 +2169,8 @@ export type DealListRow = {
   waitingUntil: Date | null;
   createdAt: Date;
   platform: Platform;
+  /** The open step waits for Channel Adda to assign an agent. */
+  awaitingAgent: boolean;
 };
 
 /**
@@ -2212,12 +2215,8 @@ export async function listDealsFor(userId: string): Promise<DealListRow[]> {
     // The seller's step that brings our agent in waits on Channel Adda
     // until an agent is assigned: there is nobody for the seller to invite.
     const waitsForAgent =
-      open !== undefined &&
-      !order.agentId &&
-      Boolean(
-        templateFor(order.mode).find((s) => s.position === open.position)
-          ?.needsAgent,
-      );
+      !isTerminal(order.status) &&
+      awaitsAgent(order.mode, open?.position ?? null, order.agentId);
     const side =
       order.buyerId === userId
         ? ("buyer" as const)
@@ -2249,6 +2248,7 @@ export async function listDealsFor(userId: string): Promise<DealListRow[]> {
           : null,
       createdAt: order.createdAt,
       platform: order.listing.platform,
+      awaitingAgent: waitsForAgent,
     };
   });
 }
@@ -2296,6 +2296,13 @@ export type DealView = {
   listingSlug: string;
   /** The listing's public page exists: on sale or reserved, not sold. */
   listingOnSale: boolean;
+  /** The open step waits for Channel Adda to assign an agent. */
+  awaitingAgent: boolean;
+  /**
+   * Our agent became primary owner. On Fastest that is when the seller is
+   * paid, so from here nothing is held for them.
+   */
+  custodyAt: Date | null;
   buyerName: string;
   sellerName: string;
   agentName: string | null;
@@ -2372,6 +2379,7 @@ export async function getDealFor(
       sellerPayTo: true,
       sellerPayToAt: true,
       sellerPayToChangedAt: true,
+      custodyAt: true,
       listing: {
         select: { title: true, slug: true, platform: true, status: true },
       },
@@ -2434,6 +2442,14 @@ export async function getDealFor(
     listingSlug: order.listing.slug,
     listingOnSale:
       order.listing.status === "LIVE" || order.listing.status === "RESERVED",
+    awaitingAgent:
+      !isTerminal(order.status) &&
+      awaitsAgent(
+        order.mode,
+        order.steps.find((s) => s.completedAt === null)?.position ?? null,
+        order.agentId,
+      ),
+    custodyAt: order.custodyAt,
     buyerName: order.buyer.name,
     sellerName: order.seller.name,
     agentName: order.agent?.name ?? null,

@@ -195,6 +195,24 @@ export function templateFor(mode: DealMode): readonly StepTemplate[] {
 }
 
 /**
+ * Whether the open step is waiting for Channel Adda rather than for its
+ * actor: it brings our agent in, and no agent has been assigned yet. Every
+ * view that says whose move it is reads this, so none of them tells the
+ * seller to invite somebody who is not there.
+ */
+export function awaitsAgent(
+  mode: DealMode,
+  openPosition: number | null,
+  agentId: string | null,
+): boolean {
+  if (openPosition === null || agentId) return false;
+  return Boolean(
+    templateFor(mode).find((step) => step.position === openPosition)
+      ?.needsAgent,
+  );
+}
+
+/**
  * Whether a deal's seeded steps are this template's, label for label.
  *
  * Steps are written when a deal opens, so a deal opened under an earlier

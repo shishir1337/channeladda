@@ -416,7 +416,21 @@ export function dealHeadline(
   viewer: DealActor,
   openStep: number | null,
   platform: Platform,
+  /** The open step waits for Channel Adda to assign an agent. */
+  awaitingAgent = false,
 ): DealHeadline {
+  if (awaitingAgent) {
+    return {
+      label: "Channel Adda is assigning an agent",
+      short: "Assigning an agent",
+      sentence:
+        viewer === "seller"
+          ? "Channel Adda is assigning an agent to run this deal. You will be told the account to invite as soon as they join."
+          : viewer === "buyer"
+            ? "Your payment is with Channel Adda. We are assigning an agent to run the deal, and the seller invites them next."
+            : "This deal is waiting for an agent.",
+    };
+  }
   const override =
     openStep === null
       ? undefined
@@ -445,7 +459,21 @@ export function dealHeadline(
  * instead: our agent takes it, and only then does the buyer pay the seller
  * directly — Channel Adda takes the admin fee and nothing else.
  */
-export function moneyNote(mode: DealMode, viewer: DealActor): string {
+export function moneyNote(
+  mode: DealMode,
+  viewer: DealActor,
+  /** Fastest: our agent is primary owner, so the seller has been paid. */
+  sellerPaid = false,
+): string {
+  if (mode === "FASTEST" && sellerPaid) {
+    if (viewer === "buyer") {
+      return "The seller has been paid from your payment, and our agent holds the channel. Our agent makes you primary owner next.";
+    }
+    if (viewer === "seller") {
+      return "You have been paid: the money is in your Channel Adda wallet. Our agent holds the channel and hands it to the buyer.";
+    }
+    return "The seller has been paid and you hold the channel. Make the buyer primary owner to finish the deal.";
+  }
   if (mode === "SAFEST") {
     if (viewer === "buyer") {
       return "You pay Channel Adda only our fee. The channel's price you pay the seller directly, once our agent holds the channel — so the seller cannot take your money and keep the channel.";

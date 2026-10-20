@@ -206,6 +206,7 @@ function DealRows({ deals }: { deals: DealListRow[] }) {
                         deal.side,
                         deal.openStep,
                         deal.platform,
+                        deal.awaitingAgent,
                       ).short
                     }
                   </Badge>

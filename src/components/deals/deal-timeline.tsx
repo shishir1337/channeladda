@@ -39,7 +39,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Price } from "@/components/ui/price";
 import { isTerminal } from "@/lib/deal-machine";
-import { templateFor } from "@/lib/deal-templates";
 import { cn } from "@/lib/utils";
 import { completeStep, endDeal } from "@/server/actions/deals";
 import type { DealStepView, DealView } from "@/server/deals";
@@ -79,19 +78,17 @@ function stepState(deal: DealView, step: DealStepView) {
     deal.holdUntil && new Date(deal.holdUntil) > new Date()
       ? new Date(deal.holdUntil)
       : null;
+  // The seller's step that brings our agent in, with no agent yet: there is
+  // nobody to invite, and the server refuses the press. It waits on Channel
+  // Adda, so it is nobody's move.
+  const awaitingAgent = deal.awaitingAgent;
   return {
     frozen,
     heldUntil,
-    mine: !frozen && !heldUntil && step.actor === deal.viewerRole,
+    awaitingAgent,
+    mine:
+      !frozen && !heldUntil && !awaitingAgent && step.actor === deal.viewerRole,
     help: stepHelp(deal.mode, step.label, deal.platform),
-    // The seller's step that brings our agent in, with no agent yet: there
-    // is nobody to invite, and the server refuses the press.
-    awaitingAgent:
-      !deal.agentName &&
-      Boolean(
-        templateFor(deal.mode).find((s) => s.position === step.position)
-          ?.needsAgent,
-      ),
     // Step 1 is completed by the payment clearing and by nothing else, so
     // the buyer gets the payment panel rather than a button the server will
     // refuse.
@@ -147,6 +144,13 @@ export function BusyLabel({
 /** Whose step it is, in words — gold only when it is the reader's. */
 function Whose({ state, who }: { state: StepState; who: string }) {
   if (state.mine) return <TurnFlag mine />;
+  if (state.awaitingAgent) {
+    return (
+      <span className="text-xs font-medium text-muted">
+        Waiting on Channel Adda
+      </span>
+    );
+  }
   if (state.frozen) {
     return (
       <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted">
@@ -335,17 +339,19 @@ function StepDetail({
         </Note>
       ) : null}
 
+      {state.awaitingAgent && step.actor === deal.viewerRole ? (
+        <Note icon={ClockIcon}>
+          Channel Adda is assigning an agent to this deal. The account to invite
+          appears here as soon as they join, and we tell you by email.
+        </Note>
+      ) : null}
+
       {state.mine ? (
         state.paymentPending ? (
           <Note>
             This step ticks itself off the moment your payment clears. There is
             no button for it, so nobody can record a payment that has not
             arrived.
-          </Note>
-        ) : state.awaitingAgent ? (
-          <Note icon={ClockIcon}>
-            Channel Adda is assigning an agent to this deal. The account to
-            invite appears here as soon as they join, and we tell you by email.
           </Note>
         ) : (
           <StepAction deal={deal} step={step} staffIds={staffIds} />

@@ -2,6 +2,7 @@ import { expect, test } from "vitest";
 import type { DealMode, OrderStatus } from "@/generated/prisma/enums";
 import { canTransition } from "@/lib/deal-machine";
 import {
+  awaitsAgent,
   OPENING_STATUS,
   templateFor,
   usesCurrentSteps,
@@ -198,5 +199,14 @@ test("labels are distinct within a mode", () => {
   for (const mode of ["SAFEST", "FASTEST"] as const) {
     const labels = templateFor(mode).map((s) => s.label);
     expect(new Set(labels).size).toBe(labels.length);
+  }
+});
+
+test("a step waits for Channel Adda only while it needs an agent and has none", () => {
+  for (const mode of ["SAFEST", "FASTEST"] as const) {
+    expect(awaitsAgent(mode, 2, null)).toBe(true);
+    expect(awaitsAgent(mode, 2, "agent-1")).toBe(false);
+    expect(awaitsAgent(mode, 3, null)).toBe(false);
+    expect(awaitsAgent(mode, null, null)).toBe(false);
   }
 });

@@ -177,6 +177,7 @@ export default async function DashboardPage() {
             deal.side,
             deal.openStep,
             deal.platform,
+            deal.awaitingAgent,
           ).label
         }`,
         cta: "Open the deal",

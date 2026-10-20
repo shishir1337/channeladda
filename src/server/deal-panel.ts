@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import type { DealActor } from "@/lib/deal-machine";
 import { isTerminal } from "@/lib/deal-machine";
 import type { PanelInput, PanelViewer } from "@/lib/deal-panel";
+import { awaitsAgent } from "@/lib/deal-templates";
 import { heldByAcceptedOffer, offerTurn } from "@/server/offers";
 
 /**
@@ -52,6 +53,7 @@ export async function loadPanelInput(
         mode: true,
         status: true,
         holdUntil: true,
+        agentId: true,
         steps: {
           where: { completedAt: null },
           orderBy: { position: "asc" },
@@ -95,6 +97,9 @@ export async function loadPanelInput(
                 }
               : null,
           holdUntil: order.holdUntil,
+          awaitingAgent:
+            !isTerminal(order.status) &&
+            awaitsAgent(order.mode, next?.position ?? null, order.agentId),
         }
       : null,
     now,

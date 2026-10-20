@@ -38,6 +38,8 @@ export type PanelDeal = {
   /** The lowest incomplete step; null once the deal has stopped. */
   nextStep: { position: number; label: string; actor: DealActor } | null;
   holdUntil: Date | null;
+  /** The open step waits for Channel Adda to assign an agent (`awaitsAgent`). */
+  awaitingAgent: boolean;
 };
 
 export type PanelInput = {
@@ -102,6 +104,7 @@ export function dealPanelState(input: PanelInput): PanelState {
     const yourMove =
       deal.status !== "DISPUTED" &&
       !holdRunning &&
+      !deal.awaitingAgent &&
       deal.nextStep?.actor === viewer;
     return { kind: "step", dealId: deal.id, yourMove };
   }

@@ -4,7 +4,7 @@ import type { DealMode } from "@/generated/prisma/enums";
 import { CUSTODIAN_ROLES, withinLevel } from "@/lib/custody-roles";
 import { db } from "@/lib/db";
 import type { DealActor } from "@/lib/deal-machine";
-import { templateFor } from "@/lib/deal-templates";
+import { awaitsAgent, templateFor } from "@/lib/deal-templates";
 import { canSendMail, sendMail } from "@/server/mailer";
 import { notify } from "@/server/notifications";
 
@@ -154,10 +154,7 @@ export async function notifyNextActor(orderId: string): Promise<void> {
     // yet: telling them it is their move sent them looking for an address
     // that was not there. Whoever can take the deal is asked instead, and
     // the seller hears when the agent joins (`assignAgent` calls this again).
-    const template = templateFor(order.mode as DealMode).find(
-      (s) => s.position === next.position,
-    );
-    if (template?.needsAgent && !order.agentId) {
+    if (awaitsAgent(order.mode as DealMode, next.position, order.agentId)) {
       await askForAgent(order);
       return;
     }

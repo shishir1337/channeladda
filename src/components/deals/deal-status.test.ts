@@ -43,6 +43,17 @@ test("on a fastest deal the money note says the seller is paid once our agent is
   expect(moneyNote("FASTEST", "seller")).toMatch(/our agent is primary owner/);
 });
 
+test("once a fastest seller is paid, nobody is told the money is still held", () => {
+  // Found on the seller's deal page: "Channel Adda is holding the buyer's
+  // payment" after it had already gone into their wallet.
+  for (const viewer of ["buyer", "seller", "agent"] as const) {
+    const note = moneyNote("FASTEST", viewer, true);
+    expect(note).not.toMatch(/is holding|holds the (price|whole amount)/);
+    expect(note).toMatch(/paid/);
+  }
+  expect(moneyNote("FASTEST", "seller", true)).toMatch(/wallet/);
+});
+
 test("a finished safest sale tells the seller the buyer paid them", () => {
   const seller = statusSentence("COMPLETED", "SAFEST", "seller");
   expect(seller).toMatch(/paid you directly/);
@@ -307,6 +318,22 @@ describe("the headline follows the open step, not just the status", () => {
     expect(seller.sentence).toMatch(/wallet/);
     const agent = dealHeadline("IN_CUSTODY", "FASTEST", "agent", 6, "YOUTUBE");
     expect(agent.sentence).toMatch(/Make the buyer primary owner/);
+  });
+
+  test("while Channel Adda assigns an agent, the headline says so to everyone", () => {
+    for (const viewer of ["buyer", "seller"] as const) {
+      const h = dealHeadline(
+        "AGENT_VERIFYING",
+        "FASTEST",
+        viewer,
+        2,
+        "YOUTUBE",
+        true,
+      );
+      expect(h.label).toBe("Channel Adda is assigning an agent");
+      expect(h.short.length).toBeLessThanOrEqual(22);
+      expect(h.sentence).not.toMatch(/^Invite our agent/);
+    }
   });
 
   test("every headline has a short label that fits a list row", () => {

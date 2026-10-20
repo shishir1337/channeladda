@@ -71,6 +71,9 @@ export default async function DealPage({
   const safest = deal.mode === "SAFEST";
   const viewer = deal.viewerRole;
   const terminal = isTerminal(deal.status);
+  // Fastest pays the seller when our agent becomes primary owner, before the
+  // deal ends: from then on the money is theirs and only the channel is held.
+  const sellerPaid = !safest && deal.custodyAt !== null;
   const disputed = deal.status === "DISPUTED";
   // By whose step is open as well as by status: one status can cover the
   // seller's step and then the agent's, and the headline has to move on
@@ -81,6 +84,7 @@ export default async function DealPage({
     viewer,
     deal.nextStep?.position ?? null,
     deal.platform,
+    deal.awaitingAgent,
   );
   const sentence = headline.sentence;
 
@@ -219,10 +223,10 @@ export default async function DealPage({
             form together can be taller than a laptop viewport, and a stuck
             column that tall hides its own end. */}
         <div className="mt-4 flex min-w-0 flex-col gap-4 lg:mt-0">
-          {/* Safest only: where the buyer pays the seller directly. */}
-          <PayToCard deal={deal} />
           {/* The account the seller invites. Never shown to the buyer. */}
           <AgentInvite deal={deal} />
+          {/* Safest only: where the buyer pays the seller directly. */}
+          <PayToCard deal={deal} />
           {/* The buyer's account that receives ownership, for whoever
               transfers to it. */}
           <HandoverAccount
@@ -256,7 +260,11 @@ export default async function DealPage({
                         : deal.buyerPaidAt
                           ? "paid to the seller directly, the buyer says; the seller confirms it next"
                           : "paid to the seller directly, once our agent holds the channel"
-                      : "part of what Channel Adda is holding"
+                      : sellerPaid
+                        ? viewer === "seller"
+                          ? "paid into your Channel Adda wallet when our agent became primary owner"
+                          : "paid to the seller when our agent became primary owner"
+                        : "part of what Channel Adda is holding"
                   }
                 />
                 <Line
@@ -274,10 +282,12 @@ export default async function DealPage({
                 {terminal ? null : (
                   <Line
                     label={
-                      safest ? "Channel Adda holds" : "Channel Adda is holding"
+                      safest || sellerPaid
+                        ? "Channel Adda holds"
+                        : "Channel Adda is holding"
                     }
                     value={
-                      safest ? (
+                      safest || sellerPaid ? (
                         "The channel"
                       ) : (
                         <Price usd={deal.totalUsd / 100} />
@@ -285,7 +295,7 @@ export default async function DealPage({
                     }
                     money
                     note={
-                      safest
+                      safest || sellerPaid
                         ? "our agent holds it until it is handed to the buyer"
                         : "the price and our fee together"
                     }
@@ -294,7 +304,7 @@ export default async function DealPage({
               </dl>
               {terminal ? null : (
                 <p className="border-t border-line px-4 py-3 text-[0.8125rem] leading-relaxed text-muted sm:px-5">
-                  {moneyNote(deal.mode, viewer)}
+                  {moneyNote(deal.mode, viewer, sellerPaid)}
                 </p>
               )}
             </section>

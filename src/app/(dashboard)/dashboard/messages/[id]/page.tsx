@@ -230,6 +230,7 @@ export default async function ThreadPage({
                     deal.viewerRole,
                     deal.nextStep?.position ?? null,
                     deal.platform,
+                    deal.awaitingAgent,
                   ).label
                 }
               </Badge>
@@ -295,11 +296,12 @@ export default async function ThreadPage({
               ) : panel.kind === "step" && deal ? (
                 <div className="flex flex-col gap-3">
                   <DealNextStep deal={deal} staffIds={staffIds} />
+                  {/* "The account to invite is on this page": it is, here too,
+                      straight under the step that needs it. */}
+                  <AgentInvite deal={deal} />
                   {/* Safest: where the buyer pays the seller directly, which
                       the chat itself cannot carry. */}
                   <PayToCard deal={deal} />
-                  {/* "The account to invite is on this page": it is, here too. */}
-                  <AgentInvite deal={deal} />
                   <HandoverAccount
                     dealId={deal.id}
                     viewerRole={deal.viewerRole}

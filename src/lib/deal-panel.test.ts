@@ -52,6 +52,7 @@ function deal(over: Partial<PanelDeal>): PanelDeal {
       actor: "seller",
     },
     holdUntil: null,
+    awaitingAgent: false,
     ...over,
   };
 }
@@ -64,6 +65,18 @@ type Row = {
 };
 
 const ROWS: Row[] = [
+  // ---- waiting for Channel Adda to assign an agent
+  {
+    // Found in the browser: the seller's panel said "Your move" over a note
+    // saying Channel Adda was still assigning an agent to invite.
+    name: "seller: inviting the agent is nobody's move until one is assigned",
+    viewer: "seller",
+    input: {
+      listingStatus: "RESERVED",
+      deal: deal({ awaitingAgent: true }),
+    },
+    want: { kind: "step", dealId: "d1", yourMove: false },
+  },
   // ---- buyer
   {
     name: "buyer: listing on sale, nothing open",

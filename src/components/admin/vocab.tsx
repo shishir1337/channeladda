@@ -433,6 +433,8 @@ export const AUDIT_LABEL: Record<string, string> = {
   "deal.dispute_note": "added to a dispute’s record",
   "deal.expired": "let a payment window lapse",
   "deal.fee_paid": "cleared an opening payment",
+  "deal.handover_changed": "corrected the account to transfer to",
+  "deal.pay_to_saved": "said where to be paid",
   "deal.refunded": "refunded a buyer",
   "deal.returned": "returned a channel to its seller",
   "deal.step_completed": "completed a step",
