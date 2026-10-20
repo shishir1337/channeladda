@@ -2,7 +2,7 @@ import type { NavGroup } from "@/components/dashboard/app-shell";
 import { AppShell } from "@/components/dashboard/app-shell";
 import { NotificationBell } from "@/components/dashboard/notification-bell";
 import { getWaitingOnYou } from "@/server/dashboard";
-import { countDealsAwaiting } from "@/server/deals";
+import { balanceOf, countDealsAwaiting } from "@/server/deals";
 import { countUnreadThreads } from "@/server/messages";
 import { listNotifications, unreadCount } from "@/server/notifications";
 import { type CurrentUser, getCurrentUser } from "@/server/session";
@@ -65,11 +65,12 @@ export default async function DashboardLayout({ children }: LayoutProps<"/">) {
   const user = await getCurrentUser();
   if (!user) return <>{children}</>;
 
-  const [waiting, unread, deals, bell] = await Promise.all([
+  const [waiting, unread, deals, bell, balanceCents] = await Promise.all([
     getWaitingOnYou(user.id),
     countUnreadThreads(user.id),
     countDealsAwaiting(user.id),
     bellFor(user.id),
+    balanceOf(user.id),
   ]);
 
   const groups: NavGroup[] = [
@@ -149,7 +150,12 @@ export default async function DashboardLayout({ children }: LayoutProps<"/">) {
   ];
 
   return (
-    <AppShell groups={groups} bell={bell} user={shellUser(user)}>
+    <AppShell
+      groups={groups}
+      bell={bell}
+      balanceCents={balanceCents}
+      user={shellUser(user)}
+    >
       {children}
     </AppShell>
   );

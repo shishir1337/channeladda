@@ -25,6 +25,7 @@ import { useEffect, useState } from "react";
 import { type ShellUser, UserMenu } from "@/components/app/user-menu";
 import { ChannelAddaLogo } from "@/components/icons/brand-icons";
 import { ThemeToggle } from "@/components/site/theme-toggle";
+import { WalletChip } from "@/components/site/wallet-balance";
 import {
   Sheet,
   SheetContent,
@@ -354,6 +355,7 @@ export function AppShell({
   staff,
   user,
   bell,
+  balanceCents,
   children,
 }: {
   groups: NavGroup[];
@@ -366,6 +368,8 @@ export function AppShell({
    * Passed in rather than fetched here so this stays a frame.
    */
   bell?: React.ReactNode;
+  /** The member's wallet balance, in cents; left out in the staff area. */
+  balanceCents?: number;
   children: React.ReactNode;
 }) {
   const [collapsed, setCollapsed] = useState(false);
@@ -563,6 +567,12 @@ export function AppShell({
               </nav>
 
               <div className="flex shrink-0 items-center gap-0.5">
+                {balanceCents !== undefined ? (
+                  <WalletChip
+                    cents={balanceCents}
+                    className="hidden rounded-md px-2.5 text-[0.8125rem] hover:bg-black/[0.05] sm:inline-flex dark:hover:bg-white/[0.06] pointer-fine:h-8"
+                  />
+                ) : null}
                 {bell}
                 <ThemeToggle
                   className={cn(

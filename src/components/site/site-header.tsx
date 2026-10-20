@@ -10,6 +10,7 @@ import {
 import { ChannelAddaLogo } from "@/components/icons/brand-icons";
 import { CurrencySwitcher } from "@/components/site/currency-switcher";
 import { ThemeToggle } from "@/components/site/theme-toggle";
+import { HeaderWallet } from "@/components/site/wallet-balance";
 import { Button } from "@/components/ui/button";
 import {
   Sheet,
@@ -87,6 +88,7 @@ export function SiteHeader() {
           </Link>
           <CurrencySwitcher className="hidden sm:inline-flex" />
           <ThemeToggle />
+          <HeaderWallet className="hidden sm:inline-flex" />
           <AccountMenu className="hidden sm:inline-flex" />
           <Button asChild size="sm" className="hidden sm:inline-flex">
             <Link href="/sell">Sell an account</Link>
