@@ -43,6 +43,7 @@ function formatValue(key: string, value: unknown): string {
     return (value / 100).toLocaleString("en-US", {
       style: "currency",
       currency: "USD",
+      minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     });
   }

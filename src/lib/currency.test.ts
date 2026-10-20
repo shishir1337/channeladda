@@ -13,9 +13,18 @@ test("a small fee is shown with its cents, not rounded to nothing", () => {
   expect(formatIn(usd, 2.97)).toBe("$2.97");
 });
 
-test("a whole amount is not given cents it does not have", () => {
-  expect(formatIn(usd, 5)).toBe("$5");
-  expect(formatIn(usd, 4_500)).toBe("$4,500");
+test("a dollar amount always shows two decimals, a whole one too", () => {
+  // The owner's call: "$0" reads as a broken figure next to "$190.10", so
+  // every dollar amount has its two decimals.
+  expect(formatIn(usd, 0)).toBe("$0.00");
+  expect(formatIn(usd, 5)).toBe("$5.00");
+  expect(formatIn(usd, 4_500)).toBe("$4,500.00");
+});
+
+test("a small converted amount shows two decimals, a whole one too", () => {
+  const bdt = currencies.find((c) => c.code === "BDT");
+  if (!bdt) throw new Error("BDT missing from the currency list");
+  expect(formatIn(bdt, 0)).toMatch(/0\.00$/);
 });
 
 test("a dollar amount keeps its cents at any size: what is charged is what is shown", () => {

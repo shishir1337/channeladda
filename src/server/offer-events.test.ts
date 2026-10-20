@@ -421,7 +421,7 @@ test(
       where: { userId: buyer.id },
     });
     expect(told.map((n) => n.title)).toEqual([
-      `Your offer of $80 was accepted`,
+      `Your offer of $80.00 was accepted`,
     ]);
     const old = await db.offer.findUniqueOrThrow({
       where: { id: stale.offerId },

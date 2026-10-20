@@ -47,14 +47,13 @@ export type ChatEvent =
   | { type: "dispute-raised"; name: string }
   | { type: "deal-ended"; outcome: string };
 
-/** $2,000 for whole dollars, $99.50 when there are cents. */
+/** $2,000.00, $99.50: always two decimals, as every amount on the site. */
 export function money(cents: number): string {
-  const whole = cents % 100 === 0;
   return (cents / 100).toLocaleString("en-US", {
     style: "currency",
     currency: "USD",
-    minimumFractionDigits: whole ? 0 : 2,
-    maximumFractionDigits: whole ? 0 : 2,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   });
 }
 

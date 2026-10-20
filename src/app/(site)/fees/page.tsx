@@ -125,9 +125,12 @@ export default async function FeesPage() {
                 {formatRate(badge.resellerDiscountBp)}% less.
               </span>{" "}
               The badge costs $
-              {(badge.resellerPriceUsd / 100).toLocaleString("en-US")} for 30
-              days, from your wallet, and takes the discount off every fee you
-              pay while it lasts
+              {(badge.resellerPriceUsd / 100).toLocaleString("en-US", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}{" "}
+              for 30 days, from your wallet, and takes the discount off every
+              fee you pay while it lasts
               {badge.sellerFeeBp > 0 ? " — buying or selling" : ""}.{" "}
               <Link
                 href="/help/rating-points-and-the-reseller-badge"
