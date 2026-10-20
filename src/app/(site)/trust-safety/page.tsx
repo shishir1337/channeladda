@@ -16,7 +16,7 @@ export const metadata: Metadata = {
 const disputeSteps = [
   {
     title: "You open the dispute",
-    body: "One button on the deal page. The deal freezes where it stands, the account stays in our custody if it is there, and the money we hold for it stays with us: it is not in the seller's balance until the deal completes, so it cannot be withdrawn while the dispute is open.",
+    body: "One button on the deal page. The deal freezes where it stands, the account stays in our custody if it is there, and any money we still hold for it stays with us, where nobody can withdraw it while the dispute is open.",
   },
   {
     title: "A moderator reads the record",
@@ -89,9 +89,9 @@ export default function TrustSafetyPage() {
                   </span>{" "}
                   On a Fastest deal you pay Channel Adda and nobody else. On a
                   Safest deal you pay the seller directly only once the deal
-                  says our agent is primary owner, and only the way you agreed
-                  in the deal chat. Anyone asking for money any other way is
-                  running a scam, whatever their rating says.
+                  says our agent holds the account, and only to the details the
+                  seller gave on the deal. Anyone asking for money any other way
+                  is running a scam, whatever their rating says.
                 </li>
                 <li>
                   <span className="font-semibold text-fg">
@@ -102,10 +102,10 @@ export default function TrustSafetyPage() {
                 </li>
                 <li>
                   <span className="font-semibold text-fg">
-                    Work the checklist before confirming.
+                    Work the checklist the moment the account is yours.
                   </span>{" "}
-                  Confirming starts the clock on the seller getting paid. Change
-                  the recovery email and phone first.
+                  Change the recovery email and phone first, and say so in the
+                  deal chat straight away if anything is wrong.
                 </li>
               </ul>
             </div>

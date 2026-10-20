@@ -128,7 +128,8 @@ export async function getWallet(userId: string): Promise<Wallet> {
       where: { userId },
       select: { address: true, network: true },
     }),
-    // The price is on our books once a Fastest deal is paid. Never on
+    // The price is on our books once a Fastest deal is paid, until our
+    // agent's custody pays it into this balance (`custodyAt`). Never on
     // Safest: the buyer pays the seller directly, and its opening payment
     // is the fee alone — so a Safest buyer's Paid is no promise of ours.
     db.order.findMany({
@@ -137,6 +138,7 @@ export async function getWallet(userId: string): Promise<Wallet> {
         status: { notIn: [...TERMINAL_STATUSES] },
         mode: "FASTEST",
         paymentRef: { not: null },
+        custodyAt: null,
       },
       orderBy: { createdAt: "desc" },
       select: {

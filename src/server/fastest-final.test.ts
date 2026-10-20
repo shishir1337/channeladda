@@ -366,3 +366,123 @@ test(
     ).toEqual({ ok: false, reason: "cap-reached" });
   }),
 );
+
+test(
+  "a dispute raised once the seller has made our agent primary owner can be decided for the seller",
+  withCleanDb(async () => {
+    // The seller has done everything; our agent has not confirmed yet. A
+    // dispute freezes the steps, so finishing it has to be possible from
+    // the dispute, or the only outcome left would refund a seller who
+    // performed.
+    const t = await paidFastest();
+    const finance = await seedUser("FINANCE");
+    await step(t.orderId, 2, t.seller.id);
+    await step(t.orderId, 3, t.agent.id);
+    await passHold(t.orderId);
+    await step(t.orderId, 4, t.seller.id);
+    await resolveDeal({
+      orderId: t.orderId,
+      to: "DISPUTED",
+      byUserId: t.seller.id,
+      note: "our agent has not confirmed",
+    });
+    expect(
+      await resolveDeal({
+        orderId: t.orderId,
+        to: "COMPLETED",
+        byUserId: finance.id,
+        note: "the agent is primary owner",
+      }),
+    ).toEqual({ ok: true });
+    expect(await balanceOf(t.seller.id)).toBe(10_000);
+  }),
+);
+
+test(
+  "a deal opened under the earlier Fastest steps, already handed over, can still be decided for the seller",
+  withCleanDb(async () => {
+    // Before the owner's process the seller made the buyer primary owner
+    // themselves and nothing stamped custody. Such a deal can only be
+    // finished from a dispute, and that must still pay the seller.
+    const t = await paidFastest();
+    const finance = await seedUser("FINANCE");
+    const old = [
+      ["Pay the full amount", "buyer"],
+      ["Add the buyer as manager", "seller"],
+      ["Confirm manager access", "buyer"],
+      ["Make the buyer primary owner", "seller"],
+      ["Confirm primary ownership", "buyer"],
+      ["Release the seller's funds", "agent"],
+    ] as const;
+    await db.transferStep.deleteMany({ where: { orderId: t.orderId } });
+    await db.transferStep.createMany({
+      data: old.map(([label, actor], index) => ({
+        orderId: t.orderId,
+        position: index + 1,
+        label,
+        actor,
+        completedAt: index < 5 ? new Date() : null,
+      })),
+    });
+    await db.order.update({
+      where: { id: t.orderId },
+      data: { status: "AWAITING_RELEASE", handoverAt: new Date() },
+    });
+
+    await resolveDeal({
+      orderId: t.orderId,
+      to: "DISPUTED",
+      byUserId: t.seller.id,
+      note: "never released",
+    });
+    expect(
+      await resolveDeal({
+        orderId: t.orderId,
+        to: "COMPLETED",
+        byUserId: finance.id,
+        note: "the buyer is primary owner",
+      }),
+    ).toEqual({ ok: true });
+    expect(await balanceOf(t.seller.id)).toBe(10_000);
+  }),
+);
+
+test(
+  "once the seller is paid, their wallet no longer lists the sale as held",
+  withCleanDb(async () => {
+    // The price was in their balance and still under "Held for your sales":
+    // the same money shown twice.
+    const { getWallet } = await import("@/server/wallet");
+    const t = await paidFastest();
+    await step(t.orderId, 2, t.seller.id);
+    await step(t.orderId, 3, t.agent.id);
+    expect((await getWallet(t.seller.id)).heldForSales).toHaveLength(1);
+
+    await passHold(t.orderId);
+    await step(t.orderId, 4, t.seller.id);
+    await step(t.orderId, 5, t.agent.id);
+    const wallet = await getWallet(t.seller.id);
+    expect(wallet.heldForSales).toHaveLength(0);
+    expect(wallet.balanceUsd).toBe(10_000);
+  }),
+);
+
+test(
+  "a Fastest deal whose agent can no longer act is put in front of staff to reassign",
+  withCleanDb(async () => {
+    // A Fastest agent owns the channel from step 3, and presses the steps
+    // after; suspended, they freeze the deal like a Safest one.
+    const { listDealsNeedingReassignment } = await import("@/server/deal-feed");
+    const t = await paidFastest();
+    await step(t.orderId, 2, t.seller.id);
+    await step(t.orderId, 3, t.agent.id);
+    await db.user.update({
+      where: { id: t.agent.id },
+      data: { bannedAt: new Date() },
+    });
+
+    const listed = await listDealsNeedingReassignment();
+    expect(listed.map((o) => o.id)).toContain(t.orderId);
+    expect(listed.find((o) => o.id === t.orderId)?.mode).toBe("FASTEST");
+  }),
+);

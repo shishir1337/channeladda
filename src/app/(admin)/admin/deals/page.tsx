@@ -415,7 +415,7 @@ export default async function AdminDealsPage({
                   reference={order.reference}
                   tags={
                     <>
-                      <DealModeBadge mode="SAFEST" />
+                      <DealModeBadge mode={order.mode} />
                       <OrderStatusBadge status={order.status} />
                       <Waited since={order.createdAt} prefix="open" />
                       <span className="text-xs text-subtle">
@@ -433,7 +433,7 @@ export default async function AdminDealsPage({
                 ) : null}
                 <EndDeal
                   orderId={order.id}
-                  mode="SAFEST"
+                  mode={order.mode}
                   status={order.status}
                   canMoveMoney={isFinance}
                   paid={order.paymentRef !== null}

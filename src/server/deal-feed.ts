@@ -3,7 +3,11 @@ import "server-only";
 import type { OrderStatus } from "@/generated/prisma/enums";
 import { CUSTODIAN_ROLES } from "@/lib/custody-roles";
 import { db } from "@/lib/db";
-import type { DealActor } from "@/lib/deal-machine";
+import {
+  AGENT_HOLDS,
+  type DealActor,
+  FASTEST_AGENT_HOLDS,
+} from "@/lib/deal-machine";
 
 /**
  * Everything that has happened to every deal, newest first.
@@ -192,22 +196,19 @@ export async function listDealsNeedingAgent(limit = 50) {
 /**
  * Deals held by an agent who can no longer act on them.
  *
- * A suspended agent still owns the channels they were holding, and so does one
- * moved to another role — neither can act on the deal any more (roleOnDeal) —
+ * A suspended agent still owns the channels they were holding, in either
+ * mode, and so does one moved to another role — neither can act on the deal any more (roleOnDeal) —
  * so these need a human to move them on rather than waiting to be noticed.
  */
 export async function listDealsNeedingReassignment(limit = 50) {
   return db.order.findMany({
     where: {
-      mode: "SAFEST",
-      status: {
-        in: [
-          "AWAITING_CUSTODY",
-          "IN_CUSTODY",
-          "AWAITING_BUYER_PAYMENT",
-          "AWAITING_HANDOVER",
-        ],
-      },
+      // In both modes: a Fastest agent owns the channel too, from the
+      // seller's invite until they hand it to the buyer.
+      OR: [
+        { mode: "SAFEST", status: { in: [...AGENT_HOLDS] } },
+        { mode: "FASTEST", status: { in: [...FASTEST_AGENT_HOLDS] } },
+      ],
       agent: {
         OR: [
           { bannedAt: { not: null } },
@@ -220,6 +221,7 @@ export async function listDealsNeedingReassignment(limit = 50) {
     select: {
       id: true,
       reference: true,
+      mode: true,
       status: true,
       // A suspended agent holding somebody's channel is the most urgent
       // thing on the staff desk, and without this it was the only queue

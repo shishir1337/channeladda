@@ -316,7 +316,7 @@ export default async function WalletPage({
           id="held"
           title="Held for your sales"
           count={wallet.heldForSales.length}
-          info="The buyer has paid Channel Adda for these. We hold it until the transfer completes, then it moves to your balance. Until then it cannot be withdrawn, so it can still go back to the buyer if the channel never reaches them."
+          info="The buyer has paid Channel Adda for these. We hold it until our agent is the channel's primary owner, then it moves to your balance. Until then it cannot be withdrawn, so it can still go back to the buyer if the channel never reaches our agent."
           actions={
             <Price
               usd={wallet.heldForSalesUsd / 100}

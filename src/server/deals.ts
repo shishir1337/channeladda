@@ -1767,6 +1767,32 @@ function movesPlatformMoney(
   return movesHeldMoney(to, order.paymentRef !== null);
 }
 
+/**
+ * The seller's own handover step on a Fastest deal, under the current steps
+ * or an earlier set. A deal disputed after it — the seller made our agent
+ * primary owner and our agent never confirmed, or a deal from before the
+ * owner's process where the seller made the buyer primary owner — has to be
+ * decidable for the seller: they have done everything, and the steps are
+ * frozen, so refunding would be the only way out.
+ */
+const SELLER_HANDOVER_LABELS: readonly string[] = [
+  "Make the agent primary owner",
+  "Make the buyer primary owner",
+  "Promote the buyer to primary owner",
+];
+
+async function sellerDidHandOver(orderId: string): Promise<boolean> {
+  const done = await db.transferStep.count({
+    where: {
+      orderId,
+      actor: "seller",
+      label: { in: [...SELLER_HANDOVER_LABELS] },
+      completedAt: { not: null },
+    },
+  });
+  return done > 0;
+}
+
 export async function resolveDeal(input: {
   orderId: string;
   to:
@@ -1866,13 +1892,13 @@ export async function resolveDeal(input: {
     return { ok: false, reason: "in-custody" };
   }
 
-  // Paying a Fastest seller from a dispute before our agent is primary
-  // owner would leave them with the money and the channel both. The Safest
-  // guard above is the same rule from the other side.
+  // Paying a Fastest seller from a dispute before they have handed the
+  // channel over would leave them with the money and the channel both. The
+  // Safest guard above is the same rule from the other side.
   if (
     input.to === "COMPLETED" &&
     order.mode === "FASTEST" &&
-    !order.custodyAt
+    !(order.custodyAt || (await sellerDidHandOver(order.id)))
   ) {
     return { ok: false, reason: "not-handed-over" };
   }

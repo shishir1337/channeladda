@@ -129,7 +129,7 @@ export const faqs = [
   },
   {
     q: "Which payment methods do you accept?",
-    a: "Payments to Channel Adda and payouts are processed in crypto through Cryptomus — USDT, BTC, ETH, TRX and 20+ other assets — and a Fastest seller withdraws to their own wallet once the deal completes. A Safest price goes from the buyer to the seller directly, by whatever method the two of you agree in the deal chat.",
+    a: "Payments to Channel Adda and payouts are processed in crypto through Cryptomus — USDT, BTC, ETH, TRX and 20+ other assets — and a Fastest seller withdraws to their own wallet once our agent holds the account. A Safest price goes from the buyer to the seller directly, to the payment details the seller gives on the deal.",
   },
   {
     q: "How do you verify that a seller really owns the account?",
@@ -137,7 +137,7 @@ export const faqs = [
   },
   {
     q: "What fees does Channel Adda charge?",
-    a: "Buyers pay a platform fee, set by us and shown in full on every listing and on the fees page before you commit. On a Fastest deal the price comes to us too; on a Safest deal you pay it to the seller directly, once our agent holds the account. If a seller fee is set, the fees page shows it, and it is taken from the price when a Fastest deal completes; there is no cost to create an account or publish a listing.",
+    a: "Buyers pay a platform fee, set by us and shown in full on every listing and on the fees page before you commit. On a Fastest deal the price comes to us too; on a Safest deal you pay it to the seller directly, once our agent holds the account. If a seller fee is set, the fees page shows it, and it is taken from the price when a Fastest seller is paid; there is no cost to create an account or publish a listing.",
   },
   {
     q: "What happens if a transfer goes wrong?",

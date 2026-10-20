@@ -40,7 +40,7 @@ const MESSAGES: Record<repo.DealFailure, string> = {
   "on-hold":
     "The waiting period is still running, so this step is not open yet. The chat shows when it ends, and we email you the moment it does.",
   "not-handed-over":
-    "Our agent is not primary owner yet, so paying the seller now would leave them with the money and the channel both. Refund the buyer, or wait until our agent holds the channel.",
+    "The seller has not handed the channel over yet, so paying them now would leave them with the money and the channel both. Refund the buyer instead.",
   "seller-paid":
     "The seller was paid when our agent became primary owner, so there is nothing left to refund. Finish the deal: our agent hands the channel to the buyer.",
   "no-agent":

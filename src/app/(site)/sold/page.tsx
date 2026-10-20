@@ -150,8 +150,9 @@ export default async function SoldPage() {
                 Every one of these was supervised by an agent
               </h2>
               <p className="mt-2.5 text-sm leading-relaxed text-muted">
-                The buyer confirmed the handover before the deal closed, and at
-                every step either the money or the account was held by us.
+                Our agent took each account from its seller and handed it on,
+                and at every step either the money or the account was held by
+                us.
               </p>
             </div>
             <Button asChild size="lg" className="shrink-0">

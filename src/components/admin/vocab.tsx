@@ -267,15 +267,20 @@ export function custodyFacts(
 ) {
   const finished = isTerminal(status);
   const disputed = status === "DISPUTED";
-  const agentHolds =
-    mode === "SAFEST" &&
-    (AGENT_HOLDS.includes(status) || (disputed && facts?.inCustody === true));
-  // Every paid, running deal has money with us: price and fee on Fastest,
-  // the admin fee on Safest, where every state the agent holds the channel
-  // in comes after the opening payment.
+  const fastest = mode === "FASTEST";
+  // Safest: from the seller's invite. Fastest: once our agent is primary
+  // owner (custody), which is also when the seller was paid.
+  const agentHolds = fastest
+    ? status === "IN_CUSTODY" || (disputed && facts?.inCustody === true)
+    : AGENT_HOLDS.includes(status) || (disputed && facts?.inCustody === true);
+  const sellerPaid = fastest && agentHolds;
+  // Every paid, running deal has money with us — price and fee on Fastest
+  // until custody pays the seller, the admin fee on Safest, where every
+  // state the agent holds the channel in comes after the opening payment.
   const platformHolds =
-    (mode === "FASTEST" ? PLATFORM_HOLDS : AGENT_HOLDS).includes(status) ||
-    (disputed && facts?.paid === true);
+    !sellerPaid &&
+    ((fastest ? PLATFORM_HOLDS : AGENT_HOLDS).includes(status) ||
+      (disputed && facts?.paid === true));
   const unknown = disputed && facts === undefined;
   const beforeAnything = status === "AWAITING_PAYMENT";
 
@@ -285,15 +290,17 @@ export function custodyFacts(
       ? "The agent owns the channel."
       : mode === "SAFEST"
         ? "The seller still owns the channel."
-        : "The seller owns the channel until the handover.";
+        : "The seller is still primary owner; our agent takes the channel from them first.";
 
   const money = unknown
     ? "Paused. Check whether the opening payment cleared."
-    : platformHolds
-      ? mode === "SAFEST"
-        ? "We are holding the admin fee. The price goes to the seller directly."
-        : "We are holding the price and the fee."
-      : "Nothing has cleared to us yet.";
+    : sellerPaid
+      ? "The seller has been paid. We hold none of this deal's money."
+      : platformHolds
+        ? mode === "SAFEST"
+          ? "We are holding the admin fee. The price goes to the seller directly."
+          : "We are holding the price and the fee."
+        : "Nothing has cleared to us yet.";
 
   let recoverable: string;
   if (finished) {
@@ -303,6 +310,9 @@ export function custodyFacts(
       "Disputed. Read the record before deciding: what can be returned depends on how far the deal got.";
   } else if (beforeAnything) {
     recoverable = "Nothing has moved. Cancelling costs nobody anything.";
+  } else if (sellerPaid) {
+    recoverable =
+      "The seller has been paid, so there is no refund. The only outcome left is finishing it: our agent makes the buyer primary owner.";
   } else if (agentHolds) {
     recoverable =
       "The channel has to go back to the seller, or on to the buyer — only on, once the seller has pressed Received. Returning it refunds the admin fee unless our agent has taken custody; finance decides.";
