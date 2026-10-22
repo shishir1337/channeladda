@@ -83,6 +83,7 @@ export const auth = betterAuth({
           "The link below works once and expires in an hour. " +
           "If this was not you, ignore this email — nothing has changed.",
         link: url,
+        action: "Reset password",
       });
     },
   },
@@ -253,6 +254,7 @@ export const auth = betterAuth({
         await sendMail({
           to: email,
           subject: `${otp} is your Channel Adda code`,
+          heading: "Confirm your email address",
           body:
             "Enter this code on Channel Adda to confirm your email address. " +
             "It works once and expires in 10 minutes. " +

@@ -2,6 +2,8 @@ import "server-only";
 
 import type { NotificationKind } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
+import { emailAction } from "@/lib/email-layout";
+import { siteUrl } from "@/lib/site-url";
 import { canSendMail, sendMail } from "@/server/mailer";
 
 /**
@@ -38,7 +40,7 @@ export type NotifyInput = {
    */
   collapseKey?: string;
   /** Send an email as well. Off by default — see rule 2. */
-  email?: { subject: string; body: string; link?: string };
+  email?: { subject: string; body: string; link?: string; action?: string };
 };
 
 export async function notify(input: NotifyInput): Promise<void> {
@@ -86,7 +88,23 @@ export async function notify(input: NotifyInput): Promise<void> {
         select: { email: true },
       });
       if (person?.email) {
-        await sendMail({ to: person.email, ...input.email });
+        // The button goes where the notification does, unless the caller
+        // chose a link of its own.
+        const href = input.href;
+        await sendMail({
+          to: person.email,
+          ...input.email,
+          link:
+            input.email.link ??
+            (href
+              ? /^https?:/.test(href)
+                ? href
+                : `${siteUrl()}${href}`
+              : undefined),
+          action:
+            input.email.action ??
+            (!input.email.link && href ? emailAction(href) : undefined),
+        });
       }
     }
   } catch (error) {

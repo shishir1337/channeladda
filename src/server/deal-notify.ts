@@ -80,6 +80,7 @@ export function turnEmail(input: {
       "Nothing moves until you do this, so the other side is waiting.",
     ].join("\n"),
     link: input.href,
+    action: "Open the deal",
   };
 }
 
@@ -293,6 +294,7 @@ export async function notifyHandoverChanged(input: {
         "If you already invited the old one, remove that invite first.",
       ].join("\n"),
       link: `${siteUrl()}${href}`,
+      action: "Open the deal",
     });
   } catch (error) {
     console.error(`[deal-notify] handover ${input.orderId}`, error);

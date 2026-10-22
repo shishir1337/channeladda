@@ -359,6 +359,7 @@ export async function remindEndingPasses(
             "You can extend it by 30 days from your wallet, from your balance or with crypto. Paying early adds the days on to the end.",
           ].join("\n"),
           link: `${process.env.NEXT_PUBLIC_SITE_URL ?? process.env.BETTER_AUTH_URL ?? "http://localhost:3000"}/dashboard/wallet#reseller`,
+          action: "Extend the badge",
         });
       } catch (error) {
         console.error(`[reseller] reminder for ${pass.userId}`, error);

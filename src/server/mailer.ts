@@ -1,6 +1,7 @@
 import "server-only";
 
 import nodemailer, { type Transporter } from "nodemailer";
+import { type EmailContent, emailHtml, emailText } from "@/lib/email-layout";
 
 /**
  * Outbound email.
@@ -16,15 +17,8 @@ import nodemailer, { type Transporter } from "nodemailer";
  * reset is far worse than a loud failure: the person is locked out and nobody
  * finds out until they complain.
  */
-export type Mail = {
-  to: string;
-  subject: string;
-  body: string;
-  /** Included in the log line, and as a link in the HTML, so it is clickable. */
-  link?: string;
-  /** A code to type on the site, set large in the HTML so it reads at a glance. */
-  code?: string;
-};
+/** One email: who it goes to, and what `@/lib/email-layout` lays out. */
+export type Mail = { to: string } & EmailContent;
 
 type SmtpConfig = {
   host: string;
@@ -77,53 +71,6 @@ function transporter(config: SmtpConfig): Transporter {
   return globalForMail.mailer;
 }
 
-/** Plain text, with the code or link on its own line so it is easy to pick out. */
-function textBody(mail: Mail): string {
-  const extra = [mail.code, mail.link].filter(Boolean).join("\n\n");
-  return extra ? `${mail.body}\n\n${extra}\n` : `${mail.body}\n`;
-}
-
-/**
- * The same content as HTML.
- *
- * Deliberately plain: a transactional email that looks like a newsletter is
- * the one a spam filter holds back, and the only thing that matters here is
- * that the link is clickable.
- */
-function htmlBody(mail: Mail): string {
-  const escapeHtml = (value: string) =>
-    value
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;");
-
-  const paragraphs = mail.body
-    .split(/\n{2,}/)
-    .map(
-      (p) =>
-        `<p style="margin:0 0 16px">${escapeHtml(p).replace(/\n/g, "<br>")}</p>`,
-    )
-    .join("");
-
-  const code = mail.code
-    ? `<p style="margin:24px 0;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:32px;font-weight:700;letter-spacing:8px">${escapeHtml(mail.code)}</p>`
-    : "";
-
-  const link = mail.link
-    ? `<p style="margin:24px 0"><a href="${escapeHtml(mail.link)}" style="display:inline-block;padding:12px 20px;background:#111;color:#fff;border-radius:10px;text-decoration:none;font-weight:600">Open Channel Adda</a></p>` +
-      `<p style="margin:0;color:#666;font-size:13px">Or paste this into your browser:<br>${escapeHtml(mail.link)}</p>`
-    : "";
-
-  return (
-    `<div style="font-family:system-ui,-apple-system,Segoe UI,sans-serif;font-size:15px;line-height:1.6;color:#111;max-width:520px">` +
-    paragraphs +
-    code +
-    link +
-    `</div>`
-  );
-}
-
 /**
  * Is there anywhere for mail to go?
  *
@@ -169,8 +116,8 @@ export async function sendMail(mail: Mail): Promise<void> {
     from: config.from,
     to: mail.to,
     subject: mail.subject,
-    text: textBody(mail),
-    html: htmlBody(mail),
+    text: emailText(mail),
+    html: emailHtml(mail),
   });
 }
 
