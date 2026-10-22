@@ -153,6 +153,10 @@ test(
         title: `Thing ${i}`,
         body: "Body",
       });
+      // createdAt is stored to the millisecond, and a local database answers
+      // fast enough for two of these to share one — which is a tie, not an
+      // order.
+      await new Promise((resolve) => setTimeout(resolve, 2));
     }
 
     const rows = await listNotifications(user.id, 3);
