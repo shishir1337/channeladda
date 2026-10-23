@@ -299,9 +299,13 @@ export default async function ListingPage({
                 All {platform.name} {platform.assetNoun}
               </Link>
             </div>
-            <ul className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {/* Swiped sideways on a phone, as on the homepage. */}
+            <ul className="no-scrollbar -mx-4 mt-6 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:snap-none sm:grid-cols-2 sm:overflow-visible sm:px-0 sm:pb-0 xl:grid-cols-3">
               {similar.map((item) => (
-                <li key={item.id}>
+                <li
+                  key={item.id}
+                  className="w-[82%] shrink-0 snap-start sm:w-auto"
+                >
                   <ListingCard listing={item} />
                 </li>
               ))}

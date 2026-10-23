@@ -120,23 +120,18 @@ export function MonetizationNotice({ listing }: { listing: Listing }) {
       />
       <div className="min-w-0">
         <h2 className="text-base font-semibold text-fg">
-          Revenue does not transfer with this account
+          Revenue does not move with the channel
         </h2>
-        <p className="mt-2 text-sm leading-relaxed text-muted">
+        {/* Two sentences where there were two paragraphs: it is a warning,
+            read on a phone, and has one thing to say. */}
+        <p className="mt-1.5 text-sm leading-relaxed text-muted">
           The{" "}
           <Price
             usd={listing.monthlyRevenue}
             className="font-semibold text-fg"
           />{" "}
-          per month shown above is paid to the current owner&apos;s own ad
-          account, which is tied to their tax identity and cannot be sold. After
-          the handover you will need to connect your own account and be approved
-          again.
-        </p>
-        <p className="mt-3 text-sm leading-relaxed text-muted">
-          Buy this listing for the audience and the content library. Treat the
-          revenue figure as evidence of what the audience earns, not as income
-          that arrives on day one.
+          a month goes to the seller&apos;s own ad account. After the handover
+          you connect your own and apply again.
         </p>
       </div>
     </div>
@@ -145,11 +140,8 @@ export function MonetizationNotice({ listing }: { listing: Listing }) {
 
 export function TransferPanel({ platform }: { platform: Platform }) {
   return (
-    <Panel title={`How this ${platform.name} handover works`} id="transfer">
-      <p className="text-sm leading-relaxed text-muted">
-        {platform.transferNote}
-      </p>
-      <ol className="mt-5 flex flex-col gap-3">
+    <Panel title={`How the ${platform.name} handover works`} id="transfer">
+      <ol className="flex flex-col gap-3">
         {platform.transferSteps.map((step, i) => (
           <li key={step} className="flex gap-3.5">
             <span className="tnum flex size-7 shrink-0 items-center justify-center rounded-full border border-line bg-surface-2 text-xs font-semibold text-muted">
@@ -162,11 +154,9 @@ export function TransferPanel({ platform }: { platform: Platform }) {
         ))}
       </ol>
       <p className="mt-5 rounded-xl border border-line bg-bg-subtle p-4 text-[0.8125rem] leading-relaxed text-muted">
-        On a Fastest deal our agent takes the channel from the seller. You are
-        invited as owner for{" "}
+        On Fastest you are an owner for{" "}
         <span className="font-semibold text-fg">{platform.holdDays} days</span>,
-        then our agent becomes primary owner, the seller is paid, and our agent
-        makes you primary owner.{" "}
+        then made primary owner.{" "}
         <Link
           href="/how-it-works"
           className="font-medium text-fg underline underline-offset-4 decoration-line-strong hover:decoration-fg"
