@@ -7,17 +7,17 @@ const sellerSteps = [
   {
     step: "1",
     title: "Publish your listing",
-    body: "Add the handle, metrics and asking price. Free, and it takes about ten minutes.",
+    body: "Free, and about ten minutes.",
   },
   {
     step: "2",
     title: "Verify ownership",
-    body: "Drop our one-time code in your bio or description. On YouTube we read it live; elsewhere a moderator checks the account.",
+    body: "Paste our code in your description. A YouTube channel goes live at once.",
   },
   {
     step: "3",
     title: "Get paid, either way",
-    body: "On a Fastest deal the money lands in your Channel Adda wallet once our agent holds the account, and you withdraw it to your own crypto wallet. On a Safest deal the buyer pays you directly once our agent holds the account — and our agent transfers it to them only after you confirm the money arrived.",
+    body: "Fastest: we pay your wallet once our agent has the channel. Safest: the buyer pays you directly.",
   },
 ];
 
@@ -29,12 +29,10 @@ export function SellerCta() {
           <div className="grid gap-10 lg:grid-cols-2 lg:gap-16">
             <div>
               <h2 className="text-[1.625rem] leading-[1.15] font-semibold tracking-[-0.025em] sm:text-[2rem]">
-                Your channel is an asset. Cash it out safely.
+                Sell your channel safely
               </h2>
               <p className="mt-4 max-w-lg text-[0.9375rem] leading-relaxed text-muted sm:text-base">
-                List for free, put your account in front of active buyers, and
-                let a supervised handover prove you are serious. No listing fee
-                — we earn a fee on deals, never on listings.
+                Free to list. We only take a fee when a deal completes.
               </p>
 
               <ul className="mt-6 flex flex-wrap gap-x-5 gap-y-2.5">

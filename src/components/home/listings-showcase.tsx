@@ -63,8 +63,8 @@ export function ListingsShowcase({ listings }: { listings: Listing[] }) {
     <Section id="browse" className="scroll-mt-24">
       <Container>
         <SectionHeading
-          title="Accounts on the block right now"
-          description="Ownership verified, analytics screenshots on file, and every seller through KYC before a listing goes live."
+          title="Accounts for sale now"
+          description="Every one checked for ownership."
         />
 
         <Tabs defaultValue="featured" className="mt-8 sm:mt-10">
@@ -100,9 +100,15 @@ export function ListingsShowcase({ listings }: { listings: Listing[] }) {
                 value={view.id}
                 className="mt-6 sm:mt-8"
               >
-                <ul className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {/* A row to swipe on a phone, as app stores do: six tall
+                    cards stacked were three screens of scrolling. A grid
+                    from a tablet up. */}
+                <ul className="no-scrollbar -mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:snap-none sm:grid-cols-2 sm:gap-4 sm:overflow-visible sm:px-0 sm:pb-0 xl:grid-cols-3">
                   {items.map((listing) => (
-                    <li key={listing.id}>
+                    <li
+                      key={listing.id}
+                      className="w-[82%] shrink-0 snap-start sm:w-auto"
+                    >
                       <ListingCard listing={listing} />
                     </li>
                   ))}

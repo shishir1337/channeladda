@@ -4,7 +4,6 @@ import { Hero } from "@/components/home/hero";
 import { HowItWorks } from "@/components/home/how-it-works";
 import { ListingsShowcase } from "@/components/home/listings-showcase";
 import { SellerCta } from "@/components/home/seller-cta";
-import { Services } from "@/components/home/services";
 import { SoldTicker } from "@/components/home/sold-ticker";
 import { Testimonials } from "@/components/home/testimonials";
 import { TopSellers } from "@/components/home/top-sellers";
@@ -45,7 +44,6 @@ export default async function HomePage() {
       <HowItWorks />
       <TrustSafety />
       <TopSellers sellers={sellers.slice(0, 4)} />
-      <Services />
       <Testimonials />
       <SellerCta />
       <Faq />

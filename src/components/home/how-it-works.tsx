@@ -14,26 +14,28 @@ import { Container, Section, SectionHeading } from "@/components/ui/section";
 import { formatRate } from "@/lib/fees";
 import { getFeeSettings } from "@/server/settings";
 
+// One short line each: the owner's clients read this on a phone, and four
+// paragraph cards were most of a screen before anything happened.
 const steps = [
   {
     icon: SearchCheckIcon,
-    title: "Find and agree",
-    body: "Filter by platform, niche, country and revenue. Send an offer or counter-offer inside Channel Adda chat until both sides agree.",
+    title: "Find an account",
+    body: "Search, ask the seller, make an offer.",
   },
   {
     icon: LockIcon,
-    title: "Choose how to pay",
-    body: "Fastest: your crypto payment goes to Channel Adda, not the seller, and the seller hands the account to our agent knowing it is secured. Safest: you pay our fee, an agent takes the account into our hands, and only then do you pay the seller directly.",
+    title: "Choose Safest or Fastest",
+    body: "We hold the channel or your money.",
   },
   {
     icon: HandshakeIcon,
     title: "Our agent hands it over",
-    body: "Our agent takes the account from the seller, checks it, and hands it to you, with every step recorded in the deal chat.",
+    body: "You see every step in the deal chat.",
   },
   {
     icon: BanknoteIcon,
-    title: "The account is yours, the deal closes",
-    body: "On a Fastest deal we pay the seller once our agent holds the account, and our agent then makes you primary owner. On a Safest deal our agent holds the account and transfers it to you once the seller confirms your payment arrived.",
+    title: "It is yours",
+    body: "The deal closes when the channel is yours.",
   },
 ];
 
@@ -42,28 +44,26 @@ const modes = [
     id: "fastest",
     icon: ZapIcon,
     name: "Fastest",
-    tagline: "Paid up front, handed over by our agent",
-    release: "When our agent holds the account",
+    tagline: "You pay us, we pay the seller",
+    release: "When our agent has the channel",
     accent: false,
     points: [
-      "We hold your money until our agent has the account from the seller",
-      "Our agent invites you as owner, and makes you primary owner after the holding period",
-      "The seller hands the account to our agent, never straight to a stranger",
-      "Ownership code verified before the listing goes up",
+      "We hold your money until our agent has the channel",
+      "Then our agent makes you the owner",
+      "The seller never hands it straight to a stranger",
     ],
   },
   {
     id: "safest",
     icon: LockIcon,
     name: "Safest",
-    tagline: "Our default for every serious deal",
-    release: "By you, once we hold the account",
+    tagline: "We hold the channel first",
+    release: "By you, after our agent has it",
     accent: true,
     points: [
-      "Our agent holds the account before you pay the seller anything",
-      "You pay us only our fee; the price goes to the seller directly",
-      "The seller confirms your payment before the account moves to you",
-      "If it breaks before our agent takes the channel, we refund our fee",
+      "Our agent takes the channel before you pay the seller",
+      "You pay us only our fee",
+      "The seller confirms your payment, then the channel is yours",
     ],
   },
 ];
@@ -81,31 +81,32 @@ export async function HowItWorks() {
     <Section id="how-it-works" className="scroll-mt-24">
       <Container>
         <SectionHeading
-          title="Four steps, and your money never moves early"
-          description="The same flow runs on a $200 Telegram channel and a $74,000 YouTube channel. Only the checks get deeper."
+          title="How it works"
+          description="Four simple steps, for every deal."
           align="center"
         />
 
-        <ol className="mt-8 grid gap-3 sm:mt-10 sm:grid-cols-2 lg:grid-cols-4">
+        {/* A row each on a phone, cards side by side from a tablet up. */}
+        <ol className="mt-8 grid gap-2.5 sm:mt-10 sm:grid-cols-2 sm:gap-3 lg:grid-cols-4">
           {steps.map((step, index) => (
             <li
               key={step.title}
-              className="flex flex-col rounded-card border border-line bg-surface p-5"
+              className="flex items-center gap-3.5 rounded-card border border-line bg-surface p-4 sm:flex-col sm:items-start sm:p-5"
             >
-              <div className="flex items-center justify-between">
-                <span className="flex size-9 items-center justify-center rounded-lg border border-line bg-surface-2 text-muted">
-                  <step.icon aria-hidden="true" className="size-4.5" />
+              <span className="relative flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary-text">
+                <step.icon aria-hidden="true" className="size-4.5" />
+                <span className="tnum absolute -top-1.5 -right-1.5 inline-flex size-5 items-center justify-center rounded-full bg-primary text-[0.6875rem] font-bold text-primary-fg ring-2 ring-surface">
+                  {index + 1}
                 </span>
-                <span className="tnum text-[0.8125rem] font-medium text-subtle">
-                  Step {index + 1}
-                </span>
+              </span>
+              <div className="min-w-0">
+                <h3 className="text-[0.9375rem] font-semibold text-fg sm:text-base">
+                  {step.title}
+                </h3>
+                <p className="mt-0.5 text-sm text-muted sm:mt-1.5">
+                  {step.body}
+                </p>
               </div>
-              <h3 className="mt-4 text-base font-semibold text-fg">
-                {step.title}
-              </h3>
-              <p className="mt-2 text-sm leading-relaxed text-muted">
-                {step.body}
-              </p>
             </li>
           ))}
         </ol>
@@ -113,11 +114,8 @@ export async function HowItWorks() {
         <div className="mt-14 sm:mt-20">
           <div className="mx-auto max-w-2xl text-center">
             <h3 className="text-xl font-semibold tracking-[-0.02em] sm:text-2xl">
-              Two ways to close a deal
+              Two ways to buy
             </h3>
-            <p className="mt-2 text-[0.9375rem] text-muted">
-              Which one you use is your choice on every listing.
-            </p>
           </div>
 
           <div className="mt-8 grid gap-4 lg:grid-cols-2">
@@ -157,16 +155,14 @@ export async function HowItWorks() {
                     the money and is more work, so it has its own rate. */}
                 <dl className="mt-5 grid grid-cols-2 gap-4 border-y border-line py-4">
                   <div>
-                    <dt className="text-[0.8125rem] text-subtle">
-                      Platform fee
-                    </dt>
+                    <dt className="text-[0.8125rem] text-subtle">Our fee</dt>
                     <dd className="tnum mt-1 text-base font-semibold text-fg">
                       {rateFor(mode.id)}
                     </dd>
                   </div>
                   <div>
                     <dt className="text-[0.8125rem] text-subtle">
-                      Seller paid
+                      Seller is paid
                     </dt>
                     <dd className="mt-1 text-base font-semibold text-fg">
                       {mode.release}

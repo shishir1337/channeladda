@@ -3,41 +3,37 @@ import {
   FingerprintIcon,
   GavelIcon,
   MessagesSquareIcon,
-  ScanEyeIcon,
   ShieldCheckIcon,
 } from "lucide-react";
 import { Container, Section, SectionHeading } from "@/components/ui/section";
 
+// One short line each. "Manual admin approval" went: a YouTube channel
+// whose ownership code is found now goes live with no moderator.
 const safeguards = [
   {
     icon: FingerprintIcon,
-    title: "KYC on every seller",
-    body: "Government ID and liveness check before a seller can publish or withdraw. Repeat offenders are permanently banned by document hash.",
+    title: "Sellers are verified",
+    body: "ID check before a seller can sell or withdraw.",
   },
   {
     icon: FileCheck2Icon,
-    title: "Ownership code check",
-    body: "Sellers drop a one-time Channel Adda code into the account bio or description. On YouTube we read the live channel and check it ourselves; everywhere else a moderator opens the account and looks. Either way it is the live account, not a screenshot.",
-  },
-  {
-    icon: ScanEyeIcon,
-    title: "Manual admin approval",
-    body: "Analytics, monetization and revenue screenshots are reviewed by a human before the listing is visible to buyers.",
+    title: "Ownership is checked",
+    body: "The seller proves it is theirs with a code on the live account.",
   },
   {
     icon: MessagesSquareIcon,
-    title: "Order-linked chat",
-    body: "Every message, offer and proof upload is attached to the order, so a dispute is judged on a real record instead of screenshots.",
+    title: "Everything is on record",
+    body: "Messages, offers and proof stay with the deal.",
   },
   {
     icon: GavelIcon,
-    title: "Dispute resolution",
-    body: "Open a dispute and the deal freezes where it stands. Our moderation team reads the whole record and decides it — the account goes on to the buyer or back to the seller, and on a Fastest deal the money follows.",
+    title: "Problems go to people",
+    body: "The deal pauses and our team decides.",
   },
   {
     icon: ShieldCheckIcon,
-    title: "Suspicious listing detection",
-    body: "Automated checks flag recycled screenshots, engagement anomalies and pricing far outside the market band for that niche.",
+    title: "Odd listings are flagged",
+    body: "Re-used screenshots and strange prices are caught.",
   },
 ];
 
@@ -59,8 +55,8 @@ export function TrustSafety({ embedded = false }: { embedded?: boolean }) {
       <Container>
         {embedded ? null : (
           <SectionHeading
-            title="The boring machinery that keeps deals clean"
-            description="Account trading has a scam problem. These are the specific controls we run so a Channel Adda deal is not a leap of faith."
+            title="How we keep deals safe"
+            description="The checks behind every deal."
             align="center"
           />
         )}
@@ -74,16 +70,19 @@ export function TrustSafety({ embedded = false }: { embedded?: boolean }) {
         >
           {safeguards.map((item) => (
             <li key={item.title}>
-              <div className="flex h-full flex-col rounded-card border border-line bg-surface p-5">
-                <span className="flex size-9 items-center justify-center rounded-lg border border-line bg-surface-2 text-muted">
+              {/* A row each on a phone; cards from a tablet up. */}
+              <div className="flex h-full items-center gap-3.5 rounded-card border border-line bg-surface p-4 sm:flex-col sm:items-start sm:p-5">
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-verified-soft text-verified">
                   <item.icon aria-hidden="true" className="size-4.5" />
                 </span>
-                <h3 className="mt-4 text-base font-semibold text-fg">
-                  {item.title}
-                </h3>
-                <p className="mt-2 text-sm leading-relaxed text-muted">
-                  {item.body}
-                </p>
+                <div className="min-w-0">
+                  <h3 className="text-[0.9375rem] font-semibold text-fg sm:text-base">
+                    {item.title}
+                  </h3>
+                  <p className="mt-0.5 text-sm text-muted sm:mt-1.5">
+                    {item.body}
+                  </p>
+                </div>
               </div>
             </li>
           ))}
@@ -95,9 +94,9 @@ export function TrustSafety({ embedded = false }: { embedded?: boolean }) {
                 from the product itself. The figures that used to sit here
                 were measurements nobody had taken. */}
             {[
-              { v: "2", l: "Deal types — we hold the money, or the account" },
-              { v: "1", l: "Agent on every deal, named before it starts" },
-              { v: "0", l: "Deals where both sides are exposed at once" },
+              { v: "2", l: "Ways to buy: we hold the money, or the channel" },
+              { v: "1", l: "Agent on every deal" },
+              { v: "0", l: "Deals where you have to trust a stranger" },
             ].map((stat) => (
               <div key={stat.l}>
                 <dt className="sr-only">{stat.l}</dt>

@@ -62,8 +62,8 @@ export async function Testimonials() {
     <Section>
       <Container>
         <SectionHeading
-          title="What closing a deal here actually feels like"
-          description="Left by buyers on deals that completed. Nobody can review a deal they were not part of."
+          title="What buyers say"
+          description="Only from deals that completed."
           align="center"
         />
 

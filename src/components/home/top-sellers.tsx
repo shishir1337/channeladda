@@ -13,8 +13,8 @@ export function TopSellers({ sellers }: { sellers: Seller[] }) {
     <Section>
       <Container>
         <SectionHeading
-          title="The people behind the listings"
-          description="Rating points come only from deals that completed: half of what each deal was worth, in dollars."
+          title="Top sellers"
+          description="Rated in points from completed deals."
           action={
             <Link
               href="/sellers"

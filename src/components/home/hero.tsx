@@ -35,13 +35,12 @@ export function Hero({ stats }: { stats: Stats }) {
           </h1>
 
           <p className="mx-auto mt-5 max-w-xl text-base leading-relaxed text-muted sm:mt-6 sm:text-lg">
-            Every deal is held open by us — the account sits with one of our
-            agents, or your payment does, until the handover is confirmed.{" "}
+            Our agent holds your money or the account until the handover is
+            done.{" "}
             <span className="tnum font-medium text-fg">
               {stats.transfers.toLocaleString("en-US")}
             </span>{" "}
-            completed transfers across YouTube, Instagram, Facebook, Telegram
-            and content websites.
+            deals completed.
           </p>
         </div>
 

@@ -18,8 +18,7 @@ export function Categories({
     <Section>
       <Container>
         <SectionHeading
-          title="Pick your platform, then filter it down"
-          description="Five marketplaces under one roof. Every listing is checked for ownership before it reaches this page."
+          title="Browse by platform"
           action={
             <Link
               href="/browse"
@@ -39,15 +38,16 @@ export function Categories({
             <li key={platform.id}>
               <Link
                 href={`/browse/${platform.id}`}
-                className="group flex h-full flex-col items-start gap-4 rounded-card border border-line bg-surface p-4 transition-colors duration-150 hover:border-line-strong hover:bg-surface-2/60 sm:p-5"
+                // Compact on a phone: the icon beside the name, not above it.
+                className="group flex h-full items-center gap-3 rounded-card border border-line bg-surface p-3 transition-colors duration-150 hover:border-line-strong hover:bg-surface-2/60 sm:flex-col sm:items-start sm:gap-4 sm:p-5"
               >
                 <span
-                  className="flex size-10 items-center justify-center rounded-lg border border-line bg-surface-2"
+                  className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-line bg-surface-2 sm:size-10"
                   style={{ color: platform.tint }}
                 >
                   <platform.icon className="size-5" />
                 </span>
-                <div>
+                <div className="min-w-0">
                   <h3 className="text-[0.9375rem] font-semibold text-fg">
                     {platform.name}
                   </h3>
@@ -55,7 +55,7 @@ export function Categories({
                     {countOf(counts[platform.id], "listing")}
                   </p>
                   {floors[platform.id] !== null ? (
-                    <p className="mt-3 text-[0.8125rem] text-subtle">
+                    <p className="mt-3 hidden text-[0.8125rem] text-subtle sm:block">
                       from{" "}
                       <Price
                         usd={floors[platform.id] ?? 0}

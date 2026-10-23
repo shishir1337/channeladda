@@ -14,11 +14,15 @@ export function AnnouncementBar() {
           aria-hidden="true"
           className="hidden size-3.5 shrink-0 text-verified sm:block"
         />
+        {/* One line on a phone: four lines of banner pushed the page itself
+            below the fold. */}
         <p className="text-[0.8125rem] leading-snug text-muted">
-          Every deal is supervised by a Channel Adda agent.{" "}
           <span className="text-fg">
-            Nobody hands anything over on trust — on Fastest we hold your
-            payment, on Safest we hold the account.
+            Every deal is protected by a Channel Adda agent.
+          </span>
+          <span className="hidden sm:inline">
+            {" "}
+            We hold your money or the account until the handover is done.
           </span>
         </p>
       </div>
