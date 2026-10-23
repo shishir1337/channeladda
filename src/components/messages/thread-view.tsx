@@ -605,7 +605,7 @@ export function ThreadView({
 
           {/* One row on a phone — attach, offer, the text, send — so the box
               takes a line of the screen rather than three. */}
-          <div className="rounded-card border border-line bg-surface shadow-xs transition-[border-color,box-shadow] duration-150 not-focus-within:hover:border-line-strong focus-within:border-primary focus-within:ring-[3px] focus-within:ring-primary/20 has-[[aria-invalid=true]]:border-danger has-[[aria-invalid=true]]:ring-danger/15 max-lg:flex max-lg:flex-wrap max-lg:items-end max-lg:gap-0.5 max-lg:rounded-2xl max-lg:p-1 dark:bg-surface-2">
+          <div className="rounded-card border border-line bg-surface shadow-xs transition-[border-color,box-shadow] duration-150 not-focus-within:hover:border-line-strong focus-within:border-primary focus-within:ring-[3px] focus-within:ring-primary/20 has-[[aria-invalid=true]]:border-danger has-[[aria-invalid=true]]:ring-danger/15 max-lg:flex max-lg:flex-wrap max-lg:items-end max-lg:gap-0.5 max-lg:rounded-[1.375rem] max-lg:p-1 dark:bg-surface-2">
             <label htmlFor="composer" className="sr-only">
               Write a message
             </label>
@@ -620,7 +620,7 @@ export function ThreadView({
                   send();
                 }
               }}
-              placeholder="Ask about revenue, traffic sources, strikes…"
+              placeholder="Write a message…"
               aria-invalid={over}
               className="block max-h-72 min-h-20 w-full resize-none bg-transparent px-3.5 pt-3 pb-1 text-base leading-6 field-sizing-content text-fg placeholder:text-subtle focus:outline-none max-lg:order-2 max-lg:max-h-32 max-lg:min-h-11 max-lg:w-auto max-lg:min-w-0 max-lg:flex-1 max-lg:px-2 max-lg:py-2.5 sm:text-sm"
             />
@@ -737,7 +737,7 @@ export function ThreadView({
                 type="button"
                 variant={hasSomething || pending ? "primary" : "secondary"}
                 title="Send (Ctrl+Enter)"
-                className="ml-auto max-lg:order-3 max-lg:ml-0 max-lg:size-11 max-lg:rounded-xl max-lg:px-0"
+                className="ml-auto max-lg:order-3 max-lg:ml-0 max-lg:size-11 max-lg:rounded-full! max-lg:px-0"
                 disabled={
                   pending ||
                   uploading ||

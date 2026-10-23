@@ -170,14 +170,16 @@
   --animate-pop-in: pop-in 160ms var(--ease-out-soft) both;
   --animate-pop-out: pop-out 120ms ease-in both;
 
+  /* A fade only. It wraps every dashboard page, and a transform here —
+     even ending at none, with the fill held — made the wrapper the box that
+     `position: fixed` is measured from, so the chat's message box, pinned
+     to the bottom of the screen, stopped short of it. */
   @keyframes app-in {
     from {
       opacity: 0;
-      transform: translateY(4px);
     }
     to {
       opacity: 1;
-      transform: none;
     }
   }
   @keyframes pop-in {

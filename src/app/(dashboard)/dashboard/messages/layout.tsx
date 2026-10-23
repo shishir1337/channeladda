@@ -50,7 +50,12 @@ export default async function MessagesLayout({ children }: LayoutProps<"/">) {
         }))}
       />
 
-      <section className="@container min-w-0">{children}</section>
+      {/* A size container only from lg, where the thread lays out by its
+          width. Container size containment also makes this the box that
+          `position: fixed` is measured from, so on a phone the message box
+          pinned "to the bottom of the screen" stopped at the bottom of this
+          section instead — 64px short, above a strip of empty page. */}
+      <section className="min-w-0 lg:@container">{children}</section>
     </div>
   );
 }

@@ -19,7 +19,9 @@ export function EventLine({
     <li className={cn("flex items-center gap-3", className)}>
       <span aria-hidden="true" className="h-px min-w-4 flex-1 bg-line" />
       <p className="max-w-[46ch] text-center text-xs leading-relaxed text-muted">
-        {message.body}
+        {/* A deal reference never splits at its hyphen ("CA-" / "11235"):
+            lines written before eventText used a non-breaking one too. */}
+        {message.body.replace(/\b([A-Z]{2})-(\d+)\b/g, "$1‑$2")}
         <span aria-hidden="true" className="mx-1.5 text-line-strong">
           ·
         </span>

@@ -83,7 +83,9 @@ export function eventText(event: ChatEvent): string {
     case "reservation-lapsed":
       return `The agreed price of ${money(event.amountCents)} lapsed because the deal was never opened. The listing is back on sale`;
     case "deal-opened":
-      return `${who(event.name)} opened a ${event.mode === "SAFEST" ? "Safest" : "Fastest"} deal at ${money(event.priceCents)} (${event.reference})`;
+      // A non-breaking hyphen: on a phone "CA-" and "11235" landed on two
+      // lines.
+      return `${who(event.name)} opened a ${event.mode === "SAFEST" ? "Safest" : "Fastest"} deal at ${money(event.priceCents)} · ${event.reference.replace("-", "‑")}`;
     case "payment-received":
       return `Payment received for ${event.reference}. The deal is under way`;
     case "payment-lapsed":
