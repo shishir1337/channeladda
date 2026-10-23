@@ -34,6 +34,7 @@ import {
   SplitBar,
   Stat,
   StatGrid,
+  type Tone,
 } from "@/components/app/kit";
 import { statusMeta } from "@/components/dashboard/listing-status";
 import { dealHeadline, stepTitle } from "@/components/deals/deal-status";
@@ -99,6 +100,19 @@ type Task = {
   cta: string;
   since: Date;
 };
+
+/**
+ * A row's icon colour, from the icon it already carries: a deal gold, an
+ * offer blue, a listing green, something to fix red. Every row used to sit
+ * on the same grey tile.
+ */
+function toneOf(icon: Icon): Tone {
+  if (icon === ArrowLeftRightIcon) return "primary";
+  if (icon === HandshakeIcon) return "info";
+  if (icon === TriangleAlertIcon) return "danger";
+  if (icon === StoreIcon || icon === FingerprintIcon) return "verified";
+  return "neutral";
+}
 
 /** Something that already happened, said in a whole sentence. */
 type Event = {
@@ -388,7 +402,9 @@ export default async function DashboardPage() {
             {tasks.slice(0, 5).map((task) => (
               <ListItem key={task.id} href={task.href}>
                 <ListRow
-                  leading={<IconTile icon={task.icon} />}
+                  leading={
+                    <IconTile icon={task.icon} tone={toneOf(task.icon)} />
+                  }
                   // The title wraps rather than truncating: it carries the
                   // amount, and an offer cut off before its price is no use.
                   title={<span className="whitespace-normal">{task.what}</span>}
@@ -630,7 +646,9 @@ export default async function DashboardPage() {
               {events.map((event) => (
                 <ListItem key={event.id} href={event.href}>
                   <ListRow
-                    leading={<IconTile icon={event.icon} />}
+                    leading={
+                      <IconTile icon={event.icon} tone={toneOf(event.icon)} />
+                    }
                     title={
                       <span className="whitespace-normal">{event.what}</span>
                     }

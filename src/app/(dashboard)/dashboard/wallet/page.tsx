@@ -400,7 +400,10 @@ export default async function WalletPage({
               return (
                 <ListItem key={entry.id}>
                   <div className="flex items-center gap-3">
-                    <IconTile icon={EntryIcon} />
+                    <IconTile
+                      icon={EntryIcon}
+                      tone={out ? "neutral" : "verified"}
+                    />
 
                     <div className="min-w-0 flex-1">
                       {/* What the kind of movement means is the same on every

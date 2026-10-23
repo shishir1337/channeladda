@@ -59,6 +59,36 @@ const ICONS = {
 
 export type NavIcon = keyof typeof ICONS;
 
+/**
+ * Each place has its own colour, so the icons are told apart at a glance
+ * rather than read: the owner found every icon the same grey. The rail is
+ * always dark, so these are the shades that read on dark; the phone's tab
+ * bar uses `TAB_TINT` for its light and dark pages.
+ */
+const RAIL_TINT: Record<NavIcon, string> = {
+  overview: "text-sky-400",
+  transfer: "text-amber-400",
+  offers: "text-violet-400",
+  messages: "text-blue-400",
+  listings: "text-emerald-400",
+  new: "text-amber-300",
+  money: "text-green-400",
+  bell: "text-orange-400",
+  settings: "text-teal-400",
+  review: "text-cyan-400",
+  staff: "text-indigo-400",
+  people: "text-pink-400",
+  support: "text-lime-400",
+  dispute: "text-red-400",
+};
+
+const TAB_TINT: Partial<Record<NavIcon, string>> = {
+  overview: "text-sky-600 dark:text-sky-400",
+  transfer: "text-amber-600 dark:text-amber-400",
+  messages: "text-blue-600 dark:text-blue-400",
+  money: "text-green-600 dark:text-green-400",
+};
+
 export type NavItem = {
   label: string;
   href: string;
@@ -108,9 +138,11 @@ function WaitingCount({ count }: { count: number }) {
  */
 function NavIconSlot({
   icon: Icon,
+  tint,
   active,
 }: {
   icon: (typeof ICONS)[NavIcon];
+  tint: string;
   active: boolean;
 }) {
   const { pending } = useLinkStatus();
@@ -120,7 +152,8 @@ function NavIconSlot({
         aria-hidden="true"
         className={cn(
           "size-4 transition-[opacity,color] duration-150",
-          active ? "text-fg" : "text-subtle group-hover:text-fg",
+          tint,
+          active ? "opacity-100" : "opacity-75 group-hover:opacity-100",
           pending && "opacity-0",
         )}
       />
@@ -198,7 +231,11 @@ function NavLink({
               : "text-muted hover:bg-black/[0.04] hover:text-fg dark:hover:bg-white/[0.05]",
           )}
         >
-          <NavIconSlot icon={ICONS[item.icon]} active={active} />
+          <NavIconSlot
+            icon={ICONS[item.icon]}
+            tint={RAIL_TINT[item.icon]}
+            active={active}
+          />
           {/* Still the link's name when folded: faded, not removed. */}
           <span
             className={cn(
@@ -404,7 +441,10 @@ function TabBar({
                   />
                 ) : null}
                 <span className="relative">
-                  <Icon aria-hidden="true" className="size-5" />
+                  <Icon
+                    aria-hidden="true"
+                    className={cn("size-5", active && TAB_TINT[item.icon])}
+                  />
                   {item.waiting ? <TabBadge count={item.waiting} /> : null}
                 </span>
                 {item.label}
@@ -583,8 +623,11 @@ export function AppShell({
           {/* Padding is the same open or folded; only the width moves, and
               whatever no longer fits is clipped by the rail itself. */}
           <aside
+            // Always the dark theme (the `dark` class re-scopes the colour
+            // tokens), on its surface shade: near-black beside a light page,
+            // a step lighter than a dark one, so it reads apart from both.
             className={cn(
-              "fixed inset-y-0 left-0 z-30 hidden flex-col overflow-hidden border-r border-line bg-bg lg:flex",
+              "dark fixed inset-y-0 left-0 z-30 hidden flex-col overflow-hidden border-r border-line bg-surface text-fg lg:flex",
               collapsed ? "w-15" : "w-60",
               mounted && cn("transition-[width]", RAIL_MOTION),
             )}
@@ -739,7 +782,10 @@ export function AppShell({
           ) : null}
 
           {/* ---- the same rail, on a phone ----------------------------------- */}
-          <SheetContent side="left" className="w-[17rem] max-w-[85vw] p-0">
+          <SheetContent
+            side="left"
+            className="dark w-[17rem] max-w-[85vw] bg-surface p-0 text-fg"
+          >
             <SheetTitle className="sr-only">Menu</SheetTitle>
             <SheetDescription className="sr-only">
               Move between the parts of your account.
