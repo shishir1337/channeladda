@@ -171,11 +171,21 @@ const TRANSITIONS: readonly Transition[] = Object.freeze([
     to: "CANCELLED",
     actors: ["buyer", "seller", "staff"],
   },
+  // Paid, and nothing handed over yet: either side may call it off and the
+  // buyer gets back what they paid. resolveDeal holds members to "nothing
+  // handed over" — once the seller has invited our agent, the agent has
+  // access to give back, which is staff's, through a dispute.
   {
     mode: "SAFEST",
     from: "AWAITING_CUSTODY",
     to: "CANCELLED",
-    actors: ["staff"],
+    actors: ["buyer", "seller", "staff"],
+  },
+  {
+    mode: "FASTEST",
+    from: "AGENT_VERIFYING",
+    to: "CANCELLED",
+    actors: ["buyer", "seller", "staff"],
   },
 
   // ---- Giving the channel back. Reachable from every state in which the

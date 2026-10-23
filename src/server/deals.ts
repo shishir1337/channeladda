@@ -95,6 +95,11 @@ export type DealFailure =
   | "seller-paid"
   /** The step brings our agent in, and nobody has been assigned yet. */
   | "no-agent"
+  /**
+   * A member cancelling after the seller has invited our agent: the agent
+   * has access to give back, so it is a dispute for staff.
+   */
+  | "seller-started"
   /** Opened under an earlier template: its steps are not the code's. */
   | "old-steps"
   /** The deal's hold — Google's wait, or the holding period — is running. */
@@ -1854,6 +1859,19 @@ export async function resolveDeal(input: {
     return { ok: false, reason: "wrong-actor" };
   }
 
+  // The buyer or the seller calling a deal off. Before payment there is
+  // nothing to undo. After it, only while the seller has pressed nothing:
+  // their first step invites our agent onto the channel, and from then on
+  // the agent has access that staff have to see given back.
+  const memberCancel =
+    input.to === "CANCELLED" && (actor === "buyer" || actor === "seller");
+  if (memberCancel && order.status !== "AWAITING_PAYMENT") {
+    const sellerActed = await db.transferStep.count({
+      where: { orderId: order.id, actor: "seller", completedAt: { not: null } },
+    });
+    if (sellerActed > 0) return { ok: false, reason: "seller-started" };
+  }
+
   // There is nothing to give back if nothing was ever taken, and nothing to
   // pay out either. Both are reachable because a dispute may be raised before
   // payment and the dispute outcomes are not restricted to states where the
@@ -1969,7 +1987,11 @@ export async function resolveDeal(input: {
   // whole escrow landed in a wallet with no finance involvement at all.
   //
   // Everything that moves no platform money is still theirs to decide.
-  if (movesPlatformMoney(input.to, order)) {
+  //
+  // A member's own cancellation is not a decision: nothing has been handed
+  // over, the whole payment goes back to the buyer who made it, and there
+  // is no side to choose.
+  if (!memberCancel && movesPlatformMoney(input.to, order)) {
     const decider = await db.user.findUnique({
       where: { id: input.byUserId },
       select: { role: true },

@@ -59,6 +59,8 @@ const MESSAGES: Record<repo.DealFailure, string> = {
   "handed-over":
     "Ownership has already been handed to the account you gave, so it can no longer be changed. Message the agent in the chat if something is wrong.",
   "bad-handover": "That account does not look right for this platform.",
+  "seller-started":
+    "The seller has already invited our agent, so this can't just be cancelled — the access has to be handed back first. Use Report a problem and our team will sort it out.",
   "out-of-level":
     "This deal's price is outside that person's level. Level 1 runs deals under $10,000, level 2 from $10,000 to under $100,000, level 3 from $100,000.",
   "price-not-paid":

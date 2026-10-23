@@ -26,7 +26,11 @@ import {
   STATUS_LABELS,
   STATUS_TONE,
 } from "@/components/deals/deal-status";
-import { DealSteps, RaiseDispute } from "@/components/deals/deal-timeline";
+import {
+  CancelDeal,
+  DealSteps,
+  RaiseDispute,
+} from "@/components/deals/deal-timeline";
 import { HandoverAccount } from "@/components/deals/handover-account";
 import { PayNow } from "@/components/deals/pay-now";
 import { PayToCard } from "@/components/deals/pay-to";
@@ -361,6 +365,7 @@ export default async function DealPage({
             </section>
           </Card>
 
+          <CancelDeal deal={deal} />
           {deal.nextStep ? <RaiseDispute deal={deal} /> : null}
         </div>
       </div>

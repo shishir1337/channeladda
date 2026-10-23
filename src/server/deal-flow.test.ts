@@ -459,6 +459,9 @@ test(
   "a buyer cannot cancel their way out after custody",
   withCleanDb(async () => {
     const { orderId, actors } = await runTo("SAFEST", 5);
+    // Members may now cancel a paid deal — but only before the seller has
+    // pressed anything. Here the seller has invited our agent and made them
+    // primary owner, so it is refused for that reason.
     expect(
       await resolveDeal({
         orderId,
@@ -466,7 +469,10 @@ test(
         byUserId: actors.buyer,
         note: "changed my mind",
       }),
-    ).toMatchObject({ ok: false, reason: "wrong-actor" });
+    ).toMatchObject({ ok: false, reason: "seller-started" });
+    expect(
+      await db.ledgerEntry.count({ where: { orderId, kind: "REFUND" } }),
+    ).toBe(0);
   }),
 );
 

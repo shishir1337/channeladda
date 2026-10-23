@@ -6,7 +6,11 @@ import { Reference } from "@/components/app/kit";
 import { ResellerBadge } from "@/components/app/reseller-badge";
 import { AgentInvite } from "@/components/deals/agent-invite";
 import { dealHeadline, STATUS_TONE } from "@/components/deals/deal-status";
-import { DealNextStep, RaiseDispute } from "@/components/deals/deal-timeline";
+import {
+  CancelDeal,
+  DealNextStep,
+  RaiseDispute,
+} from "@/components/deals/deal-timeline";
 import { HandoverAccount } from "@/components/deals/handover-account";
 import { PayNow } from "@/components/deals/pay-now";
 import { PayToCard } from "@/components/deals/pay-to";
@@ -286,13 +290,16 @@ export default async function ThreadPage({
                   after="refresh"
                 />
               ) : panel.kind === "pay" && deal && wallet ? (
-                <PayNow
-                  orderId={deal.id}
-                  amountUsd={deal.totalUsd}
-                  priceUsd={deal.priceUsd}
-                  mode={deal.mode}
-                  availableUsd={wallet.availableUsd}
-                />
+                <div className="flex flex-col gap-3">
+                  <PayNow
+                    orderId={deal.id}
+                    amountUsd={deal.totalUsd}
+                    priceUsd={deal.priceUsd}
+                    mode={deal.mode}
+                    availableUsd={wallet.availableUsd}
+                  />
+                  <CancelDeal deal={deal} />
+                </div>
               ) : panel.kind === "step" && deal ? (
                 <div className="flex flex-col gap-3">
                   <DealNextStep deal={deal} staffIds={staffIds} />
@@ -311,12 +318,16 @@ export default async function ThreadPage({
                     open={deal.handoverOpen}
                     inUse={deal.handoverInUse}
                   />
+                  <CancelDeal deal={deal} />
                   {deal.nextStep ? <RaiseDispute deal={deal} /> : null}
                 </div>
               ) : panel.kind === "waiting-for-payment" && deal ? (
                 // A Safest seller can say where to be paid from the moment the
                 // deal opens, rather than at the step that needs it.
-                <PayToCard deal={deal} />
+                <div className="flex flex-col gap-3">
+                  <PayToCard deal={deal} />
+                  <CancelDeal deal={deal} />
+                </div>
               ) : null}
             </DealPanel>
           </div>

@@ -2,6 +2,7 @@
 
 import {
   CheckIcon,
+  CircleXIcon,
   ClockIcon,
   InfoIcon,
   LoaderCircleIcon,
@@ -38,6 +39,7 @@ import {
 } from "@/components/deals/deal-status";
 import { Button } from "@/components/ui/button";
 import { Price } from "@/components/ui/price";
+import { memberMayCancel } from "@/lib/deal-cancel";
 import { isTerminal } from "@/lib/deal-machine";
 import { cn } from "@/lib/utils";
 import { completeStep, endDeal } from "@/server/actions/deals";
@@ -830,6 +832,109 @@ export function RaiseDispute({ deal }: { deal: DealView }) {
             onClick={() => setOpen(false)}
           >
             Never mind
+          </Button>
+        </div>
+        {error ? (
+          <p
+            role="alert"
+            className="mt-2.5 text-[0.8125rem] font-medium text-danger"
+          >
+            {error}
+          </p>
+        ) : null}
+      </div>
+    </Card>
+  );
+}
+
+/**
+ * The buyer or the seller calling the deal off.
+ *
+ * Offered only while it will work — before payment, or after it while the
+ * seller has pressed nothing (`memberMayCancel`). Later, our agent has
+ * access to hand back, and "Something is wrong" is the way out.
+ */
+export function CancelDeal({ deal }: { deal: DealView }) {
+  const router = useRouter();
+  const noteId = useId();
+  const [open, setOpen] = useState(false);
+  const [note, setNote] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  if (deal.viewerRole !== "buyer" && deal.viewerRole !== "seller") return null;
+  if (!memberMayCancel(deal)) return null;
+
+  const unpaid = deal.status === "AWAITING_PAYMENT";
+  const outcome = unpaid
+    ? "Nothing has been paid, so nothing is owed."
+    : deal.viewerRole === "buyer"
+      ? "Everything you paid goes back to your Channel Adda balance."
+      : "The buyer gets back everything they paid.";
+
+  if (!open) {
+    return (
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        onClick={() => setOpen(true)}
+        className="self-start"
+      >
+        <CircleXIcon aria-hidden="true" />
+        Cancel this deal
+      </Button>
+    );
+  }
+
+  return (
+    <Card>
+      <div className="p-4 sm:p-5">
+        <h2 className="text-sm leading-6 font-semibold text-fg">
+          Cancel this deal?
+        </h2>
+        <p className="mt-1 text-[0.8125rem] leading-relaxed text-muted">
+          {outcome} The listing goes back on sale.
+        </p>
+        <TextField
+          id={noteId}
+          name="note"
+          label="Why"
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          className="mt-4 max-w-md"
+          required
+        />
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Button
+            type="button"
+            variant="danger"
+            size="sm"
+            disabled={pending || note.trim() === ""}
+            onClick={() => {
+              setError(null);
+              startTransition(async () => {
+                const result = await endDeal(deal.id, "CANCELLED", note.trim());
+                if (!result.ok) {
+                  setError(result.error);
+                  return;
+                }
+                router.refresh();
+              });
+            }}
+          >
+            <BusyLabel busy={pending} busyText="Cancelling…">
+              Cancel the deal
+            </BusyLabel>
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            disabled={pending}
+            onClick={() => setOpen(false)}
+          >
+            Keep it
           </Button>
         </div>
         {error ? (
