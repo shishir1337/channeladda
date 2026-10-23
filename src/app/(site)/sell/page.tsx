@@ -29,7 +29,7 @@ const steps = [
   },
   {
     title: "Prove you own it",
-    body: "We give you a one-time code to paste into your bio or description, and we check it on the live account: automatically on YouTube, by a moderator everywhere else. No screenshot can fake that, which is why buyers here trust listings they have never seen before.",
+    body: "Paste a one-time code into your description. On YouTube we check it automatically and your listing goes live at once; elsewhere a moderator checks it.",
   },
   {
     title: "Field offers in one place",

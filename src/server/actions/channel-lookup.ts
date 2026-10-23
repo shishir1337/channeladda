@@ -13,6 +13,7 @@ import {
   suggestHandle,
 } from "@/lib/channel-url";
 import { db } from "@/lib/db";
+import { approveListing } from "@/server/admin-listings";
 import { recordAudit } from "@/server/audit";
 import { storeRemoteImage } from "@/server/remote-image";
 import { requireUser } from "@/server/session";
@@ -486,11 +487,27 @@ export async function checkOwnershipCode(
       },
     });
 
+    // Proven by Google, so it goes live now: the owner's call, a moderator
+    // pressing Approve on a channel the check has just verified added
+    // nothing. Should publishing fail, the listing waits in the review
+    // queue, verified, for a moderator to publish by hand.
+    const published = await approveListing(listing.id, "ownership-check");
+
     revalidatePath(`/dashboard/listings/${listing.id}`);
+    if (!published.ok) {
+      return {
+        ok: true,
+        message:
+          "Verified — you control this channel. A moderator will publish it shortly, and you can take the code out of your description.",
+      };
+    }
+    revalidatePath(`/listing/${published.slug}`);
+    revalidatePath("/browse");
+    revalidatePath("/");
     return {
       ok: true,
       message:
-        "Verified — you control this channel. It is with a moderator now, and you can take the code out of your description.",
+        "Verified — your listing is live. You can take the code out of your description now.",
     };
   } catch (error) {
     if (error instanceof YouTubeError && error.kind === "quota") {

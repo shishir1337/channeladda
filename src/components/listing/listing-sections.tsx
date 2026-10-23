@@ -192,12 +192,12 @@ export function ProofPanel({ count }: { count: number }) {
             <span className="font-medium text-fg">
               {countOf(count, "screenshot")}
             </span>
-            <span className="text-subtle">checked by a moderator</span>
+            <span className="text-subtle">from inside the account</span>
           </p>
+          {/* Not "checked by a moderator": a YouTube channel whose ownership
+              code is found goes live with no moderator in between. */}
           <p className="mt-3 text-sm leading-relaxed text-muted">
-            Uploaded by the seller and checked by our moderation team before
-            this listing went live. The screenshots are not published; ask the
-            seller about anything you want to see before you start a deal.
+            Private to our team. Ask the seller for anything you want to see.
           </p>
         </>
       ) : (

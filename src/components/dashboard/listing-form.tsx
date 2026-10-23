@@ -1612,8 +1612,9 @@ export function ListingForm({
               <p className="mt-1.5">
                 After that you get a one-time code to put in your{" "}
                 {platform?.name ?? "account"} description. We read it back to
-                prove the account is yours, then a moderator checks the listing
-                — usually within a few hours.
+                prove the account is yours: a YouTube channel goes live at once,
+                anything else after a moderator looks, usually within a few
+                hours.
               </p>
             </InfoTip>
           </div>

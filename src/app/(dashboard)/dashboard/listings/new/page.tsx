@@ -65,7 +65,7 @@ export default async function NewListingPage() {
         back={{ href: "/dashboard/listings", label: "Your listings" }}
         title="List an account"
         description="Free to list, and about ten minutes with the link to hand."
-        info="Free to list, and about ten minutes with the link to hand. Nothing is shown to buyers until you have proved the account is yours and a moderator has checked it."
+        info="Buyers see nothing until you have proved the account is yours. A YouTube channel then goes live at once."
       />
 
       <Card>

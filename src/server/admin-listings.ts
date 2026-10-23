@@ -347,7 +347,15 @@ async function ensureSellerSlug(sellerId: string) {
   throw new Error(`could not find a free profile handle for ${sellerId}`);
 }
 
-export async function approveListing(id: string) {
+/**
+ * Publishes a listing: a moderator's Approve, or — for a YouTube channel —
+ * the ownership check itself, once Google has shown the seller's code in
+ * the channel's own description. `by` only changes what the seller is told.
+ */
+export async function approveListing(
+  id: string,
+  by: "moderator" | "ownership-check" = "moderator",
+) {
   const existing = await db.listing.findUnique({
     where: { id },
     select: { id: true, status: true, ownershipCode: true, sellerId: true },
@@ -384,7 +392,10 @@ export async function approveListing(id: string) {
     href: `/listing/${updated.slug}`,
     email: {
       subject: "Your listing is live on Channel Adda",
-      body: "A moderator has checked it and it is on the marketplace. Buyers can find it and make offers on it now.",
+      body:
+        by === "ownership-check"
+          ? "We found your code on the channel, so it is on the marketplace. Buyers can find it and make offers on it now, and you can take the code out of your description."
+          : "A moderator has checked it and it is on the marketplace. Buyers can find it and make offers on it now.",
     },
   });
 

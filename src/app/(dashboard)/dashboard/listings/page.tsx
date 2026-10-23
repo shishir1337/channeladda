@@ -148,10 +148,9 @@ export default async function MyListingsPage() {
               <>
                 List your first account{" "}
                 <InfoTip label="About listing an account">
-                  Three steps and about ten minutes. Nothing goes in front of
-                  buyers until you have proved the account is yours and a
-                  moderator has checked it — and you can stop halfway and come
-                  back to a saved draft.
+                  Three steps and about ten minutes. Buyers see nothing until
+                  you have proved the account is yours, and you can stop halfway
+                  and come back to a saved draft.
                 </InfoTip>
               </>
             }

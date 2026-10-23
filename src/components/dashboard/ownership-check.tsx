@@ -132,9 +132,9 @@ export function OwnershipPanel({
           Anyone can paste a link. Only the owner can edit {how.place} — so put
           this code there and{" "}
           {how.automatic
-            ? "we will read it back"
+            ? "we will read it back, and the listing goes live at once"
             : "a moderator will look for it"}
-          . It can come out again once the listing is approved.
+          . It can come out again once the listing is live.
         </InfoTip>
       </div>
 
@@ -180,7 +180,7 @@ export function OwnershipPanel({
               ))}
               <Step n={how.steps.length + 1}>
                 {how.automatic ? (
-                  "Come back and press check. It is usually instant."
+                  "Come back and press check. Your listing goes live as soon as we see it."
                 ) : (
                   <>
                     Come back here and tell us it is there.{" "}
@@ -219,7 +219,9 @@ export function OwnershipPanel({
           </Button>
         )}
 
-        {waitingOnSeller && code && !hasProof ? (
+        {/* Only the by-hand route needs a screenshot: an automatic check
+            publishes on the code alone. */}
+        {waitingOnSeller && code && !hasProof && !how.automatic ? (
           <p className="mt-4 flex items-start gap-2 text-[0.8125rem] leading-relaxed text-danger">
             <CircleAlertIcon
               aria-hidden="true"

@@ -103,21 +103,50 @@ test(
 );
 
 test(
-  "a listing waiting on its code goes to review once the code is found",
+  "a channel whose code is found goes live at once, with no moderator in between",
   withCleanDb(async () => {
+    // The owner: "for a channel's listing we need to approve from the admin
+    // team — no need, make it automatic." Google has just proved the seller
+    // controls the channel; a moderator pressing Approve added nothing.
     youtube.configured = true;
     const id = await listingIn("CODE_CHECK");
+    const before = Date.now();
 
     expect(await checkOwnershipCode(id)).toMatchObject({ ok: true });
 
     const row = await db.listing.findUniqueOrThrow({ where: { id } });
-    expect(row.status).toBe("ADMIN_REVIEW");
+    expect(row.status).toBe("LIVE");
     expect(row.ownershipVerifiedAt).not.toBeNull();
+    // The age buyers see starts now, not when the draft was opened.
+    expect(row.listedAt.getTime()).toBeGreaterThanOrEqual(before - 1000);
+    const told = await db.notification.findFirst({
+      where: { userId: viewer.id, kind: "LISTING" },
+    });
+    expect(told?.title).toBe("Your listing is live");
   }),
 );
 
 test(
-  "a listing already in review is verified and stays in review",
+  "a first-time seller gets a public profile address as their channel goes live",
+  withCleanDb(async () => {
+    // Without one, the live listing would be a 404: its page links to the
+    // seller's profile.
+    youtube.configured = true;
+    const id = await listingIn("CODE_CHECK");
+    await db.user.update({ where: { id: viewer.id }, data: { slug: null } });
+
+    await checkOwnershipCode(id);
+
+    expect(await statusOf(id)).toBe("LIVE");
+    const seller = await db.user.findUniqueOrThrow({
+      where: { id: viewer.id },
+    });
+    expect(seller.slug).toBeTruthy();
+  }),
+);
+
+test(
+  "a listing already sent for review goes live once its code is found",
   withCleanDb(async () => {
     youtube.configured = true;
     const id = await listingIn("ADMIN_REVIEW");
@@ -125,7 +154,7 @@ test(
     expect(await checkOwnershipCode(id)).toMatchObject({ ok: true });
 
     const row = await db.listing.findUniqueOrThrow({ where: { id } });
-    expect(row.status).toBe("ADMIN_REVIEW");
+    expect(row.status).toBe("LIVE");
     expect(row.ownershipVerifiedAt).not.toBeNull();
   }),
 );
