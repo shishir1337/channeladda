@@ -31,7 +31,13 @@ export default async function MessagesPage() {
   const user = await requireUser("/dashboard/messages");
   const threads = await listThreads(user);
   const unread = threads.filter((thread) => thread.unread > 0);
-  const oldestUnread = unread.at(-1);
+  // By time, not position: running deals are listed first, so the last row
+  // is no longer the oldest.
+  const oldestUnread = unread.reduce<(typeof unread)[number] | undefined>(
+    (oldest, thread) =>
+      !oldest || thread.lastMessageAt < oldest.lastMessageAt ? thread : oldest,
+    undefined,
+  );
 
   if (threads.length === 0) {
     return (

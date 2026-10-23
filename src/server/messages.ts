@@ -1,9 +1,11 @@
 import "server-only";
 
-import type { OfferStatus, Platform } from "@/generated/prisma/enums";
+import type { Prisma } from "@/generated/prisma/client";
+import type { DealMode, OfferStatus, Platform } from "@/generated/prisma/enums";
 import { OPENING_MESSAGE } from "@/lib/chat-opening";
 import { isCustodianRole } from "@/lib/custody-roles";
 import { db } from "@/lib/db";
+import { TERMINAL_STATUSES } from "@/lib/deal-machine";
 import { MAX_MESSAGE } from "@/lib/messages";
 import {
   mentionsOffPlatform,
@@ -127,6 +129,8 @@ export type ThreadSummary = {
   unread: number;
   flagged: boolean;
   closed: boolean;
+  /** The deal still running in this conversation, if there is one. */
+  deal: { reference: string; mode: DealMode } | null;
 };
 
 const STAFF_ROLES = ["MODERATOR", "FINANCE", "SUPERADMIN"];
@@ -469,7 +473,39 @@ async function unreadByThread(
   return new Map(rows.map((row) => [row.conversationId, row.unread]));
 }
 
-/** Everything this person is part of, newest first. */
+const RUNNING = { status: { notIn: [...TERMINAL_STATUSES] } };
+
+const THREAD_ROW = {
+  id: true,
+  buyerId: true,
+  sellerId: true,
+  lastMessageAt: true,
+  flaggedAt: true,
+  closedAt: true,
+  listing: { select: { slug: true, title: true, handle: true } },
+  buyer: { select: { name: true } },
+  seller: { select: { name: true } },
+  messages: {
+    orderBy: { createdAt: "desc" },
+    take: 1,
+    select: { body: true, fromStaff: true },
+  },
+  orders: {
+    where: RUNNING,
+    orderBy: { createdAt: "desc" },
+    take: 1,
+    select: { reference: true, mode: true },
+  },
+} satisfies Prisma.ConversationSelect;
+
+/**
+ * Everything this person is part of: conversations with a deal still
+ * running first, then the rest, each newest first.
+ *
+ * Running deals are fetched whole rather than out of the newest fifty — a
+ * stalled deal is the one most worth seeing, and it is often the quietest
+ * thread in the list.
+ */
 export async function listThreads(
   viewer: CurrentUser,
   take = 50,
@@ -480,33 +516,29 @@ export async function listThreads(
   const asAgent =
     isCustodianRole(viewer.role) && (await stillAnAgent(viewer.id));
 
-  const rows = await db.conversation.findMany({
-    where: {
-      OR: [
-        { buyerId: viewer.id },
-        { sellerId: viewer.id },
-        ...(asAgent ? [{ orders: runningDealsOf(viewer.id) }] : []),
-      ],
-    },
-    orderBy: { lastMessageAt: "desc" },
-    take,
-    select: {
-      id: true,
-      buyerId: true,
-      sellerId: true,
-      lastMessageAt: true,
-      flaggedAt: true,
-      closedAt: true,
-      listing: { select: { slug: true, title: true, handle: true } },
-      buyer: { select: { name: true } },
-      seller: { select: { name: true } },
-      messages: {
-        orderBy: { createdAt: "desc" },
-        take: 1,
-        select: { body: true, fromStaff: true },
-      },
-    },
-  });
+  const mine: Prisma.ConversationWhereInput = {
+    OR: [
+      { buyerId: viewer.id },
+      { sellerId: viewer.id },
+      ...(asAgent ? [{ orders: runningDealsOf(viewer.id) }] : []),
+    ],
+  };
+  const withDeal = { orders: { some: RUNNING } };
+
+  const [dealRows, otherRows] = await Promise.all([
+    db.conversation.findMany({
+      where: { AND: [mine, withDeal] },
+      orderBy: { lastMessageAt: "desc" },
+      select: THREAD_ROW,
+    }),
+    db.conversation.findMany({
+      where: { AND: [mine, { NOT: withDeal }] },
+      orderBy: { lastMessageAt: "desc" },
+      take,
+      select: THREAD_ROW,
+    }),
+  ]);
+  const rows = [...dealRows, ...otherRows];
   const unread = await unreadByThread(
     viewer.id,
     rows.map((row) => row.id),
@@ -533,6 +565,7 @@ export async function listThreads(
       unread: unread.get(row.id) ?? 0,
       flagged: row.flaggedAt !== null,
       closed: row.closedAt !== null,
+      deal: row.orders[0] ?? null,
     };
   });
 }
@@ -557,7 +590,8 @@ export async function countUnreadThreads(userId: string): Promise<number> {
   return [...unread.values()].filter((n) => n > 0).length;
 }
 
-export type StaffThread = ThreadSummary & {
+// The staff queue has its own order (flagged first) and no deal tag.
+export type StaffThread = Omit<ThreadSummary, "deal"> & {
   buyerName: string;
   sellerName: string;
   flagReason: string | null;

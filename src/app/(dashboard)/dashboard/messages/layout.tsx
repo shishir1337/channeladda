@@ -46,6 +46,7 @@ export default async function MessagesLayout({ children }: LayoutProps<"/">) {
           unread: thread.unread > 0,
           flagged: thread.flagged,
           closed: thread.closed,
+          deal: thread.deal,
         }))}
       />
 
