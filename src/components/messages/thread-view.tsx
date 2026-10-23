@@ -15,6 +15,7 @@ import {
   XIcon,
 } from "lucide-react";
 import { useEffect, useRef, useState, useTransition } from "react";
+import { InfoTip } from "@/components/app/info-tip";
 import { EmptyState } from "@/components/app/kit";
 import {
   ChatOfferCard,
@@ -504,20 +505,19 @@ export function ThreadView({
       >
         {/* A quiet line rather than a box: it is read once, before the first
           message, and should not compete with the conversation after that.
-          The words stay exactly as they are — this is the rule itself. */}
-        <p className="mx-auto flex max-w-[66ch] items-start gap-2 px-1 text-xs leading-relaxed text-muted">
+          One line on screen; the rule itself, word for word, behind the (i). */}
+        <p className="mx-auto flex max-w-[66ch] items-center gap-2 px-1 text-xs leading-relaxed text-muted">
           <EyeIcon
             aria-hidden="true"
-            className="mt-0.5 size-3.5 shrink-0 text-subtle"
+            className="size-3.5 shrink-0 text-subtle"
           />
-          <span>
-            <strong className="font-medium text-fg">
-              Channel Adda can read this conversation
-            </strong>{" "}
-            and will step in if something goes wrong. Phone numbers, emails and
-            links are removed automatically. Photos and clips are deleted after
-            48 hours, and a thread with no deal on it clears after 10 days.
-          </span>
+          <span>Channel Adda can see this chat, to keep you safe.</span>
+          <InfoTip label="About this chat">
+            Channel Adda can read this conversation and will step in if
+            something goes wrong. Phone numbers, emails and links are removed
+            automatically. Photos and clips are deleted after 48 hours, and a
+            thread with no deal on it clears after 10 days.
+          </InfoTip>
         </p>
 
         {messages.length === 0 ? (

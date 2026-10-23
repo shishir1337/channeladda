@@ -62,19 +62,15 @@ export function PayNow({
   const body = (
     <>
       <p className="max-w-[62ch] text-[0.8125rem] leading-relaxed text-muted">
+        {/* One line each: what this payment is, and what happens to it. */}
         {mode === "SAFEST" ? (
           <>
-            This is our fee to start, and the only payment Channel Adda takes.
-            Once our agent holds the channel, you pay the seller the price of{" "}
+            Our fee only. You pay the seller{" "}
             <Price usd={priceUsd / 100} className="font-medium text-fg" />{" "}
-            directly, to the details the seller gives on this deal.
+            later, once our agent has the channel.
           </>
         ) : (
-          <>
-            The channel price and our fee together. We hold all of it until our
-            agent has taken the channel from the seller, and our agent then
-            makes you primary owner.
-          </>
+          "The price and our fee. We keep it safe until our agent has the channel."
         )}
       </p>
 

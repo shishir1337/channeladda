@@ -23,7 +23,6 @@ import type { OfferComposerConfig } from "@/components/messages/offer-composer";
 import { toMessageViews, toPanelView } from "@/components/messages/serialize";
 import { ThreadView } from "@/components/messages/thread-view";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { db } from "@/lib/db";
 import { dealPanelState } from "@/lib/deal-panel";
 import { templateFor } from "@/lib/deal-templates";
@@ -209,16 +208,6 @@ export default async function ThreadPage({
             />
           ) : null
         }
-        actions={
-          deal ? (
-            <Button asChild variant="secondary" size="sm">
-              <Link href={`/dashboard/deals/${deal.id}`}>
-                Deal page
-                <ArrowUpRightIcon aria-hidden="true" />
-              </Link>
-            </Button>
-          ) : null
-        }
         meta={
           deal ? (
             <>
@@ -238,10 +227,19 @@ export default async function ThreadPage({
                   ).label
                 }
               </Badge>
-              <span className="inline-flex items-center gap-1.5">
+              {/* The deal's page, from its reference: one tap, and no
+                  second button taking a row of its own on a phone. */}
+              <Link
+                href={`/dashboard/deals/${deal.id}`}
+                className="group inline-flex min-h-8 items-center gap-1.5 rounded-md text-fg transition-colors duration-150 hover:text-primary-text"
+              >
                 {deal.mode === "SAFEST" ? "Safest" : "Fastest"} deal
                 <Reference>{deal.reference}</Reference>
-              </span>
+                <ArrowUpRightIcon
+                  aria-hidden="true"
+                  className="size-3.5 text-subtle transition duration-150 group-hover:translate-x-px group-hover:-translate-y-px"
+                />
+              </Link>
             </>
           ) : null
         }
@@ -263,7 +261,6 @@ export default async function ThreadPage({
               viewerRole={thread.viewerRole}
               otherName={otherSide.split(/\s+/)[0] || otherSide}
               listingSlug={thread.listingSlug}
-              dealReference={panelInput?.deal?.reference ?? null}
               progress={progress}
               wait={deal?.wait ?? null}
             >

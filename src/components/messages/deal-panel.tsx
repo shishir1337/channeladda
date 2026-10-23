@@ -4,7 +4,7 @@ import { ArrowUpRightIcon, ChevronDownIcon, ClockIcon } from "lucide-react";
 import Link from "next/link";
 import { type ReactNode, useState } from "react";
 import { InfoTip } from "@/components/app/info-tip";
-import { Dot, Reference, Ring, TurnFlag } from "@/components/app/kit";
+import { Dot, Ring, TurnFlag } from "@/components/app/kit";
 import { WaitCountdown } from "@/components/messages/countdown";
 import { OfferActions } from "@/components/offers/offer-actions";
 import { Price } from "@/components/ui/price";
@@ -68,7 +68,6 @@ export function DealPanel({
   viewerRole,
   otherName,
   listingSlug,
-  dealReference,
   progress = null,
   wait = null,
   children,
@@ -78,7 +77,6 @@ export function DealPanel({
   /** The other side's first name, as the reader would say it. */
   otherName: string;
   listingSlug: string;
-  dealReference: string | null;
   /**
    * Steps done out of all of them, counted by the page from the deal it has
    * already loaded. Drawn as a ring beside the heading of the panel's own
@@ -152,19 +150,24 @@ export function DealPanel({
   ) : null;
 
   if (childOwns) {
+    // Your move: the card shows at once, under its own heading. A folded
+    // line above it only said the same words twice on a phone.
     return (
       <section aria-label="What happens next">
         {clock}
-        {toggle}
-        <div className={cn("mt-2 lg:mt-0 lg:block", open ? "block" : "hidden")}>
+        {view.yourMove ? null : toggle}
+        <div
+          className={cn(
+            "lg:mt-0 lg:block",
+            view.yourMove ? "block" : cn("mt-2", open ? "block" : "hidden"),
+          )}
+        >
           {children}
           <Body
             state={state}
             viewerRole={viewerRole}
             listingSlug={listingSlug}
-            dealReference={dealReference}
             hasChildren
-            framed={false}
           />
         </div>
       </section>
@@ -245,9 +248,7 @@ export function DealPanel({
             state={state}
             viewerRole={viewerRole}
             listingSlug={listingSlug}
-            dealReference={dealReference}
             hasChildren={Boolean(children)}
-            framed
           />
           {children && !childBelow ? (
             <div className="mt-4 border-t border-line">{children}</div>
@@ -436,21 +437,13 @@ function Body({
   state,
   viewerRole,
   listingSlug,
-  dealReference,
   hasChildren = false,
-  framed,
 }: {
   state: PanelStateView;
   viewerRole: "buyer" | "seller" | "agent" | "staff";
   listingSlug: string;
-  dealReference: string | null;
   /** The page supplied the card for this state, so no fallback link. */
   hasChildren?: boolean;
-  /**
-   * Inside the panel's own card, where the deal link is its footer; beside
-   * the deal's cards, where it is a quiet line under them.
-   */
-  framed: boolean;
 }) {
   const side = viewerRole === "buyer" || viewerRole === "seller";
 
@@ -480,33 +473,9 @@ function Body({
     );
   }
 
-  const dealId = "dealId" in state ? state.dealId : null;
-  if (dealId) {
-    return (
-      <Link
-        href={`/dashboard/deals/${dealId}`}
-        className={cn(
-          "group flex min-h-11 items-center gap-2 text-[0.8125rem] font-medium text-muted transition-colors duration-150 hover:text-fg pointer-fine:min-h-8",
-          framed ? "-mb-1 mt-4 border-t border-line pt-3" : "mt-2 px-1",
-        )}
-      >
-        {dealReference ? (
-          <>
-            Deal <Reference>{dealReference}</Reference>
-          </>
-        ) : (
-          "The deal page"
-        )}
-        <ArrowUpRightIcon
-          aria-hidden="true"
-          className={cn(
-            "size-3.5 shrink-0 text-subtle transition duration-150 group-hover:translate-x-px group-hover:-translate-y-px group-hover:text-fg",
-            framed && "ml-auto",
-          )}
-        />
-      </Link>
-    );
-  }
+  // A deal's page is one tap away from its reference in the chat header;
+  // a second link here only repeated it.
+  if ("dealId" in state && state.dealId) return null;
 
   if ((state.kind === "buy" || state.kind === "start-deal") && !hasChildren) {
     return (
