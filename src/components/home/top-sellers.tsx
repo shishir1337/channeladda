@@ -1,4 +1,4 @@
-import { ArrowRightIcon, BadgeCheckIcon, TimerIcon } from "lucide-react";
+import { ArrowRightIcon, BadgeCheckIcon } from "lucide-react";
 import Link from "next/link";
 import { pointsLabel, ResellerBadge } from "@/components/app/reseller-badge";
 import { SellerAvatar } from "@/components/site/seller-avatar";
@@ -79,17 +79,6 @@ export function TopSellers({ sellers }: { sellers: Seller[] }) {
                     </dd>
                   </div>
                 </dl>
-
-                <p className="mt-4 flex items-center gap-1.5 text-[0.8125rem] text-muted">
-                  <TimerIcon
-                    aria-hidden="true"
-                    className="size-3.5 text-subtle"
-                  />
-                  Replies in{" "}
-                  <span className="tnum font-medium text-fg">
-                    ~{seller.responseMins} min
-                  </span>
-                </p>
 
                 <div className="mt-auto flex flex-wrap gap-1.5 pt-5">
                   {seller.specialties.map((id) => {

@@ -2,7 +2,6 @@ import {
   BadgeCheckIcon,
   MessageSquareIcon,
   ShieldCheckIcon,
-  TimerIcon,
 } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -134,38 +133,11 @@ export default async function SellerPage({
 
           {/* Every completed deal, bought or sold, so a buyer sees the whole
               of someone's record here before deciding to deal with them. */}
-          <dl className="mt-8 grid grid-cols-2 gap-x-6 gap-y-5 border-y border-line py-5 sm:grid-cols-3 lg:grid-cols-6">
+          <dl className="mt-8 grid grid-cols-3 gap-x-6 gap-y-5 border-y border-line py-5">
             <Stat label="Deals done" value={String(record.deals)} />
             <Stat
               label="Deal worth"
               value={<Price usd={record.worthCents / 100} compact />}
-            />
-            <Stat
-              label="Safest deals"
-              value={
-                <>
-                  {record.safest.deals}
-                  <span className="text-sm font-normal text-subtle">
-                    <Price usd={record.safest.worthCents / 100} compact />
-                  </span>
-                </>
-              }
-            />
-            <Stat
-              label="Fastest deals"
-              value={
-                <>
-                  {record.fastest.deals}
-                  <span className="text-sm font-normal text-subtle">
-                    <Price usd={record.fastest.worthCents / 100} compact />
-                  </span>
-                </>
-              }
-            />
-            <Stat
-              label="Replies in"
-              value={`~${seller.responseMins} min`}
-              icon={<TimerIcon aria-hidden="true" className="size-4" />}
             />
             <Stat label="Live listings" value={String(active.length)} />
           </dl>
@@ -223,20 +195,11 @@ export default async function SellerPage({
   );
 }
 
-function Stat({
-  label,
-  value,
-  icon,
-}: {
-  label: string;
-  value: React.ReactNode;
-  icon?: React.ReactNode;
-}) {
+function Stat({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div>
       <dt className="text-[0.8125rem] text-subtle">{label}</dt>
       <dd className="tnum mt-1 flex items-baseline gap-1.5 text-xl font-semibold tracking-[-0.02em] text-fg">
-        {icon}
         {value}
       </dd>
     </div>

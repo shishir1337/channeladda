@@ -1,4 +1,4 @@
-import { BadgeCheckIcon, TimerIcon } from "lucide-react";
+import { BadgeCheckIcon } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { pointsLabel, ResellerBadge } from "@/components/app/reseller-badge";
@@ -120,18 +120,8 @@ export default async function SellersPage() {
                     </div>
                   </dl>
 
-                  <p className="mt-4 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[0.8125rem] text-muted">
-                    <TimerIcon
-                      aria-hidden="true"
-                      className="size-3.5 text-subtle"
-                    />
-                    Replies in{" "}
-                    <span className="tnum font-medium text-fg">
-                      ~{seller.responseMins} min
-                    </span>
-                    <span className="ml-auto text-subtle">
-                      Since {seller.memberSince}
-                    </span>
+                  <p className="mt-4 text-[0.8125rem] text-subtle">
+                    Member since {seller.memberSince}
                   </p>
 
                   <div className="mt-auto flex flex-wrap gap-1.5 pt-4">

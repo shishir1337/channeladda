@@ -230,6 +230,8 @@ export function SellerPanel({ seller }: { seller: Seller }) {
             </span>
             <span aria-hidden="true">·</span>
             <span>{seller.country}</span>
+            <span aria-hidden="true">·</span>
+            <span>Member since {seller.memberSince}</span>
           </p>
         </div>
       </div>
@@ -240,10 +242,6 @@ export function SellerPanel({ seller }: { seller: Seller }) {
           className="mt-5 border-t border-line pt-5"
         />
       ) : null}
-      <dl className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <Stat label="Replies in" value={`~${seller.responseMins} min`} />
-        <Stat label="Member since" value={seller.memberSince} />
-      </dl>
 
       <div className="mt-5 flex flex-wrap gap-2.5">
         <Button asChild variant="secondary" size="sm">
@@ -255,14 +253,5 @@ export function SellerPanel({ seller }: { seller: Seller }) {
         </Badge>
       </div>
     </Panel>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: ReactNode }) {
-  return (
-    <div>
-      <dt className="text-xs text-subtle">{label}</dt>
-      <dd className="tnum mt-1 text-sm font-semibold">{value}</dd>
-    </div>
   );
 }

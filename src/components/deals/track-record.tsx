@@ -21,40 +21,19 @@ export function TrackRecordStats({
   record: TrackRecord;
   className?: string;
 }) {
+  // All deals as one figure: which of our two flows someone used says
+  // nothing about them, and a profile reading "Safest deals 0 · $0.00" looked
+  // like a mark against them.
   const items = [
     { label: "Deals done", value: <>{record.deals}</> },
     {
       label: "Deal worth",
       value: <Price usd={record.worthCents / 100} compact />,
     },
-    {
-      label: "Safest deals",
-      value: (
-        <>
-          {record.safest.deals}
-          <span className="font-normal text-subtle">
-            {" · "}
-            <Price usd={record.safest.worthCents / 100} compact />
-          </span>
-        </>
-      ),
-    },
-    {
-      label: "Fastest deals",
-      value: (
-        <>
-          {record.fastest.deals}
-          <span className="font-normal text-subtle">
-            {" · "}
-            <Price usd={record.fastest.worthCents / 100} compact />
-          </span>
-        </>
-      ),
-    },
   ];
 
   return (
-    <dl className={cn("grid grid-cols-2 gap-4 sm:grid-cols-4", className)}>
+    <dl className={cn("grid grid-cols-2 gap-4", className)}>
       {items.map((item) => (
         <div key={item.label} className="min-w-0">
           <dt className="text-xs text-subtle">{item.label}</dt>
@@ -67,10 +46,7 @@ export function TrackRecordStats({
   );
 }
 
-/**
- * "750 points · 12 deals · $84K · Safest 8 · Fastest 4", or plainly that
- * there are none.
- */
+/** "750 points · 12 deals · $84K", or plainly that there are none. */
 export function TrackRecordLine({
   record,
   points,
@@ -99,10 +75,6 @@ export function TrackRecordLine({
       <span className="font-medium text-fg">{deals(record.deals)}</span>
       {" · "}
       <Price usd={record.worthCents / 100} compact />
-      {" · "}
-      Safest {record.safest.deals}
-      {" · "}
-      Fastest {record.fastest.deals}
     </span>
   );
 }
