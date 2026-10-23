@@ -224,7 +224,6 @@ export default async function ListingPage({
             <div id="buy" className="mt-7 scroll-mt-20 lg:hidden">
               <BuyPanel
                 listing={listing}
-                holdDays={platform.holdDays}
                 fees={fees}
                 isOwnListing={isOwnListing}
                 heldOfferUsd={heldOfferUsd}
@@ -266,7 +265,6 @@ export default async function ListingPage({
             <div className="sticky top-24">
               <BuyPanel
                 listing={listing}
-                holdDays={platform.holdDays}
                 fees={fees}
                 isOwnListing={isOwnListing}
                 heldOfferUsd={heldOfferUsd}

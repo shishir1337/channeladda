@@ -1,6 +1,6 @@
 "use client";
 
-import { ShieldCheckIcon, ZapIcon } from "lucide-react";
+import { CheckIcon, ShieldCheckIcon, ZapIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useId, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
@@ -28,18 +28,24 @@ const MODES = [
     label: "Safest",
     icon: ShieldCheckIcon,
     holds: "We hold the channel",
-    blurb:
-      "Our agent takes ownership of the channel first and verifies it. Then you pay the seller directly, and once they confirm it arrived, our agent transfers the channel to you.",
-    upfrontNote: "Up front you pay our fee only",
+    // Three short lines, not a paragraph: the owner's clients read this on a
+    // phone and went looking for the choice under the wall of text.
+    steps: [
+      "You pay our fee",
+      "Our agent takes the channel",
+      "You pay the seller, then get the channel",
+    ],
   },
   {
     id: "FASTEST" as const,
     label: "Fastest",
     icon: ZapIcon,
     holds: "We hold the money",
-    blurb:
-      "You pay us the full amount up front. Our agent takes the channel from the seller and invites you as owner, and after the holding period makes you primary owner. The seller is paid once our agent holds the channel.",
-    upfrontNote: "Up front you pay the price and our fee",
+    steps: [
+      "You pay us the price and our fee",
+      "Our agent takes the channel",
+      "You get the channel, the seller gets paid",
+    ],
   },
 ];
 
@@ -90,67 +96,89 @@ export function StartDeal({
 
   return (
     <div className="mt-5">
-      <fieldset
-        className="grid gap-2.5"
-        aria-describedby={`${groupId}-detail`}
-        disabled={pending}
-      >
-        <legend className="mb-2 text-[0.8125rem] font-medium text-subtle">
-          How you want to buy
+      <fieldset disabled={pending} aria-describedby={`${groupId}-steps`}>
+        <legend className="mb-2.5 text-[0.9375rem] font-semibold text-fg">
+          Choose your deal
         </legend>
-        {MODES.map((option) => {
-          const selected = option.id === mode;
-          return (
-            <button
-              key={option.id}
-              type="button"
-              aria-pressed={selected}
-              onClick={() => setMode(option.id)}
-              className={cn(
-                "flex w-full cursor-pointer items-start gap-3 rounded-card border p-3.5 text-left transition-colors duration-150",
-                selected
-                  ? "border-fg/80 bg-surface-2/60 ring-1 ring-fg/10"
-                  : "border-line hover:border-line-strong hover:bg-surface-2",
-              )}
-            >
-              <option.icon
-                aria-hidden="true"
+        {/* Two tiles side by side, even on a phone: the choice is the first
+            thing in the panel and both options are visible at once. Real
+            radio inputs, so arrow keys move between them. */}
+        <div className="grid grid-cols-2 gap-2.5">
+          {MODES.map((option) => {
+            const selected = option.id === mode;
+            return (
+              <label
+                key={option.id}
                 className={cn(
-                  "mt-0.5 size-4 shrink-0",
-                  selected ? "text-fg" : "text-subtle",
+                  "relative flex cursor-pointer flex-col rounded-card border p-3 transition-[border-color,background-color,box-shadow] duration-150 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-primary/40 sm:p-3.5",
+                  selected
+                    ? "border-primary bg-primary-soft shadow-xs"
+                    : "border-line bg-surface hover:border-line-strong dark:bg-surface-2",
                 )}
-              />
-              <span className="min-w-0">
-                <span className="flex flex-wrap items-baseline gap-x-2">
-                  <span className="text-sm font-semibold text-fg">
-                    {option.label}
+              >
+                <input
+                  type="radio"
+                  name={groupId}
+                  value={option.id}
+                  checked={selected}
+                  onChange={() => setMode(option.id)}
+                  className="sr-only"
+                />
+                <span className="flex items-start justify-between gap-2">
+                  <span
+                    className={cn(
+                      "inline-flex size-8 items-center justify-center rounded-lg",
+                      selected
+                        ? "bg-primary text-primary-fg"
+                        : "bg-surface-2 text-muted dark:bg-surface-3",
+                    )}
+                  >
+                    <option.icon aria-hidden="true" className="size-4" />
                   </span>
-                  <span className="text-xs text-muted">{option.holds}</span>
+                  <span
+                    aria-hidden="true"
+                    className={cn(
+                      "inline-flex size-5 items-center justify-center rounded-full border",
+                      selected
+                        ? "border-primary bg-primary text-primary-fg"
+                        : "border-line-strong",
+                    )}
+                  >
+                    {selected ? <CheckIcon className="size-3" /> : null}
+                  </span>
                 </span>
-                <span className="mt-1 block text-xs leading-relaxed text-muted">
-                  {option.upfrontNote}:{" "}
-                  <Price
-                    usd={buyerTotal(price, fees, option.id).total}
-                    className="font-medium text-fg"
-                  />
+                <span className="mt-2.5 text-[0.9375rem] leading-5 font-semibold text-fg">
+                  {option.label}
                 </span>
-              </span>
-            </button>
-          );
-        })}
+                <span className="mt-0.5 text-xs leading-4 text-muted">
+                  {option.holds}
+                </span>
+                <span className="mt-3 border-t border-line pt-2.5 text-[0.6875rem] text-subtle">
+                  Pay now
+                </span>
+                <Price
+                  usd={buyerTotal(price, fees, option.id).total}
+                  className="tnum text-sm font-semibold text-fg"
+                />
+              </label>
+            );
+          })}
+        </div>
       </fieldset>
 
-      <p
-        id={`${groupId}-detail`}
-        className="mt-3 text-xs leading-relaxed text-muted"
-      >
-        {chosen.blurb}
-        {/* Google's own wait before a manager can be made owner; the other
-            platforms have nothing like it. */}
-        {mode === "SAFEST" && platform === "YOUTUBE"
-          ? " One Google waiting period."
-          : null}
-      </p>
+      <ol id={`${groupId}-steps`} className="mt-3.5 flex flex-col gap-1.5">
+        {chosen.steps.map((line, i) => (
+          <li
+            key={line}
+            className="flex items-center gap-2.5 text-[0.8125rem] text-muted"
+          >
+            <span className="tnum inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-surface-2 text-[0.6875rem] font-semibold text-fg dark:bg-surface-3">
+              {i + 1}
+            </span>
+            {line}
+          </li>
+        ))}
+      </ol>
 
       <dl className="mt-4 space-y-2 border-y border-line py-3.5 text-sm">
         {mode === "FASTEST" ? (
@@ -241,9 +269,8 @@ export function StartDeal({
           className="mt-0.5 size-4 shrink-0 cursor-pointer accent-fg"
         />
         <span>
-          I understand that revenue, subscriber counts and monetization can
-          change after a handover, that no part of that is guaranteed by Channel
-          Adda, and that a drop afterwards is not grounds for a refund.
+          I understand revenue, subscribers and monetization can change after
+          the handover, and a drop is not grounds for a refund.
         </span>
       </label>
 
@@ -251,13 +278,20 @@ export function StartDeal({
         type="button"
         size="lg"
         className="mt-3 w-full"
-        disabled={pending || !acceptedRisk}
+        // Not disabled until the box is ticked: a grey button nobody can
+        // press, with no word why, read as broken. It says what is missing.
+        disabled={pending}
         onClick={() => {
           if (!session?.user) {
             router.push(`/signin?next=/listing/${listingSlug}`);
             return;
           }
           setError(null);
+          if (!acceptedRisk) {
+            setError("Tick the box above to continue.");
+            document.getElementById(riskId)?.focus();
+            return;
+          }
           const parsed = parseHandoverTo(platform, handoverTo);
           if (!parsed.ok) {
             setHandoverError(parsed.error);

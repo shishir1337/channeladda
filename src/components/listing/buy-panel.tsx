@@ -18,15 +18,11 @@ import type { FeeSettings } from "@/lib/fees";
  */
 export function BuyPanel({
   listing,
-  holdDays,
   fees,
   isOwnListing,
   heldOfferUsd = null,
 }: {
   listing: Listing;
-  /** Only the primitive is passed — a Platform carries its icon component,
-   *  and functions cannot cross into a Client Component. */
-  holdDays: number;
   /** Set by an admin, so it is read on the server and handed down. */
   fees: FeeSettings;
   /** A seller cannot buy their own listing, so they get neither action. */
@@ -107,22 +103,16 @@ export function BuyPanel({
         ) : null}
       </div>
 
-      <div className="mt-5 rounded-card border border-line bg-bg-subtle p-4">
-        <p className="flex items-center gap-2 text-sm font-semibold text-fg">
-          <ShieldCheckIcon
-            aria-hidden="true"
-            className="size-4 shrink-0 text-verified"
-          />
-          Nobody can be left short
-        </p>
-        <p className="mt-1.5 text-[0.8125rem] leading-relaxed text-muted">
-          On a Fastest deal you pay Channel Adda, never the seller, and the
-          seller is paid only once our agent holds the channel, after a{" "}
-          <span className="font-medium text-fg">{holdDays}-day</span> holding
-          period. On a Safest deal our agent holds the channel first, and you
-          pay the seller directly only once it is in our hands.
-        </p>
-      </div>
+      {/* One line where there was a paragraph: the deal tiles above already
+          say what each mode holds. */}
+      <p className="mt-5 flex items-start gap-2 text-[0.8125rem] leading-relaxed text-muted">
+        <ShieldCheckIcon
+          aria-hidden="true"
+          className="mt-0.5 size-4 shrink-0 text-verified"
+        />
+        Either way, our agent holds the channel or the money until the other
+        side has delivered.
+      </p>
 
       <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
         <span className="inline-flex items-center gap-1.5 text-[0.8125rem] text-subtle">
