@@ -114,7 +114,7 @@ export function OfferActions({
           </Button>
           <Button
             type="button"
-            variant="ghost"
+            variant="danger-outline"
             size="sm"
             disabled={pending}
             onClick={() => run(() => declineOffer(offer.id))}
@@ -187,7 +187,7 @@ export function OfferActions({
       {yours ? (
         <Button
           type="button"
-          variant="ghost"
+          variant="danger-outline"
           size="sm"
           disabled={pending}
           onClick={() => run(() => withdrawOffer(offer.id))}

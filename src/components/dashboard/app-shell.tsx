@@ -11,6 +11,7 @@ import {
   HandshakeIcon,
   LayoutDashboardIcon,
   LifeBuoyIcon,
+  MenuIcon,
   MessageSquareIcon,
   PanelLeftIcon,
   PlusIcon,
@@ -350,8 +351,109 @@ const iconButton =
  * collapses to icons (remembered, and ⌘/Ctrl+B), and on a phone it lives
  * behind the button in the corner.
  */
+/** An open conversation, whose message box needs the bottom of the screen. */
+function isThread(pathname: string) {
+  return /^\/dashboard\/messages\/[^/]+/.test(pathname);
+}
+
+/**
+ * The phone's tab bar: the four places a member goes most, and "More" for
+ * the rest of the menu.
+ *
+ * The owner's members are mostly on phones and many are not technical; a
+ * menu behind an icon in the top corner was the only way around. A bar at
+ * the bottom, where the thumb already is, is the pattern every app they use
+ * has taught them. It steps aside inside an open chat, as messaging apps do,
+ * so the message box keeps the bottom of the screen.
+ */
+function TabBar({
+  tabs,
+  pathname,
+  moreWaiting,
+}: {
+  tabs: NavItem[];
+  pathname: string;
+  moreWaiting: number;
+}) {
+  return (
+    <nav
+      aria-label="Main"
+      className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-bg/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md backdrop-saturate-150 lg:hidden"
+    >
+      <ul className="mx-auto grid max-w-xl grid-cols-5">
+        {tabs.map((item) => {
+          const Icon = ICONS[item.icon];
+          const active =
+            item.href === "/dashboard"
+              ? pathname === item.href
+              : isActive(pathname, { ...item, section: true });
+          return (
+            <li key={item.href}>
+              <Link
+                href={item.href}
+                aria-current={active ? "page" : undefined}
+                className={cn(
+                  "relative flex h-15 flex-col items-center justify-center gap-1 text-[0.6875rem] font-medium transition-colors duration-150",
+                  active ? "text-fg" : "text-subtle active:text-fg",
+                )}
+              >
+                {active ? (
+                  <span
+                    aria-hidden="true"
+                    className="absolute top-0 h-0.5 w-8 rounded-full bg-primary"
+                  />
+                ) : null}
+                <span className="relative">
+                  <Icon aria-hidden="true" className="size-5" />
+                  {item.waiting ? <TabBadge count={item.waiting} /> : null}
+                </span>
+                {item.label}
+                {item.waiting ? (
+                  <span className="sr-only">
+                    , {item.waiting} waiting on you
+                  </span>
+                ) : null}
+              </Link>
+            </li>
+          );
+        })}
+        <li>
+          <SheetTrigger asChild>
+            <button
+              type="button"
+              className="relative flex h-15 w-full cursor-pointer flex-col items-center justify-center gap-1 text-[0.6875rem] font-medium text-subtle transition-colors duration-150 active:text-fg"
+            >
+              <span className="relative">
+                <MenuIcon aria-hidden="true" className="size-5" />
+                {moreWaiting ? <TabBadge count={moreWaiting} /> : null}
+              </span>
+              More
+              {moreWaiting ? (
+                <span className="sr-only">, {moreWaiting} waiting on you</span>
+              ) : null}
+            </button>
+          </SheetTrigger>
+        </li>
+      </ul>
+    </nav>
+  );
+}
+
+/** A count on a tab icon: filled gold, so it is seen at a glance. */
+function TabBadge({ count }: { count: number }) {
+  return (
+    <span
+      aria-hidden="true"
+      className="absolute -top-1.5 -right-2.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[0.625rem] leading-none font-bold text-primary-fg tabular-nums ring-2 ring-bg"
+    >
+      {count > 9 ? "9+" : count}
+    </span>
+  );
+}
+
 export function AppShell({
   groups,
+  tabs,
   staff,
   user,
   bell,
@@ -359,6 +461,11 @@ export function AppShell({
   children,
 }: {
   groups: NavGroup[];
+  /**
+   * The phone's bottom tab bar, in order. Left out in the staff area, which
+   * keeps its drawer.
+   */
+  tabs?: NavItem[];
   /** Marks the rail as the staff area so the two are never confused. */
   staff?: boolean;
   /** Who is signed in, for the account menu. */
@@ -450,6 +557,14 @@ export function AppShell({
   const area = staff ? "staff" : "member";
   const page = current?.item.label ?? (staff ? "Staff" : "Your account");
 
+  const showTabs = tabs !== undefined && !isThread(pathname);
+  // What "More" holds that is waiting: everything not already on a tab.
+  const tabHrefs = new Set(tabs?.map((tab) => tab.href));
+  const moreWaiting = groups
+    .flatMap((group) => group.items)
+    .filter((item) => !tabHrefs.has(item.href))
+    .reduce((total, item) => total + (item.waiting ?? 0), 0);
+
   return (
     <Tooltip.Provider delayDuration={250} skipDelayDuration={150}>
       {/* The sheet wraps the whole frame so its trigger can live in the top
@@ -507,7 +622,13 @@ export function AppShell({
                       ? `Open the menu — ${waiting} waiting on you`
                       : "Open the menu"
                   }
-                  className={cn(iconButton, "relative lg:hidden")}
+                  // With the tab bar, "More" opens the menu; a second
+                  // button up here only competed with the page title.
+                  className={cn(
+                    iconButton,
+                    "relative lg:hidden",
+                    tabs !== undefined && "hidden",
+                  )}
                 >
                   <PanelLeftIcon
                     aria-hidden="true"
@@ -588,7 +709,11 @@ export function AppShell({
 
             <main
               id="main"
-              className="px-4 pt-6 pb-16 sm:px-6 lg:px-10 lg:pt-8 lg:pb-20"
+              className={cn(
+                "px-4 pt-6 sm:px-6 lg:px-10 lg:pt-8 lg:pb-20",
+                // Room for the tab bar and the phone's home indicator.
+                showTabs ? "pb-28" : "pb-16",
+              )}
             >
               {/* The inbox is an app view — threads, the conversation and
                   the deal side by side — so it takes the width there is.
@@ -607,6 +732,10 @@ export function AppShell({
               </div>
             </main>
           </div>
+
+          {showTabs && tabs ? (
+            <TabBar tabs={tabs} pathname={pathname} moreWaiting={moreWaiting} />
+          ) : null}
 
           {/* ---- the same rail, on a phone ----------------------------------- */}
           <SheetContent side="left" className="w-[17rem] max-w-[85vw] p-0">

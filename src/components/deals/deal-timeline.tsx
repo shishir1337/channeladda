@@ -874,9 +874,11 @@ export function CancelDeal({ deal }: { deal: DealView }) {
 
   if (!open) {
     return (
+      // Red, because it ends the deal: the owner found it in the same grey
+      // as every harmless button.
       <Button
         type="button"
-        variant="ghost"
+        variant="danger-outline"
         size="sm"
         onClick={() => setOpen(true)}
         className="self-start"

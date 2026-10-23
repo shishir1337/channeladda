@@ -277,7 +277,7 @@ export function ImageUpload({
               setItems([]);
               setNotice(null);
             }}
-            className="inline-flex h-11 cursor-pointer items-center gap-1.5 rounded-lg border border-line bg-surface px-3 text-[0.8125rem] font-medium text-muted shadow-xs transition-colors duration-150 pointer-fine:h-8 pointer-fine:px-2.5 hover:border-danger/40 hover:text-danger dark:bg-surface-2"
+            className="inline-flex h-11 cursor-pointer items-center gap-1.5 rounded-lg border border-line bg-surface px-3 text-[0.8125rem] font-medium text-danger shadow-xs transition-colors duration-150 pointer-fine:h-8 pointer-fine:px-2.5 hover:border-danger/40 hover:bg-danger-soft dark:bg-surface-2"
           >
             <TrashIcon aria-hidden="true" className="size-3.5" />
             Remove

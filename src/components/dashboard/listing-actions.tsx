@@ -129,9 +129,8 @@ export function ListingControls({
           ) : (
             <Button
               type="button"
-              variant="ghost"
+              variant="danger-outline"
               size="sm"
-              className="hover:text-danger"
               disabled={pending}
               onClick={() => setConfirmingDelete(true)}
             >

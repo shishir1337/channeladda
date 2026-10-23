@@ -382,8 +382,8 @@ function describe(
       };
     case "pay":
       return {
-        summary: "Pay to begin the deal",
-        title: "Pay to begin the deal",
+        summary: "Pay to start the deal",
+        title: "Pay to start the deal",
         yourMove: true,
       };
     case "waiting-for-payment":

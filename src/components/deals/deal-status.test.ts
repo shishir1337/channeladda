@@ -226,7 +226,8 @@ describe("the headline follows the open step, not just the status", () => {
       2,
       "YOUTUBE",
     );
-    expect(h.label).toBe(STATUS_LABELS.AWAITING_CUSTODY);
+    // The seller's own badge names their move, not "waiting for the seller".
+    expect(h.label).toBe("Invite our agent now");
     expect(h.sentence).toMatch(/owner/);
   });
 
@@ -251,7 +252,8 @@ describe("the headline follows the open step, not just the status", () => {
 
   test("a safest buyer is told to pay the seller directly, and press Paid", () => {
     const buyer = dealHeadline("IN_CUSTODY", "SAFEST", "buyer", 6, "YOUTUBE");
-    expect(buyer.label).toMatch(/buyer to pay the seller/i);
+    // Addressed to the buyer, not about "the buyer".
+    expect(buyer.label).toBe("Pay the seller now");
     expect(buyer.sentence).toMatch(/directly/);
     expect(buyer.sentence).toMatch(/Paid/);
   });
@@ -360,5 +362,35 @@ describe("the headline follows the open step, not just the status", () => {
       short: STATUS_SHORT.COMPLETED,
       sentence: statusSentence("COMPLETED", "SAFEST", "buyer"),
     });
+  });
+});
+
+describe("the badge speaks to whoever is reading it", () => {
+  // The owner: a buyer looking at their own deal read "Waiting for the
+  // buyer's payment". The buyer and the seller each get their own words;
+  // staff and the agent keep the neutral one.
+  test("an unpaid deal", () => {
+    const label = (viewer: "buyer" | "seller" | "agent") =>
+      dealHeadline("AWAITING_PAYMENT", "FASTEST", viewer, 1, "YOUTUBE").label;
+    expect(label("buyer")).toBe("Waiting for your payment");
+    expect(label("seller")).toBe("Waiting for the buyer to pay");
+    expect(label("agent")).toBe(STATUS_LABELS.AWAITING_PAYMENT);
+  });
+
+  test("a Safest buyer paying the seller", () => {
+    const label = (viewer: "buyer" | "seller" | "agent") =>
+      dealHeadline("IN_CUSTODY", "SAFEST", viewer, 6, "YOUTUBE").label;
+    expect(label("buyer")).toBe("Pay the seller now");
+    expect(label("seller")).toBe("Waiting for the buyer to pay you");
+    expect(label("agent")).toBe("Waiting for the buyer to pay the seller");
+  });
+
+  test("the seller's own turn says so", () => {
+    expect(
+      dealHeadline("IN_CUSTODY", "SAFEST", "seller", 7, "YOUTUBE").label,
+    ).toBe("Confirm the buyer's payment");
+    expect(
+      dealHeadline("AGENT_VERIFYING", "FASTEST", "seller", 2, "YOUTUBE").label,
+    ).toBe("Invite our agent now");
   });
 });

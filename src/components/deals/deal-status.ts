@@ -251,8 +251,12 @@ export function statusSentence(
 /** One reader's headline: the badge, its short form, and the sentence. */
 export type DealHeadline = { label: string; short: string; sentence: string };
 
+type Reader = "buyer" | "seller";
+
 type Override = {
   label: string;
+  /** The badge for the buyer or the seller, where the neutral one would name them. */
+  labelFor?: Partial<Record<Reader, string>>;
   short: string;
   sentence: (w: Words) => Record<"buyer" | "seller" | "agent", string>;
 };
@@ -309,6 +313,10 @@ const BY_OPEN_STEP: Partial<Record<string, Override>> = {
   },
   "SAFEST:IN_CUSTODY:6": {
     label: "Waiting for the buyer to pay the seller",
+    labelFor: {
+      buyer: "Pay the seller now",
+      seller: "Waiting for the buyer to pay you",
+    },
     short: "Buyer paying",
     sentence: () => ({
       buyer:
@@ -320,6 +328,7 @@ const BY_OPEN_STEP: Partial<Record<string, Override>> = {
   },
   "SAFEST:IN_CUSTODY:7": {
     label: "Waiting for the seller to confirm the payment",
+    labelFor: { seller: "Confirm the buyer's payment" },
     short: "Seller confirming",
     sentence: () => ({
       buyer:
@@ -344,6 +353,7 @@ const BY_OPEN_STEP: Partial<Record<string, Override>> = {
   },
   "FASTEST:AGENT_VERIFYING:2": {
     label: "Waiting for the seller to invite our agent",
+    labelFor: { seller: "Invite our agent now" },
     short: "Seller inviting",
     sentence: () => ({
       buyer:
@@ -403,6 +413,32 @@ const BY_OPEN_STEP: Partial<Record<string, Override>> = {
 };
 
 /**
+ * The status badge for the buyer or the seller, where the neutral wording
+ * would talk about them in the third person ("the buyer's payment", read by
+ * the buyer). Staff and the agent keep STATUS_LABELS.
+ */
+const PERSONAL_LABELS: Partial<
+  Record<OrderStatus, Partial<Record<Reader, string>>>
+> = {
+  AWAITING_PAYMENT: {
+    buyer: "Waiting for your payment",
+    seller: "Waiting for the buyer to pay",
+  },
+  // Only step 2 reaches this: steps 3 to 5 have their own copy above.
+  AWAITING_CUSTODY: { seller: "Invite our agent now" },
+  AWAITING_BUYER_PAYMENT: {
+    buyer: "Pay the seller now",
+    seller: "Waiting for the buyer to pay you",
+  },
+  AWAITING_RELEASE: { seller: "Paying you" },
+  RETURNED_TO_SELLER: { seller: "Channel returned to you" },
+};
+
+function isReader(viewer: DealActor): viewer is Reader {
+  return viewer === "buyer" || viewer === "seller";
+}
+
+/**
  * What the deal says at the top for this reader, given which step is open.
  *
  * A status can cover several steps owned by different people, and copy
@@ -439,13 +475,17 @@ export function dealHeadline(
     const reader =
       viewer === "buyer" || viewer === "seller" ? viewer : ("agent" as const);
     return {
-      label: override.label,
+      label:
+        (isReader(viewer) ? override.labelFor?.[viewer] : undefined) ??
+        override.label,
       short: override.short,
       sentence: override.sentence(wordsFor(platform))[reader],
     };
   }
   return {
-    label: STATUS_LABELS[status],
+    label:
+      (isReader(viewer) ? PERSONAL_LABELS[status]?.[viewer] : undefined) ??
+      STATUS_LABELS[status],
     short: STATUS_SHORT[status],
     sentence: statusSentence(status, mode, viewer),
   };

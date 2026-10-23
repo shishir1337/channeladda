@@ -210,7 +210,7 @@ export function PayNow({
           id="pay-now-heading"
           className="mt-2.5 text-[0.9375rem] leading-6 font-semibold text-fg"
         >
-          {mode === "SAFEST" ? "Pay the admin fee to begin" : "Pay to begin"}
+          {mode === "SAFEST" ? "Pay our fee to start" : "Pay to start"}
         </h2>
         <div className="mt-1.5">{body}</div>
       </section>

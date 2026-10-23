@@ -1,4 +1,4 @@
-import type { NavGroup } from "@/components/dashboard/app-shell";
+import type { NavGroup, NavItem } from "@/components/dashboard/app-shell";
 import { AppShell } from "@/components/dashboard/app-shell";
 import { NotificationBell } from "@/components/dashboard/notification-bell";
 import { getWaitingOnYou } from "@/server/dashboard";
@@ -149,9 +149,28 @@ export default async function DashboardLayout({ children }: LayoutProps<"/">) {
     },
   ];
 
+  // The phone's tab bar: where members go most. Everything else is in "More".
+  const tabs: NavItem[] = [
+    { label: "Home", href: "/dashboard", icon: "overview" },
+    {
+      label: "Deals",
+      href: "/dashboard/deals",
+      icon: "transfer",
+      waiting: deals,
+    },
+    {
+      label: "Messages",
+      href: "/dashboard/messages",
+      icon: "messages",
+      waiting: unread,
+    },
+    { label: "Wallet", href: "/dashboard/wallet", icon: "money" },
+  ];
+
   return (
     <AppShell
       groups={groups}
+      tabs={tabs}
       bell={bell}
       balanceCents={balanceCents}
       user={shellUser(user)}
