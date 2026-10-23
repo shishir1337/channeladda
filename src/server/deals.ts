@@ -273,7 +273,9 @@ export async function createDeal(input: {
    * deals opened by staff tools and older tests stay valid.
    */
   handoverTo?: string | null;
-}): Promise<DealOutcome<{ orderId: string; reference: string }>> {
+}): Promise<
+  DealOutcome<{ orderId: string; reference: string; conversationId: string }>
+> {
   const listing = await db.listing.findUnique({
     where: { id: input.listingId },
     select: { id: true, sellerId: true, status: true, priceUsd: true },
@@ -335,152 +337,157 @@ export async function createDeal(input: {
   for (let attempt = 0; attempt < 5; attempt++) {
     const reference = newReference();
     try {
-      const { orderId, closed } = await db.$transaction(async (tx) => {
-        // Compare-and-set, not read-then-write: two buyers pressing buy at the
-        // same moment must not both end up with an order. A zero row count
-        // means somebody else got there between the read above and here.
-        //
-        // From an accepted offer the listing is already reserved — by the
-        // offer — so the check is that it still is, and that no live deal
-        // has been opened against it in the meantime. The unique offerId on
-        // the order then makes a second deal off the same acceptance
-        // impossible rather than merely unlikely.
-        if (offer) {
-          const stillHeld = await tx.listing.count({
-            where: { id: listing.id, status: "RESERVED" },
-          });
-          const live = await tx.order.count({
-            where: {
-              listingId: listing.id,
-              status: { notIn: [...TERMINAL_STATUSES] },
-            },
-          });
-          if (stillHeld !== 1 || live > 0) throw new DealAbort("taken");
-        } else {
-          const reserved = await tx.listing.updateMany({
-            where: { id: listing.id, status: "LIVE" },
-            data: { status: "RESERVED" },
-          });
-          if (reserved.count !== 1) throw new DealAbort("taken");
-        }
-
-        // The 10-day chat purge carves out threads with an order on them, and
-        // nothing ever wrote that link — so the carve-out could never fire,
-        // and every deal's conversation was deleted after ten days. That
-        // conversation is what the dispute process and the refund policy both
-        // call the only account of what was agreed.
-        //
-        // Every deal has one now: a buyer who never wrote to the seller gets
-        // the thread here, so the agent has somewhere to talk to both. The
-        // link lives on the deal, not the thread, so a second deal opened in
-        // the same conversation after the first lapsed is linked too. Inside
-        // the transaction: if the order rolls back, the link does too.
-        const conversationId = await ensureConversation(tx, {
-          listingId: listing.id,
-          buyerId: input.buyerId,
-          sellerId: listing.sellerId,
-        });
-        const now = new Date();
-
-        // Anybody still waiting on an offer hears a decision rather than
-        // nothing. Without this a buyer could watch “waiting on seller” for
-        // up to thirty days on a channel somebody else had already bought.
-        //
-        // One at a time, so each closes with a line in its own conversation.
-        // The buyer opening this deal is not "declined": their own open offer
-        // is one they have just superseded, so it reads as withdrawn.
-        const open = await tx.offer.findMany({
-          where: { listingId: listing.id, status: "OPEN" },
-          select: { id: true, buyerId: true, amountUsd: true },
-        });
-        const closed: {
-          buyerId: string;
-          amountUsd: number;
-          thread: string | null;
-        }[] = [];
-        for (const other of open) {
-          const own = other.buyerId === input.buyerId;
-          const moved = await tx.offer.updateMany({
-            where: { id: other.id, status: "OPEN" },
-            data: { status: own ? "WITHDRAWN" : "REJECTED", respondedAt: now },
-          });
-          if (moved.count !== 1 || own) continue;
-          const thread = await tx.conversation.findUnique({
-            where: {
-              listingId_buyerId: {
+      const { orderId, conversationId, closed } = await db.$transaction(
+        async (tx) => {
+          // Compare-and-set, not read-then-write: two buyers pressing buy at the
+          // same moment must not both end up with an order. A zero row count
+          // means somebody else got there between the read above and here.
+          //
+          // From an accepted offer the listing is already reserved — by the
+          // offer — so the check is that it still is, and that no live deal
+          // has been opened against it in the meantime. The unique offerId on
+          // the order then makes a second deal off the same acceptance
+          // impossible rather than merely unlikely.
+          if (offer) {
+            const stillHeld = await tx.listing.count({
+              where: { id: listing.id, status: "RESERVED" },
+            });
+            const live = await tx.order.count({
+              where: {
                 listingId: listing.id,
-                buyerId: other.buyerId,
+                status: { notIn: [...TERMINAL_STATUSES] },
+              },
+            });
+            if (stillHeld !== 1 || live > 0) throw new DealAbort("taken");
+          } else {
+            const reserved = await tx.listing.updateMany({
+              where: { id: listing.id, status: "LIVE" },
+              data: { status: "RESERVED" },
+            });
+            if (reserved.count !== 1) throw new DealAbort("taken");
+          }
+
+          // The 10-day chat purge carves out threads with an order on them, and
+          // nothing ever wrote that link — so the carve-out could never fire,
+          // and every deal's conversation was deleted after ten days. That
+          // conversation is what the dispute process and the refund policy both
+          // call the only account of what was agreed.
+          //
+          // Every deal has one now: a buyer who never wrote to the seller gets
+          // the thread here, so the agent has somewhere to talk to both. The
+          // link lives on the deal, not the thread, so a second deal opened in
+          // the same conversation after the first lapsed is linked too. Inside
+          // the transaction: if the order rolls back, the link does too.
+          const conversationId = await ensureConversation(tx, {
+            listingId: listing.id,
+            buyerId: input.buyerId,
+            sellerId: listing.sellerId,
+          });
+          const now = new Date();
+
+          // Anybody still waiting on an offer hears a decision rather than
+          // nothing. Without this a buyer could watch “waiting on seller” for
+          // up to thirty days on a channel somebody else had already bought.
+          //
+          // One at a time, so each closes with a line in its own conversation.
+          // The buyer opening this deal is not "declined": their own open offer
+          // is one they have just superseded, so it reads as withdrawn.
+          const open = await tx.offer.findMany({
+            where: { listingId: listing.id, status: "OPEN" },
+            select: { id: true, buyerId: true, amountUsd: true },
+          });
+          const closed: {
+            buyerId: string;
+            amountUsd: number;
+            thread: string | null;
+          }[] = [];
+          for (const other of open) {
+            const own = other.buyerId === input.buyerId;
+            const moved = await tx.offer.updateMany({
+              where: { id: other.id, status: "OPEN" },
+              data: {
+                status: own ? "WITHDRAWN" : "REJECTED",
+                respondedAt: now,
+              },
+            });
+            if (moved.count !== 1 || own) continue;
+            const thread = await tx.conversation.findUnique({
+              where: {
+                listingId_buyerId: {
+                  listingId: listing.id,
+                  buyerId: other.buyerId,
+                },
+              },
+              select: { id: true },
+            });
+            if (thread) {
+              await postEvent(tx, {
+                conversationId: thread.id,
+                kind: "EVENT",
+                event: {
+                  type: "offer-auto-declined",
+                  amountCents: other.amountUsd,
+                },
+                senderId: null,
+                offerId: other.id,
+                at: now,
+              });
+            }
+            closed.push({ ...other, thread: thread?.id ?? null });
+          }
+
+          const order = await tx.order.create({
+            data: {
+              reference,
+              listingId: listing.id,
+              buyerId: input.buyerId,
+              sellerId: listing.sellerId,
+              conversationId,
+              mode: input.mode,
+              status: "AWAITING_PAYMENT",
+              offerId: offer?.id ?? null,
+              priceUsd: amounts.priceUsd,
+              buyerFeeUsd: amounts.buyerFeeUsd,
+              sellerFeeUsd: amounts.sellerFeeUsd,
+              totalUsd: amounts.totalUsd,
+              // The consent three published policies say we collect. The
+              // column has existed since the schema was written and nothing
+              // ever wrote it, so a dispute about lost monetization was
+              // refused on the strength of an acknowledgement we could not
+              // produce.
+              revenueRiskAcceptedAt: input.acceptedRevenueRisk
+                ? new Date()
+                : null,
+              handoverTo: input.handoverTo ?? null,
+              steps: {
+                create: steps.map((step) => ({
+                  position: step.position,
+                  label: step.label,
+                  actor: step.actor,
+                })),
               },
             },
             select: { id: true },
           });
-          if (thread) {
-            await postEvent(tx, {
-              conversationId: thread.id,
-              kind: "EVENT",
-              event: {
-                type: "offer-auto-declined",
-                amountCents: other.amountUsd,
-              },
-              senderId: null,
-              offerId: other.id,
-              at: now,
-            });
-          }
-          closed.push({ ...other, thread: thread?.id ?? null });
-        }
 
-        const order = await tx.order.create({
-          data: {
-            reference,
-            listingId: listing.id,
-            buyerId: input.buyerId,
-            sellerId: listing.sellerId,
+          await postEvent(tx, {
             conversationId,
-            mode: input.mode,
-            status: "AWAITING_PAYMENT",
-            offerId: offer?.id ?? null,
-            priceUsd: amounts.priceUsd,
-            buyerFeeUsd: amounts.buyerFeeUsd,
-            sellerFeeUsd: amounts.sellerFeeUsd,
-            totalUsd: amounts.totalUsd,
-            // The consent three published policies say we collect. The
-            // column has existed since the schema was written and nothing
-            // ever wrote it, so a dispute about lost monetization was
-            // refused on the strength of an acknowledgement we could not
-            // produce.
-            revenueRiskAcceptedAt: input.acceptedRevenueRisk
-              ? new Date()
-              : null,
-            handoverTo: input.handoverTo ?? null,
-            steps: {
-              create: steps.map((step) => ({
-                position: step.position,
-                label: step.label,
-                actor: step.actor,
-              })),
+            kind: "EVENT",
+            event: {
+              type: "deal-opened",
+              name: buyer?.name ?? "",
+              mode: input.mode,
+              reference,
+              priceCents: amounts.priceUsd,
             },
-          },
-          select: { id: true },
-        });
+            senderId: input.buyerId,
+            orderId: order.id,
+            at: now,
+          });
 
-        await postEvent(tx, {
-          conversationId,
-          kind: "EVENT",
-          event: {
-            type: "deal-opened",
-            name: buyer?.name ?? "",
-            mode: input.mode,
-            reference,
-            priceCents: amounts.priceUsd,
-          },
-          senderId: input.buyerId,
-          orderId: order.id,
-          at: now,
-        });
-
-        return { orderId: order.id, closed };
-      });
+          return { orderId: order.id, conversationId, closed };
+        },
+      );
 
       await notifyClosedOffers(closed);
 
@@ -497,7 +504,7 @@ export async function createDeal(input: {
         },
       });
 
-      return { ok: true, orderId, reference };
+      return { ok: true, orderId, reference, conversationId };
     } catch (error) {
       if (error instanceof DealAbort)
         return { ok: false, reason: error.reason };

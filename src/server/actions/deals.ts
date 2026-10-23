@@ -84,7 +84,7 @@ export async function startDeal(
   mode: DealMode,
   acceptedRevenueRisk = false,
   handoverTo = "",
-): Promise<DealResult & { orderId?: string }> {
+): Promise<DealResult & { orderId?: string; conversationId?: string }> {
   const user = await requireUser();
 
   // As for offers: every update about the deal goes to this address.
@@ -133,6 +133,7 @@ export async function startDeal(
     ok: true,
     message: `Deal ${result.reference} opened.`,
     orderId: result.orderId,
+    conversationId: result.conversationId,
   };
 }
 

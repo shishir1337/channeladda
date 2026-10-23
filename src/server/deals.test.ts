@@ -15,6 +15,27 @@ async function openDeal(mode: "SAFEST" | "FASTEST" = "SAFEST") {
 }
 
 test(
+  "a new deal hands back its chat, so the buyer can be taken straight there",
+  withCleanDb(async () => {
+    // The owner: after starting a deal the buyer landed on the deal page and
+    // had to press through to the chat, which is where the deal is run.
+    const seeded = await seedListing();
+    const result = await createDeal({
+      listingId: seeded.listing.id,
+      buyerId: seeded.buyer.id,
+      mode: "SAFEST",
+    });
+    if (!result.ok) throw new Error(result.reason);
+
+    const order = await db.order.findUniqueOrThrow({
+      where: { id: result.orderId },
+    });
+    expect(result.conversationId).toBeTruthy();
+    expect(result.conversationId).toBe(order.conversationId);
+  }),
+);
+
+test(
   "creating a safest deal reserves the listing and seeds eight steps",
   withCleanDb(async () => {
     const { listing, buyer, orderId, reference } = await openDeal("SAFEST");

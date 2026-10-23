@@ -61,7 +61,7 @@ export function StartDeal({
   isOwnListing: boolean;
   /**
    * Where the buyer goes once the deal is open. From the listing, to the
-   * deal page; from a conversation, nowhere — the conversation redraws with
+   * deal's chat; from a conversation, nowhere — the conversation redraws with
    * the payment card, and the buyer never has to leave it.
    */
   after?: "deal-page" | "refresh";
@@ -279,7 +279,13 @@ export function StartDeal({
               router.refresh();
               return;
             }
-            router.push(`/dashboard/deals/${result.orderId}`);
+            // Straight into the deal's chat, where it is paid for and run:
+            // the deal page only pointed on to it.
+            router.push(
+              result.conversationId
+                ? `/dashboard/messages/${result.conversationId}`
+                : `/dashboard/deals/${result.orderId}`,
+            );
           });
         }}
       >
