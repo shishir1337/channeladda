@@ -76,7 +76,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/">) {
   const groups: NavGroup[] = [
     {
       label: null,
-      items: [{ label: "Overview", href: "/dashboard", icon: "overview" }],
+      items: [{ label: "Home", href: "/dashboard", icon: "overview" }],
     },
     {
       label: "Trading",

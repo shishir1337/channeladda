@@ -36,7 +36,7 @@ import {
   StatGrid,
 } from "@/components/app/kit";
 import { statusMeta } from "@/components/dashboard/listing-status";
-import { dealHeadline } from "@/components/deals/deal-status";
+import { dealHeadline, stepTitle } from "@/components/deals/deal-status";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Price } from "@/components/ui/price";
@@ -167,19 +167,28 @@ export default async function DashboardPage() {
       )
       .map((deal) => ({
         id: `deal-${deal.id}`,
-        href: `/dashboard/deals/${deal.id}`,
+        // Into the chat, where the step is done, rather than the deal page
+        // that only points on to it.
+        href: deal.conversationId
+          ? `/dashboard/messages/${deal.conversationId}`
+          : `/dashboard/deals/${deal.id}`,
         icon: ArrowLeftRightIcon,
-        what: <>Your move on {deal.listingTitle}</>,
-        detail: `${deal.reference} — ${
-          dealHeadline(
-            deal.status,
-            deal.mode,
-            deal.side,
-            deal.openStep,
-            deal.platform,
-            deal.awaitingAgent,
-          ).label
-        }`,
+        // The thing to do, in words — not "Your move on" and the whole
+        // listing title, which on a phone was three lines before the verb.
+        what:
+          deal.status === "AWAITING_PAYMENT" && deal.side === "buyer"
+            ? "Pay to start the deal"
+            : deal.openLabel
+              ? stepTitle(deal.openLabel, deal.side)
+              : dealHeadline(
+                  deal.status,
+                  deal.mode,
+                  deal.side,
+                  deal.openStep,
+                  deal.platform,
+                  deal.awaitingAgent,
+                ).label,
+        detail: `${deal.reference} · ${deal.listingTitle}`,
         cta: "Open the deal",
         since: deal.createdAt,
       })),
@@ -385,7 +394,9 @@ export default async function DashboardPage() {
                   title={<span className="whitespace-normal">{task.what}</span>}
                   meta={
                     <>
-                      <span className="min-w-0 truncate">{task.detail}</span>
+                      <span className="min-w-0 grow basis-0 truncate">
+                        {task.detail}
+                      </span>
                       <Sep />
                       <span className="shrink-0 tabular-nums">
                         {howLong(task.since, now)}
@@ -460,7 +471,11 @@ export default async function DashboardPage() {
                 : "Nothing bought yet."
             }
           />
-          <WalletDoor />
+          {/* The tab bar has Wallet on a phone; a card for it here only
+              pushed the page down. */}
+          <div className="max-lg:hidden">
+            <WalletDoor />
+          </div>
         </StatGrid>
       </Section>
 
@@ -490,7 +505,7 @@ export default async function DashboardPage() {
                 bare
                 icon={StoreIcon}
                 title="No listings yet"
-                body="It is free to list, and nothing goes in front of buyers until we have checked it."
+                body="Free to list. Buyers see it once you prove the account is yours."
                 action={
                   <Button asChild size="sm" variant="secondary">
                     <Link href="/dashboard/listings/new">List an account</Link>
@@ -621,7 +636,9 @@ export default async function DashboardPage() {
                     }
                     meta={
                       <>
-                        <span className="min-w-0 truncate">{event.detail}</span>
+                        <span className="min-w-0 grow basis-0 truncate">
+                          {event.detail}
+                        </span>
                         <Sep />
                         <span className="shrink-0">{ago(event.at, now)}</span>
                       </>

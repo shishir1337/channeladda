@@ -2226,6 +2226,10 @@ export type DealListRow = {
   platform: Platform;
   /** The open step waits for Channel Adda to assign an agent. */
   awaitingAgent: boolean;
+  /** The deal's chat, where it is paid for and run. */
+  conversationId: string | null;
+  /** The open step's stored label, for its name on screen. */
+  openLabel: string | null;
 };
 
 /**
@@ -2252,6 +2256,7 @@ export async function listDealsFor(userId: string): Promise<DealListRow[]> {
       agentId: true,
       holdUntil: true,
       createdAt: true,
+      conversationId: true,
       listing: { select: { title: true, platform: true } },
       buyer: { select: { name: true } },
       seller: { select: { name: true } },
@@ -2259,7 +2264,7 @@ export async function listDealsFor(userId: string): Promise<DealListRow[]> {
         where: { completedAt: null },
         orderBy: { position: "asc" },
         take: 1,
-        select: { actor: true, position: true },
+        select: { actor: true, position: true, label: true },
       },
     },
   });
@@ -2297,6 +2302,10 @@ export async function listDealsFor(userId: string): Promise<DealListRow[]> {
       openStep: isTerminal(order.status)
         ? null
         : (order.steps[0]?.position ?? null),
+      openLabel: isTerminal(order.status)
+        ? null
+        : (order.steps[0]?.label ?? null),
+      conversationId: order.conversationId,
       waitingUntil:
         !isTerminal(order.status) && order.holdUntil && order.holdUntil > now
           ? order.holdUntil
