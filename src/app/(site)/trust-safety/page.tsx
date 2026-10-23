@@ -9,22 +9,22 @@ import { Container, Section, SectionHeading } from "@/components/ui/section";
 export const metadata: Metadata = {
   title: "Trust & safety",
   description:
-    "KYC, live ownership verification, admin approval, order-linked chat and dispute resolution. The specific controls that make a Channel Adda deal safe.",
+    "Verified sellers, live ownership checks, a record of every deal and disputes decided by people: the checks that make a Channel Adda deal safe.",
   alternates: { canonical: "/trust-safety" },
 };
 
 const disputeSteps = [
   {
     title: "You open the dispute",
-    body: "One button on the deal page. The deal freezes where it stands, the account stays in our custody if it is there, and any money we still hold for it stays with us, where nobody can withdraw it while the dispute is open.",
+    body: "One button on the deal. Everything pauses, and nothing can be withdrawn.",
   },
   {
-    title: "A moderator reads the record",
-    body: "The whole conversation, every proof upload, the transfer checklist with timestamps, and a live check of who controls the account right now.",
+    title: "Our team checks the record",
+    body: "The chat, the proof and every step, with times.",
   },
   {
-    title: "A decision inside seven days",
-    body: "Either the deal completes or it is reversed — the account goes on to the buyer, or back to the seller with the money. First response within 48 hours, and the outcome and the reasoning are written onto the deal.",
+    title: "A decision within seven days",
+    body: "The deal completes, or everything goes back. We reply within 48 hours.",
   },
 ];
 
@@ -33,8 +33,8 @@ export default function TrustSafetyPage() {
     <>
       <PageHeader
         crumbs={[{ label: "Home", href: "/" }, { label: "Trust & safety" }]}
-        title="The boring machinery that keeps deals clean"
-        description="Account trading has a scam problem. Rather than promise you it is safe, here are the specific controls we run and what each one actually prevents."
+        title="Trust and safety"
+        description="The checks behind every deal, and what happens if something goes wrong."
       />
 
       <TrustSafety embedded />

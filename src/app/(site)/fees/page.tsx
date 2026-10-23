@@ -43,8 +43,8 @@ export default async function FeesPage() {
     <>
       <PageHeader
         crumbs={[{ label: "Home", href: "/" }, { label: "Fees" }]}
-        title="Two fees, both stated up front"
-        description="There is no listing fee and no required subscription. The buyer's fee is charged when a deal opens and refunded in full if it falls through before our agent takes custody of the account."
+        title="Fees"
+        description="No listing fee. The buyer pays our fee when a deal starts, and gets it back if the deal ends before our agent has the channel."
       />
 
       <Section>
@@ -94,8 +94,8 @@ export default async function FeesPage() {
             <ModeTable
               mode="FASTEST"
               fees={fees}
-              title="Fastest — the money passes through us"
-              note="You pay Channel Adda the price and the fee together. We pay the seller once our agent holds the account, and our agent then makes you primary owner."
+              title="Fastest: you pay us, we pay the seller"
+              note="We pay the seller once our agent has the channel."
               columns={[
                 "Sale price",
                 "Buyer fee",
@@ -108,8 +108,8 @@ export default async function FeesPage() {
             <ModeTable
               mode="SAFEST"
               fees={fees}
-              title="Safest — the account passes through us, the money does not"
-              note="You pay Channel Adda only the fee. The price you pay the seller directly, once our agent holds the account — and the account comes to you once the seller confirms it arrived."
+              title="Safest: you pay the seller directly"
+              note="You pay us only our fee, and pay the seller once our agent has the channel."
               columns={[
                 "Sale price",
                 "Our fee",

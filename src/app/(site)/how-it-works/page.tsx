@@ -20,8 +20,8 @@ export default function HowItWorksPage() {
     <>
       <PageHeader
         crumbs={[{ label: "Home", href: "/" }, { label: "How it works" }]}
-        title="Nobody goes first on trust"
-        description="The oldest problem in account trading is that someone has to move first — hand over the login, or hand over the money. We take one side of the exchange and hold it, so neither of you has to."
+        title="How a deal works"
+        description="Nobody has to trust a stranger. Our agent holds one side until the other has delivered."
       />
 
       <HowItWorks />
@@ -29,8 +29,8 @@ export default function HowItWorksPage() {
       <Section className="border-y border-line bg-bg-subtle">
         <Container>
           <SectionHeading
-            title="Why the wait is different on every platform"
-            description="On a Fastest deal our agent takes the account from the seller and you are invited as owner for the whole holding period. Then our agent becomes primary owner, the seller is paid, and our agent makes you primary owner. On YouTube it is Google's own 7-day wait before a new owner can be made primary owner."
+            title="Waiting time by platform"
+            description="Each platform has its own wait before ownership can move. On YouTube it is Google's 7 days."
           />
 
           <div className="mt-8 overflow-x-auto rounded-card border border-line bg-surface sm:mt-10">

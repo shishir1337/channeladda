@@ -25,19 +25,19 @@ export const metadata: Metadata = {
 const steps = [
   {
     title: "Publish your listing",
-    body: "Add the handle, the metrics and your asking price. Free, and it takes about ten minutes. We ask one question most marketplaces do not: exactly how your account is set up, because that decides whether a transfer is a two-hour job or a two-week one.",
+    body: "Add the link, the numbers and your price. Free, about ten minutes.",
   },
   {
     title: "Prove you own it",
     body: "Paste a one-time code into your description. On YouTube we check it automatically and your listing goes live at once; elsewhere a moderator checks it.",
   },
   {
-    title: "Field offers in one place",
-    body: "Accept, reject or counter. Everything stays inside Channel Adda, so the price you agreed is on record if anything is ever disputed.",
+    title: "Answer offers",
+    body: "Accept, decline or counter, all in the chat.",
   },
   {
     title: "Get paid, either way",
-    body: "On a Fastest deal the buyer's money is with us before you hand anything over, and reaches your Channel Adda balance once our agent holds it. On a Safest deal you give the account to our agent first, the buyer pays you directly, and our agent hands it on only after you confirm the money arrived. Either way you never hand over an account you have not been paid for.",
+    body: "Fastest: we pay your wallet once our agent has the channel. Safest: the buyer pays you directly.",
   },
 ];
 
@@ -52,8 +52,8 @@ export default async function SellPage() {
     <>
       <PageHeader
         crumbs={[{ label: "Home", href: "/" }, { label: "Sell" }]}
-        title="Your channel is an asset. Cash it out safely."
-        description="List for free, put your account in front of active buyers, and let a supervised handover prove you are dealing with someone serious. We earn a fee on deals, never on listings."
+        title="Sell your channel safely"
+        description="Free to list. We only take a fee when a deal completes."
         actions={
           <Button asChild size="lg">
             <Link href="/signup?next=%2Fdashboard%2Flistings%2Fnew">
@@ -86,21 +86,24 @@ export default async function SellPage() {
 
       <Section>
         <Container>
-          <SectionHeading title="Four steps, and you never hand over an account on trust" />
+          <SectionHeading title="How selling works" />
 
-          <ol className="mt-8 grid gap-3 sm:mt-10 sm:grid-cols-2">
+          {/* A short row each, as on the homepage: four paragraph cards
+              were most of a phone screen apiece. */}
+          <ol className="mt-8 grid gap-2.5 sm:mt-10 sm:grid-cols-2 sm:gap-3">
             {steps.map((step, i) => (
-              <li key={step.title}>
-                <div className="flex h-full flex-col rounded-card border border-line bg-surface p-5 sm:p-6">
-                  <span className="tnum text-[0.8125rem] font-medium text-subtle">
-                    Step {i + 1}
-                  </span>
-                  <h3 className="mt-2 text-base font-semibold text-fg">
+              <li
+                key={step.title}
+                className="flex items-center gap-3.5 rounded-card border border-line bg-surface p-4 sm:p-5"
+              >
+                <span className="tnum flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-fg">
+                  {i + 1}
+                </span>
+                <div className="min-w-0">
+                  <h3 className="text-[0.9375rem] font-semibold text-fg">
                     {step.title}
                   </h3>
-                  <p className="mt-2 text-sm leading-relaxed text-muted">
-                    {step.body}
-                  </p>
+                  <p className="mt-0.5 text-sm text-muted">{step.body}</p>
                 </div>
               </li>
             ))}
@@ -113,11 +116,11 @@ export default async function SellPage() {
           <div className="lg:grid lg:grid-cols-2 lg:items-center lg:gap-16">
             <div className="max-w-xl">
               <SectionHeading
-                title="What you actually take home"
+                title="What you get"
                 description={
                   fees.sellerFeeBp > 0
-                    ? "No listing fee and no monthly cost. A success fee is deducted only when a Fastest sale is paid out, and the buyer pays their own fee on top of your asking price."
-                    : "No listing fee, no monthly cost and no seller fee. The buyer pays their own fee on top of your asking price."
+                    ? "No listing fee. A small fee only when a Fastest sale is paid out."
+                    : "No listing fee and no seller fee. The buyer pays our fee."
                 }
               />
               <Button asChild variant="secondary" size="md" className="mt-7">
@@ -167,8 +170,8 @@ export default async function SellPage() {
       <Section>
         <Container>
           <SectionHeading
-            title="Five marketplaces, one listing flow"
-            description="Each platform has its own transfer mechanism, so each has its own checklist and its own hold period. Pick yours to see how the handover works."
+            title="Pick your platform"
+            description="Each has its own handover and waiting time."
           />
 
           <ul className="mt-8 grid grid-cols-2 gap-3 sm:mt-10 sm:grid-cols-3 lg:grid-cols-5">
@@ -204,17 +207,17 @@ export default async function SellPage() {
               {
                 icon: LockIcon,
                 title: "You are protected too",
-                body: "A buyer cannot vanish mid-deal with your credentials. On a Fastest deal their money is with us before you start; on a Safest deal our agent holds the account, and it moves on only after you confirm the buyer's payment arrived.",
+                body: "Our agent holds the money or the channel, so a buyer cannot run off.",
               },
               {
                 icon: BadgeCheckIcon,
-                title: "Reputation that follows you",
-                body: "Every completed sale adds to a rating buyers can see. It is the reason a second sale is easier than the first.",
+                title: "Earn rating points",
+                body: "Every sale adds points that buyers can see.",
               },
               {
                 icon: WalletIcon,
                 title: "Paid in crypto",
-                body: "A Fastest sale reaches your Channel Adda balance once our agent holds the account, and you withdraw it to your own crypto wallet through Cryptomus.",
+                body: "Withdraw your balance to your own crypto wallet.",
               },
             ].map((item) => (
               <div
@@ -240,9 +243,7 @@ export default async function SellPage() {
                 Ready to list?
               </h2>
               <p className="mt-2 text-sm leading-relaxed text-muted">
-                Creating an account takes about fifteen seconds and needs no
-                documents. Identity checks only come in before your first
-                listing goes live.
+                It takes a few seconds to sign up.
               </p>
             </div>
             <Button asChild size="lg" className="shrink-0">
