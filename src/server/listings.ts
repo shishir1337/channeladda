@@ -2,6 +2,7 @@ import "server-only";
 import type { Listing, SoldItem } from "@/data/listings";
 import type { PlatformId } from "@/data/platforms";
 import type { Prisma } from "@/generated/prisma/client";
+import { channelLink } from "@/lib/channel-link";
 import { db } from "@/lib/db";
 import {
   type Facet,
@@ -10,6 +11,7 @@ import {
   type QueryResult,
   type SortKey,
 } from "@/lib/listing-query";
+import { ratingPointsFor } from "@/server/track-record";
 
 /** DB stores money in cents and engagement in tenths of a percent. */
 const toUsd = (cents: number) => cents / 100;
@@ -68,11 +70,15 @@ function deriveTag(
 }
 
 /** Maps a DB row onto the shape the components already consume. */
-type SellerStat = { name: string; rating: number | null; sales: number };
+type SellerStat = { name: string; points: number; sales: number };
 
 /**
- * Rating and completed sales for a page of listings, in two queries rather
- * than two per card.
+ * Rating points and completed sales for a page of listings, in a few
+ * queries rather than a few per card.
+ *
+ * Points, not stars: the client's rating is half the worth of a member's
+ * completed deals, and nothing on the site takes a star review, so a star
+ * score could only ever read "New (0 reviews)".
  */
 async function sellerStatsFor(
   sellerIds: string[],
@@ -80,16 +86,12 @@ async function sellerStatsFor(
   const unique = [...new Set(sellerIds)];
   if (unique.length === 0) return new Map();
 
-  const [people, ratings, sales] = await Promise.all([
+  const [people, points, sales] = await Promise.all([
     db.user.findMany({
       where: { id: { in: unique } },
       select: { id: true, name: true },
     }),
-    db.review.groupBy({
-      by: ["subjectId"],
-      where: { subjectId: { in: unique } },
-      _avg: { rating: true },
-    }),
+    ratingPointsFor(unique),
     db.order.groupBy({
       by: ["sellerId"],
       where: { sellerId: { in: unique }, status: "COMPLETED" },
@@ -97,7 +99,6 @@ async function sellerStatsFor(
     }),
   ]);
 
-  const ratingBy = new Map(ratings.map((r) => [r.subjectId, r._avg.rating]));
   const salesBy = new Map(sales.map((r) => [r.sellerId, r._count._all]));
 
   return new Map(
@@ -105,10 +106,7 @@ async function sellerStatsFor(
       person.id,
       {
         name: person.name,
-        // Null rather than a number: a seller with no reviews has not
-        // earned 5.0, and 0.0 would read as a bad seller rather than a new
-        // one. The surfaces show “New”.
-        rating: ratingBy.get(person.id) ?? null,
+        points: points.get(person.id) ?? 0,
         sales: salesBy.get(person.id) ?? 0,
       },
     ]),
@@ -148,8 +146,9 @@ function toListing(row: Row, seller?: SellerStat): Listing {
     avatarUrl: row.avatarUrl,
     sellerSlug: row.seller.slug ?? "",
     sellerName: seller?.name ?? row.seller.name,
-    sellerRating: seller?.rating ?? null,
+    sellerPoints: seller?.points ?? 0,
     sellerSales: seller?.sales ?? 0,
+    channel: channelLink(row.platform, row.sourceUrl),
     watching: row.watching,
     listedDaysAgo,
     tag: deriveTag(row, listedDaysAgo),

@@ -39,9 +39,11 @@ export type Listing = {
    * the card throw and took the whole page down with it.
    */
   sellerName: string;
-  /** Null until somebody has actually reviewed them. */
-  sellerRating: number | null;
+  /** Rating points: half the worth of their completed deals, tripled for a reseller. */
+  sellerPoints: number;
   sellerSales: number;
+  /** The account on its own platform, when the seller's link checks out. */
+  channel: { href: string; label: string } | null;
   watching: number;
   /** Days since the listing went live — drives "just listed" sorting. */
   listedDaysAgo: number;
@@ -63,8 +65,9 @@ export type SeedListing = Omit<
   | "avatarUrl"
   | "slug"
   | "sellerName"
-  | "sellerRating"
+  | "sellerPoints"
   | "sellerSales"
+  | "channel"
 >;
 
 /** Artwork lives in /public/media, keyed by the fixture id. */

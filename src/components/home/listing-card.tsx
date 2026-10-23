@@ -1,5 +1,6 @@
-import { BadgeCheckIcon, StarIcon } from "lucide-react";
+import { BadgeCheckIcon } from "lucide-react";
 import Link from "next/link";
+import { pointsLabel } from "@/components/app/reseller-badge";
 import { FavoriteButton } from "@/components/home/favorite-button";
 import { Badge } from "@/components/ui/badge";
 import { Price } from "@/components/ui/price";
@@ -173,21 +174,11 @@ export function ListingCard({
             ) : null}
           </div>
           <p className="mt-1 flex min-w-0 items-center gap-1 text-[0.8125rem] text-subtle">
-            {listing.sellerRating !== null ? (
-              <>
-                <StarIcon
-                  aria-hidden="true"
-                  className="size-3.5 shrink-0 fill-primary text-primary"
-                />
-                <span className="tnum font-medium text-muted">
-                  {listing.sellerRating.toFixed(1)}
-                </span>
-              </>
-            ) : (
-              <span className="font-medium text-muted">New</span>
-            )}
-            <span aria-hidden="true">·</span>
             <span className="min-w-0 truncate">{listing.sellerName}</span>
+            <span aria-hidden="true">·</span>
+            <span className="tnum shrink-0 font-medium text-muted">
+              {pointsLabel(listing.sellerPoints)}
+            </span>
             <span aria-hidden="true">·</span>
             <span className="tnum shrink-0">
               {countOf(listing.sellerSales, "sale")}

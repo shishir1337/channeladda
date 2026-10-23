@@ -1,4 +1,5 @@
 import {
+  ArrowUpRightIcon,
   BadgeCheckIcon,
   CalendarClockIcon,
   CircleDollarSignIcon,
@@ -157,6 +158,31 @@ export default async function ListingPage({
                   {platform.name} · {listing.niche}
                 </p>
               </div>
+              {listing.channel ? (
+                <a
+                  href={listing.channel.href}
+                  target="_blank"
+                  // nofollow: a seller's channel is not something we vouch
+                  // for to search engines; noreferrer keeps our URL to us.
+                  rel="noopener noreferrer nofollow"
+                  aria-label={`${listing.channel.label} (opens in a new tab)`}
+                  className="group inline-flex h-11 shrink-0 items-center gap-1.5 self-center rounded-lg border border-line bg-surface px-3 text-[0.8125rem] font-medium text-fg shadow-xs transition-colors duration-150 hover:border-line-strong hover:bg-surface-2 pointer-fine:h-9 dark:bg-surface-2 dark:hover:bg-surface-3"
+                >
+                  <PlatformIcon
+                    aria-hidden="true"
+                    className="size-4 shrink-0"
+                    style={{ color: platform.tint }}
+                  />
+                  <span className="hidden sm:inline">
+                    {listing.channel.label}
+                  </span>
+                  <span className="sm:hidden">Open</span>
+                  <ArrowUpRightIcon
+                    aria-hidden="true"
+                    className="size-3.5 shrink-0 text-subtle transition duration-150 group-hover:translate-x-px group-hover:-translate-y-px group-hover:text-fg"
+                  />
+                </a>
+              ) : null}
             </div>
 
             <p className="mt-5 text-base leading-relaxed text-fg sm:text-lg">

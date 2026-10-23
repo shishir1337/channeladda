@@ -1,16 +1,14 @@
 import { BadgeCheckIcon, TimerIcon } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ResellerBadge } from "@/components/app/reseller-badge";
+import { pointsLabel, ResellerBadge } from "@/components/app/reseller-badge";
 import { SellerAvatar } from "@/components/site/seller-avatar";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/page-header";
 import { Price } from "@/components/ui/price";
 import { Container, Section } from "@/components/ui/section";
-import { Stars } from "@/components/ui/stars";
 import { platformMap } from "@/data/platforms";
 import { databaseGate } from "@/lib/db-gate";
-import { countOf } from "@/lib/plural";
 import { getSellerListings } from "@/server/listings";
 import { getSellers } from "@/server/sellers";
 
@@ -21,7 +19,7 @@ export const revalidate = 60;
 export const metadata: Metadata = {
   title: "Verified sellers",
   description:
-    "Every Channel Adda seller is KYC-verified and rated only by buyers whose deals actually completed. Browse sellers by rating, volume and platform.",
+    "Every Channel Adda seller is KYC-verified and rated in points earned only from deals that completed. Browse sellers by rating points, volume and platform.",
   alternates: { canonical: "/sellers" },
 };
 
@@ -47,7 +45,7 @@ export default async function SellersPage() {
       <PageHeader
         crumbs={[{ label: "Home", href: "/" }, { label: "Sellers" }]}
         title="The people behind the listings"
-        description="Ratings come only from deals that completed. There is no way to buy a review here, which is what makes these numbers worth reading."
+        description="Rating points come only from deals that completed: half of what each deal was worth, in dollars. That is what makes these numbers worth reading."
       >
         <dl className="mt-7 grid grid-cols-3 gap-6 border-y border-line py-5">
           <Stat label="Verified sellers" value={String(topSellers.length)} />
@@ -91,23 +89,12 @@ export default async function SellersPage() {
                         {seller.reseller ? <ResellerBadge /> : null}
                       </h2>
                       <p className="mt-0.5 flex items-center gap-1.5 text-[0.8125rem] text-subtle">
-                        {seller.rating !== null ? (
-                          <>
-                            <Stars rating={seller.rating} />
-                            <span className="tnum font-medium text-fg">
-                              {seller.rating.toFixed(1)}
-                            </span>
-                            <span className="tnum truncate">
-                              {countOf(seller.reviews, "review")} ·{" "}
-                              {seller.country}
-                            </span>
-                          </>
-                        ) : (
-                          <span className="truncate">
-                            <span className="font-medium text-fg">New</span> ·{" "}
-                            {seller.country}
-                          </span>
-                        )}
+                        <span className="truncate">
+                          <span className="tnum font-medium text-fg">
+                            {pointsLabel(seller.points ?? 0)}
+                          </span>{" "}
+                          · {seller.country}
+                        </span>
                       </p>
                     </div>
                   </div>

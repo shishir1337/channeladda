@@ -16,7 +16,6 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Breadcrumbs } from "@/components/ui/page-header";
 import { Price } from "@/components/ui/price";
 import { Container, Section } from "@/components/ui/section";
-import { Stars } from "@/components/ui/stars";
 import { platformMap } from "@/data/platforms";
 import { databaseGate } from "@/lib/db-gate";
 import { countOf } from "@/lib/plural";
@@ -40,7 +39,7 @@ export async function generateMetadata({
   const seller = await getSeller(slug);
   if (!seller) return { title: "Seller not found" };
 
-  const description = `${seller.name} has completed ${seller.sales} supervised sales on Channel Adda${seller.rating === null ? "" : ` with a ${seller.rating.toFixed(1)} rating`}. Verified since ${seller.memberSince}.`;
+  const description = `${seller.name} has completed ${seller.sales} supervised sales on Channel Adda and holds ${pointsLabel(seller.points ?? 0)}. Verified since ${seller.memberSince}.`;
   return {
     title: `${seller.name} — verified seller`,
     description,
@@ -94,28 +93,7 @@ export default async function SellerPage({
                   {seller.reseller ? <ResellerBadge /> : null}
                 </h1>
                 <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted">
-                  {/* The rating takes its own line on a phone, so the
-                      separators never dangle at a line's end. */}
-                  {seller.rating !== null ? (
-                    <span className="flex basis-full items-center gap-1.5 sm:basis-auto">
-                      <Stars rating={seller.rating} />
-                      <span className="tnum font-semibold text-fg">
-                        {seller.rating.toFixed(1)}
-                      </span>
-                      <span className="tnum">
-                        {countOf(seller.reviews, "review")}
-                      </span>
-                    </span>
-                  ) : (
-                    <span className="basis-full sm:basis-auto">
-                      <span className="font-medium text-fg">New</span> · no
-                      reviews yet
-                    </span>
-                  )}
-                  <span aria-hidden="true" className="hidden sm:inline">
-                    ·
-                  </span>
-                  <span className="tnum font-medium text-fg">
+                  <span className="tnum font-semibold text-fg">
                     {pointsLabel(seller.points ?? 0)}
                   </span>
                   <span aria-hidden="true">·</span>
@@ -198,10 +176,10 @@ export default async function SellerPage({
               className="mt-0.5 size-4 shrink-0 text-verified"
             />
             <span>
-              Every review here comes from a deal that completed, so a review
-              cannot be bought. Rating points are half the worth of completed
-              deals, bought or sold; a Reseller badge holder&apos;s count{" "}
-              {resellerPointsMultiplier} times while their badge lasts.
+              Rating points come only from deals that completed: half of what
+              each deal was worth in dollars, bought or sold. A Reseller badge
+              holder&apos;s count {resellerPointsMultiplier} times while their
+              badge lasts.
             </span>
           </p>
         </Container>

@@ -1,14 +1,12 @@
 import { ArrowRightIcon, BadgeCheckIcon, TimerIcon } from "lucide-react";
 import Link from "next/link";
-import { ResellerBadge } from "@/components/app/reseller-badge";
+import { pointsLabel, ResellerBadge } from "@/components/app/reseller-badge";
 import { SellerAvatar } from "@/components/site/seller-avatar";
 import { Badge } from "@/components/ui/badge";
 import { Price } from "@/components/ui/price";
 import { Container, Section, SectionHeading } from "@/components/ui/section";
-import { Stars } from "@/components/ui/stars";
 import { platformMap } from "@/data/platforms";
 import type { Seller } from "@/data/sellers";
-import { countOf } from "@/lib/plural";
 
 export function TopSellers({ sellers }: { sellers: Seller[] }) {
   return (
@@ -16,7 +14,7 @@ export function TopSellers({ sellers }: { sellers: Seller[] }) {
       <Container>
         <SectionHeading
           title="The people behind the listings"
-          description="Ratings come only from deals that completed — there is no way to buy a review here."
+          description="Rating points come only from deals that completed: half of what each deal was worth, in dollars."
           action={
             <Link
               href="/sellers"
@@ -62,22 +60,9 @@ export function TopSellers({ sellers }: { sellers: Seller[] }) {
                 </div>
 
                 <div className="mt-4 flex items-center gap-2 text-[0.8125rem]">
-                  {seller.rating !== null ? (
-                    <>
-                      <Stars rating={seller.rating} />
-                      <span className="tnum font-semibold text-fg">
-                        {seller.rating.toFixed(1)}
-                      </span>
-                      <span className="tnum text-subtle">
-                        {countOf(seller.reviews, "review")}
-                      </span>
-                    </>
-                  ) : (
-                    <span className="text-subtle">
-                      <span className="font-medium text-fg">New</span> · no
-                      reviews yet
-                    </span>
-                  )}
+                  <span className="tnum font-semibold text-fg">
+                    {pointsLabel(seller.points ?? 0)}
+                  </span>
                 </div>
 
                 <dl className="mt-4 grid grid-cols-2 gap-4 border-t border-line pt-4">

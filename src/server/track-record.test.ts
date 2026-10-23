@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { expect, test } from "vitest";
 import type { DealMode, OrderStatus } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
-import { trackRecord } from "@/server/track-record";
+import { ratingPointsFor, trackRecord } from "@/server/track-record";
 import { seedListing, seedUser, withCleanDb } from "@/test/db";
 
 // Before agreeing a deal, each side wants to know who they are dealing with:
@@ -101,6 +101,44 @@ test(
       deals: 0,
       worthCents: 0,
     });
+  }),
+);
+
+test(
+  "rating points for a page of people: both sides of the table, and nobody missing",
+  withCleanDb(async () => {
+    // One query set for a whole page of listing cards, not one per card.
+    const { listing, seller, buyer } = await seedListing();
+    const nobody = await seedUser();
+    const common = { listingId: listing.id, sellerId: seller.id };
+    await order({
+      ...common,
+      buyerId: buyer.id,
+      mode: "FASTEST",
+      status: "COMPLETED",
+      priceCents: 100_000,
+    });
+    await order({
+      ...common,
+      buyerId: buyer.id,
+      mode: "SAFEST",
+      status: "COMPLETED",
+      priceCents: 30_000,
+    });
+    // Running deals earn nothing yet.
+    await order({
+      ...common,
+      buyerId: buyer.id,
+      mode: "SAFEST",
+      status: "IN_CUSTODY",
+      priceCents: 900_000,
+    });
+
+    const points = await ratingPointsFor([seller.id, buyer.id, nobody.id]);
+    // $1,300 completed on each side: 650 points apiece.
+    expect(points.get(seller.id)).toBe(650);
+    expect(points.get(buyer.id)).toBe(650);
+    expect(points.get(nobody.id)).toBe(0);
   }),
 );
 

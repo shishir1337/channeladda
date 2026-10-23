@@ -14,7 +14,7 @@ import { getSiteStats } from "@/server/sellers";
 const trustPoints = [
   { icon: ShieldCheckIcon, label: "Agent-held deals" },
   { icon: BadgeCheckIcon, label: "Ownership checked" },
-  { icon: StarIcon, label: "Reviews from real buyers" },
+  { icon: StarIcon, label: "Rating points from real deals" },
 ];
 
 /**

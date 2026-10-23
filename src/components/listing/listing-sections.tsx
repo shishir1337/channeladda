@@ -17,7 +17,6 @@ import { SellerAvatar } from "@/components/site/seller-avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Price } from "@/components/ui/price";
-import { Stars } from "@/components/ui/stars";
 import type { Listing } from "@/data/listings";
 import type { Platform } from "@/data/platforms";
 import type { Seller } from "@/data/sellers";
@@ -226,21 +225,7 @@ export function SellerPanel({ seller }: { seller: Seller }) {
             {seller.reseller ? <ResellerBadge /> : null}
           </h3>
           <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[0.8125rem] text-subtle">
-            {seller.rating !== null ? (
-              <>
-                <Stars rating={seller.rating} />
-                <span className="tnum font-medium text-fg">
-                  {seller.rating.toFixed(1)}
-                </span>
-                <span className="tnum">
-                  {countOf(seller.reviews, "review")}
-                </span>
-              </>
-            ) : (
-              <span className="font-medium text-fg">New</span>
-            )}
-            <span aria-hidden="true">·</span>
-            <span className="tnum text-muted">
+            <span className="tnum font-medium text-fg">
               {pointsLabel(seller.points ?? 0)}
             </span>
             <span aria-hidden="true">·</span>
