@@ -217,7 +217,7 @@ export function TopUp() {
         id={id}
         name="amount"
         label="Amount in US dollars"
-        hint="Anything from $10 to $10,000. For more than that, talk to us first."
+        hint="From $10 to $10,000."
         inputMode="decimal"
         value={amount}
         onChange={(e) => setAmount(e.target.value)}
@@ -279,10 +279,10 @@ export function PayoutAddressForm({
   return (
     <Panel
       icon={LockIcon}
-      title="Where your payouts go"
+      title="Your wallet address"
       // The check stays on the card: it is what stops the mistake the
       // warning below describes.
-      description="Check it against your own wallet, character by character, before you save it."
+      description="Check it carefully against your own wallet before you save."
       info="Payouts are sent to this address and nowhere else."
     >
       <div className="max-w-2xl">
@@ -290,23 +290,20 @@ export function PayoutAddressForm({
             afterwards that their money is frozen for a day has been ambushed
             by the interface. */}
         <Note tone="warning" icon={TriangleAlertIcon}>
-          <p className="font-medium">
-            Two things to know before you save this.
-          </p>
+          <p className="font-medium">Before you save</p>
           <ul className="mt-1.5 flex list-disc flex-col gap-1 pl-4 marker:text-primary-text">
             <li>
               <strong className="font-semibold">
-                Withdrawals are held for 24 hours after you set or change it
+                Withdrawals pause for 24 hours
               </strong>{" "}
-              — that delay is what stops somebody who gets into your account
-              from emptying it.
+              after you set or change it. This keeps your money safe if someone
+              gets into your account.
             </li>
             <li>
               <strong className="font-semibold">
-                A payout sent to a wrong address is gone
+                Money sent to a wrong address is lost.
               </strong>{" "}
-              — not held, not reversible, and not something Channel Adda or
-              anybody else can get back.
+              Nobody can get it back.
             </li>
           </ul>
         </Note>
@@ -417,84 +414,87 @@ export function RequestPayout({
     >
       {hasAddress && belowMinimum && minimumUsd > 0 ? (
         <Note icon={LockIcon} className="mb-4">
-          The smallest payout we can send is {minLabel}, and you have {maxLabel}{" "}
-          available. A crypto transfer pays the network&rsquo;s fee whatever its
-          size, so below that figure it would cost you more to receive the money
-          than the money is worth.
+          The smallest payout is {minLabel}. You have {maxLabel}.
         </Note>
       ) : null}
 
+      {/* No address: say what to do and offer it, instead of a whole form
+          that cannot be used. */}
       {!hasAddress ? (
-        <Note icon={LockIcon} className="mb-4">
-          Set a payout address first — the panel below. We have nowhere to send
-          money to until you do, and withdrawals are held for 24 hours after you
-          set it.
-        </Note>
-      ) : null}
-
-      <div className="flex flex-wrap items-end gap-3">
-        <TextField
-          id={id}
-          name="amount"
-          label="Amount in US dollars"
-          hint={
-            // Below the minimum there is no range to state: "Between $20.00
-            // and $0.00" read as a broken sum.
-            minimumUsd > 0 && belowMinimum
-              ? `The smallest payout is ${minLabel}.`
-              : minimumUsd > 0
-                ? `Between ${minLabel} and ${maxLabel}.`
-                : `You can take out up to ${maxLabel}.`
-          }
-          inputMode="decimal"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          className="min-w-0 flex-1 sm:max-w-xs"
-          disabled={!hasAddress || max <= 0}
-          required
-        />
-        <Button
-          type="button"
-          size="md"
-          variant="secondary"
-          onClick={() => setAmount(String(max))}
-          disabled={pending || !hasAddress || max <= 0}
-        >
-          All of it
-        </Button>
-      </div>
-
-      <div className="mt-auto pt-5">
-        <Button
-          type="button"
-          size="md"
-          className="w-full sm:w-auto"
-          disabled={pending || !hasAddress || max <= 0 || !amount.trim()}
-          onClick={() => {
-            setMessage(null);
-            startTransition(async () => {
-              const result = await requestPayout(Number(amount));
-              setBad(!result.ok);
-              setMessage(result.ok ? result.message : result.error);
-              if (result.ok) {
-                setAmount("");
-                router.refresh();
+        <div className="flex flex-col items-start gap-3">
+          <p className="text-[0.8125rem] leading-relaxed text-muted">
+            Add your wallet address first, so we know where to send your money.
+          </p>
+          <Button asChild variant="secondary" size="md">
+            <a href="#payout-address">Add wallet address</a>
+          </Button>
+        </div>
+      ) : (
+        <>
+          <div className="flex flex-wrap items-end gap-3">
+            <TextField
+              id={id}
+              name="amount"
+              label="Amount in US dollars"
+              hint={
+                // Below the minimum there is no range to state: "Between $20.00
+                // and $0.00" read as a broken sum.
+                minimumUsd > 0 && belowMinimum
+                  ? `The smallest payout is ${minLabel}.`
+                  : minimumUsd > 0
+                    ? `Between ${minLabel} and ${maxLabel}.`
+                    : `You can take out up to ${maxLabel}.`
               }
-            });
-          }}
-        >
-          <BusyLabel
-            pending={pending}
-            idle="Request a payout"
-            busy="Sending the request…"
-          />
-        </Button>
-        <p className="mt-2 text-xs leading-relaxed text-subtle">
-          The blockchain takes its own network fee out of the amount sent. That
-          fee is set by the network, not by Channel Adda.
-        </p>
-        <Notice message={message} bad={bad} />
-      </div>
+              inputMode="decimal"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              className="min-w-0 flex-1 sm:max-w-xs"
+              disabled={!hasAddress || max <= 0}
+              required
+            />
+            <Button
+              type="button"
+              size="md"
+              variant="secondary"
+              onClick={() => setAmount(String(max))}
+              disabled={pending || !hasAddress || max <= 0}
+            >
+              All of it
+            </Button>
+          </div>
+
+          <div className="mt-auto pt-5">
+            <Button
+              type="button"
+              size="md"
+              className="w-full sm:w-auto"
+              disabled={pending || !hasAddress || max <= 0 || !amount.trim()}
+              onClick={() => {
+                setMessage(null);
+                startTransition(async () => {
+                  const result = await requestPayout(Number(amount));
+                  setBad(!result.ok);
+                  setMessage(result.ok ? result.message : result.error);
+                  if (result.ok) {
+                    setAmount("");
+                    router.refresh();
+                  }
+                });
+              }}
+            >
+              <BusyLabel
+                pending={pending}
+                idle="Request a payout"
+                busy="Sending the request…"
+              />
+            </Button>
+            <p className="mt-2 text-xs leading-relaxed text-subtle">
+              The network takes a small fee from what is sent.
+            </p>
+            <Notice message={message} bad={bad} />
+          </div>
+        </>
+      )}
     </Panel>
   );
 }

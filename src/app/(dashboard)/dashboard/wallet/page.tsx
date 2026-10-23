@@ -4,7 +4,6 @@ import {
   CircleCheckIcon,
   CoinsIcon,
   GemIcon,
-  InfoIcon,
   LockIcon,
   PlusIcon,
   RotateCcwIcon,
@@ -184,7 +183,9 @@ export default async function WalletPage({
       {/* ---- the figures ------------------------------------------------- */}
       <Section>
         <Card>
-          <dl className="grid sm:grid-cols-2">
+          {/* One figure unless a payout is waiting: the two were always the
+              same number, side by side, and read as a puzzle. */}
+          <dl className={cn("grid", held && "sm:grid-cols-2")}>
             <div className="p-4 sm:p-6">
               <dt className={FIGURE_LABEL}>
                 <WalletIcon
@@ -194,6 +195,9 @@ export default async function WalletPage({
                 Your balance
                 <InfoTip label="About your balance">
                   Everything credited to you, less everything already paid out.
+                  Money from a Fastest sale lands here once our agent has the
+                  channel. A Safest buyer pays you directly, so that money never
+                  comes here.
                 </InfoTip>
               </dt>
               <dd className={FIGURE}>
@@ -201,32 +205,34 @@ export default async function WalletPage({
               </dd>
             </div>
 
-            <div className="border-t border-line p-4 sm:border-t-0 sm:border-l sm:p-6">
-              <dt className={FIGURE_LABEL}>
-                <CoinsIcon
-                  aria-hidden="true"
-                  className="size-3.5 shrink-0 text-subtle"
-                />
-                Available to use now
-                <InfoTip label="About what is available">
-                  {held ? (
-                    <>
-                      <Price
-                        usd={wallet.pendingWithdrawalUsd / 100}
-                        className="font-semibold text-fg"
-                      />{" "}
-                      is held while finance checks the payout you asked for. It
-                      is still your money — it just cannot be spent twice.
-                    </>
-                  ) : (
-                    "All of it. Nothing is being held against a payout."
-                  )}
-                </InfoTip>
-              </dt>
-              <dd className={FIGURE}>
-                <Price usd={wallet.availableUsd / 100} />
-              </dd>
-            </div>
+            {held ? (
+              <div className="border-t border-line p-4 sm:border-t-0 sm:border-l sm:p-6">
+                <dt className={FIGURE_LABEL}>
+                  <CoinsIcon
+                    aria-hidden="true"
+                    className="size-3.5 shrink-0 text-subtle"
+                  />
+                  Available to use now
+                  <InfoTip label="About what is available">
+                    {held ? (
+                      <>
+                        <Price
+                          usd={wallet.pendingWithdrawalUsd / 100}
+                          className="font-semibold text-fg"
+                        />{" "}
+                        is held while finance checks the payout you asked for.
+                        It is still your money — it just cannot be spent twice.
+                      </>
+                    ) : (
+                      "All of it. Nothing is being held against a payout."
+                    )}
+                  </InfoTip>
+                </dt>
+                <dd className={FIGURE}>
+                  <Price usd={wallet.availableUsd / 100} />
+                </dd>
+              </div>
+            ) : null}
           </dl>
 
           {/* The two figures differ only while a payout waits for finance,
@@ -257,7 +263,7 @@ export default async function WalletPage({
           <div className="flex flex-col gap-2 rounded-b-[inherit] border-t border-line bg-surface-2/50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:px-6">
             <div className="min-w-0">
               <p className="text-xs leading-5 font-medium text-muted">
-                Payouts go to
+                Withdrawals go to
               </p>
               {wallet.payoutAddress ? (
                 <p className="mt-0.5 flex min-w-0 flex-wrap items-center gap-2">
@@ -270,44 +276,23 @@ export default async function WalletPage({
                 </p>
               ) : (
                 <p className="mt-0.5 text-[0.8125rem] text-fg">
-                  No address yet. Add one below before you withdraw.
+                  Not set yet.{" "}
+                  <a
+                    href="#payout-address"
+                    className="font-medium underline decoration-line-strong underline-offset-4 hover:decoration-fg"
+                  >
+                    Add your wallet address
+                  </a>
                 </p>
               )}
             </div>
-            <p className="shrink-0 text-xs leading-relaxed text-subtle sm:max-w-[17rem] sm:text-right">
-              {wallet.payoutAddress
-                ? "Changing this address holds withdrawals for 24 hours."
-                : "Setting an address holds withdrawals for the first 24 hours."}
-            </p>
+            {wallet.payoutAddress ? (
+              <p className="shrink-0 text-xs leading-relaxed text-subtle sm:max-w-[17rem] sm:text-right">
+                Changing it pauses withdrawals for 24 hours.
+              </p>
+            ) : null}
           </div>
         </Card>
-
-        {/* In sight, as one quiet line: a seller looking for their money
-            needs to see at once when it arrives here, and that a Safest price
-            never does. */}
-        <div className="mt-3 flex items-start gap-2 text-[0.8125rem] leading-relaxed text-muted">
-          <InfoIcon
-            aria-hidden="true"
-            className="mt-[0.1875rem] size-3.5 shrink-0 text-subtle"
-          />
-          <p className="max-w-[72ch]">
-            A Fastest sale reaches this balance once our agent holds the
-            account. A Safest buyer pays you directly, so it never comes through
-            here. Until then a Fastest buyer&rsquo;s payment is held by Channel
-            Adda and listed under{" "}
-            <strong className="font-semibold text-fg">
-              Held for your sales
-            </strong>
-            .{" "}
-            <Link
-              href="/fees"
-              className="font-medium text-fg underline decoration-line-strong underline-offset-4 transition-colors duration-150 hover:decoration-fg"
-            >
-              How the two modes differ
-            </Link>
-            .
-          </p>
-        </div>
       </Section>
 
       {/* ---- held for your sales ---------------------------------------- */}
@@ -372,7 +357,7 @@ export default async function WalletPage({
             minimumUsd={settings.minWithdrawalUsd}
           />
         </div>
-        <div className="mt-4">
+        <div id="payout-address" className="mt-4 scroll-mt-20">
           <PayoutAddressForm current={wallet.payoutAddress} />
         </div>
       </Section>
