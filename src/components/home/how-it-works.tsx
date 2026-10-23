@@ -49,7 +49,7 @@ const modes = [
     accent: false,
     points: [
       "We hold your money until our agent has the channel",
-      "Then our agent makes you the owner",
+      "Then our agent makes you primary owner",
       "The seller never hands it straight to a stranger",
     ],
   },
