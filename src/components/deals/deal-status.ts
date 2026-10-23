@@ -99,6 +99,91 @@ export const ACTOR_LABELS: Record<DealActor, string> = {
   system: "Channel Adda",
 };
 
+/**
+ * What each step is called on screen, for whoever is reading.
+ *
+ * The stored labels are identifiers as much as words — running deals are
+ * matched on them, and `deals:in-flight` treats a changed one as old steps —
+ * so they stay, and this is what is shown instead. Each name says who does
+ * it, from the reader's side ("You pay", "The seller invites our agent"), so
+ * the list needs no "Then the seller" under every line. Staff, and a step
+ * from an earlier template, see the stored label.
+ */
+export const STEP_TITLES: Readonly<
+  Record<string, Record<"buyer" | "seller" | "agent", string>>
+> = {
+  // Safest
+  "Pay the admin fee": {
+    buyer: "You pay our fee",
+    seller: "The buyer pays our fee",
+    agent: "The buyer pays our fee",
+  },
+  "Accept the owner invite": {
+    buyer: "Our agent accepts the invite",
+    seller: "Our agent accepts your invite",
+    agent: "You accept the owner invite",
+  },
+  "Verify the channel": {
+    buyer: "Our agent checks the channel",
+    seller: "Our agent checks the channel",
+    agent: "You check the channel",
+  },
+  "Pay the seller": {
+    buyer: "You pay the seller",
+    seller: "The buyer pays you",
+    agent: "The buyer pays the seller",
+  },
+  "Confirm the payment arrived": {
+    buyer: "The seller confirms your payment",
+    seller: "You confirm the payment arrived",
+    agent: "The seller confirms the payment",
+  },
+  "Transfer ownership to the buyer": {
+    buyer: "Our agent hands you the channel",
+    seller: "Our agent hands the channel to the buyer",
+    agent: "You hand the channel to the buyer",
+  },
+  // Fastest
+  "Pay the full amount": {
+    buyer: "You pay",
+    seller: "The buyer pays us",
+    agent: "The buyer pays us",
+  },
+  "Invite the buyer as owner": {
+    buyer: "Our agent invites you as owner",
+    seller: "Our agent invites the buyer",
+    agent: "You invite the buyer as owner",
+  },
+  "Confirm primary ownership": {
+    buyer: "Our agent confirms they own it",
+    seller: "Our agent confirms, and you are paid",
+    agent: "You confirm you are primary owner",
+  },
+  "Make the buyer primary owner": {
+    buyer: "Our agent makes you primary owner",
+    seller: "Our agent makes the buyer primary owner",
+    agent: "You make the buyer primary owner",
+  },
+  // Both
+  "Invite the agent as owner": {
+    buyer: "The seller invites our agent",
+    seller: "You invite our agent as owner",
+    agent: "The seller invites you as owner",
+  },
+  "Make the agent primary owner": {
+    buyer: "The seller makes our agent primary owner",
+    seller: "You make our agent primary owner",
+    agent: "The seller makes you primary owner",
+  },
+};
+
+export function stepTitle(label: string, viewer: DealActor): string {
+  if (viewer !== "buyer" && viewer !== "seller" && viewer !== "agent") {
+    return label;
+  }
+  return STEP_TITLES[label]?.[viewer] ?? label;
+}
+
 /** "you" when it is the reader's own move, which is the whole point. */
 export function actorLabel(actor: DealActor, viewer: DealActor): string {
   return actor === viewer ? "you" : ACTOR_LABELS[actor];

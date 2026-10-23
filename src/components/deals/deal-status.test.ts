@@ -8,8 +8,10 @@ import {
   moneyNote,
   STATUS_LABELS,
   STATUS_SHORT,
+  STEP_TITLES,
   statusSentence,
   stepHelp,
+  stepTitle,
 } from "@/components/deals/deal-status";
 import type { Platform } from "@/generated/prisma/enums";
 import { templateFor } from "@/lib/deal-templates";
@@ -392,5 +394,50 @@ describe("the badge speaks to whoever is reading it", () => {
     expect(
       dealHeadline("AGENT_VERIFYING", "FASTEST", "seller", 2, "YOUTUBE").label,
     ).toBe("Invite our agent now");
+  });
+});
+
+describe("each step is named for whoever is reading it", () => {
+  // The owner: "Invite the buyer as owner", "Confirm primary ownership" and
+  // "Then our agent" read as the platform's checklist, not as what is going
+  // to happen to the person looking. The stored labels stay (running deals
+  // are matched on them); only what is shown changes.
+  test("every step of both templates has a reader's name", () => {
+    for (const mode of ["SAFEST", "FASTEST"] as const) {
+      for (const step of templateFor(mode)) {
+        for (const viewer of ["buyer", "seller", "agent"] as const) {
+          expect(stepTitle(step.label, viewer)).toBeTruthy();
+        }
+        expect(STEP_TITLES[step.label]).toBeDefined();
+      }
+    }
+  });
+
+  test("the buyer, the seller and our agent each read their own words", () => {
+    expect(stepTitle("Pay the full amount", "buyer")).toBe("You pay");
+    expect(stepTitle("Pay the full amount", "seller")).toBe(
+      "The buyer pays us",
+    );
+    expect(stepTitle("Invite the agent as owner", "seller")).toBe(
+      "You invite our agent as owner",
+    );
+    expect(stepTitle("Invite the agent as owner", "buyer")).toBe(
+      "The seller invites our agent",
+    );
+    expect(stepTitle("Make the buyer primary owner", "buyer")).toBe(
+      "Our agent makes you primary owner",
+    );
+    expect(stepTitle("Make the agent primary owner", "agent")).toBe(
+      "The seller makes you primary owner",
+    );
+  });
+
+  test("staff, and a step from older templates, keep the stored label", () => {
+    expect(stepTitle("Pay the full amount", "staff")).toBe(
+      "Pay the full amount",
+    );
+    expect(stepTitle("Release the seller's funds", "buyer")).toBe(
+      "Release the seller's funds",
+    );
   });
 });

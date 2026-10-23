@@ -22,7 +22,6 @@ import {
 import { AgentInvite } from "@/components/deals/agent-invite";
 import {
   dealHeadline,
-  moneyNote,
   STATUS_LABELS,
   STATUS_TONE,
 } from "@/components/deals/deal-status";
@@ -118,6 +117,7 @@ export default async function DealPage({
   // point, so it takes the place of the step's own action rather than
   // sitting beside it. It is the only payment Channel Adda takes.
   const paying = viewer === "buyer" && deal.status === "AWAITING_PAYMENT";
+  const yourMove = paying || deal.nextStep?.actor === viewer;
   const wallet = paying ? await getWallet(user.id) : null;
 
   const ModeIcon = safest ? ShieldCheckIcon : ZapIcon;
@@ -190,7 +190,10 @@ export default async function DealPage({
           ) : null}
 
           <Card>
-            {disputed ? null : (
+            {/* When it is the reader's move, the step card below says what
+                to do, so this line would only say it first. It stays for
+                the times they are waiting on somebody else. */}
+            {disputed || yourMove ? null : (
               <section
                 aria-labelledby="stage-heading"
                 className="border-b border-line p-4 sm:p-5"
@@ -306,11 +309,6 @@ export default async function DealPage({
                   />
                 )}
               </dl>
-              {terminal ? null : (
-                <p className="border-t border-line px-4 py-3 text-[0.8125rem] leading-relaxed text-muted sm:px-5">
-                  {moneyNote(deal.mode, viewer, sellerPaid)}
-                </p>
-              )}
             </section>
           </Card>
 

@@ -36,6 +36,7 @@ import {
   confirmYes,
   holdNote,
   stepHelp,
+  stepTitle,
 } from "@/components/deals/deal-status";
 import { Button } from "@/components/ui/button";
 import { Price } from "@/components/ui/price";
@@ -270,7 +271,7 @@ export function DealNextStep({
             id="next-step-heading"
             className="min-w-0 text-[0.9375rem] leading-6 font-semibold text-fg"
           >
-            {step.label}
+            {stepTitle(step.label, deal.viewerRole)}
           </h2>
           <StepInfo step={step} state={state} className="mt-0.5" />
         </div>
@@ -634,7 +635,7 @@ function Step({
           <>
             <div className="flex items-start gap-1.5">
               <p className="min-w-0 text-sm leading-5 font-semibold text-fg">
-                {step.label}
+                {stepTitle(step.label, deal.viewerRole)}
               </p>
               <StepInfo step={step} state={current} />
             </div>
@@ -663,22 +664,19 @@ function Step({
                 done ? "text-muted" : "text-subtle",
               )}
             >
-              {step.label}
+              {stepTitle(step.label, deal.viewerRole)}
             </p>
-            <p className="text-xs text-subtle">
-              {done ? (
-                <>
-                  Done by {actorLabel(step.actor, deal.viewerRole)} on{" "}
-                  {step.completedAt?.toLocaleDateString("en-GB", {
-                    day: "numeric",
-                    month: "short",
-                    year: "numeric",
-                  })}
-                </>
-              ) : (
-                <>Then {ACTOR_LABELS[step.actor]}</>
-              )}
-            </p>
+            {/* The name already says who does it, so a step still to come
+                needs nothing under it; a finished one says when. */}
+            {done ? (
+              <p className="text-xs text-subtle">
+                Done{" "}
+                {step.completedAt?.toLocaleDateString("en-GB", {
+                  day: "numeric",
+                  month: "short",
+                })}
+              </p>
+            ) : null}
           </div>
         )}
 
