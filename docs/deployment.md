@@ -76,6 +76,7 @@ Then, as the app:
 cd /var/www/channeladda
 pnpm install --frozen-lockfile
 pnpm exec prisma migrate deploy   # NOT `migrate dev` — it is interactive
+pnpm exec prisma generate
 pnpm build
 ```
 
@@ -376,6 +377,7 @@ git pull
 pnpm install --frozen-lockfile
 pnpm deals:in-flight          # only when a change alters the deal steps; see below
 pnpm exec prisma migrate deploy
+pnpm exec prisma generate     # install skips this when nothing changed; see below
 pnpm build                    # pm2 restart alone does NOT pick up source changes
 pm2 restart channeladda
 ```
@@ -394,6 +396,14 @@ rather than shipping.
 Migrate **before** building. The homepage is pre-rendered from the database
 during the build, so building against an unmigrated database fails with
 "The column … does not exist in the current database".
+
+Generate the Prisma client by hand. It lives in `src/generated/prisma`, which
+is not in git, and `pnpm install` only regenerates it from its `postinstall`
+hook — which does not run when the install prints "Already up to date". A
+pull that changes `prisma/schema.prisma` then builds against the old client
+and fails type-checking with dozens of errors such as "Module
+'@/generated/prisma/enums' has no exported member …" or "Property … does not
+exist on type 'PrismaClient'".
 
 ---
 
