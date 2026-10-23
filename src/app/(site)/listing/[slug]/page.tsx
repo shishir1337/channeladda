@@ -127,7 +127,7 @@ export default async function ListingPage({
         <div className="lg:grid lg:grid-cols-[1fr_22rem] lg:items-start lg:gap-8">
           <div className="min-w-0">
             {/* Identity */}
-            <div className="flex items-start gap-4">
+            <div className="flex flex-wrap items-start gap-4">
               {/* biome-ignore lint/performance/noImgElement: static SVG avatar. */}
               <img
                 src={listing.avatarUrl}
@@ -166,17 +166,16 @@ export default async function ListingPage({
                   // for to search engines; noreferrer keeps our URL to us.
                   rel="noopener noreferrer nofollow"
                   aria-label={`${listing.channel.label} (opens in a new tab)`}
-                  className="group inline-flex h-11 shrink-0 items-center gap-1.5 self-center rounded-lg border border-line bg-surface px-3 text-[0.8125rem] font-medium text-fg shadow-xs transition-colors duration-150 hover:border-line-strong hover:bg-surface-2 pointer-fine:h-9 dark:bg-surface-2 dark:hover:bg-surface-3"
+                  // A row of its own on a phone, where beside the name it
+                  // would break the handle mid-word.
+                  className="group inline-flex h-11 shrink-0 basis-full items-center justify-center gap-1.5 rounded-lg border border-line bg-surface px-3 text-[0.8125rem] font-medium text-fg shadow-xs transition-colors duration-150 hover:border-line-strong hover:bg-surface-2 sm:basis-auto sm:self-center pointer-fine:h-9 dark:bg-surface-2 dark:hover:bg-surface-3"
                 >
                   <PlatformIcon
                     aria-hidden="true"
                     className="size-4 shrink-0"
                     style={{ color: platform.tint }}
                   />
-                  <span className="hidden sm:inline">
-                    {listing.channel.label}
-                  </span>
-                  <span className="sm:hidden">Open</span>
+                  {listing.channel.label}
                   <ArrowUpRightIcon
                     aria-hidden="true"
                     className="size-3.5 shrink-0 text-subtle transition duration-150 group-hover:translate-x-px group-hover:-translate-y-px group-hover:text-fg"
