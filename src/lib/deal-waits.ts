@@ -79,6 +79,24 @@ export function activeWait(input: WaitInput): Wait | null {
 }
 
 /** "4d 6h", "5h 12m", "12m 05s", "45s": the coarsest grain still worth reading. */
+/**
+ * The cards of a flip clock: every unit as two digits, days only while
+ * there are any left. A wait already over reads 00 00 00.
+ */
+export function countdownParts(
+  ms: number,
+): { unit: "days" | "hrs" | "min" | "sec"; value: string }[] {
+  const seconds = Math.max(0, Math.floor(ms / 1000));
+  const days = Math.floor(seconds / 86_400);
+  const two = (n: number) => String(n).padStart(2, "0");
+  return [
+    ...(days > 0 ? [{ unit: "days" as const, value: two(days) }] : []),
+    { unit: "hrs", value: two(Math.floor((seconds % 86_400) / 3_600)) },
+    { unit: "min", value: two(Math.floor((seconds % 3_600) / 60)) },
+    { unit: "sec", value: two(seconds % 60) },
+  ];
+}
+
 export function formatCountdown(ms: number): string {
   if (ms <= 0) return "now";
   const seconds = Math.floor(ms / 1000);

@@ -1,6 +1,7 @@
 import { expect, test } from "vitest";
 import {
   activeWait,
+  countdownParts,
   formatCountdown,
   holdDaysFor,
   type WaitInput,
@@ -83,6 +84,27 @@ test("a finished, stopped or disputed deal has no clock running", () => {
   for (const status of ["COMPLETED", "CANCELLED", "DISPUTED"] as const) {
     expect(activeWait(deal({ status, holdUntil: ahead(DAY) }))).toBeNull();
   }
+});
+
+test("a countdown splits into the cards a flip clock shows", () => {
+  // The owner wanted "an actual countdown with minutes and seconds
+  // flipping": every unit as two digits, days only while there are any.
+  expect(countdownParts(4 * DAY + 6 * HOUR + 7 * 60_000 + 9_000)).toEqual([
+    { unit: "days", value: "04" },
+    { unit: "hrs", value: "06" },
+    { unit: "min", value: "07" },
+    { unit: "sec", value: "09" },
+  ]);
+  expect(countdownParts(5 * HOUR + 12 * 60_000 + 30_500)).toEqual([
+    { unit: "hrs", value: "05" },
+    { unit: "min", value: "12" },
+    { unit: "sec", value: "30" },
+  ]);
+  expect(countdownParts(-1)).toEqual([
+    { unit: "hrs", value: "00" },
+    { unit: "min", value: "00" },
+    { unit: "sec", value: "00" },
+  ]);
 });
 
 test("countdowns read at the right grain", () => {

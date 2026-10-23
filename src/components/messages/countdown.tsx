@@ -1,12 +1,9 @@
 "use client";
 
 import { HourglassIcon } from "lucide-react";
-import { useEffect, useState } from "react";
-import { formatCountdown } from "@/lib/deal-waits";
+import { Fragment, useEffect, useState } from "react";
+import { countdownParts, formatCountdown } from "@/lib/deal-waits";
 import { cn } from "@/lib/utils";
-
-const MINUTE = 60_000;
-const HOUR = 60 * MINUTE;
 
 const exactDate = new Intl.DateTimeFormat("en-GB", {
   weekday: "short",
@@ -17,12 +14,14 @@ const exactDate = new Intl.DateTimeFormat("en-GB", {
 });
 
 /**
- * The clock a deal is waiting on, counting down where both sides can see it.
+ * The clock a deal is waiting on, as a flip clock both sides can see.
  *
- * Ticks every second in the last hour, when the seconds matter, and every
- * thirty above it, when they do not. The server renders the same text from
- * its own clock; the first tick in the browser corrects any drift, which is
- * why the figure itself is exempt from the hydration check.
+ * The owner asked for "an actual countdown, with minutes and seconds
+ * flipping", in the chat and above all on a phone: so it ticks every second
+ * and each unit is a split-flap card (styles in globals.css). The server
+ * renders the figures from its own clock; the first tick in the browser
+ * corrects any drift, which is why the digits are exempt from the
+ * hydration check. Screen readers get one quiet line instead of the cards.
  */
 export function WaitCountdown({
   label,
@@ -39,41 +38,102 @@ export function WaitCountdown({
 
   useEffect(() => {
     if (left <= 0) return;
+    // On the second boundary, so every card turns together.
     const id = window.setTimeout(
       () => setNow(Date.now()),
-      left < HOUR ? 1000 : 30_000,
+      1000 - (Date.now() % 1000),
     );
     return () => window.clearTimeout(id);
   }, [left]);
 
+  const parts = countdownParts(left);
+
   return (
     <div
       className={cn(
-        "flex items-center gap-3 rounded-card border border-line bg-surface px-4 py-3 shadow-xs",
+        "rounded-card border border-line bg-surface p-3.5 shadow-xs",
         className,
       )}
     >
-      <span
-        aria-hidden="true"
-        className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-surface-2 text-muted ring-1 ring-line ring-inset"
-      >
-        <HourglassIcon className="size-4" />
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className="text-xs text-subtle">{label}</p>
-        <p className="text-[0.9375rem] leading-6 font-semibold text-fg tabular-nums">
-          <span suppressHydrationWarning>
-            {left > 0 ? `in ${formatCountdown(left)}` : "Any moment now"}
-          </span>
+      <div className="flex items-baseline justify-between gap-3">
+        <p className="flex min-w-0 items-center gap-1.5 text-xs font-medium text-muted">
+          <HourglassIcon aria-hidden="true" className="size-3.5 shrink-0" />
+          <span className="truncate">{label}</span>
         </p>
+        <time
+          dateTime={new Date(end).toISOString()}
+          className="shrink-0 text-xs text-subtle tabular-nums"
+          suppressHydrationWarning
+        >
+          {exactDate.format(end)}
+        </time>
       </div>
-      <time
-        dateTime={new Date(end).toISOString()}
-        className="shrink-0 text-right text-xs text-subtle tabular-nums"
-        suppressHydrationWarning
-      >
-        {exactDate.format(end)}
-      </time>
+
+      <span className="sr-only" suppressHydrationWarning>
+        {left > 0 ? `in ${formatCountdown(left)}` : "any moment now"}
+      </span>
+
+      {left > 0 ? (
+        <div
+          aria-hidden="true"
+          className={cn(
+            "mt-3 grid gap-2",
+            parts.length === 4 ? "grid-cols-4" : "grid-cols-3",
+          )}
+        >
+          {parts.map((part) => (
+            <div key={part.unit} className="flex flex-col items-center gap-1">
+              <span className="w-full max-w-[4.5rem]">
+                <FlipCard value={part.value} />
+              </span>
+              <span className="text-[0.625rem] font-medium tracking-wider text-subtle uppercase">
+                {part.unit}
+              </span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="mt-1.5 text-[0.9375rem] font-semibold text-fg">
+          Any moment now
+        </p>
+      )}
     </div>
+  );
+}
+
+/**
+ * One split-flap card. When the value changes the old top half folds down
+ * and the new bottom half unfolds; a new `turn` key restarts the fold.
+ */
+function FlipCard({ value }: { value: string }) {
+  const [current, setCurrent] = useState(value);
+  const [previous, setPrevious] = useState(value);
+  const [turn, setTurn] = useState(0);
+
+  // Following a prop by adjusting state while rendering, as React suggests,
+  // rather than an effect that would paint the old figure for a frame.
+  if (value !== current) {
+    setPrevious(current);
+    setCurrent(value);
+    setTurn((n) => n + 1);
+  }
+
+  return (
+    <span className="flip-card text-[1.625rem] font-semibold">
+      <span className="flip-half flip-top" suppressHydrationWarning>
+        {current}
+      </span>
+      <span className="flip-half flip-bottom" suppressHydrationWarning>
+        {previous}
+      </span>
+      {turn > 0 ? (
+        <Fragment key={turn}>
+          <span className="flip-half flip-top flip-fold-top">{previous}</span>
+          <span className="flip-half flip-bottom flip-fold-bottom">
+            {current}
+          </span>
+        </Fragment>
+      ) : null}
+    </span>
   );
 }

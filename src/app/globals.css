@@ -477,3 +477,78 @@
   }
   /* biome-ignore-end lint/complexity/noImportantStyles: see above */
 }
+
+/* The flip clock on a deal's wait (components/messages/countdown.tsx).
+   Each card is two halves. On a change the old top half folds down and the
+   new bottom half unfolds over the old one, like a split-flap board; under
+   reduced motion the rule above makes both folds instant. */
+@layer components {
+  .flip-card {
+    --flip-h: 2.75rem;
+    position: relative;
+    display: block;
+    width: 100%;
+    height: var(--flip-h);
+    perspective: 18rem;
+    font-variant-numeric: tabular-nums;
+  }
+  .flip-half {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 50%;
+    overflow: hidden;
+    display: flex;
+    justify-content: center;
+    line-height: var(--flip-h);
+    background: var(--color-surface-2);
+    color: var(--color-fg);
+    backface-visibility: hidden;
+  }
+  .flip-top {
+    top: 0;
+    align-items: flex-start;
+    border-radius: 0.5rem 0.5rem 0 0;
+  }
+  .flip-bottom {
+    bottom: 0;
+    align-items: flex-end;
+    border-radius: 0 0 0.5rem 0.5rem;
+  }
+  /* The seam between the halves. */
+  .flip-card::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    height: 1px;
+    background: var(--color-bg);
+    opacity: 0.7;
+    z-index: 3;
+  }
+  .flip-fold-top {
+    z-index: 2;
+    transform-origin: bottom;
+    animation: flip-fold-top 0.25s ease-in forwards;
+  }
+  .flip-fold-bottom {
+    z-index: 2;
+    transform-origin: top;
+    transform: rotateX(90deg);
+    animation: flip-fold-bottom 0.25s ease-out 0.25s forwards;
+  }
+  @keyframes flip-fold-top {
+    to {
+      transform: rotateX(-90deg);
+    }
+  }
+  @keyframes flip-fold-bottom {
+    from {
+      transform: rotateX(90deg);
+    }
+    to {
+      transform: rotateX(0);
+    }
+  }
+}
