@@ -1,13 +1,12 @@
-import { HandCoinsIcon, InboxIcon, TagIcon } from "lucide-react";
+import { HandCoinsIcon, TagIcon } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import type { ReactNode } from "react";
 import {
-  Dot,
   EmptyState,
+  FilterBar,
+  FilterLink,
   List,
   PageHeader,
-  Section,
 } from "@/components/app/kit";
 import {
   OfferCard,
@@ -15,6 +14,12 @@ import {
 } from "@/components/dashboard/offer-card";
 import { Button } from "@/components/ui/button";
 import { iconText } from "@/components/ui/icon-hue";
+import {
+  OFFER_TABS,
+  type OfferTab,
+  offerTabs,
+  openOfferTab,
+} from "@/lib/offer-tabs";
 import type { OfferView } from "@/server/offers";
 import { getOffersForBuyer, getOffersForSeller } from "@/server/offers";
 import { requireUser } from "@/server/session";
@@ -46,68 +51,45 @@ function toCard(offer: OfferView): OfferCardData {
   };
 }
 
-function Group({
-  id,
-  title,
-  info,
-  offers,
-  viewingAs,
-  empty,
-}: {
-  id: string;
-  title: string;
-  info: string;
-  offers: OfferCardData[];
-  viewingAs: "buyer" | "seller";
-  empty: ReactNode;
-}) {
-  const waiting = offers.filter((o) => o.awaiting === viewingAs).length;
+const TAB_LABEL: Record<OfferTab, string> = {
+  yours: "Your turn",
+  waiting: "Waiting",
+  closed: "Closed",
+};
 
-  return (
-    <Section
-      id={id}
-      title={title}
-      info={info}
-      count={offers.length > 0 ? offers.length : undefined}
-      actions={
-        // Gold only for what is waiting on the reader, and said in words.
-        waiting > 0 ? (
-          <span className="inline-flex h-6 items-center gap-1.5 rounded-full bg-primary-soft px-2.5 text-xs font-medium whitespace-nowrap text-primary-text tabular-nums ring-1 ring-primary/25 ring-inset">
-            <Dot tone="primary" pulse />
-            {waiting} waiting on you
-          </span>
-        ) : null
-      }
-    >
-      {offers.length === 0 ? (
-        empty
-      ) : (
-        <List>
-          {offers.map((offer) => (
-            <OfferCard key={offer.id} offer={offer} viewingAs={viewingAs} />
-          ))}
-        </List>
-      )}
-    </Section>
-  );
-}
+const TAB_EMPTY: Record<OfferTab, string> = {
+  yours: "No offer needs an answer from you.",
+  waiting: "No offers are waiting on anyone else.",
+  closed: "No offers have closed yet.",
+};
 
-export default async function OffersPage() {
+export default async function OffersPage({
+  searchParams,
+}: PageProps<"/dashboard/offers">) {
   const user = await requireUser("/dashboard/offers");
-  const [received, made] = await Promise.all([
+  const [received, made, params] = await Promise.all([
     getOffersForSeller(user.id),
     getOffersForBuyer(user.id),
+    searchParams,
   ]);
 
-  const waiting = [
-    ...received.filter((offer) => offer.awaiting === "seller"),
-    ...made.filter((offer) => offer.awaiting === "buyer"),
-  ].length;
+  // Both sides in one list, each offer knowing which side the reader is on.
+  const all = [
+    ...received.map((offer) => ({ ...offer, viewingAs: "seller" as const })),
+    ...made.map((offer) => ({ ...offer, viewingAs: "buyer" as const })),
+  ];
+  const tabs = offerTabs(all);
+  const counts = {
+    yours: tabs.yours.length,
+    waiting: tabs.waiting.length,
+    closed: tabs.closed.length,
+  };
+  const asked = typeof params.tab === "string" ? params.tab : undefined;
+  const tab = openOfferTab(asked, counts);
+  const waiting = counts.yours;
 
   return (
     <>
-      {/* Only the count that needs the reader gets a line; the two section
-          headings already say what the page holds. */}
       <PageHeader
         title="Offers"
         description={
@@ -122,49 +104,55 @@ export default async function OffersPage() {
         }
       />
 
-      <Group
-        id="received"
-        title="Offers on your listings"
-        info="What buyers have offered you. Accept, counter or decline."
-        offers={received.map(toCard)}
-        viewingAs="seller"
-        empty={
-          <EmptyState
-            as="h3"
-            icon={InboxIcon}
-            title="Nobody has made you an offer yet"
-            info="Buyers can offer below your asking price on any live listing of yours, and you can counter without losing the buyer."
-            action={
-              <Button asChild variant="secondary" size="sm">
-                <Link href="/dashboard/listings">See your listings</Link>
-              </Button>
-            }
-            className="py-10"
-          />
-        }
-      />
-
-      <Group
-        id="made"
-        title="Offers you have made"
-        info="What you have offered on other people's listings."
-        offers={made.map(toCard)}
-        viewingAs="buyer"
-        empty={
-          <EmptyState
-            as="h3"
-            icon={TagIcon}
-            title="You have not made any offers"
-            info="Make an offer on any listing for less than its asking price — the seller can accept it, counter it, or let it lapse."
-            action={
+      {all.length === 0 ? (
+        <EmptyState
+          icon={TagIcon}
+          title="No offers yet"
+          info="Make an offer on any listing for less than its asking price, and buyers can do the same on yours. The other side can accept, counter or let it lapse."
+          action={
+            <>
               <Button asChild size="sm">
                 <Link href="/browse">Find an account</Link>
               </Button>
-            }
-            className="py-10"
-          />
-        }
-      />
+              <Button asChild variant="secondary" size="sm">
+                <Link href="/dashboard/listings">See your listings</Link>
+              </Button>
+            </>
+          }
+        />
+      ) : (
+        <>
+          <FilterBar label="Offers by whose move it is" className="mb-5">
+            {OFFER_TABS.map((name) => (
+              <FilterLink
+                key={name}
+                href={`/dashboard/offers?tab=${name}`}
+                active={tab === name}
+                count={counts[name]}
+                tone={name === "yours" ? "primary" : "neutral"}
+              >
+                {TAB_LABEL[name]}
+              </FilterLink>
+            ))}
+          </FilterBar>
+
+          {tabs[tab].length > 0 ? (
+            <List>
+              {tabs[tab].map((offer) => (
+                <OfferCard
+                  key={offer.id}
+                  offer={toCard(offer)}
+                  viewingAs={offer.viewingAs}
+                />
+              ))}
+            </List>
+          ) : (
+            <p className="rounded-card border border-dashed border-line px-4 py-8 text-center text-sm text-muted">
+              {TAB_EMPTY[tab]}
+            </p>
+          )}
+        </>
+      )}
 
       {/* Money copy, so it stays on the page word for word — as one quiet
           line under the lists rather than a box competing with them. */}

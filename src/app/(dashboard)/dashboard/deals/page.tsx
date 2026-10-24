@@ -10,12 +10,13 @@ import Link from "next/link";
 import {
   Amount,
   EmptyState,
+  FilterBar,
+  FilterLink,
   IconTile,
   List,
   ListItem,
   PageHeader,
   Reference,
-  Section,
   Sep,
   TurnFlag,
 } from "@/components/app/kit";
@@ -27,6 +28,7 @@ import {
 } from "@/components/deals/deal-status";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { DEAL_TABS, type DealTab, dealTabs, openTab } from "@/lib/deal-tabs";
 import type { DealListRow } from "@/server/deals";
 import { listDealsFor } from "@/server/deals";
 import { requireUser } from "@/server/session";
@@ -42,39 +44,54 @@ const SIDE_ICONS = {
   agent: ShieldCheckIcon,
 } as const;
 
+/** The tabs' names, said as plainly as the rows below them. */
+const TAB_LABEL: Record<DealTab, string> = {
+  yours: "Your turn",
+  running: "In progress",
+  paused: "Paused",
+  finished: "Finished",
+};
+
+const TAB_EMPTY: Record<DealTab, string> = {
+  yours: "Nothing needs you right now.",
+  running: "No deals in progress.",
+  paused: "No deals are paused.",
+  finished: "No finished deals yet.",
+};
+
 /**
- * Every deal, both sides in one list.
+ * Every deal, both sides in one list, in tabs by where it stands.
  *
  * Same reasoning as the inbox: everyone here buys and sells, so splitting
- * this into a buying tab and a selling tab would hide half of what somebody
- * is doing from them. The side is a label on the row instead.
- *
- * What the list *is* split by is whose turn it is, because that is the only
- * question somebody opens this page with. A flat list by date made a deal
- * that needs a payment today look exactly like one that needs nothing for a
- * week.
+ * by buying and selling would hide half of what somebody is doing. The side
+ * is a label on the row instead. The tabs answer the question somebody opens
+ * this page with — is anything mine to do? — and the page opens on that tab
+ * whenever it is not empty.
  */
-export default async function DealsPage() {
+export default async function DealsPage({
+  searchParams,
+}: PageProps<"/dashboard/deals">) {
   const user = await requireUser("/dashboard/deals");
-  const deals = await listDealsFor(user.id);
+  const [deals, params] = await Promise.all([
+    listDealsFor(user.id),
+    searchParams,
+  ]);
 
-  // A disputed deal still names a next actor, because staff resolve it on
-  // rather than ending it. Nobody can act on it though, so it is its own
-  // group instead of sitting under "Waiting on you" with a button nobody can
-  // press.
-  const paused = deals.filter((deal) => deal.status === "DISPUTED");
-  const live = deals.filter((deal) => deal.status !== "DISPUTED");
-  // A step behind a running hold is nobody's move until it ends, so it
-  // waits with the others rather than under "Waiting on you".
-  const mine = live.filter(
-    (deal) => deal.awaiting === deal.side && deal.waitingUntil === null,
+  const tabs = dealTabs(deals);
+  const counts = {
+    yours: tabs.yours.length,
+    running: tabs.running.length,
+    paused: tabs.paused.length,
+    finished: tabs.finished.length,
+  };
+  const asked = typeof params.tab === "string" ? params.tab : undefined;
+  const tab = openTab(asked, counts);
+  // Paused only shows while something is: a tab that is always empty is
+  // one more word to read.
+  const shown = DEAL_TABS.filter(
+    (name) => name !== "paused" || counts.paused > 0 || tab === "paused",
   );
-  const theirs = live.filter(
-    (deal) =>
-      deal.awaiting !== null &&
-      (deal.awaiting !== deal.side || deal.waitingUntil !== null),
-  );
-  const finished = live.filter((deal) => deal.awaiting === null);
+  const mine = counts.yours;
 
   return (
     <>
@@ -83,8 +100,8 @@ export default async function DealsPage() {
       <PageHeader
         title="Deals"
         description={
-          mine.length > 0
-            ? `${mine.length} of your ${deals.length} ${deals.length === 1 ? "deal" : "deals"} ${mine.length === 1 ? "needs" : "need"} something from you.`
+          mine > 0
+            ? `${mine} of your ${deals.length} ${deals.length === 1 ? "deal" : "deals"} ${mine === 1 ? "needs" : "need"} something from you.`
             : undefined
         }
         info={
@@ -114,48 +131,33 @@ export default async function DealsPage() {
         />
       ) : (
         <>
-          {/* The only gold on the page is this count and the "Your move"
-              flags: a deal waiting on the reader is found by its turn, not
-              by a tinted row. */}
-          {mine.length > 0 ? (
-            <Section
-              id="waiting-on-you"
-              title="Waiting on you"
-              count={mine.length}
-              tone="primary"
-              info="Nothing on these moves until you act."
-            >
-              <DealRows deals={mine} />
-            </Section>
-          ) : null}
+          <FilterBar label="Deals by where they stand" className="mb-5">
+            {shown.map((name) => (
+              <FilterLink
+                key={name}
+                href={`/dashboard/deals?tab=${name}`}
+                active={tab === name}
+                count={counts[name]}
+                tone={
+                  name === "yours"
+                    ? "primary"
+                    : name === "paused"
+                      ? "danger"
+                      : "neutral"
+                }
+              >
+                {TAB_LABEL[name]}
+              </FilterLink>
+            ))}
+          </FilterBar>
 
-          {paused.length > 0 ? (
-            <Section
-              id="paused"
-              title="Paused with Channel Adda"
-              count={paused.length}
-              info="A moderator is reading the record. Nothing moves until they decide."
-            >
-              <DealRows deals={paused} />
-            </Section>
-          ) : null}
-
-          {theirs.length > 0 ? (
-            <Section
-              id="with-the-other-side"
-              title="With the other side"
-              count={theirs.length}
-              info="In progress. A deal moves up to “Waiting on you” when it is your turn."
-            >
-              <DealRows deals={theirs} />
-            </Section>
-          ) : null}
-
-          {finished.length > 0 ? (
-            <Section id="finished" title="Finished" count={finished.length}>
-              <DealRows deals={finished} />
-            </Section>
-          ) : null}
+          {tabs[tab].length > 0 ? (
+            <DealRows deals={tabs[tab]} />
+          ) : (
+            <p className="rounded-card border border-dashed border-line px-4 py-8 text-center text-sm text-muted">
+              {TAB_EMPTY[tab]}
+            </p>
+          )}
         </>
       )}
     </>

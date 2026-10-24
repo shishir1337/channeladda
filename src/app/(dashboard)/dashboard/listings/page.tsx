@@ -15,12 +15,12 @@ import { InfoTip } from "@/components/app/info-tip";
 import {
   Card,
   EmptyState,
+  FilterBar,
+  FilterLink,
   List,
   ListItem,
   PageHeader,
-  Section,
   Sep,
-  SplitBar,
   TurnFlag,
 } from "@/components/app/kit";
 import {
@@ -31,6 +31,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { platforms } from "@/data/platforms";
 import type { ListingStatus } from "@/generated/prisma/enums";
+import { pickTab } from "@/lib/tabs";
 import { cn } from "@/lib/utils";
 import { getMyListings, type SellerListing } from "@/server/seller-listings";
 import { requireUser } from "@/server/session";
@@ -99,9 +100,35 @@ const FIRST_STEPS = [
   },
 ];
 
-export default async function MyListingsPage() {
+type ListingTab = "yours" | "sale" | "draft" | "sold";
+const LISTING_TABS: readonly ListingTab[] = ["yours", "sale", "draft", "sold"];
+
+const TAB_LABEL: Record<ListingTab, string> = {
+  yours: "Your turn",
+  sale: "On sale",
+  draft: "Not live yet",
+  sold: "Sold",
+};
+
+const TAB_EMPTY: Record<ListingTab, string> = {
+  yours: "Nothing needs you right now.",
+  sale: "Nothing is on sale right now.",
+  draft: "No drafts or listings in review.",
+  sold: "Nothing sold yet.",
+};
+
+/**
+ * Your listings in tabs by stage, as Deals and Offers are: the page opens on
+ * whatever needs you, and each listing sits in one place.
+ */
+export default async function MyListingsPage({
+  searchParams,
+}: PageProps<"/dashboard/listings">) {
   const user = await requireUser("/dashboard/listings");
-  const listings = await getMyListings(user.id);
+  const [listings, params] = await Promise.all([
+    getMyListings(user.id),
+    searchParams,
+  ]);
 
   const needsYou = listings.filter((l) => NEEDS_YOU.includes(l.status));
   const onSale = listings.filter((l) => ON_SALE.includes(l.status));
@@ -113,6 +140,24 @@ export default async function MyListingsPage() {
       !IN_PROGRESS.includes(l.status),
   );
 
+  const groups: Record<ListingTab, typeof listings> = {
+    yours: needsYou,
+    sale: onSale,
+    draft: inProgress,
+    sold: archive.slice(0, ARCHIVE_SHOWN),
+  };
+  const counts: Record<ListingTab, number> = {
+    yours: needsYou.length,
+    sale: onSale.length,
+    draft: inProgress.length,
+    sold: archive.length,
+  };
+  const tab = pickTab(
+    typeof params.tab === "string" ? params.tab : undefined,
+    LISTING_TABS,
+    counts,
+  );
+
   const newButton = (
     <Button asChild size="md">
       <Link href="/dashboard/listings/new">
@@ -121,8 +166,6 @@ export default async function MyListingsPage() {
       </Link>
     </Button>
   );
-
-  const watching = onSale.reduce((n, l) => n + l.watching, 0);
 
   return (
     <>
@@ -187,117 +230,45 @@ export default async function MyListingsPage() {
           </ol>
         </Card>
       ) : (
-        // The stages as one bar rather than four boxes of numbers: how the
-        // listings split is the thing to see, and the sections below hold
-        // the detail.
-        <Card padded>
-          <div className="flex items-end justify-between gap-6">
-            <div className="min-w-0">
-              <p className="text-[0.8125rem] leading-5 font-medium text-muted">
-                All listings
-              </p>
-              <p className="mt-1 text-[1.625rem] leading-8 font-semibold tracking-[-0.02em] text-fg tabular-nums">
-                {listings.length.toLocaleString("en-US")}
-              </p>
-            </div>
-            <div className="min-w-0 text-right">
-              <p className="text-[0.8125rem] leading-5 font-medium text-muted">
-                Watching
-              </p>
-              <p className="mt-1 text-[1.625rem] leading-8 font-semibold tracking-[-0.02em] text-fg tabular-nums">
-                {watching.toLocaleString("en-US")}
-              </p>
-            </div>
-          </div>
-          <SplitBar
-            className="mt-4"
-            label="Your listings by stage"
-            parts={[
-              {
-                label:
-                  needsYou.length > 0 ? (
-                    <Link
-                      href="/dashboard/listings#waiting"
-                      className="relative rounded-sm font-medium text-fg underline decoration-line-strong underline-offset-4 transition-colors duration-150 hover:decoration-fg pointer-coarse:after:absolute pointer-coarse:after:-inset-3 pointer-coarse:after:content-['']"
-                    >
-                      Waiting on you
-                    </Link>
-                  ) : (
-                    "Waiting on you"
-                  ),
-                value: needsYou.length,
-                tone: "primary",
-              },
-              { label: "On sale", value: onSale.length, tone: "verified" },
-              { label: "Not live yet", value: inProgress.length, tone: "info" },
-              { label: "Sold", value: archive.length, tone: "muted" },
-            ]}
-          />
-        </Card>
+        <>
+          <FilterBar label="Your listings by stage" className="mb-5">
+            {LISTING_TABS.map((name) => (
+              <FilterLink
+                key={name}
+                href={`/dashboard/listings?tab=${name}`}
+                active={tab === name}
+                count={counts[name]}
+                tone={name === "yours" ? "primary" : "neutral"}
+              >
+                {TAB_LABEL[name]}
+              </FilterLink>
+            ))}
+          </FilterBar>
+
+          {groups[tab].length > 0 ? (
+            <>
+              <List>
+                {groups[tab].map((listing) => (
+                  <ListingRow
+                    key={listing.id}
+                    listing={listing}
+                    needsYou={tab === "yours"}
+                  />
+                ))}
+              </List>
+              {tab === "sold" && archive.length > ARCHIVE_SHOWN ? (
+                <p className="mt-3 text-xs text-subtle">
+                  The {ARCHIVE_SHOWN} most recent of {archive.length}.
+                </p>
+              ) : null}
+            </>
+          ) : (
+            <p className="rounded-card border border-dashed border-line px-4 py-8 text-center text-sm text-muted">
+              {TAB_EMPTY[tab]}
+            </p>
+          )}
+        </>
       )}
-
-      {needsYou.length > 0 ? (
-        <Section
-          id="waiting"
-          title="Waiting on you"
-          info="These will not move until you act."
-          count={needsYou.length}
-          tone="primary"
-          className="scroll-mt-24"
-        >
-          <List>
-            {needsYou.map((listing) => (
-              <ListingRow key={listing.id} listing={listing} needsYou />
-            ))}
-          </List>
-        </Section>
-      ) : null}
-
-      {onSale.length > 0 ? (
-        <Section
-          title="On sale"
-          info="Live listings are visible to buyers. A paused one keeps its place and can go back up any time."
-          count={onSale.length}
-        >
-          <List>
-            {onSale.map((listing) => (
-              <ListingRow key={listing.id} listing={listing} />
-            ))}
-          </List>
-        </Section>
-      ) : null}
-
-      {inProgress.length > 0 ? (
-        <Section
-          title="Not live yet"
-          info="Drafts are private. Anything in review is with a moderator."
-          count={inProgress.length}
-        >
-          <List>
-            {inProgress.map((listing) => (
-              <ListingRow key={listing.id} listing={listing} />
-            ))}
-          </List>
-        </Section>
-      ) : null}
-
-      {archive.length > 0 ? (
-        <Section
-          title="Sold"
-          description={
-            archive.length > ARCHIVE_SHOWN
-              ? `The ${ARCHIVE_SHOWN} most recent of ${archive.length}.`
-              : undefined
-          }
-          count={archive.length}
-        >
-          <List>
-            {archive.slice(0, ARCHIVE_SHOWN).map((listing) => (
-              <ListingRow key={listing.id} listing={listing} />
-            ))}
-          </List>
-        </Section>
-      ) : null}
     </>
   );
 }
