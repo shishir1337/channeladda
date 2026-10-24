@@ -33,13 +33,32 @@ const tagStyles = {
 export function ListingCard({
   listing,
   priority,
+  phoneRow = false,
   className,
 }: {
   listing: Listing;
   /** Skip lazy-loading for cards above the fold. */
   priority?: boolean;
+  /**
+   * In a list down the page, a phone shows the listing as one compact row:
+   * a full card there was a whole screen per listing, so somebody browsing
+   * saw one or two at a time. Off in swipe rows, where cards sit side by side.
+   */
+  phoneRow?: boolean;
   className?: string;
 }) {
+  if (phoneRow) {
+    return (
+      <>
+        <PhoneRow listing={listing} priority={priority} className="sm:hidden" />
+        <ListingCard
+          listing={listing}
+          priority={priority}
+          className={cn("max-sm:hidden", className)}
+        />
+      </>
+    );
+  }
   const platform = platformMap[listing.platform];
   const PlatformIcon = platform.icon;
   const tag = listing.tag ? tagStyles[listing.tag] : null;
@@ -185,6 +204,108 @@ export function ListingCard({
             </span>
           </p>
         </div>
+      </div>
+    </article>
+  );
+}
+
+/**
+ * The listing as one row, for a phone: the account's picture, who it is,
+ * the three numbers on one line, and the price. About a quarter of the
+ * card's height, so four or five fit on a screen.
+ */
+function PhoneRow({
+  listing,
+  priority,
+  className,
+}: {
+  listing: Listing;
+  priority?: boolean;
+  className?: string;
+}) {
+  const platform = platformMap[listing.platform];
+  const PlatformIcon = platform.icon;
+  const tag = listing.tag ? tagStyles[listing.tag] : null;
+  const revenue = revenueLine(listing);
+
+  return (
+    <article
+      className={cn(
+        "group relative flex gap-3 rounded-card border border-line bg-surface p-3 transition-colors duration-150 active:bg-surface-2",
+        className,
+      )}
+    >
+      <div className="relative shrink-0 self-start">
+        {/* biome-ignore lint/performance/noImgElement: static SVG avatar, as on the card. */}
+        <img
+          src={listing.avatarUrl}
+          alt=""
+          width={64}
+          height={64}
+          loading={priority ? "eager" : "lazy"}
+          decoding="async"
+          className="size-16 rounded-xl bg-surface-2 object-cover"
+        />
+        <span
+          className="absolute -right-1.5 -bottom-1.5 flex size-6 items-center justify-center rounded-md border-2 border-surface bg-surface-2"
+          style={{ color: platform.tint }}
+        >
+          <PlatformIcon className="size-3.5" />
+          <span className="sr-only">{platform.name}</span>
+        </span>
+      </div>
+
+      <div className="min-w-0 flex-1">
+        <div className="flex min-w-0 items-center gap-1.5 pr-10">
+          <h3 className="min-w-0 truncate text-[0.9375rem] font-semibold text-fg">
+            <Link
+              href={`/listing/${listing.slug}`}
+              className="after:absolute after:inset-0 after:rounded-card focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-primary"
+            >
+              {listing.handle}
+            </Link>
+          </h3>
+          {listing.ownershipVerified ? (
+            <BadgeCheckIcon
+              aria-label="Ownership verified"
+              className="size-4 shrink-0 text-verified"
+            />
+          ) : null}
+        </div>
+        <p className="truncate pr-10 text-[0.8125rem] text-subtle">
+          {listing.niche} · {listing.country}
+        </p>
+        <p className="tnum mt-1 truncate text-[0.8125rem] text-muted">
+          <span className="font-medium text-fg">
+            {formatCompact(listing.audience)}
+          </span>{" "}
+          {platform.metricLabel.toLowerCase()} · {listing.engagement}% ·{" "}
+          {listing.ageYears} yr
+        </p>
+        <div className="mt-1.5 flex min-w-0 items-center gap-2">
+          <Price
+            usd={listing.price}
+            className="tnum text-base font-semibold text-fg"
+          />
+          {revenue.kind === "revenue" ? (
+            <span className="truncate text-xs text-muted">
+              <Price usd={revenue.usd} compact /> a month
+            </span>
+          ) : null}
+          {tag ? (
+            <Badge variant={tag.variant} className="ml-auto shrink-0">
+              {tag.label}
+            </Badge>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="absolute top-1 right-1">
+        <FavoriteButton
+          listingId={listing.id}
+          handle={listing.handle}
+          on="surface"
+        />
       </div>
     </article>
   );

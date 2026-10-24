@@ -78,10 +78,10 @@ export function BrowseView({
             />
           ) : (
             <>
-              <ul className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              <ul className="mt-6 grid grid-cols-1 gap-2.5 sm:grid-cols-2 sm:gap-4 xl:grid-cols-3">
                 {result.items.map((listing, i) => (
                   <li key={listing.id}>
-                    <ListingCard listing={listing} priority={i < 3} />
+                    <ListingCard listing={listing} priority={i < 3} phoneRow />
                   </li>
                 ))}
               </ul>

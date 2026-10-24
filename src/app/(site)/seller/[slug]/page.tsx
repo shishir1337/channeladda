@@ -167,10 +167,10 @@ export default async function SellerPage({
           </h2>
 
           {active.length ? (
-            <ul className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            <ul className="mt-6 grid grid-cols-1 gap-2.5 sm:grid-cols-2 sm:gap-3 xl:grid-cols-3">
               {active.map((listing, i) => (
                 <li key={listing.id}>
-                  <ListingCard listing={listing} priority={i < 3} />
+                  <ListingCard listing={listing} priority={i < 3} phoneRow />
                 </li>
               ))}
             </ul>
