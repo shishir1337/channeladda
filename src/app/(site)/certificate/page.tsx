@@ -30,7 +30,7 @@ export default async function CertificateIndexPage({
         title="Check a certificate"
         description="Every completed deal comes with a certificate of transfer. Type its code to see if it is genuine."
       />
-      <Section className="pt-0 sm:pt-0">
+      <Section className="pt-6 sm:pt-8">
         <Container narrow>
           <form
             action="/certificate"

@@ -51,7 +51,7 @@ export default async function CertificateCheckPage({
         ]}
         title="Check a certificate"
       />
-      <Section className="pt-0 sm:pt-0">
+      <Section className="pt-6 sm:pt-8">
         <Container narrow>
           {certificate ? (
             <div className="max-w-2xl overflow-hidden rounded-panel border border-verified/30 bg-surface">
