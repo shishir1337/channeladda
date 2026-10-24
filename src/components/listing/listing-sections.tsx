@@ -38,7 +38,7 @@ export function Panel({
   return (
     <section
       id={id}
-      className="scroll-mt-24 rounded-card border border-line bg-surface p-5 sm:p-6"
+      className="scroll-mt-24 rounded-card border border-line bg-surface p-4 sm:p-6"
     >
       <h2 className="flex items-center gap-2 text-base font-semibold text-fg">
         {icon}
@@ -114,7 +114,7 @@ export function MonetizationNotice({ listing }: { listing: Listing }) {
   if (listing.monthlyRevenue <= 0) return null;
 
   return (
-    <div className="flex gap-3 rounded-card border border-primary/30 bg-primary-soft/70 p-5 sm:p-6">
+    <div className="flex gap-3 rounded-card border border-primary/30 bg-primary-soft/70 p-4 sm:p-6">
       <TriangleAlertIcon
         aria-hidden="true"
         className="mt-0.5 size-4.5 shrink-0 text-primary-text"

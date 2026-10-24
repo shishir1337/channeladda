@@ -889,7 +889,7 @@ export function AppShell({
             <main
               id="main"
               className={cn(
-                "px-4 pt-6 sm:px-6 lg:px-10 lg:pt-8 lg:pb-20",
+                "px-3 pt-5 sm:px-6 sm:pt-6 lg:px-10 lg:pt-8 lg:pb-20",
                 // Room for the tab bar and the phone's home indicator — or,
                 // in an open chat, for the message box pinned in its place.
                 showTabs || isThread(pathname) ? "pb-28" : "pb-16",

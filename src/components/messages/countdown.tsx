@@ -2,6 +2,7 @@
 
 import { HourglassIcon } from "lucide-react";
 import { Fragment, useEffect, useState } from "react";
+import { iconText } from "@/components/ui/icon-hue";
 import { countdownParts, formatCountdown } from "@/lib/deal-waits";
 import { cn } from "@/lib/utils";
 
@@ -57,7 +58,10 @@ export function WaitCountdown({
     >
       <div className="flex items-baseline justify-between gap-3">
         <p className="flex min-w-0 items-center gap-1.5 text-xs font-medium text-muted">
-          <HourglassIcon aria-hidden="true" className="size-3.5 shrink-0" />
+          <HourglassIcon
+            aria-hidden="true"
+            className={cn("size-3.5 shrink-0", iconText(HourglassIcon))}
+          />
           <span className="truncate">{label}</span>
         </p>
         <time

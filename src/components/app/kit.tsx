@@ -338,7 +338,7 @@ export function Card({
       className={cn(
         "rounded-card border shadow-xs",
         CARD_TONE[tone],
-        padded && "p-4 sm:p-5",
+        padded && "p-3.5 sm:p-5",
         className,
       )}
     >
@@ -372,7 +372,7 @@ export function CardHeader({
   return (
     <div
       className={cn(
-        "flex items-start justify-between gap-3 border-b border-line px-4 py-3 sm:px-5",
+        "flex items-start justify-between gap-3 border-b border-line px-3.5 py-3 sm:px-5",
         className,
       )}
     >
@@ -420,7 +420,7 @@ export function CardBody({
   children: ReactNode;
   className?: string;
 }) {
-  return <div className={cn("p-4 sm:p-5", className)}>{children}</div>;
+  return <div className={cn("p-3.5 sm:p-5", className)}>{children}</div>;
 }
 
 export function CardFooter({
@@ -433,7 +433,7 @@ export function CardFooter({
   return (
     <div
       className={cn(
-        "rounded-b-[inherit] border-t border-line bg-surface-2/50 px-4 py-3 text-[0.8125rem] text-muted sm:px-5",
+        "rounded-b-[inherit] border-t border-line bg-surface-2/50 px-3.5 py-3 text-[0.8125rem] text-muted sm:px-5",
         className,
       )}
     >
@@ -539,7 +539,7 @@ export function Callout({
     <div
       role={role}
       className={cn(
-        "flex flex-col gap-3 rounded-card border px-4 py-3.5 sm:flex-row sm:items-center",
+        "flex flex-col gap-3 rounded-card border px-3.5 py-3.5 sm:flex-row sm:items-center",
         style.box,
         className,
       )}
@@ -647,7 +647,7 @@ export function AllClear({
   return (
     <div
       className={cn(
-        "flex items-start gap-3 rounded-card border border-line bg-surface px-4 py-3.5 shadow-xs",
+        "flex items-start gap-3 rounded-card border border-line bg-surface px-3.5 py-3.5 shadow-xs",
         className,
       )}
     >
@@ -741,7 +741,7 @@ export function Stat({
   return (
     <div
       className={cn(
-        "group relative flex min-w-0 flex-col rounded-card border border-line bg-surface p-4 shadow-xs",
+        "group relative flex min-w-0 flex-col rounded-card border border-line bg-surface p-3.5 shadow-xs sm:p-4",
         href &&
           "transition-[border-color,background-color] duration-150 hover:border-line-strong hover:bg-surface-2/40 has-[a:focus-visible]:outline-2 has-[a:focus-visible]:outline-offset-2 has-[a:focus-visible]:outline-ring",
         className,
@@ -839,7 +839,7 @@ export function ListItem({
   padded?: boolean;
   className?: string;
 }) {
-  const pad = padded && "px-4 py-3 sm:px-5";
+  const pad = padded && "px-3.5 py-3 sm:px-5";
   return (
     <li className={cn("relative", !href && pad, className)}>
       {flag ? (
@@ -1030,7 +1030,7 @@ export function FilterBar({
     <nav
       aria-label={label}
       className={cn(
-        "no-scrollbar -mx-4 overflow-x-auto border-b border-line px-4 sm:mx-0 sm:px-0",
+        "no-scrollbar -mx-3 overflow-x-auto border-b border-line px-3 sm:mx-0 sm:px-0",
         className,
       )}
     >
@@ -1479,7 +1479,7 @@ export function Disclosure({
       <summary
         className={cn(
           "flex min-h-11 cursor-pointer list-none items-center gap-2 text-[0.8125rem] font-medium text-muted transition-colors select-none hover:text-fg pointer-fine:min-h-9 [&::-webkit-details-marker]:hidden",
-          !bare && "justify-between px-4 sm:px-5",
+          !bare && "justify-between px-3.5 sm:px-5",
           bare && "w-fit",
         )}
       >
@@ -1492,7 +1492,7 @@ export function Disclosure({
       <div
         className={cn(
           "animate-app-in text-[0.8125rem] leading-relaxed text-muted",
-          !bare && "border-t border-line px-4 py-3.5 sm:px-5",
+          !bare && "border-t border-line px-3.5 py-3.5 sm:px-5",
           bare && "pt-1 pb-2",
         )}
       >
