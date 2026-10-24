@@ -225,9 +225,9 @@ export default async function SellerPage({
             <h2 className="text-xl font-semibold tracking-[-0.02em] sm:text-2xl">
               What buyers say
             </h2>
-            <p className="mt-1.5 flex items-center gap-2 text-sm text-muted">
+            <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted">
               <Stars rating={reviews.average} />
-              <span className="tnum font-medium text-fg">
+              <span className="tnum font-medium whitespace-nowrap text-fg">
                 {reviews.average?.toFixed(1)} out of 5
               </span>
               <span>
