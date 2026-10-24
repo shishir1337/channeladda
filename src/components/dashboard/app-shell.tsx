@@ -15,18 +15,27 @@ import {
   MessageSquareIcon,
   PanelLeftIcon,
   PlusIcon,
+  SearchIcon,
   SettingsIcon,
   ShieldCheckIcon,
   StoreIcon,
+  UserRoundIcon,
   UsersIcon,
 } from "lucide-react";
 import Link, { useLinkStatus } from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { type ShellUser, UserMenu } from "@/components/app/user-menu";
+import {
+  Avatar,
+  type ShellUser,
+  SignOutButton,
+  UserMenu,
+} from "@/components/app/user-menu";
 import { ChannelAddaLogo } from "@/components/icons/brand-icons";
-import { ThemeToggle } from "@/components/site/theme-toggle";
+import { ThemeRow, ThemeToggle } from "@/components/site/theme-toggle";
 import { WalletChip } from "@/components/site/wallet-balance";
+import { Button } from "@/components/ui/button";
+import { HUE_TEXT, type Hue, hueOf } from "@/components/ui/icon-hue";
 import {
   Sheet,
   SheetContent,
@@ -55,39 +64,29 @@ const ICONS = {
   people: UsersIcon,
   support: LifeBuoyIcon,
   dispute: GavelIcon,
+  browse: SearchIcon,
+  profile: UserRoundIcon,
 } as const;
 
 export type NavIcon = keyof typeof ICONS;
 
 /**
  * Each place has its own colour, so the icons are told apart at a glance
- * rather than read: the owner found every icon the same grey. The rail is
- * always dark, so these are the shades that read on dark; the phone's tab
- * bar uses `TAB_TINT` for its light and dark pages.
+ * rather than read: the owner found every icon the same grey. The colour is
+ * the icon's own (`@/components/ui/icon-hue`), so Wallet is the same green
+ * here as on every page; these are the places whose icon is a control (a
+ * plus, a magnifier) or shares a colour with a neighbour in the rail.
  */
-const RAIL_TINT: Record<NavIcon, string> = {
-  overview: "text-sky-400",
-  transfer: "text-amber-400",
-  offers: "text-violet-400",
-  messages: "text-blue-400",
-  listings: "text-emerald-400",
-  new: "text-amber-300",
-  money: "text-green-400",
-  bell: "text-orange-400",
-  settings: "text-teal-400",
-  review: "text-cyan-400",
-  staff: "text-indigo-400",
-  people: "text-pink-400",
-  support: "text-lime-400",
-  dispute: "text-red-400",
+const NAV_HUE: Partial<Record<NavIcon, Hue>> = {
+  new: "yellow",
+  browse: "cyan",
+  review: "cyan",
+  staff: "indigo",
 };
 
-const TAB_TINT: Partial<Record<NavIcon, string>> = {
-  overview: "text-sky-600 dark:text-sky-400",
-  transfer: "text-amber-600 dark:text-amber-400",
-  messages: "text-blue-600 dark:text-blue-400",
-  money: "text-green-600 dark:text-green-400",
-};
+function tintOf(icon: NavIcon): string {
+  return HUE_TEXT[NAV_HUE[icon] ?? hueOf(ICONS[icon]) ?? "sky"];
+}
 
 export type NavItem = {
   label: string;
@@ -233,7 +232,7 @@ function NavLink({
         >
           <NavIconSlot
             icon={ICONS[item.icon]}
-            tint={RAIL_TINT[item.icon]}
+            tint={tintOf(item.icon)}
             active={active}
           />
           {/* Still the link's name when folded: faded, not removed. */}
@@ -352,7 +351,7 @@ function Wordmark({
     <Link
       href={href}
       className="flex h-11 min-w-0 flex-1 items-center gap-2 overflow-hidden rounded-md px-1 pointer-fine:h-9"
-      aria-label={staff ? "Channel Adda staff area" : "Channel Adda dashboard"}
+      aria-label={staff ? "Channel Adda staff area" : "Channel Adda website"}
     >
       <ChannelAddaLogo className="size-7 shrink-0" />
       <span
@@ -443,7 +442,7 @@ function TabBar({
                 <span className="relative">
                   <Icon
                     aria-hidden="true"
-                    className={cn("size-5", active && TAB_TINT[item.icon])}
+                    className={cn("size-5", active && tintOf(item.icon))}
                   />
                   {item.waiting ? <TabBadge count={item.waiting} /> : null}
                 </span>
@@ -488,6 +487,143 @@ function TabBadge({ count }: { count: number }) {
     >
       {count > 9 ? "9+" : count}
     </span>
+  );
+}
+
+type Crumb = { label: string; href?: string };
+
+/** What one page below a section is called: "Deals › Deal". */
+const CHILD: Record<string, string> = {
+  "/dashboard/deals": "Deal",
+  "/dashboard/listings": "Listing",
+  "/dashboard/messages": "Chat",
+  "/admin/deals": "Deal",
+  "/admin/listings": "Listing",
+  "/admin/messages": "Chat",
+  "/admin/users": "Member",
+  "/admin/disputes": "Dispute",
+  "/admin/support": "Ticket",
+};
+
+/**
+ * Where you are, as links back up: Home › Deals › Deal. The section is a
+ * link once you are inside it, so the way back is the word you just tapped.
+ */
+export function trailFor(
+  pathname: string,
+  home: { href: string; label: string },
+  item: Pick<NavItem, "href" | "label"> | undefined,
+  page: string,
+): Crumb[] {
+  if (!item) return [{ label: page }];
+  if (item.href === home.href) return [{ label: item.label }];
+  const crumbs: Crumb[] = [{ label: home.label, href: home.href }];
+  if (pathname === item.href) return [...crumbs, { label: item.label }];
+  return [
+    ...crumbs,
+    { label: item.label, href: item.href },
+    { label: CHILD[item.href] ?? "Details" },
+  ];
+}
+
+/**
+ * The trail in the top bar. A phone has room for one word, so it names the
+ * section — "Deals" on a deal, as a link back to the list — and leaves the
+ * way back from a page to the page's own "All deals" link.
+ */
+function Trail({ crumbs }: { crumbs: Crumb[] }) {
+  // The crumb a phone shows: the section on a page inside one, else the page.
+  const phone = crumbs.length === 3 ? 1 : crumbs.length - 1;
+  return (
+    <nav
+      aria-label="You are here"
+      className="flex min-w-0 flex-1 items-center gap-1 text-sm"
+    >
+      {crumbs.map((crumb, index) => {
+        const last = index === crumbs.length - 1;
+        return (
+          <span
+            key={crumb.label}
+            className={cn(
+              "flex min-w-0 items-center gap-1",
+              !last && "shrink-0",
+              index !== phone && "max-lg:hidden",
+            )}
+          >
+            {index > 0 ? (
+              <ChevronRightIcon
+                aria-hidden="true"
+                className="size-3.5 shrink-0 text-subtle/70 max-lg:hidden"
+              />
+            ) : null}
+            {last || !crumb.href ? (
+              <span
+                aria-current={last ? "page" : undefined}
+                className="truncate font-medium text-fg"
+              >
+                {crumb.label}
+              </span>
+            ) : (
+              <Link
+                href={crumb.href}
+                className="inline-flex min-h-11 items-center rounded-md px-1 text-muted transition-colors duration-150 hover:text-fg max-lg:-ml-1 max-lg:font-medium max-lg:text-fg pointer-fine:min-h-8"
+              >
+                {crumb.label}
+              </Link>
+            )}
+          </span>
+        );
+      })}
+    </nav>
+  );
+}
+
+/**
+ * Who you are, at the top of the phone's menu, with the way to change it.
+ * The owner found the profile hard to reach; this is the first thing the
+ * menu shows.
+ */
+function ProfileCard({
+  user,
+  area,
+  onNavigate,
+}: {
+  user: ShellUser;
+  area: "member" | "staff";
+  onNavigate: () => void;
+}) {
+  return (
+    <div className="mx-3 mb-2 rounded-lg border border-line bg-surface-2 p-3">
+      <div className="flex items-center gap-3">
+        <Avatar
+          name={user.name}
+          image={user.image}
+          className="size-11 text-sm"
+        />
+        <div className="min-w-0">
+          <p className="truncate text-[0.9375rem] font-semibold text-fg">
+            {user.name}
+          </p>
+          <p className="truncate text-xs text-subtle">{user.email}</p>
+        </div>
+      </div>
+      {area === "member" ? (
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <Button asChild size="sm" variant="secondary">
+            <Link href="/dashboard/profile" onClick={onNavigate}>
+              Edit profile
+            </Link>
+          </Button>
+          {user.slug ? (
+            <Button asChild size="sm" variant="ghost">
+              <Link href={`/seller/${user.slug}`} onClick={onNavigate}>
+                Public page
+              </Link>
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -580,6 +716,9 @@ export function AppShell({
   });
 
   const home = staff ? "/admin" : "/dashboard";
+  // The logo goes to the website, as it does on every site; the staff
+  // area's goes to the staff desk, which is its home.
+  const site = staff ? "/admin" : "/";
 
   // The header names where you are, derived from the nav rather than passed
   // down by every page — one source of truth, and it cannot drift.
@@ -596,6 +735,15 @@ export function AppShell({
 
   const area = staff ? "staff" : "member";
   const page = current?.item.label ?? (staff ? "Staff" : "Your account");
+  const homeItem = groups
+    .flatMap((group) => group.items)
+    .find((item) => item.href === home);
+  const crumbs = trailFor(
+    pathname,
+    { href: home, label: homeItem?.label ?? "Home" },
+    current?.item,
+    page,
+  );
 
   const showTabs = tabs !== undefined && !isThread(pathname);
   // What "More" holds that is waiting: everything not already on a tab.
@@ -633,7 +781,7 @@ export function AppShell({
             )}
           >
             <div className="flex h-14 shrink-0 items-center px-3">
-              <Wordmark collapsed={collapsed} href={home} staff={staff} />
+              <Wordmark collapsed={collapsed} href={site} staff={staff} />
             </div>
 
             <div className="no-scrollbar flex-1 overflow-x-hidden overflow-y-auto px-2.5 pt-2 pb-4">
@@ -657,34 +805,41 @@ export function AppShell({
             )}
           >
             <header className="sticky top-0 z-20 flex h-14 items-center gap-2 border-b border-line bg-bg/80 px-3 backdrop-blur-md backdrop-saturate-150 sm:px-5 lg:px-6">
-              <SheetTrigger asChild>
-                <button
-                  type="button"
-                  aria-label={
-                    waiting > 0
-                      ? `Open the menu — ${waiting} waiting on you`
-                      : "Open the menu"
-                  }
-                  // With the tab bar, "More" opens the menu; a second
-                  // button up here only competed with the page title.
-                  className={cn(
-                    iconButton,
-                    "relative lg:hidden",
-                    tabs !== undefined && "hidden",
-                  )}
+              {/* On a phone the mark is the way back to the website, as a
+                  logo is on every site; the tab bar's "More" is the menu.
+                  The staff area, with no tab bar, keeps its menu button. */}
+              {tabs !== undefined ? (
+                <Link
+                  href={site}
+                  aria-label="Channel Adda website"
+                  className={cn(iconButton, "-ml-1.5 lg:hidden")}
                 >
-                  <PanelLeftIcon
-                    aria-hidden="true"
-                    className="size-[1.125rem]"
-                  />
-                  {waiting > 0 ? (
-                    <span
+                  <ChannelAddaLogo className="size-7" />
+                </Link>
+              ) : (
+                <SheetTrigger asChild>
+                  <button
+                    type="button"
+                    aria-label={
+                      waiting > 0
+                        ? `Open the menu — ${waiting} waiting on you`
+                        : "Open the menu"
+                    }
+                    className={cn(iconButton, "relative lg:hidden")}
+                  >
+                    <PanelLeftIcon
                       aria-hidden="true"
-                      className="absolute top-2 right-2 size-1.5 rounded-full bg-primary ring-2 ring-bg pointer-fine:top-1 pointer-fine:right-1"
+                      className="size-[1.125rem]"
                     />
-                  ) : null}
-                </button>
-              </SheetTrigger>
+                    {waiting > 0 ? (
+                      <span
+                        aria-hidden="true"
+                        className="absolute top-2 right-2 size-1.5 rounded-full bg-primary ring-2 ring-bg pointer-fine:top-1 pointer-fine:right-1"
+                      />
+                    ) : null}
+                  </button>
+                </SheetTrigger>
+              )}
               <button
                 type="button"
                 onClick={toggle}
@@ -704,44 +859,25 @@ export function AppShell({
 
               <span
                 aria-hidden="true"
-                className="mx-1 hidden h-4 w-px bg-line-strong/70 sm:block"
+                className="mx-1 hidden h-4 w-px bg-line-strong/70 lg:block"
               />
 
-              <nav
-                aria-label="You are here"
-                className="flex min-w-0 flex-1 items-center gap-1.5 text-sm"
-              >
-                {current?.group.label ? (
-                  <>
-                    <span className="hidden shrink-0 text-muted sm:inline">
-                      {current.group.label}
-                    </span>
-                    <ChevronRightIcon
-                      aria-hidden="true"
-                      className="hidden size-3.5 shrink-0 text-subtle/70 sm:block"
-                    />
-                  </>
-                ) : null}
-                <span
-                  aria-current="page"
-                  className="truncate font-medium text-fg"
-                >
-                  {page}
-                </span>
-              </nav>
+              <Trail crumbs={crumbs} />
 
               <div className="flex shrink-0 items-center gap-0.5">
                 {balanceCents !== undefined ? (
                   <WalletChip
                     cents={balanceCents}
-                    className="hidden rounded-md px-2.5 text-[0.8125rem] hover:bg-black/[0.05] sm:inline-flex dark:hover:bg-white/[0.06] pointer-fine:h-8"
+                    className="rounded-md px-2 text-[0.8125rem] hover:bg-black/[0.05] sm:px-2.5 dark:hover:bg-white/[0.06] pointer-fine:h-8"
                   />
                 ) : null}
                 {bell}
+                {/* Not on a phone: choosing a theme is a once-in-a-while
+                    thing, and lives in the menu there. */}
                 <ThemeToggle
                   className={cn(
                     iconButton,
-                    "border-0 hover:border-0 [&_svg]:size-4",
+                    "hidden border-0 hover:border-0 lg:inline-flex [&_svg]:size-4",
                   )}
                 />
                 <div className="lg:hidden">
@@ -791,18 +927,30 @@ export function AppShell({
               Move between the parts of your account.
             </SheetDescription>
             <div className="flex h-14 shrink-0 items-center px-3 pr-12">
-              <Wordmark collapsed={false} href={home} staff={staff} />
+              <Wordmark collapsed={false} href={site} staff={staff} />
             </div>
-            <div className="flex-1 overflow-y-auto px-3 pt-2 pb-4">
-              <NavList
-                groups={groups}
-                currentHref={current?.item.href}
-                collapsed={false}
+            <div className="flex-1 overflow-y-auto pt-1 pb-4">
+              <ProfileCard
+                user={user}
+                area={area}
                 onNavigate={() => setDrawerOpen(false)}
               />
+              <div className="px-3">
+                <NavList
+                  groups={groups}
+                  currentHref={current?.item.href}
+                  collapsed={false}
+                  onNavigate={() => setDrawerOpen(false)}
+                />
+              </div>
             </div>
-            <div className="shrink-0 border-t border-line p-2">
-              <UserMenu user={user} area={area} />
+            <div className="flex shrink-0 flex-col gap-1 border-t border-line p-2">
+              <ThemeRow />
+              {area === "staff" ? (
+                <UserMenu user={user} area={area} />
+              ) : (
+                <SignOutButton />
+              )}
             </div>
           </SheetContent>
         </div>

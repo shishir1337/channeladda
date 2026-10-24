@@ -52,6 +52,8 @@ function shellUser(user: CurrentUser) {
     email: user.email,
     emailVerified: user.emailVerified,
     role: user.role,
+    image: user.image,
+    slug: user.slug,
   };
 }
 
@@ -135,6 +137,11 @@ export default async function DashboardLayout({ children }: LayoutProps<"/">) {
       label: "Account",
       items: [
         {
+          label: "Profile",
+          href: "/dashboard/profile",
+          icon: "profile",
+        },
+        {
           label: "Notifications",
           href: "/dashboard/notifications",
           icon: "bell",
@@ -147,11 +154,23 @@ export default async function DashboardLayout({ children }: LayoutProps<"/">) {
         },
       ],
     },
+    {
+      // The way back to the website, said in words: the logo does it too,
+      // but nobody should have to know that.
+      label: "Website",
+      items: [
+        { label: "Browse accounts", href: "/browse", icon: "browse" },
+        { label: "Help centre", href: "/help", icon: "support" },
+      ],
+    },
   ];
 
   // The phone's tab bar: where members go most. Everything else is in "More".
+  // Browse, not Wallet: the balance is in the top bar on every screen, and
+  // the marketplace was the one place a phone could not get back to.
   const tabs: NavItem[] = [
     { label: "Home", href: "/dashboard", icon: "overview" },
+    { label: "Browse", href: "/browse", icon: "browse" },
     {
       label: "Deals",
       href: "/dashboard/deals",
@@ -164,7 +183,6 @@ export default async function DashboardLayout({ children }: LayoutProps<"/">) {
       icon: "messages",
       waiting: unread,
     },
-    { label: "Wallet", href: "/dashboard/wallet", icon: "money" },
   ];
 
   return (

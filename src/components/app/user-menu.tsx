@@ -9,9 +9,11 @@ import {
   MailWarningIcon,
   ShieldCheckIcon,
   ShieldIcon,
+  UserRoundIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { ThemeMenuItem } from "@/components/site/theme-toggle";
 import { authClient } from "@/lib/auth-client";
 import { cn } from "@/lib/utils";
 
@@ -20,6 +22,10 @@ export type ShellUser = {
   email: string;
   emailVerified: boolean;
   role: string;
+  /** Their profile photo, when they have added one. */
+  image?: string | null;
+  /** Their public page's handle, once they have one. */
+  slug?: string | null;
 };
 
 const ROLE_LABEL: Record<string, string> = {
@@ -42,17 +48,34 @@ function initialsOf(name: string) {
 
 export function Avatar({
   name,
+  image,
   className,
 }: {
   name: string;
+  image?: string | null;
   className?: string;
 }) {
+  const shape = cn(
+    "inline-flex size-7 shrink-0 items-center justify-center rounded-full ring-1 ring-line ring-inset",
+    className,
+  );
+  if (image) {
+    return (
+      // biome-ignore lint/performance/noImgElement: a small square of the member's own upload, served from our origin.
+      <img
+        src={image}
+        alt=""
+        aria-hidden="true"
+        className={cn(shape, "bg-surface-2 object-cover")}
+      />
+    );
+  }
   return (
     <span
       aria-hidden="true"
       className={cn(
-        "inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-linear-to-b from-surface-2 to-surface-3 text-[0.6875rem] font-semibold text-fg ring-1 ring-line ring-inset",
-        className,
+        shape,
+        "bg-linear-to-b from-surface-2 to-surface-3 text-[0.6875rem] font-semibold text-fg",
       )}
     >
       {initialsOf(name)}
@@ -97,7 +120,7 @@ export function UserMenu({
           variant === "compact" && "size-11 justify-center pointer-fine:size-9",
         )}
       >
-        <Avatar name={user.name} />
+        <Avatar name={user.name} image={user.image} />
         {variant === "sidebar" ? (
           <span
             className={cn(
@@ -132,7 +155,7 @@ export function UserMenu({
           className="z-50 w-60 origin-[var(--radix-dropdown-menu-content-transform-origin)] rounded-lg border border-line bg-surface p-1 shadow-lift data-[state=closed]:animate-pop-out data-[state=open]:animate-pop-in"
         >
           <div className="flex items-center gap-2.5 px-2 py-2">
-            <Avatar name={user.name} className="size-8" />
+            <Avatar name={user.name} image={user.image} className="size-8" />
             <div className="min-w-0">
               <p className="truncate text-[0.8125rem] font-medium text-fg">
                 {user.name}
@@ -175,6 +198,14 @@ export function UserMenu({
           ) : null}
           {area === "member" ? (
             <DropdownMenu.Item asChild>
+              <Link href="/dashboard/profile" className={item}>
+                <UserRoundIcon aria-hidden="true" />
+                Your profile
+              </Link>
+            </DropdownMenu.Item>
+          ) : null}
+          {area === "member" ? (
+            <DropdownMenu.Item asChild>
               <Link href="/dashboard/security" className={item}>
                 <ShieldCheckIcon aria-hidden="true" />
                 Security
@@ -187,22 +218,37 @@ export function UserMenu({
               Marketplace
             </Link>
           </DropdownMenu.Item>
+          <ThemeMenuItem className={item} />
 
           <DropdownMenu.Separator className="-mx-1 my-1 h-px bg-line" />
-          <DropdownMenu.Item
-            className={item}
-            onSelect={async () => {
-              await authClient.signOut();
-              // Refresh so server components drop the signed-in view.
-              router.push("/");
-              router.refresh();
-            }}
-          >
+          <DropdownMenu.Item className={item} onSelect={() => signOut(router)}>
             <LogOutIcon aria-hidden="true" />
             Sign out
           </DropdownMenu.Item>
         </DropdownMenu.Content>
       </DropdownMenu.Portal>
     </DropdownMenu.Root>
+  );
+}
+
+async function signOut(router: ReturnType<typeof useRouter>) {
+  await authClient.signOut();
+  // Refresh so server components drop the signed-in view.
+  router.push("/");
+  router.refresh();
+}
+
+/** The way out, as a row of its own at the foot of the phone's menu. */
+export function SignOutButton() {
+  const router = useRouter();
+  return (
+    <button
+      type="button"
+      onClick={() => signOut(router)}
+      className="flex h-11 w-full cursor-pointer items-center gap-2.5 rounded-md px-3 text-sm text-muted transition-colors duration-150 hover:bg-white/[0.05] hover:text-fg"
+    >
+      <LogOutIcon aria-hidden="true" className="size-4 shrink-0" />
+      Sign out
+    </button>
   );
 }

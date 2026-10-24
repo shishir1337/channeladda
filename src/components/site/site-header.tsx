@@ -9,7 +9,7 @@ import {
 } from "@/components/auth/account-menu";
 import { ChannelAddaLogo } from "@/components/icons/brand-icons";
 import { CurrencySwitcher } from "@/components/site/currency-switcher";
-import { ThemeToggle } from "@/components/site/theme-toggle";
+import { ThemeRow, ThemeToggle } from "@/components/site/theme-toggle";
 import { HeaderWallet } from "@/components/site/wallet-balance";
 import { Button } from "@/components/ui/button";
 import {
@@ -87,8 +87,10 @@ export function SiteHeader() {
             <SearchIcon aria-hidden="true" className="size-[1.15rem]" />
           </Link>
           <CurrencySwitcher className="hidden sm:inline-flex" />
-          <ThemeToggle />
-          <HeaderWallet className="hidden sm:inline-flex" />
+          {/* In the menu on a phone: a theme is chosen once in a while,
+              and the header there has room for what is used every visit. */}
+          <ThemeToggle className="hidden sm:inline-flex" />
+          <HeaderWallet className="px-2 sm:px-3" />
           <AccountMenu className="hidden sm:inline-flex" />
           <Button asChild size="sm" className="hidden sm:inline-flex">
             <Link href="/sell">Sell an account</Link>
@@ -160,6 +162,7 @@ export function SiteHeader() {
                   </p>
                   <CurrencySwitcher fullWidth />
                 </div>
+                <ThemeRow className="-mx-3 w-auto sm:hidden" />
                 <Button asChild size="md">
                   <Link href="/sell">Sell an account</Link>
                 </Button>
