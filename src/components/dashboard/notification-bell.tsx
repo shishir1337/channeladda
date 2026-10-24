@@ -15,6 +15,7 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
+import { iconTile } from "@/components/ui/icon-hue";
 import type { NotificationKind } from "@/generated/prisma/enums";
 import { cn } from "@/lib/utils";
 import { readAll, readOne } from "@/server/actions/notifications";
@@ -168,7 +169,7 @@ export function NotificationBell({
             <div className="px-6 py-10 text-center">
               <span
                 aria-hidden="true"
-                className="mx-auto inline-flex size-9 items-center justify-center rounded-lg border border-line bg-surface text-muted shadow-xs"
+                className={`mx-auto inline-flex size-9 items-center justify-center rounded-lg border ${iconTile(BellIcon)}`}
               >
                 <BellIcon className="size-4" />
               </span>

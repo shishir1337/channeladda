@@ -1,11 +1,11 @@
 import {
-  ArrowUpRightIcon,
+  BanknoteArrowDownIcon,
+  BanknoteArrowUpIcon,
   BanknoteIcon,
   CircleCheckIcon,
   CoinsIcon,
   GemIcon,
   LockIcon,
-  PlusIcon,
   RotateCcwIcon,
   SlidersHorizontalIcon,
   TagIcon,
@@ -32,6 +32,7 @@ import {
   TopUp,
 } from "@/components/dashboard/wallet-panels";
 import { Badge } from "@/components/ui/badge";
+import { iconText } from "@/components/ui/icon-hue";
 import { Price } from "@/components/ui/price";
 import type { LedgerKind } from "@/generated/prisma/enums";
 import { cn } from "@/lib/utils";
@@ -60,7 +61,7 @@ const KINDS: Record<string, KindWords> = {
   DEPOSIT: {
     title: "You added funds",
     meaning: "A top-up you paid in crypto. Your balance is held in US dollars.",
-    icon: PlusIcon,
+    icon: BanknoteArrowDownIcon,
   },
   ESCROW_HOLD: {
     title: "Paid into a deal",
@@ -96,7 +97,7 @@ const KINDS: Record<string, KindWords> = {
     title: "Sent to your payout address",
     meaning:
       "Paid out to the wallet address you gave us. The network fee is taken by the blockchain, not by us.",
-    icon: ArrowUpRightIcon,
+    icon: BanknoteArrowUpIcon,
   },
   ADJUSTMENT: {
     title: "Corrected by Channel Adda",
@@ -190,7 +191,7 @@ export default async function WalletPage({
               <dt className={FIGURE_LABEL}>
                 <WalletIcon
                   aria-hidden="true"
-                  className="size-3.5 shrink-0 text-subtle"
+                  className={`size-3.5 shrink-0 ${iconText(WalletIcon)}`}
                 />
                 Your balance
                 <InfoTip label="About your balance">
@@ -210,7 +211,7 @@ export default async function WalletPage({
                 <dt className={FIGURE_LABEL}>
                   <CoinsIcon
                     aria-hidden="true"
-                    className="size-3.5 shrink-0 text-subtle"
+                    className={`size-3.5 shrink-0 ${iconText(CoinsIcon)}`}
                   />
                   Available to use now
                   <InfoTip label="About what is available">
@@ -400,9 +401,11 @@ export default async function WalletPage({
               return (
                 <ListItem key={entry.id}>
                   <div className="flex items-center gap-3">
+                    {/* Money in is green; money out wears its own icon's
+                        colour — a deal payment, a fee — not an alarm. */}
                     <IconTile
                       icon={EntryIcon}
-                      tone={out ? "neutral" : "verified"}
+                      tone={out ? undefined : "verified"}
                     />
 
                     <div className="min-w-0 flex-1">

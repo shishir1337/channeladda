@@ -12,6 +12,7 @@ import {
 import Link from "next/link";
 import type { ComponentType, ReactNode, SVGProps } from "react";
 import { InfoTip } from "@/components/app/info-tip";
+import { iconText, iconTile } from "@/components/ui/icon-hue";
 import { Price } from "@/components/ui/price";
 import { cn } from "@/lib/utils";
 
@@ -379,7 +380,7 @@ export function CardHeader({
         {IconCmp ? (
           <IconCmp
             aria-hidden="true"
-            className="mt-0.5 size-4 shrink-0 text-subtle"
+            className={cn("mt-0.5 size-4 shrink-0", iconText(IconCmp))}
           />
         ) : null}
         <div className="min-w-0">
@@ -444,11 +445,16 @@ export function CardFooter({
 /** A small square that holds an icon at the start of a row or card. */
 export function IconTile({
   icon: IconCmp,
-  tone = "neutral",
+  tone,
   size = "md",
   className,
 }: {
   icon: Icon;
+  /**
+   * A status colour, when the tile says how something went (money in is
+   * green). Left out, the tile takes the icon's own colour, so the same
+   * icon looks the same on every page; "neutral" asks for grey.
+   */
   tone?: Tone;
   size?: "sm" | "md" | "lg";
   className?: string;
@@ -458,9 +464,11 @@ export function IconTile({
       aria-hidden="true"
       className={cn(
         "inline-flex shrink-0 items-center justify-center border",
-        tone === "neutral"
-          ? "border-line bg-surface text-muted shadow-xs"
-          : SOFT[tone],
+        tone === undefined
+          ? iconTile(IconCmp, "border-line bg-surface text-muted shadow-xs")
+          : tone === "neutral"
+            ? "border-line bg-surface text-muted shadow-xs"
+            : SOFT[tone],
         size === "sm" && "size-7 rounded-md [&_svg]:size-3.5",
         size === "md" && "size-8 rounded-lg [&_svg]:size-4",
         size === "lg" && "size-10 rounded-lg [&_svg]:size-[1.15rem]",
@@ -598,7 +606,7 @@ export function EmptyState({
       <IconTile
         icon={icon}
         size="lg"
-        tone={tone === "success" ? "verified" : "neutral"}
+        tone={tone === "success" ? "verified" : undefined}
       />
       <div className="mt-4 flex items-center justify-center gap-1.5">
         <Title className="text-sm font-semibold tracking-normal text-fg">
@@ -744,7 +752,7 @@ export function Stat({
         {IconCmp ? (
           <IconCmp
             aria-hidden="true"
-            className="size-3.5 shrink-0 text-subtle"
+            className={cn("size-3.5 shrink-0", iconText(IconCmp))}
           />
         ) : null}
         {href ? (

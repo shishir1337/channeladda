@@ -12,6 +12,7 @@ import { type ReactNode, useId, useRef, useState, useTransition } from "react";
 import { Card, CardBody, CardHeader, inputClass } from "@/components/app/kit";
 import { TextField } from "@/components/auth/fields";
 import { Button } from "@/components/ui/button";
+import { iconText } from "@/components/ui/icon-hue";
 import type { UserRole } from "@/generated/prisma/enums";
 import { cn } from "@/lib/utils";
 import { inviteTeammate, revokeInvite } from "@/server/actions/admin-users";
@@ -295,7 +296,7 @@ export function InviteTeammate({
             ) : (
               <LinkIcon
                 aria-hidden="true"
-                className="mt-1 size-3.5 shrink-0 text-subtle"
+                className={`mt-1 size-3.5 shrink-0 ${iconText(LinkIcon)}`}
               />
             )}
             <span>

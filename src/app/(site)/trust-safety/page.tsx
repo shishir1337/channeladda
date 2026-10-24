@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { TrustSafety } from "@/components/home/trust-safety";
 import { Button } from "@/components/ui/button";
+import { iconText } from "@/components/ui/icon-hue";
 import { PageHeader } from "@/components/ui/page-header";
 import { Container, Section, SectionHeading } from "@/components/ui/section";
 
@@ -114,7 +115,7 @@ export default function TrustSafetyPage() {
               <h2 className="flex items-center gap-2.5 text-lg font-semibold">
                 <ScaleIcon
                   aria-hidden="true"
-                  className="size-5 shrink-0 text-subtle"
+                  className={`size-5 shrink-0 ${iconText(ScaleIcon)}`}
                 />
                 Where we draw the line
               </h2>

@@ -327,7 +327,7 @@ function OwnershipChip({ listing }: { listing: SellerListing }) {
   if (listing.status === "DRAFT" || listing.status === "CODE_CHECK")
     return null;
   return (
-    <Badge variant="neutral">
+    <Badge variant="warning">
       <ShieldAlertIcon aria-hidden="true" />
       Ownership not verified
     </Badge>

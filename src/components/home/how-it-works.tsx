@@ -10,6 +10,7 @@ import {
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { iconTile } from "@/components/ui/icon-hue";
 import { Container, Section, SectionHeading } from "@/components/ui/section";
 import { formatRate } from "@/lib/fees";
 import { getFeeSettings } from "@/server/settings";
@@ -132,7 +133,9 @@ export async function HowItWorks() {
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-start gap-3">
-                    <span className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-line bg-surface-2 text-muted">
+                    <span
+                      className={`flex size-10 shrink-0 items-center justify-center rounded-lg border ${iconTile(mode.icon)}`}
+                    >
                       <mode.icon aria-hidden="true" className="size-4.5" />
                     </span>
                     <div>
@@ -175,7 +178,7 @@ export async function HowItWorks() {
                     <li key={point} className="flex gap-2.5 text-sm text-muted">
                       <CheckIcon
                         aria-hidden="true"
-                        className="mt-0.5 size-4 shrink-0 text-fg"
+                        className="mt-0.5 size-4 shrink-0 text-verified"
                       />
                       {point}
                     </li>

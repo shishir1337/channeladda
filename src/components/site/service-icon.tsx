@@ -17,11 +17,16 @@ const iconMap = {
   "arrow-left-right": ArrowLeftRightIcon,
 } as const;
 
+/** The component for a service's icon name. */
+export function serviceIcon(name: string) {
+  return iconMap[name as keyof typeof iconMap] ?? MegaphoneIcon;
+}
+
 /** Resolves a service's icon name to a component in one place. */
 export function ServiceIcon({
   name,
   ...props
 }: { name: string } & SVGProps<SVGSVGElement>) {
-  const Icon = iconMap[name as keyof typeof iconMap] ?? MegaphoneIcon;
+  const Icon = serviceIcon(name);
   return <Icon aria-hidden="true" {...props} />;
 }

@@ -1,5 +1,6 @@
 import { MailIcon } from "lucide-react";
 import { Callout, Card } from "@/components/app/kit";
+import { iconText } from "@/components/ui/icon-hue";
 import type { DealView } from "@/server/deals";
 
 /**
@@ -27,7 +28,7 @@ export function AgentInvite({ deal }: { deal: DealView }) {
         <div className="flex items-center gap-2 border-b border-line px-4 py-3 sm:px-5">
           <MailIcon
             aria-hidden="true"
-            className="size-4 shrink-0 text-subtle"
+            className={`size-4 shrink-0 ${iconText(MailIcon)}`}
           />
           <h2
             id="invite-heading"

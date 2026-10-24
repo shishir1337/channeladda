@@ -1,3 +1,4 @@
+import type { BadgeVariant } from "@/components/ui/badge";
 import type { DealMode, OrderStatus, Platform } from "@/generated/prisma/enums";
 import type { DealActor } from "@/lib/deal-machine";
 
@@ -19,7 +20,7 @@ import type { DealActor } from "@/lib/deal-machine";
  * takes the admin fee and nothing else.
  */
 
-export type StatusTone = "neutral" | "info" | "verified" | "danger";
+export type StatusTone = BadgeVariant;
 
 /**
  * Viewer-neutral on purpose. The label this replaces said "your payment",
@@ -70,16 +71,20 @@ export const STATUS_SHORT: Record<OrderStatus, string> = {
  * so it never has to compete with a status.
  */
 export const STATUS_TONE: Record<OrderStatus, StatusTone> = {
-  AWAITING_PAYMENT: "info",
+  // Waiting on a payment: gold, the colour of "somebody's move".
+  AWAITING_PAYMENT: "primary",
+  AWAITING_BUYER_PAYMENT: "primary",
+  // The seller handing over to us: blue, in progress.
   AGENT_VERIFYING: "info",
   AWAITING_CUSTODY: "info",
-  IN_CUSTODY: "info",
-  AWAITING_BUYER_PAYMENT: "info",
-  AWAITING_HANDOVER: "info",
   AWAITING_RELEASE: "info",
-  COMPLETED: "verified",
-  PAYMENT_EXPIRED: "neutral",
-  CANCELLED: "neutral",
+  // The channel in our hands, on its way to the buyer: violet.
+  IN_CUSTODY: "accent",
+  AWAITING_HANDOVER: "accent",
+  // Endings, each in its own colour.
+  COMPLETED: "success",
+  PAYMENT_EXPIRED: "warning",
+  CANCELLED: "danger",
   RETURNED_TO_SELLER: "neutral",
   REFUNDED: "neutral",
   DISPUTED: "danger",

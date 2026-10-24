@@ -8,8 +8,9 @@ import {
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ServiceIcon } from "@/components/site/service-icon";
+import { ServiceIcon, serviceIcon } from "@/components/site/service-icon";
 import { Button } from "@/components/ui/button";
+import { iconText, iconTile } from "@/components/ui/icon-hue";
 import { PageHeader } from "@/components/ui/page-header";
 import { Price } from "@/components/ui/price";
 import { Container, Section } from "@/components/ui/section";
@@ -56,7 +57,9 @@ export default async function ServicePage({
         ]}
         title={
           <span className="flex flex-wrap items-center gap-3">
-            <span className="flex size-12 shrink-0 items-center justify-center rounded-lg border border-line bg-surface-2 text-muted sm:size-14">
+            <span
+              className={`flex size-12 shrink-0 items-center justify-center rounded-lg border sm:size-14 ${iconTile(serviceIcon(service.icon))}`}
+            >
               <ServiceIcon name={service.icon} className="size-6" />
             </span>
             {service.title}
@@ -81,7 +84,7 @@ export default async function ServicePage({
                   <li key={item} className="flex gap-3 text-[0.9375rem]">
                     <CheckIcon
                       aria-hidden="true"
-                      className="mt-0.5 size-4 shrink-0 text-fg"
+                      className="mt-0.5 size-4 shrink-0 text-verified"
                     />
                     <span className="leading-relaxed text-muted">{item}</span>
                   </li>
@@ -178,7 +181,7 @@ export default async function ServicePage({
                       >
                         <ServiceIcon
                           name={other.icon}
-                          className="size-4 shrink-0 text-subtle"
+                          className={`size-4 shrink-0 ${iconText(serviceIcon(other.icon))}`}
                         />
                         {other.title}
                         <ArrowRightIcon

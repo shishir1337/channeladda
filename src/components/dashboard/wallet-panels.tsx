@@ -1,11 +1,11 @@
 "use client";
 
 import {
-  ArrowUpRightIcon,
+  BanknoteArrowDownIcon,
+  BanknoteArrowUpIcon,
   CheckCircle2Icon,
   Loader2Icon,
   LockIcon,
-  PlusIcon,
   TriangleAlertIcon,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -189,7 +189,7 @@ export function TopUp() {
 
   return (
     <Panel
-      icon={PlusIcon}
+      icon={BanknoteArrowDownIcon}
       title="Add funds"
       info="Top up once and pay for deals without raising a new invoice each time. You pay in crypto; your balance is held in US dollars."
     >
@@ -408,7 +408,7 @@ export function RequestPayout({
 
   return (
     <Panel
-      icon={ArrowUpRightIcon}
+      icon={BanknoteArrowUpIcon}
       title="Withdraw"
       info="Finance checks every payout, normally within one working day. The amount is held against your balance while they do, so it cannot be spent twice."
     >

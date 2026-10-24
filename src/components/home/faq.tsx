@@ -7,6 +7,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
+import { iconTile } from "@/components/ui/icon-hue";
 import { Container, Section } from "@/components/ui/section";
 import { faqs } from "@/data/site";
 
@@ -21,7 +22,9 @@ export function Faq() {
             </h2>
 
             <div className="mt-6 rounded-card border border-line bg-surface p-5">
-              <span className="flex size-9 items-center justify-center rounded-lg border border-line bg-surface-2 text-muted">
+              <span
+                className={`flex size-9 items-center justify-center rounded-lg border ${iconTile(MessagesSquareIcon)}`}
+              >
                 <MessagesSquareIcon aria-hidden="true" className="size-4.5" />
               </span>
               <h3 className="mt-4 text-[0.9375rem] font-semibold text-fg">

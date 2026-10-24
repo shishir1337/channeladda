@@ -8,6 +8,7 @@ import {
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { iconTile } from "@/components/ui/icon-hue";
 import { PageHeader } from "@/components/ui/page-header";
 import { Price } from "@/components/ui/price";
 import { Container, Section, SectionHeading } from "@/components/ui/section";
@@ -76,7 +77,7 @@ export default async function SellPage() {
             >
               <CheckIcon
                 aria-hidden="true"
-                className="size-4 shrink-0 text-fg"
+                className="size-4 shrink-0 text-verified"
               />
               {point}
             </li>
@@ -224,7 +225,9 @@ export default async function SellPage() {
                 key={item.title}
                 className="rounded-card border border-line bg-surface p-5 sm:p-6"
               >
-                <span className="flex size-9 items-center justify-center rounded-lg border border-line bg-surface-2 text-muted">
+                <span
+                  className={`flex size-9 items-center justify-center rounded-lg border ${iconTile(item.icon)}`}
+                >
                   <item.icon aria-hidden="true" className="size-4.5" />
                 </span>
                 <h3 className="mt-4 text-[0.9375rem] font-semibold text-fg">

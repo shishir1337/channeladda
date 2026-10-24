@@ -39,6 +39,7 @@ import {
   stepTitle,
 } from "@/components/deals/deal-status";
 import { Button } from "@/components/ui/button";
+import { iconText } from "@/components/ui/icon-hue";
 import { Price } from "@/components/ui/price";
 import { memberMayCancel } from "@/lib/deal-cancel";
 import { isTerminal } from "@/lib/deal-machine";
@@ -779,7 +780,7 @@ export function RaiseDispute({ deal }: { deal: DealView }) {
       <div className="flex items-center gap-2 border-b border-line px-4 py-3 sm:px-5">
         <ShieldAlertIcon
           aria-hidden="true"
-          className="size-4 shrink-0 text-subtle"
+          className={`size-4 shrink-0 ${iconText(ShieldAlertIcon)}`}
         />
         <h2 className="text-sm leading-6 font-semibold text-fg">
           Raise this with us

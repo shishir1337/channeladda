@@ -29,6 +29,7 @@ import {
 } from "@/components/messages/offer-composer";
 import { OfferActions } from "@/components/offers/offer-actions";
 import { Button } from "@/components/ui/button";
+import { iconText } from "@/components/ui/icon-hue";
 import { chatTime } from "@/lib/chat-time";
 import { MAX_MESSAGE } from "@/lib/messages";
 import { cn } from "@/lib/utils";
@@ -584,7 +585,7 @@ export function ThreadView({
         <p className="mt-6 flex items-start justify-center gap-2 rounded-card border border-line bg-surface-2/60 px-4 py-3 text-[0.8125rem] leading-relaxed text-muted">
           <LockIcon
             aria-hidden="true"
-            className="mt-0.5 size-3.5 shrink-0 text-subtle"
+            className={`mt-0.5 size-3.5 shrink-0 ${iconText(LockIcon)}`}
           />
           <span>
             Channel Adda closed this conversation. Nothing further can be sent.

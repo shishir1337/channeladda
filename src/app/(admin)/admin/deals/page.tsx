@@ -58,6 +58,7 @@ import {
 } from "@/components/app/kit";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { iconText } from "@/components/ui/icon-hue";
 import { Pagination } from "@/components/ui/pagination";
 import type { OrderStatus } from "@/generated/prisma/enums";
 import { isCustodianRole, levelLabel, withinLevel } from "@/lib/custody-roles";
@@ -500,7 +501,7 @@ export default async function AdminDealsPage({
                     <div className="mt-3 flex items-start gap-2.5 rounded-lg border border-line bg-surface-2/50 px-3 py-2.5">
                       <ReceiptIcon
                         aria-hidden="true"
-                        className="mt-0.5 size-4 shrink-0 text-subtle"
+                        className={`mt-0.5 size-4 shrink-0 ${iconText(ReceiptIcon)}`}
                       />
                       <div className="min-w-0 flex-1 text-xs leading-relaxed">
                         <p className="flex flex-wrap items-center gap-x-2 gap-y-1">

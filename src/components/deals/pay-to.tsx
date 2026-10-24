@@ -13,6 +13,7 @@ import { Callout, Card, textareaClass } from "@/components/app/kit";
 import { FormNotice } from "@/components/auth/fields";
 import { BusyLabel } from "@/components/deals/deal-timeline";
 import { Button } from "@/components/ui/button";
+import { iconText } from "@/components/ui/icon-hue";
 import { MAX_PAY_TO } from "@/lib/pay-to";
 import { cn } from "@/lib/utils";
 import { savePayTo } from "@/server/actions/deals";
@@ -60,7 +61,7 @@ function Frame({ title, children }: { title: ReactNode; children: ReactNode }) {
         <div className="flex items-center gap-2 border-b border-line px-4 py-3 sm:px-5">
           <WalletIcon
             aria-hidden="true"
-            className="size-4 shrink-0 text-subtle"
+            className={`size-4 shrink-0 ${iconText(WalletIcon)}`}
           />
           <h2
             id={headingId}

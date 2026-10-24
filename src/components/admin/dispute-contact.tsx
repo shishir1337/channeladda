@@ -1,5 +1,6 @@
 import { ExternalLinkIcon, PhoneIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { iconText } from "@/components/ui/icon-hue";
 
 /**
  * The seller's WhatsApp, for staff.
@@ -41,7 +42,7 @@ export function WhatsAppContact({
       <span className="tnum inline-flex items-center gap-1.5 text-fg select-all">
         <PhoneIcon
           aria-hidden="true"
-          className="size-3.5 shrink-0 text-subtle"
+          className={`size-3.5 shrink-0 ${iconText(PhoneIcon)}`}
         />
         {number}
       </span>

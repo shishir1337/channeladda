@@ -1,7 +1,8 @@
 import { ArrowUpRightIcon, ShieldCheckIcon } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ServiceIcon } from "@/components/site/service-icon";
+import { ServiceIcon, serviceIcon } from "@/components/site/service-icon";
+import { iconTile } from "@/components/ui/icon-hue";
 import { PageHeader } from "@/components/ui/page-header";
 import { Price } from "@/components/ui/price";
 import { Container, Section } from "@/components/ui/section";
@@ -32,7 +33,9 @@ export default function ServicesPage() {
                   href={`/services/${service.slug}`}
                   className="lift-card group flex h-full flex-col rounded-card border border-line bg-surface p-5 hover:border-line-strong sm:p-6"
                 >
-                  <span className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-line bg-surface-2 text-muted transition-colors duration-150 group-hover:text-fg">
+                  <span
+                    className={`flex size-10 shrink-0 items-center justify-center rounded-lg border ${iconTile(serviceIcon(service.icon))}`}
+                  >
                     <ServiceIcon name={service.icon} className="size-4.5" />
                   </span>
 

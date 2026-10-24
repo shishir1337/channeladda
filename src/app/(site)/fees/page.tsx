@@ -158,7 +158,7 @@ export default async function FeesPage() {
                   >
                     <CheckIcon
                       aria-hidden="true"
-                      className="mt-0.5 size-4 shrink-0 text-fg"
+                      className="mt-0.5 size-4 shrink-0 text-verified"
                     />
                     {item}
                   </li>

@@ -1,5 +1,4 @@
-import type { ComponentProps } from "react";
-import { Badge } from "@/components/ui/badge";
+import { Badge, type BadgeVariant } from "@/components/ui/badge";
 import type { ListingStatus } from "@/generated/prisma/enums";
 
 /**
@@ -11,7 +10,7 @@ const STATUS: Record<
   ListingStatus,
   {
     label: string;
-    variant: ComponentProps<typeof Badge>["variant"];
+    variant: BadgeVariant;
     note: string;
   }
 > = {
@@ -37,14 +36,14 @@ const STATUS: Record<
   },
   RESERVED: {
     label: "Reserved",
-    variant: "info",
+    variant: "accent",
     // Reserved from the moment a deal opens until it ends, offer or not, so
     // "the buyer is paying" was wrong for most of it.
     note: "A deal is running for this listing. It stays off the market until the deal ends.",
   },
   SOLD: {
     label: "Sold",
-    variant: "neutral",
+    variant: "success",
     note: "This account has changed hands.",
   },
   REJECTED: {
@@ -54,7 +53,7 @@ const STATUS: Record<
   },
   PAUSED: {
     label: "Paused",
-    variant: "neutral",
+    variant: "warning",
     note: "Hidden from buyers. Resume it whenever you like.",
   },
   REMOVED: {

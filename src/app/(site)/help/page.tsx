@@ -2,6 +2,7 @@ import { ArrowRightIcon, LifeBuoyIcon } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { iconTile } from "@/components/ui/icon-hue";
 import { PageHeader } from "@/components/ui/page-header";
 import { Container, Section } from "@/components/ui/section";
 import { helpArticles, helpCategories } from "@/data/help";
@@ -64,7 +65,9 @@ export default function HelpPage() {
 
           <div className="mt-12 flex flex-col items-start gap-4 rounded-panel border border-line bg-surface p-6 sm:flex-row sm:items-center sm:justify-between sm:p-8">
             <div className="flex items-start gap-3.5">
-              <span className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-line bg-surface-2 text-muted">
+              <span
+                className={`flex size-10 shrink-0 items-center justify-center rounded-lg border ${iconTile(LifeBuoyIcon)}`}
+              >
                 <LifeBuoyIcon aria-hidden="true" className="size-4.5" />
               </span>
               <div className="max-w-lg">

@@ -8,6 +8,7 @@ import {
   TrendingUpIcon,
 } from "lucide-react";
 import Link from "next/link";
+import { iconTile } from "@/components/ui/icon-hue";
 import { Container, Section, SectionHeading } from "@/components/ui/section";
 import { services } from "@/data/site";
 
@@ -38,7 +39,9 @@ export function Services() {
                   href={`/services/${service.slug}`}
                   className="lift-card group flex h-full items-start gap-4 rounded-card border border-line bg-surface p-5 hover:border-line-strong"
                 >
-                  <span className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-line bg-surface-2 text-muted transition-colors duration-150 group-hover:text-fg">
+                  <span
+                    className={`flex size-9 shrink-0 items-center justify-center rounded-lg border ${iconTile(Icon)}`}
+                  >
                     <Icon aria-hidden="true" className="size-4.5" />
                   </span>
                   <div className="min-w-0 flex-1">

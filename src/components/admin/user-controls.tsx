@@ -14,6 +14,7 @@ import { Callout, Card, CardBody, CardHeader } from "@/components/app/kit";
 import { TextArea, TextField } from "@/components/auth/fields";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { iconText } from "@/components/ui/icon-hue";
 import type { DealLevel, KycStatus, UserRole } from "@/generated/prisma/enums";
 import { DEAL_LEVELS, isCustodianRole, levelLabel } from "@/lib/custody-roles";
 import { cn } from "@/lib/utils";
@@ -795,9 +796,12 @@ const KYC_CHOICES: {
   },
 ];
 
-const KYC_VARIANT: Record<KycStatus, "neutral" | "verified" | "danger"> = {
+const KYC_VARIANT: Record<
+  KycStatus,
+  "neutral" | "info" | "verified" | "danger"
+> = {
   NOT_STARTED: "neutral",
-  PENDING: "neutral",
+  PENDING: "info",
   APPROVED: "verified",
   REJECTED: "danger",
 };
@@ -863,7 +867,7 @@ export function KycControl({
           <p className="flex items-start gap-2 text-[0.8125rem] leading-relaxed text-muted">
             <LockIcon
               aria-hidden="true"
-              className="mt-1 size-3.5 shrink-0 text-subtle"
+              className={`mt-1 size-3.5 shrink-0 ${iconText(LockIcon)}`}
             />
             <span>{blockedBecause ?? "You cannot change this."}</span>
           </p>

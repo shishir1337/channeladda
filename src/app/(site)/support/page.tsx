@@ -8,6 +8,7 @@ import {
 import type { Metadata } from "next";
 import Link from "next/link";
 import { SupportForm } from "@/components/site/support-form";
+import { iconTile } from "@/components/ui/icon-hue";
 import { PageHeader } from "@/components/ui/page-header";
 import { Container, Section } from "@/components/ui/section";
 import { helpArticles } from "@/data/help";
@@ -72,7 +73,9 @@ export default async function SupportPage({
             {channels.map((channel) => (
               <li key={channel.title}>
                 <div className="flex h-full flex-col rounded-card border border-line bg-surface p-5 sm:p-6">
-                  <span className="flex size-9 items-center justify-center rounded-lg border border-line bg-surface-2 text-muted">
+                  <span
+                    className={`flex size-9 items-center justify-center rounded-lg border ${iconTile(channel.icon)}`}
+                  >
                     <channel.icon aria-hidden="true" className="size-4.5" />
                   </span>
                   <h2 className="mt-4 text-[0.9375rem] font-semibold text-fg">

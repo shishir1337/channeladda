@@ -16,6 +16,7 @@ import { TrackRecordStats } from "@/components/deals/track-record";
 import { SellerAvatar } from "@/components/site/seller-avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { iconText } from "@/components/ui/icon-hue";
 import { Price } from "@/components/ui/price";
 import type { Listing } from "@/data/listings";
 import type { Platform } from "@/data/platforms";
@@ -95,7 +96,7 @@ export function MetricsPanel({
           >
             <row.icon
               aria-hidden="true"
-              className="size-4 shrink-0 text-subtle"
+              className={`size-4 shrink-0 ${iconText(row.icon)}`}
             />
             <dt className="text-sm text-muted">{row.label}</dt>
             <dd className="tnum ml-auto text-sm font-semibold text-fg">
@@ -177,7 +178,7 @@ export function ProofPanel({ count }: { count: number }) {
           <p className="flex items-center gap-2.5 rounded-lg border border-line bg-bg-subtle px-3 py-2.5 text-sm">
             <ImageIcon
               aria-hidden="true"
-              className="size-4 shrink-0 text-subtle"
+              className={`size-4 shrink-0 ${iconText(ImageIcon)}`}
             />
             <span className="font-medium text-fg">
               {countOf(count, "screenshot")}

@@ -14,6 +14,7 @@ import {
   type OfferCardData,
 } from "@/components/dashboard/offer-card";
 import { Button } from "@/components/ui/button";
+import { iconText } from "@/components/ui/icon-hue";
 import type { OfferView } from "@/server/offers";
 import { getOffersForBuyer, getOffersForSeller } from "@/server/offers";
 import { requireUser } from "@/server/session";
@@ -170,7 +171,7 @@ export default async function OffersPage() {
       <p className="mt-10 flex max-w-[100ch] items-start gap-2.5 text-[0.8125rem] leading-relaxed text-muted">
         <HandCoinsIcon
           aria-hidden="true"
-          className="mt-0.5 size-4 shrink-0 text-subtle"
+          className={`mt-0.5 size-4 shrink-0 ${iconText(HandCoinsIcon)}`}
         />
         <span className="min-w-0">
           <span className="font-medium text-fg">

@@ -12,6 +12,15 @@ const badgeVariants = cva(
         primary: "bg-primary-soft text-primary-text border border-primary/30",
         info: "bg-info-soft text-info border border-info/25",
         danger: "bg-danger-soft text-danger border border-danger/25",
+        // Lapsed or set aside: expired, paused.
+        warning:
+          "bg-orange-500/10 text-orange-700 border border-orange-500/25 dark:text-orange-300",
+        // Held mid-way: countered, reserved, in our hands.
+        accent:
+          "bg-violet-500/10 text-violet-700 border border-violet-500/25 dark:text-violet-300",
+        // Finished well: completed, sold. Filled, so an ending reads apart
+        // from "live".
+        success: "bg-verified text-bg border border-verified",
         solid: "bg-primary text-primary-fg",
       },
       size: {
@@ -22,6 +31,10 @@ const badgeVariants = cva(
     defaultVariants: { variant: "neutral", size: "sm" },
   },
 );
+
+export type BadgeVariant = NonNullable<
+  VariantProps<typeof badgeVariants>["variant"]
+>;
 
 export function Badge({
   className,

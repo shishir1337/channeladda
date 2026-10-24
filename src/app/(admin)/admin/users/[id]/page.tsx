@@ -115,9 +115,12 @@ const SIDE: Record<"buyer" | "seller" | "agent", string> = {
   agent: "Agent",
 };
 
-const KYC_VARIANT: Record<KycStatus, "neutral" | "verified" | "danger"> = {
+const KYC_VARIANT: Record<
+  KycStatus,
+  "neutral" | "info" | "verified" | "danger"
+> = {
   NOT_STARTED: "neutral",
-  PENDING: "neutral",
+  PENDING: "info",
   APPROVED: "verified",
   REJECTED: "danger",
 };

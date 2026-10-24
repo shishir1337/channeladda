@@ -8,6 +8,7 @@ import {
   TelegramIcon,
   YouTubeIcon,
 } from "@/components/icons/brand-icons";
+import { iconText } from "@/components/ui/icon-hue";
 import { Container } from "@/components/ui/section";
 import { footerNav } from "@/data/site";
 
@@ -97,7 +98,7 @@ export function SiteFooter() {
           <Link href="/support" className="group flex items-start gap-3">
             <MessagesSquareIcon
               aria-hidden="true"
-              className="mt-0.5 size-4.5 shrink-0 text-subtle"
+              className={`mt-0.5 size-4.5 shrink-0 ${iconText(MessagesSquareIcon)}`}
             />
             <div>
               <h2 className="text-sm font-semibold text-fg group-hover:underline group-hover:underline-offset-4">
@@ -111,7 +112,7 @@ export function SiteFooter() {
           <div className="flex items-start gap-3">
             <MailIcon
               aria-hidden="true"
-              className="mt-0.5 size-4.5 shrink-0 text-subtle"
+              className={`mt-0.5 size-4.5 shrink-0 ${iconText(MailIcon)}`}
             />
             <div>
               <h2 className="text-sm font-semibold text-fg">
@@ -164,7 +165,7 @@ export function SiteFooter() {
         <p className="mt-6 flex items-start gap-2.5 text-xs leading-relaxed text-subtle">
           <ShieldCheckIcon
             aria-hidden="true"
-            className="mt-0.5 size-4 shrink-0 text-subtle"
+            className={`mt-0.5 size-4 shrink-0 ${iconText(ShieldCheckIcon)}`}
           />
           <span>
             Channel Adda is an independent marketplace and is not affiliated

@@ -6,6 +6,7 @@ import { useId, useState, useTransition } from "react";
 import { Card } from "@/components/app/kit";
 import { BusyLabel } from "@/components/messages/chat-parts";
 import { Button } from "@/components/ui/button";
+import { iconText } from "@/components/ui/icon-hue";
 import type { DealMode, Platform } from "@/generated/prisma/enums";
 import type { DealActor } from "@/lib/deal-machine";
 import { handoverTarget, parseHandoverTo } from "@/lib/handover-target";
@@ -79,7 +80,7 @@ export function HandoverAccount({
         <div className="flex items-center gap-2 border-b border-line px-4 py-3 sm:px-5">
           <UserRoundCheckIcon
             aria-hidden="true"
-            className="size-4 shrink-0 text-subtle"
+            className={`size-4 shrink-0 ${iconText(UserRoundCheckIcon)}`}
           />
           <h2
             id={`${inputId}-heading`}

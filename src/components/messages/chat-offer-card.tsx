@@ -3,7 +3,9 @@
 import { TagIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { TurnFlag } from "@/components/app/kit";
+import { OFFER_STATUS } from "@/components/deals/offer-status";
 import { Badge } from "@/components/ui/badge";
+import { iconText } from "@/components/ui/icon-hue";
 import { Price } from "@/components/ui/price";
 import type { OfferStatus } from "@/generated/prisma/enums";
 import { chatTime, timeLeft } from "@/lib/chat-time";
@@ -20,17 +22,7 @@ export type ThreadOfferView = {
   expiresAt: string;
 };
 
-const STATUS: Record<
-  OfferStatus,
-  { label: string; variant: "neutral" | "verified" | "primary" | "info" }
-> = {
-  OPEN: { label: "Open", variant: "primary" },
-  ACCEPTED: { label: "Accepted", variant: "verified" },
-  REJECTED: { label: "Declined", variant: "neutral" },
-  COUNTERED: { label: "Countered", variant: "info" },
-  EXPIRED: { label: "Expired", variant: "neutral" },
-  WITHDRAWN: { label: "Withdrawn", variant: "neutral" },
-};
+const STATUS = OFFER_STATUS;
 
 /**
  * One offer, in the conversation it belongs to.
@@ -74,7 +66,10 @@ export function ChatOfferCard({
       >
         <div className="px-4 pt-3.5 pb-4">
           <header className="flex flex-wrap items-center gap-2">
-            <TagIcon aria-hidden="true" className="size-3.5 text-subtle" />
+            <TagIcon
+              aria-hidden="true"
+              className={`size-3.5 ${iconText(TagIcon)}`}
+            />
             <span className="text-[0.8125rem] font-medium text-fg">
               {heading}
             </span>

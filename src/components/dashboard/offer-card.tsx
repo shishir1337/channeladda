@@ -3,6 +3,7 @@
 import { ClockIcon, MessagesSquareIcon } from "lucide-react";
 import Link from "next/link";
 import { Callout, Meter, TurnFlag } from "@/components/app/kit";
+import { OFFER_STATUS } from "@/components/deals/offer-status";
 import { OfferActions } from "@/components/offers/offer-actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -31,20 +32,7 @@ export type OfferCardData = {
   conversationId: string | null;
 };
 
-const STATUS: Record<
-  OfferStatus,
-  {
-    label: string;
-    variant: "neutral" | "verified" | "primary" | "danger" | "info";
-  }
-> = {
-  OPEN: { label: "Open", variant: "primary" },
-  ACCEPTED: { label: "Accepted", variant: "verified" },
-  REJECTED: { label: "Declined", variant: "neutral" },
-  COUNTERED: { label: "Countered", variant: "info" },
-  EXPIRED: { label: "Expired", variant: "neutral" },
-  WITHDRAWN: { label: "Withdrawn", variant: "neutral" },
-};
+const STATUS = OFFER_STATUS;
 
 function usd(value: number) {
   return value.toLocaleString("en-US", {

@@ -34,12 +34,13 @@ import {
   SplitBar,
   Stat,
   StatGrid,
-  type Tone,
 } from "@/components/app/kit";
 import { statusMeta } from "@/components/dashboard/listing-status";
 import { dealHeadline, stepTitle } from "@/components/deals/deal-status";
-import { Badge } from "@/components/ui/badge";
+import { OFFER_STATUS } from "@/components/deals/offer-status";
+import { Badge, type BadgeVariant } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { iconText } from "@/components/ui/icon-hue";
 import { Price } from "@/components/ui/price";
 import type { ListingStatus, OfferStatus } from "@/generated/prisma/enums";
 import { cn } from "@/lib/utils";
@@ -101,19 +102,6 @@ type Task = {
   since: Date;
 };
 
-/**
- * A row's icon colour, from the icon it already carries: a deal gold, an
- * offer blue, a listing green, something to fix red. Every row used to sit
- * on the same grey tile.
- */
-function toneOf(icon: Icon): Tone {
-  if (icon === ArrowLeftRightIcon) return "primary";
-  if (icon === HandshakeIcon) return "info";
-  if (icon === TriangleAlertIcon) return "danger";
-  if (icon === StoreIcon || icon === FingerprintIcon) return "verified";
-  return "neutral";
-}
-
 /** Something that already happened, said in a whole sentence. */
 type Event = {
   id: string;
@@ -121,18 +109,14 @@ type Event = {
   icon: Icon;
   what: ReactNode;
   detail: string;
-  outcome: string | null;
+  outcome: { label: string; variant: BadgeVariant } | null;
   at: Date;
 };
 
-const OFFER_OUTCOME: Record<OfferStatus, string | null> = {
-  OPEN: null,
-  ACCEPTED: "Accepted",
-  REJECTED: "Declined",
-  COUNTERED: "Countered",
-  EXPIRED: "Expired",
-  WITHDRAWN: "Withdrawn",
-};
+/** An offer's outcome, coloured as everywhere else; an open one has none yet. */
+function offerOutcome(status: OfferStatus) {
+  return status === "OPEN" ? null : OFFER_STATUS[status];
+}
 
 /** What each listing state looks like as a thing that happened. */
 const LISTING_EVENT: Record<ListingStatus, string> = {
@@ -286,7 +270,7 @@ export default async function DashboardPage() {
         </>
       ),
       detail: offer.listingHandle,
-      outcome: OFFER_OUTCOME[offer.effectiveStatus],
+      outcome: offerOutcome(offer.effectiveStatus),
       at: offer.respondedAt ?? offer.createdAt,
       skip: offer.awaiting === "seller",
     })),
@@ -305,7 +289,7 @@ export default async function DashboardPage() {
         </>
       ),
       detail: offer.listingHandle,
-      outcome: OFFER_OUTCOME[offer.effectiveStatus],
+      outcome: offerOutcome(offer.effectiveStatus),
       at: offer.respondedAt ?? offer.createdAt,
       skip: offer.awaiting === "buyer",
     })),
@@ -315,7 +299,7 @@ export default async function DashboardPage() {
       icon: StoreIcon,
       what: <>{LISTING_EVENT[listing.status]}</>,
       detail: listing.handle,
-      outcome: statusMeta(listing.status).label,
+      outcome: statusMeta(listing.status),
       at: listing.updatedAt,
       skip: listing.status === "CODE_CHECK" || listing.status === "REJECTED",
     })),
@@ -402,9 +386,7 @@ export default async function DashboardPage() {
             {tasks.slice(0, 5).map((task) => (
               <ListItem key={task.id} href={task.href}>
                 <ListRow
-                  leading={
-                    <IconTile icon={task.icon} tone={toneOf(task.icon)} />
-                  }
+                  leading={<IconTile icon={task.icon} />}
                   // The title wraps rather than truncating: it carries the
                   // amount, and an offer cut off before its price is no use.
                   title={<span className="whitespace-normal">{task.what}</span>}
@@ -646,9 +628,7 @@ export default async function DashboardPage() {
               {events.map((event) => (
                 <ListItem key={event.id} href={event.href}>
                   <ListRow
-                    leading={
-                      <IconTile icon={event.icon} tone={toneOf(event.icon)} />
-                    }
+                    leading={<IconTile icon={event.icon} />}
                     title={
                       <span className="whitespace-normal">{event.what}</span>
                     }
@@ -663,7 +643,9 @@ export default async function DashboardPage() {
                     }
                     trailing={
                       event.outcome ? (
-                        <Badge size="sm">{event.outcome}</Badge>
+                        <Badge size="sm" variant={event.outcome.variant}>
+                          {event.outcome.label}
+                        </Badge>
                       ) : null
                     }
                     chevron
@@ -723,7 +705,7 @@ function WalletDoor() {
         <span className="flex items-center gap-2 text-[0.8125rem] leading-5 font-medium text-muted">
           <WalletIcon
             aria-hidden="true"
-            className="size-3.5 shrink-0 text-subtle"
+            className={`size-3.5 shrink-0 ${iconText(WalletIcon)}`}
           />
           Wallet
           <ArrowUpRightIcon

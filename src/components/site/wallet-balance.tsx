@@ -4,6 +4,7 @@ import { WalletIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { iconText } from "@/components/ui/icon-hue";
 import { Price } from "@/components/ui/price";
 import { useSession } from "@/lib/auth-client";
 import { cn } from "@/lib/utils";
@@ -29,7 +30,10 @@ export function WalletChip({
         className,
       )}
     >
-      <WalletIcon aria-hidden="true" className="size-4 shrink-0 text-subtle" />
+      <WalletIcon
+        aria-hidden="true"
+        className={`size-4 shrink-0 ${iconText(WalletIcon)}`}
+      />
       <span className="sr-only">Wallet balance: </span>
       <Price usd={cents / 100} className="tabular-nums" />
     </Link>

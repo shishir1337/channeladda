@@ -68,7 +68,7 @@ export const ORDER_STATUS: Record<
   },
   IN_CUSTODY: {
     label: "In custody",
-    variant: "primary",
+    variant: "accent",
     whose: "buyer",
     note: "The agent owns the channel. Safest: the buyer pays the seller directly and the seller confirms it arrived. Fastest: the seller has been paid, and the agent makes the buyer primary owner.",
   },
@@ -80,7 +80,7 @@ export const ORDER_STATUS: Record<
   },
   AWAITING_HANDOVER: {
     label: "Awaiting handover",
-    variant: "primary",
+    variant: "accent",
     whose: "transfer",
     note: "Safest: the agent is transferring the channel to the buyer. Fastest: the holding period, then the seller makes the agent primary owner.",
   },
@@ -98,19 +98,19 @@ export const ORDER_STATUS: Record<
   },
   COMPLETED: {
     label: "Completed",
-    variant: "verified",
+    variant: "success",
     whose: null,
     note: "The channel changed hands and the seller was paid.",
   },
   PAYMENT_EXPIRED: {
     label: "Payment expired",
-    variant: "neutral",
+    variant: "warning",
     whose: null,
     note: "The payment window lapsed before anything moved.",
   },
   CANCELLED: {
     label: "Cancelled",
-    variant: "neutral",
+    variant: "danger",
     whose: null,
     note: "Ended before a channel or a payment was in play.",
   },
@@ -346,7 +346,7 @@ export const LISTING_STATUS: Record<
   },
   CODE_CHECK: {
     label: "Placing code",
-    variant: "neutral",
+    variant: "info",
     note: "With the seller, who has to put the ownership code on the profile.",
   },
   ADMIN_REVIEW: {
@@ -361,12 +361,12 @@ export const LISTING_STATUS: Record<
   },
   RESERVED: {
     label: "Reserved",
-    variant: "info",
+    variant: "accent",
     note: "An offer was accepted and a deal is running.",
   },
   SOLD: {
     label: "Sold",
-    variant: "neutral",
+    variant: "success",
     note: "The channel has changed hands.",
   },
   REJECTED: {
@@ -376,7 +376,7 @@ export const LISTING_STATUS: Record<
   },
   PAUSED: {
     label: "Paused",
-    variant: "neutral",
+    variant: "warning",
     note: "Hidden from buyers.",
   },
   REMOVED: {

@@ -35,6 +35,7 @@ import { PayNow } from "@/components/deals/pay-now";
 import { PayToCard } from "@/components/deals/pay-to";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { iconText } from "@/components/ui/icon-hue";
 import { Price } from "@/components/ui/price";
 import { db } from "@/lib/db";
 import { isTerminal } from "@/lib/deal-machine";
@@ -140,7 +141,10 @@ export default async function DealPage({
               {headline.label}
             </Badge>
             <span className="inline-flex items-center gap-1.5 font-medium text-muted">
-              <ModeIcon aria-hidden="true" className="size-3.5 text-subtle" />
+              <ModeIcon
+                aria-hidden="true"
+                className={`size-3.5 ${iconText(ModeIcon)}`}
+              />
               {safest ? "Safest deal" : "Fastest deal"}
             </span>
             <MetaItem label="Reference">

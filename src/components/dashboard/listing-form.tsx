@@ -30,6 +30,7 @@ import {
 } from "@/components/dashboard/channel-import";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { iconText } from "@/components/ui/icon-hue";
 import { ImageUpload } from "@/components/upload/image-upload";
 import { type FeeSettings, formatRate, quote } from "@/lib/fees";
 import type { ListingDraftInput, PLATFORM_IDS } from "@/lib/listing-form";
@@ -1660,7 +1661,7 @@ export function ListingForm({
                 <>
                   <LockIcon
                     aria-hidden="true"
-                    className="mt-0.5 size-3.5 shrink-0 text-subtle sm:mt-0"
+                    className={`mt-0.5 size-3.5 shrink-0 sm:mt-0 ${iconText(LockIcon)}`}
                   />
                   <span>
                     Private to you. Save a draft at any point and come back —

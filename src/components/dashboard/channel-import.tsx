@@ -30,6 +30,7 @@ import {
   YouTubeIcon,
 } from "@/components/icons/brand-icons";
 import { Button } from "@/components/ui/button";
+import { iconText } from "@/components/ui/icon-hue";
 import { normaliseChannelUrl, parseChannelUrl } from "@/lib/channel-url";
 import type { PLATFORM_IDS } from "@/lib/listing-form";
 import type { ImportKey } from "@/lib/listing-import";
@@ -431,7 +432,7 @@ export function ChannelLinkField({
         <p className="mt-2 flex items-start gap-2 text-xs leading-relaxed text-muted">
           <LinkIcon
             aria-hidden="true"
-            className="mt-0.5 size-3.5 shrink-0 text-subtle"
+            className={`mt-0.5 size-3.5 shrink-0 ${iconText(LinkIcon)}`}
           />
           <span>
             Pasting a different link re-points the listing at that account, and

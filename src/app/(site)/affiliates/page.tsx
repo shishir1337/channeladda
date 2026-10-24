@@ -8,6 +8,7 @@ import {
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { iconTile } from "@/components/ui/icon-hue";
 import { PageHeader } from "@/components/ui/page-header";
 import { Price } from "@/components/ui/price";
 import { Container, Section, SectionHeading } from "@/components/ui/section";
@@ -90,7 +91,9 @@ export default async function AffiliatesPage() {
             {steps.map((step, i) => (
               <li key={step.title}>
                 <div className="flex h-full flex-col rounded-card border border-line bg-surface p-5 sm:p-6">
-                  <span className="flex size-9 items-center justify-center rounded-lg border border-line bg-surface-2 text-muted">
+                  <span
+                    className={`flex size-9 items-center justify-center rounded-lg border ${iconTile(step.icon)}`}
+                  >
                     <step.icon aria-hidden="true" className="size-4.5" />
                   </span>
                   <p className="tnum mt-4 text-[0.8125rem] font-medium text-subtle">
@@ -129,7 +132,7 @@ export default async function AffiliatesPage() {
                   >
                     <CheckIcon
                       aria-hidden="true"
-                      className="mt-0.5 size-4 shrink-0 text-fg"
+                      className="mt-0.5 size-4 shrink-0 text-verified"
                     />
                     {point}
                   </li>

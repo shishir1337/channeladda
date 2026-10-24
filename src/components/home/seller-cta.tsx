@@ -47,7 +47,7 @@ export function SellerCta() {
                   >
                     <CheckIcon
                       aria-hidden="true"
-                      className="size-4 shrink-0 text-fg"
+                      className="size-4 shrink-0 text-verified"
                     />
                     {point}
                   </li>

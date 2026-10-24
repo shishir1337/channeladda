@@ -33,6 +33,7 @@ import {
 import { Avatar } from "@/components/app/user-menu";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { iconText } from "@/components/ui/icon-hue";
 import type { UserRole } from "@/generated/prisma/enums";
 import { isCustodianRole, levelLabel } from "@/lib/custody-roles";
 import { cn } from "@/lib/utils";
@@ -481,7 +482,7 @@ export default async function AdminTeamPage() {
                           <span className="inline-flex items-center gap-1">
                             <ClockIcon
                               aria-hidden="true"
-                              className="size-3.5 text-subtle"
+                              className={`size-3.5 ${iconText(ClockIcon)}`}
                             />
                             {invite.expired ? (
                               "The link no longer works"
