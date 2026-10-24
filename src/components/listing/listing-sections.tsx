@@ -5,6 +5,7 @@ import {
   GlobeIcon,
   ImageIcon,
   MapPinIcon,
+  StarIcon,
   TrendingUpIcon,
   TriangleAlertIcon,
   UsersIcon,
@@ -219,6 +220,21 @@ export function SellerPanel({ seller }: { seller: Seller }) {
             <span className="tnum font-medium text-fg">
               {pointsLabel(seller.points ?? 0)}
             </span>
+            {seller.rating !== null && seller.reviews > 0 ? (
+              <>
+                <span aria-hidden="true">·</span>
+                <span className="inline-flex items-center gap-1">
+                  <StarIcon
+                    aria-hidden="true"
+                    className="size-3.5 fill-primary text-primary"
+                  />
+                  <span className="tnum font-medium text-fg">
+                    {seller.rating.toFixed(1)}
+                  </span>
+                  <span>({countOf(seller.reviews, "review")})</span>
+                </span>
+              </>
+            ) : null}
             <span aria-hidden="true">·</span>
             <span>{seller.country}</span>
             <span aria-hidden="true">·</span>

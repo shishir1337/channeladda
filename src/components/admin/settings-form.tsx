@@ -192,6 +192,7 @@ export function SettingsForm({
     resellerPriceUsd: number;
     resellerDiscountBp: number;
     resellerPointsMultiplier: number;
+    googleReviewUrl: string | null;
   };
 }) {
   const router = useRouter();
@@ -207,6 +208,7 @@ export function SettingsForm({
     resellerPrice: useId(),
     resellerDiscount: useId(),
     resellerMultiplier: useId(),
+    googleReview: useId(),
   };
 
   const [safest, setSafest] = useState(formatRate(current.buyerFeeBpSafest));
@@ -233,6 +235,9 @@ export function SettingsForm({
   );
   const [resellerMultiplier, setResellerMultiplier] = useState(
     String(current.resellerPointsMultiplier),
+  );
+  const [googleReview, setGoogleReview] = useState(
+    current.googleReviewUrl ?? "",
   );
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saved, setSaved] = useState<string | null>(null);
@@ -322,6 +327,12 @@ export function SettingsForm({
       to: `${resellerMultiplier}x`,
       changed: Number(resellerMultiplier) !== current.resellerPointsMultiplier,
     },
+    {
+      label: "Google review link",
+      from: current.googleReviewUrl ? "set" : "none",
+      to: googleReview.trim() ? "set" : "none",
+      changed: googleReview.trim() !== (current.googleReviewUrl ?? ""),
+    },
   ]
     .filter((row) => row.changed)
     .map(({ label, from, to }) => ({ label, from, to }));
@@ -348,6 +359,7 @@ export function SettingsForm({
             resellerPrice: Number(resellerPrice),
             resellerDiscountBp: toBp(resellerDiscount),
             resellerPointsMultiplier: Number(resellerMultiplier),
+            googleReviewUrl: googleReview,
           });
           if (!result.ok) {
             setErrors(result.errors);
@@ -513,6 +525,51 @@ export function SettingsForm({
           onChange={setResellerMultiplier}
           error={errors.resellerPointsMultiplier}
         />
+      </Group>
+
+      <Group
+        title="Reviews"
+        info="After a completed deal the buyer rates the seller, then the buyer and the seller each rate Channel Adda, in the deal's chat. Google does not show stars a site collects about itself, so after four or five stars they are offered this link to say it on Google too."
+      >
+        <div className="px-4 py-4 sm:px-5">
+          <label
+            htmlFor={ids.googleReview}
+            className={cn(labelClass, "text-sm")}
+          >
+            Google review link
+          </label>
+          <p id={`${ids.googleReview}-hint`} className={hintClass}>
+            From your Google Business Profile: Ask for reviews, then copy the
+            link. Leave it empty to not offer one.
+          </p>
+          <input
+            id={ids.googleReview}
+            name="googleReviewUrl"
+            type="url"
+            inputMode="url"
+            autoComplete="off"
+            spellCheck={false}
+            placeholder="https://g.page/r/…/review"
+            value={googleReview}
+            onChange={(e) => setGoogleReview(e.target.value)}
+            aria-invalid={Boolean(errors.googleReviewUrl)}
+            aria-describedby={
+              errors.googleReviewUrl
+                ? `${ids.googleReview}-hint ${ids.googleReview}-error`
+                : `${ids.googleReview}-hint`
+            }
+            className={cn(inputClass, "mt-2")}
+          />
+          {errors.googleReviewUrl ? (
+            <p
+              id={`${ids.googleReview}-error`}
+              role="alert"
+              className="mt-1.5 text-xs leading-relaxed text-danger"
+            >
+              {errors.googleReviewUrl}
+            </p>
+          ) : null}
+        </div>
       </Group>
 
       {previewable ? (

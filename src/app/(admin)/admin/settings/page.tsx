@@ -106,6 +106,7 @@ export default async function AdminSettingsPage() {
       <SettingsForm
         current={{
           buyerFeeBpSafest: settings.buyerFeeBpSafest,
+          googleReviewUrl: settings.googleReviewUrl,
           buyerFeeBpFastest: settings.buyerFeeBpFastest,
           maxHoldsPerAgent: settings.maxHoldsPerAgent,
           secondApprovalAboveUsd: settings.secondApprovalAboveUsd,

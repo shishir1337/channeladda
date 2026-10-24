@@ -1,9 +1,11 @@
 import { Container, Section, SectionHeading } from "@/components/ui/section";
 import { Stars } from "@/components/ui/stars";
 import { db } from "@/lib/db";
+import { platformReviews, shortName } from "@/server/reviews";
 
 /**
- * Reviews, from the reviews table.
+ * What members say about Channel Adda, from the reviews they left in a deal's
+ * chat once it completed.
  *
  * This used to render three hard-coded quotes — named people, five stars
  * each, one describing a dispute "settled in my favour within 48 hours" by a
@@ -12,17 +14,17 @@ import { db } from "@/lib/db";
  * is the one kind of marketing copy that is a legal problem rather than a
  * tone problem.
  *
- * Now it shows reviews people actually left on completed deals, and the whole
- * section is absent until there are some. An empty marketplace saying nothing
- * about reviews is honest; one quoting customers it does not have is not.
+ * Every review here stands on a completed deal its author was in, and the
+ * whole section is absent until there are some.
  */
 const SHOWN = 3;
 
 async function recentReviews() {
-  return db.review.findMany({
+  return db.platformReview.findMany({
     where: {
-      // A review the person meant as praise, on a deal that really finished.
+      // Praise that says something, on a deal that really finished.
       rating: { gte: 4 },
+      NOT: { body: "" },
       order: { status: "COMPLETED" },
     },
     orderBy: { createdAt: "desc" },
@@ -31,9 +33,14 @@ async function recentReviews() {
       id: true,
       rating: true,
       body: true,
+      authorId: true,
       author: { select: { name: true } },
       order: {
-        select: { mode: true, listing: { select: { platform: true } } },
+        select: {
+          mode: true,
+          buyerId: true,
+          listing: { select: { platform: true } },
+        },
       },
     },
   });
@@ -47,23 +54,23 @@ const PLATFORM_NAMES: Record<string, string> = {
   WEBSITE: "website",
 };
 
-/** "Hannah W." — a reviewer's surname is not ours to publish. */
-function shortName(name: string): string {
-  const [first, ...rest] = name.trim().split(/\s+/);
-  const last = rest.at(-1);
-  return last ? `${first} ${last[0]}.` : first;
-}
-
 export async function Testimonials() {
-  const reviews = await recentReviews();
+  const [reviews, summary] = await Promise.all([
+    recentReviews(),
+    platformReviews({ take: 0 }),
+  ]);
   if (reviews.length === 0) return null;
 
   return (
     <Section>
       <Container>
         <SectionHeading
-          title="What buyers say"
-          description="Only from deals that completed."
+          title="What members say"
+          description={
+            summary.average !== null
+              ? `Rated ${summary.average.toFixed(1)} out of 5 by ${summary.count} ${summary.count === 1 ? "member" : "members"}, all from completed deals.`
+              : "Only from deals that completed."
+          }
           align="center"
         />
 
@@ -83,7 +90,10 @@ export async function Testimonials() {
                     {shortName(review.author.name)}
                   </span>
                   <span className="mt-0.5 block text-[0.8125rem] text-subtle">
-                    Bought a{" "}
+                    {review.authorId === review.order.buyerId
+                      ? "Bought"
+                      : "Sold"}{" "}
+                    a{" "}
                     {PLATFORM_NAMES[review.order.listing.platform] ?? "channel"}{" "}
                     account ·{" "}
                     {review.order.mode === "SAFEST" ? "Safest" : "Fastest"} deal

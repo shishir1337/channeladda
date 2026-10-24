@@ -14,7 +14,13 @@ import {
   TagIcon,
   XIcon,
 } from "lucide-react";
-import { useEffect, useRef, useState, useTransition } from "react";
+import {
+  type ReactNode,
+  useEffect,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
 import { InfoTip } from "@/components/app/info-tip";
 import { EmptyState } from "@/components/app/kit";
 import {
@@ -377,6 +383,7 @@ export function ThreadView({
   otherSide,
   viewerRole,
   offerComposer = null,
+  after = null,
 }: {
   conversationId: string;
   messages: ThreadMessageView[];
@@ -391,6 +398,11 @@ export function ThreadView({
    * something the server would refuse.
    */
   offerComposer?: OfferComposerConfig | null;
+  /**
+   * Drawn after the last line of the conversation: what the chat asks of
+   * the reader once the deal is over, as the next thing in it.
+   */
+  after?: ReactNode;
 }) {
   const [offering, setOffering] = useState(false);
   const [draft, setDraft] = useState("");
@@ -576,6 +588,7 @@ export function ThreadView({
             })}
           </ul>
         )}
+        {after ? <div className="mt-6">{after}</div> : null}
         {/* The margin lands the message box on screen with the newest
           message, rather than leaving it just under the fold. */}
         <div ref={endRef} className="scroll-mb-48" />

@@ -45,7 +45,10 @@ export type ChatEvent =
   // this line is shown in previews.
   | { type: "pay-to-saved"; name: string; changed: boolean }
   | { type: "dispute-raised"; name: string }
-  | { type: "deal-ended"; outcome: string };
+  | { type: "deal-ended"; outcome: string }
+  // After a completed deal: the buyer's stars for the seller. The words of
+  // the review stay on the seller's page, not in previews.
+  | { type: "seller-reviewed"; name: string; seller: string; rating: number };
 
 /** $2,000.00, $99.50: always two decimals, as every amount on the site. */
 export function money(cents: number): string {
@@ -114,5 +117,7 @@ export function eventText(event: ChatEvent): string {
       return `${who(event.name)} raised a dispute. The deal is paused while Channel Adda looks at it`;
     case "deal-ended":
       return event.outcome;
+    case "seller-reviewed":
+      return `${who(event.name)} gave ${who(event.seller)} ${event.rating} ${event.rating === 1 ? "star" : "stars"}`;
   }
 }

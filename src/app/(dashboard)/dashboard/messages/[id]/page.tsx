@@ -15,6 +15,7 @@ import {
 import { HandoverAccount } from "@/components/deals/handover-account";
 import { PayNow } from "@/components/deals/pay-now";
 import { PayToCard } from "@/components/deals/pay-to";
+import { ReviewPrompts } from "@/components/deals/review-prompts";
 import { TrackRecordLine } from "@/components/deals/track-record";
 import { StartDeal } from "@/components/listing/start-deal";
 import { channelOf, ThreadHeader } from "@/components/messages/chat-parts";
@@ -36,6 +37,7 @@ import { loadPanelInput } from "@/server/deal-panel";
 import { getDealFor } from "@/server/deals";
 import { getThread, markThreadRead } from "@/server/messages";
 import { activeResellers, ratingFor } from "@/server/reseller-status";
+import { reviewPromptFor } from "@/server/reviews";
 import { requireUser } from "@/server/session";
 import { getSettings } from "@/server/settings";
 import { threadFingerprint } from "@/server/thread-fingerprint";
@@ -105,6 +107,9 @@ export default async function ThreadPage({
   // went through: everything else ends as it did.
   const certificate =
     deal?.status === "COMPLETED" ? await certificateFor(deal.id) : null;
+  // Then the chat asks for reviews: the seller, then Channel Adda.
+  const reviewPrompt =
+    certificate && deal ? await reviewPromptFor(deal.id, user.id) : null;
   const wallet =
     panel?.kind === "pay" && deal ? await getWallet(user.id) : null;
   // How far the deal has got, for the ring on the panel — counted from the
@@ -366,6 +371,14 @@ export default async function ThreadPage({
             viewerRole={thread.viewerRole}
             offerComposer={offerComposer}
             messages={toMessageViews(thread.messages)}
+            after={
+              reviewPrompt ? (
+                <ReviewPrompts
+                  prompt={reviewPrompt}
+                  googleReviewUrl={settings.googleReviewUrl}
+                />
+              ) : null
+            }
           />
         </div>
       </div>

@@ -78,3 +78,26 @@ test("the offer window still has to be sane", () => {
     "offerExpiryHours",
   );
 });
+
+test("the Google review link is a Google address, or nothing", () => {
+  // Shown to members after a good review, so it must not send them anywhere
+  // but Google.
+  for (const url of [
+    "https://g.page/r/CaBcD1234/review",
+    "https://search.google.com/local/writereview?placeid=ChIJ123",
+    "https://maps.app.goo.gl/AbCd123",
+    "",
+  ]) {
+    expect(fields({ ...VALID, googleReviewUrl: url }), url).toEqual([]);
+  }
+  for (const url of [
+    "http://g.page/r/CaBcD1234/review",
+    "https://g.page.evil.example/review",
+    "https://example.com/?r=google.com",
+    "javascript:alert(1)",
+  ]) {
+    expect(fields({ ...VALID, googleReviewUrl: url }), url).toContain(
+      "googleReviewUrl",
+    );
+  }
+});

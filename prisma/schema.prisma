@@ -190,34 +190,35 @@ model User {
   sessions Session[]
   accounts Account[]
 
-  listings       Listing[]
-  offersMade     Offer[]            @relation("OfferBuyer")
-  ordersBought   Order[]            @relation("OrderBuyer")
-  ordersSold     Order[]            @relation("OrderSeller")
-  messages       Message[]
-  buyerThreads   Conversation[]     @relation("ConversationBuyer")
-  sellerThreads  Conversation[]     @relation("ConversationSeller")
-  staffThreads   Conversation[]     @relation("ConversationStaff")
-  threadReads    ConversationRead[]
-  reviewsGiven   Review[]           @relation("ReviewAuthor")
-  reviewsGot     Review[]           @relation("ReviewSubject")
-  favourites     Favourite[]
-  ledger         LedgerEntry[]
-  withdrawals    Withdrawal[]
-  notifications  Notification[]
-  auditEntries   AuditLog[]         @relation("AuditActor")
-  kycSubmission  KycSubmission?
-  payoutAddress  PayoutAddress?
-  settingsEdits  PlatformSettings[] @relation("SettingsEditor")
-  supportSent    SupportTicket[]    @relation("SupportRequester")
-  supportHandled SupportTicket[]    @relation("SupportHandler")
-  invitesSent    StaffInvite[]      @relation("StaffInviteAuthor")
-  ordersAgented  Order[]            @relation("OrderAgent")
-  stepsApproved  TransferStep[]     @relation("StepApprover")
-  twoFactors     TwoFactor[]
-  invoices       Invoice[]
-  uploads        Upload[]
-  resellerPasses ResellerPass[]
+  listings        Listing[]
+  offersMade      Offer[]            @relation("OfferBuyer")
+  ordersBought    Order[]            @relation("OrderBuyer")
+  ordersSold      Order[]            @relation("OrderSeller")
+  messages        Message[]
+  buyerThreads    Conversation[]     @relation("ConversationBuyer")
+  sellerThreads   Conversation[]     @relation("ConversationSeller")
+  staffThreads    Conversation[]     @relation("ConversationStaff")
+  threadReads     ConversationRead[]
+  reviewsGiven    Review[]           @relation("ReviewAuthor")
+  reviewsGot      Review[]           @relation("ReviewSubject")
+  platformReviews PlatformReview[]   @relation("PlatformReviewAuthor")
+  favourites      Favourite[]
+  ledger          LedgerEntry[]
+  withdrawals     Withdrawal[]
+  notifications   Notification[]
+  auditEntries    AuditLog[]         @relation("AuditActor")
+  kycSubmission   KycSubmission?
+  payoutAddress   PayoutAddress?
+  settingsEdits   PlatformSettings[] @relation("SettingsEditor")
+  supportSent     SupportTicket[]    @relation("SupportRequester")
+  supportHandled  SupportTicket[]    @relation("SupportHandler")
+  invitesSent     StaffInvite[]      @relation("StaffInviteAuthor")
+  ordersAgented   Order[]            @relation("OrderAgent")
+  stepsApproved   TransferStep[]     @relation("StepApprover")
+  twoFactors      TwoFactor[]
+  invoices        Invoice[]
+  uploads         Upload[]
+  resellerPasses  ResellerPass[]
 
   @@index([slug])
   @@index([role])
@@ -584,12 +585,13 @@ model Order {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  steps    TransferStep[]
-  messages Message[]
-  dispute  Dispute?
-  ledger   LedgerEntry[]
-  invoices Invoice[]
-  review   Review?
+  steps           TransferStep[]
+  messages        Message[]
+  dispute         Dispute?
+  ledger          LedgerEntry[]
+  invoices        Invoice[]
+  review          Review?
+  platformReviews PlatformReview[]
 
   @@index([buyerId, status])
   @@index([sellerId, status])
@@ -777,6 +779,23 @@ model Review {
   createdAt DateTime @default(now())
 
   @@index([subjectId])
+}
+
+/// What a buyer or a seller thought of Channel Adda itself, asked for in the
+/// deal's chat once it completed, after the buyer has rated the seller. One
+/// per person per deal, so every review stands on a deal that really happened.
+model PlatformReview {
+  id        String   @id @default(cuid())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User     @relation("PlatformReviewAuthor", fields: [authorId], references: [id])
+  rating    Int // 1-5
+  body      String   @default("")
+  createdAt DateTime @default(now())
+
+  @@unique([orderId, authorId])
+  @@index([createdAt])
 }
 
 // ---------------------------------------------------------------- money
@@ -1030,6 +1049,12 @@ model PlatformSettings {
   /// constant, and it is the one most likely to need tuning: it decides how
   /// long a buyer who walked away keeps a listing off the market.
   paymentWindowHours Int @default(48)
+
+  /// The "write a review" link of Channel Adda's Google Business Profile.
+  /// After a member gives Channel Adda four or five stars in the chat they
+  /// are offered it: Google does not show stars a site collects about
+  /// itself, so a review only counts there if it is posted there.
+  googleReviewUrl String?
 
   /// When the scheduled sweep last finished, and what it did. A dead
   /// crontab was silent before this, and its documented consequence is

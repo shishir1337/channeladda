@@ -36,6 +36,8 @@ export type PlatformSettings = FeeSettings & {
   resellerDiscountBp: number;
   /** How many times the holder's rating points count while it is active. */
   resellerPointsMultiplier: number;
+  /** Channel Adda's Google "write a review" link, offered after a good review. */
+  googleReviewUrl: string | null;
   /** When the scheduled sweep last finished. Null if it never has. */
   lastSweepAt: Date | null;
   /** What it did, per job: a count, or the error it hit. */
@@ -79,6 +81,7 @@ export async function getSettings(): Promise<PlatformSettings> {
       resellerPriceUsd: true,
       resellerDiscountBp: true,
       resellerPointsMultiplier: true,
+      googleReviewUrl: true,
       lastSweepAt: true,
       lastSweepResult: true,
       updatedAt: true,
@@ -102,6 +105,7 @@ export async function getSettings(): Promise<PlatformSettings> {
         resellerPriceUsd: row.resellerPriceUsd,
         resellerDiscountBp: row.resellerDiscountBp,
         resellerPointsMultiplier: row.resellerPointsMultiplier,
+        googleReviewUrl: row.googleReviewUrl,
         lastSweepAt: row.lastSweepAt,
         lastSweepResult:
           (row.lastSweepResult as Record<string, number | string> | null) ??
@@ -119,6 +123,7 @@ export async function getSettings(): Promise<PlatformSettings> {
         resellerPriceUsd: RESELLER_DEFAULTS.priceUsd,
         resellerDiscountBp: RESELLER_DEFAULTS.discountBp,
         resellerPointsMultiplier: RESELLER_DEFAULTS.pointsMultiplier,
+        googleReviewUrl: null,
         lastSweepAt: null,
         lastSweepResult: null,
         updatedAt: null,
@@ -151,7 +156,27 @@ export type SettingsInput = {
   resellerPrice: number;
   resellerDiscountBp: number;
   resellerPointsMultiplier: number;
+  /** Left out, the stored link stays as it is; empty clears it. */
+  googleReviewUrl?: string;
 };
+
+/** Google's own review addresses: g.page, google.com and its short links. */
+function isGoogleReviewUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    const host = url.hostname.toLowerCase();
+    return (
+      url.protocol === "https:" &&
+      (host === "g.page" ||
+        host === "google.com" ||
+        host.endsWith(".google.com") ||
+        host === "goo.gl" ||
+        host.endsWith(".goo.gl"))
+    );
+  } catch {
+    return false;
+  }
+}
 
 export type SettingsError = { field: string; message: string };
 
@@ -267,6 +292,15 @@ export function validateSettings(input: SettingsInput): SettingsError[] {
     });
   }
 
+  const google = input.googleReviewUrl?.trim();
+  if (google && !isGoogleReviewUrl(google)) {
+    errors.push({
+      field: "googleReviewUrl",
+      message:
+        "Paste the review link from your Google Business Profile (it starts with https://g.page/ or https://search.google.com/).",
+    });
+  }
+
   return errors;
 }
 
@@ -288,6 +322,7 @@ export async function updateSettings(input: SettingsInput, actorId: string) {
       resellerPriceUsd: true,
       resellerDiscountBp: true,
       resellerPointsMultiplier: true,
+      googleReviewUrl: true,
     },
   });
 
@@ -303,6 +338,9 @@ export async function updateSettings(input: SettingsInput, actorId: string) {
     resellerPriceUsd: Math.round(input.resellerPrice * 100),
     resellerDiscountBp: input.resellerDiscountBp,
     resellerPointsMultiplier: input.resellerPointsMultiplier,
+    ...(input.googleReviewUrl === undefined
+      ? {}
+      : { googleReviewUrl: input.googleReviewUrl.trim() || null }),
     updatedById: actorId,
   };
 

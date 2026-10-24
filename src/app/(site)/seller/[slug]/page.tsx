@@ -2,6 +2,7 @@ import {
   BadgeCheckIcon,
   MessageSquareIcon,
   ShieldCheckIcon,
+  StarIcon,
 } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -15,11 +16,13 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Breadcrumbs } from "@/components/ui/page-header";
 import { Price } from "@/components/ui/price";
 import { Container, Section } from "@/components/ui/section";
+import { Stars } from "@/components/ui/stars";
 import { platformMap } from "@/data/platforms";
 import { databaseGate } from "@/lib/db-gate";
 import { countOf } from "@/lib/plural";
 import { emptyRecord } from "@/lib/track-record";
 import { getSellerListings } from "@/server/listings";
+import { sellerReviewsBySlug } from "@/server/reviews";
 import { getSeller, getSellerSlugs } from "@/server/sellers";
 import { getSettings } from "@/server/settings";
 
@@ -60,7 +63,10 @@ export default async function SellerPage({
   ]);
   if (!seller) notFound();
 
-  const active = await getSellerListings(seller.slug);
+  const [active, reviews] = await Promise.all([
+    getSellerListings(seller.slug),
+    sellerReviewsBySlug(seller.slug),
+  ]);
   const record = seller.record ?? emptyRecord();
 
   return (
@@ -96,6 +102,26 @@ export default async function SellerPage({
                   <span className="tnum font-semibold text-fg">
                     {pointsLabel(seller.points ?? 0)}
                   </span>
+                  {reviews.average !== null ? (
+                    <>
+                      <span aria-hidden="true">·</span>
+                      <a
+                        href="#reviews"
+                        className="inline-flex items-center gap-1 font-medium text-fg hover:underline"
+                      >
+                        <StarIcon
+                          aria-hidden="true"
+                          className="size-3.5 fill-primary text-primary"
+                        />
+                        <span className="tnum">
+                          {reviews.average.toFixed(1)}
+                        </span>
+                        <span className="text-muted">
+                          ({countOf(reviews.count, "review")})
+                        </span>
+                      </a>
+                    </>
+                  ) : null}
                   <span aria-hidden="true">·</span>
                   <span>{seller.country}</span>
                   <span aria-hidden="true">·</span>
@@ -192,6 +218,57 @@ export default async function SellerPage({
           )}
         </Container>
       </Section>
+
+      {reviews.count > 0 ? (
+        <Section id="reviews" className="scroll-mt-20 border-t border-line">
+          <Container>
+            <h2 className="text-xl font-semibold tracking-[-0.02em] sm:text-2xl">
+              What buyers say
+            </h2>
+            <p className="mt-1.5 flex items-center gap-2 text-sm text-muted">
+              <Stars rating={reviews.average} />
+              <span className="tnum font-medium text-fg">
+                {reviews.average?.toFixed(1)} out of 5
+              </span>
+              <span>
+                · {countOf(reviews.count, "review")}, all from completed deals
+              </span>
+            </p>
+            <ul className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {reviews.recent.map((review) => (
+                <li
+                  key={review.id}
+                  className="flex flex-col rounded-card border border-line bg-surface p-5"
+                >
+                  <div
+                    role="img"
+                    aria-label={`Rated ${review.rating} out of 5`}
+                  >
+                    <Stars rating={review.rating} />
+                  </div>
+                  {review.body ? (
+                    <p className="mt-3 flex-1 text-[0.9375rem] leading-relaxed text-fg">
+                      {review.body}
+                    </p>
+                  ) : (
+                    <p className="mt-3 flex-1 text-sm text-subtle">
+                      No comment left.
+                    </p>
+                  )}
+                  <p className="mt-4 text-[0.8125rem] text-subtle">
+                    {review.author} ·{" "}
+                    {review.createdAt.toLocaleDateString("en-GB", {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                    })}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </Container>
+        </Section>
+      ) : null}
     </>
   );
 }

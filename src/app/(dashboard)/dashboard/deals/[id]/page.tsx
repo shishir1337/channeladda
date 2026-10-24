@@ -34,6 +34,7 @@ import {
 import { HandoverAccount } from "@/components/deals/handover-account";
 import { PayNow } from "@/components/deals/pay-now";
 import { PayToCard } from "@/components/deals/pay-to";
+import { ReviewPrompts } from "@/components/deals/review-prompts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { iconText } from "@/components/ui/icon-hue";
@@ -44,7 +45,9 @@ import { templateFor } from "@/lib/deal-templates";
 import { cn } from "@/lib/utils";
 import { certificateFor } from "@/server/certificate";
 import { getDealFor } from "@/server/deals";
+import { reviewPromptFor } from "@/server/reviews";
 import { requireUser } from "@/server/session";
+import { getSettings } from "@/server/settings";
 import { getWallet } from "@/server/wallet";
 
 export const metadata: Metadata = {
@@ -127,6 +130,9 @@ export default async function DealPage({
   // Only a deal that went through has one; null otherwise.
   const certificate =
     deal.status === "COMPLETED" ? await certificateFor(deal.id) : null;
+  const [reviewPrompt, settings] = certificate
+    ? await Promise.all([reviewPromptFor(deal.id, user.id), getSettings()])
+    : [null, null];
 
   return (
     <>
@@ -196,6 +202,12 @@ export default async function DealPage({
                   ? certificate.code
                   : null
               }
+            />
+          ) : null}
+          {reviewPrompt ? (
+            <ReviewPrompts
+              prompt={reviewPrompt}
+              googleReviewUrl={settings?.googleReviewUrl ?? null}
             />
           ) : null}
           {/* A paused deal says so above everything, in the one colour that
