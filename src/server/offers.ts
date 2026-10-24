@@ -2,7 +2,6 @@ import "server-only";
 
 import type { OfferStatus } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
-import { TERMINAL_STATUSES } from "@/lib/deal-machine";
 import { fromCents } from "@/lib/listing-form";
 import {
   mentionsOffPlatform,
@@ -15,6 +14,7 @@ import {
   ensureConversation,
   postEvent,
 } from "@/server/chat-events";
+import { notifyClosedOffers, releaseIfFree } from "@/server/listing-hold";
 import { notify } from "@/server/notifications";
 import { getSettings } from "@/server/settings";
 
@@ -674,19 +674,6 @@ export async function acceptOffer(
  * In the bell and not by email: there is nothing for them to do, and it is
  * news rather than a request.
  */
-export async function notifyClosedOffers(
-  closed: { buyerId: string; amountUsd: number; thread: string | null }[],
-) {
-  for (const offer of closed) {
-    await notify({
-      userId: offer.buyerId,
-      kind: "OFFER",
-      title: `Your offer of ${asMoney(offer.amountUsd)} closed`,
-      body: "The listing went to another buyer, so it is no longer available.",
-      href: offer.thread ? threadHref(offer.thread) : "/dashboard/offers",
-    });
-  }
-}
 
 export async function declineOffer(
   offerId: string,
@@ -1106,18 +1093,9 @@ export async function releaseLapsedOfferReservations(
     // undefined: another sweep got there first. null: no conversation.
     if (thread === undefined) continue;
 
-    const live = await db.order.count({
-      where: {
-        listingId: offer.listingId,
-        status: { notIn: [...TERMINAL_STATUSES] },
-      },
-    });
-    if (live === 0) {
-      await db.listing.updateMany({
-        where: { id: offer.listingId, status: "RESERVED" },
-        data: { status: "LIVE" },
-      });
-    }
+    // Back on sale unless something else holds it: a paid deal, or another
+    // accepted offer. Unpaid deals do not.
+    await releaseIfFree(db, offer.listingId);
 
     const amount = asMoney(offer.amountUsd);
     await notify({
@@ -1203,3 +1181,6 @@ export async function expireOffers(now = new Date()): Promise<number> {
   }
   return expired;
 }
+
+// Closing other people's offers moved with the listing hold; still importable from here.
+export { notifyClosedOffers };

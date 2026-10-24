@@ -118,8 +118,10 @@ test(
     const theirs = await offerFrom(other.id);
     const mine = await offerFrom(seeded.buyer.id);
 
-    // The buyer stops haggling and buys at the asking price.
-    await open("SAFEST", seeded);
+    // The buyer stops haggling and buys at the asking price. Opening the
+    // deal closes nothing: only paying for it does.
+    const deal = await open("SAFEST", seeded);
+    await recordOpeningPayment(deal.orderId, "pay-1", "USDT");
 
     const there = await db.message.findMany({
       where: { conversationId: theirs.conversationId, kind: "EVENT" },

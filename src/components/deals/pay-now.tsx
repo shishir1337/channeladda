@@ -82,6 +82,11 @@ export function PayNow({
         />
       </div>
 
+      {/* Opening a deal reserves nothing: the first buyer to pay gets it. */}
+      <p className="mt-3 max-w-[62ch] text-[0.8125rem] leading-relaxed font-medium text-primary-text">
+        Pay soon: until you do, another buyer can still buy it.
+      </p>
+
       {route.kind === "top-up" ? (
         <p className="mt-3 max-w-[62ch] text-[0.8125rem] leading-relaxed text-muted">
           You have{" "}

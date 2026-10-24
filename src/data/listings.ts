@@ -24,7 +24,7 @@ export type Listing = {
   /** Present when the seller has dropped the price since listing. */
   wasPrice?: number;
   ownershipVerified: boolean;
-  /** Held for somebody completing a purchase, by a deal or an accepted offer. */
+  /** Held for a buyer who has paid, or whose offer the seller accepted. */
   reserved?: boolean;
   /// Artwork URLs, supplied by the seller in production.
   coverUrl: string;

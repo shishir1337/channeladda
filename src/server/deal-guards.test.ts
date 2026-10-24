@@ -589,8 +589,8 @@ test(
       data: { createdAt: new Date(Date.now() - 1000 * 60 * 60 * 72) },
     });
 
-    // The listing is RESERVED by a deal nobody ever paid for. Before this,
-    // that was permanent and anyone could do it to any listing for free.
+    // A deal nobody paid for holds nothing, so the next buyer is let
+    // straight in, and the sweep still closes the abandoned one.
     const next = await seedUser();
     const result = await createDeal({
       listingId: listing.id,
@@ -599,6 +599,8 @@ test(
     });
     expect(result.ok).toBe(true);
 
+    const { expireStaleDeals } = await import("@/server/deals");
+    await expireStaleDeals();
     const abandoned = await db.order.findUniqueOrThrow({
       where: { id: orderId },
     });
@@ -607,7 +609,7 @@ test(
 );
 
 test(
-  "a listing reserved by a fresh deal is still not buyable",
+  "a fresh unpaid deal does not stop another buyer",
   withCleanDb(async () => {
     const { listing } = await open("SAFEST");
     const next = await seedUser();
@@ -617,6 +619,6 @@ test(
         buyerId: next.id,
         mode: "SAFEST",
       }),
-    ).toMatchObject({ ok: false, reason: "not-live" });
+    ).toMatchObject({ ok: true });
   }),
 );

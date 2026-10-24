@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import { db } from "@/lib/db";
-import { createDeal } from "@/server/deals";
+import { createDeal, recordOpeningPayment } from "@/server/deals";
 import {
   acceptOffer,
   createOffer,
@@ -89,15 +89,17 @@ test(
     });
     expect(first).toMatchObject({ ok: true });
 
-    // The listing is held by the deal now, so a second attempt is refused
-    // rather than opening another deal off the same acceptance.
-    expect(
-      await createDeal({
-        listingId: o.listing.id,
-        buyerId: o.buyer.id,
-        mode: "SAFEST",
-      }),
-    ).toMatchObject({ ok: false });
+    // A second attempt opens no second deal off the same acceptance: the
+    // buyer is handed the one already waiting for their payment.
+    const second = await createDeal({
+      listingId: o.listing.id,
+      buyerId: o.buyer.id,
+      mode: "SAFEST",
+    });
+    expect(second).toMatchObject({
+      ok: true,
+      orderId: first.ok ? first.orderId : "",
+    });
     expect(await db.order.count({ where: { listingId: o.listing.id } })).toBe(
       1,
     );
@@ -194,11 +196,18 @@ test(
     });
     if (!made.ok) throw new Error(made.reason);
 
-    await createDeal({
+    const deal = await createDeal({
       listingId: seeded.listing.id,
       buyerId: seeded.buyer.id,
       mode: "FASTEST",
     });
+    if (!deal.ok) throw new Error(deal.reason);
+    // Opening the deal is not buying it: the offer stands until it is paid.
+    expect(
+      (await db.offer.findUniqueOrThrow({ where: { id: made.value.offerId } }))
+        .status,
+    ).toBe("OPEN");
+    await recordOpeningPayment(deal.orderId, "pay-1", "USDT");
 
     const offer = await db.offer.findUniqueOrThrow({
       where: { id: made.value.offerId },

@@ -8,6 +8,11 @@ import { isSerializationFailure } from "@/lib/serialization-failure";
 import { recordAudit } from "@/server/audit";
 import { postEvent } from "@/server/chat-events";
 import { notifyNextActor } from "@/server/deal-notify";
+import {
+  claimListing,
+  paymentInProgress,
+  settleRivals,
+} from "@/server/listing-hold";
 import { notify, notifyStaff } from "@/server/notifications";
 import { getSettings } from "@/server/settings";
 
@@ -38,7 +43,11 @@ export type WalletFailure =
   /** The payout address was changed too recently to send to. */
   | "address-locked"
   | "already-settled"
-  | "not-payable";
+  | "not-payable"
+  /** Somebody else has paid for this listing: it is no longer for sale. */
+  | "taken"
+  /** Another buyer is part-way through paying for it by crypto. */
+  | "being-paid";
 
 export type WalletOutcome<T = Record<never, never>> =
   | ({ ok: true } & T)
@@ -265,6 +274,8 @@ export async function payFromWallet(
       reference: true,
       paymentRef: true,
       conversationId: true,
+      listingId: true,
+      offerId: true,
     },
   });
 
@@ -272,6 +283,10 @@ export async function payFromWallet(
   if (order.buyerId !== userId) return { ok: false, reason: "wrong-actor" };
   if (order.status !== "AWAITING_PAYMENT" || order.paymentRef) {
     return { ok: false, reason: "not-payable" };
+  }
+  // A buyer already paying by crypto has the hour their invoice lasts.
+  if (await paymentInProgress(order.listingId, order.id)) {
+    return { ok: false, reason: "being-paid" };
   }
 
   const target = OPENING_STATUS[order.mode];
@@ -285,6 +300,10 @@ export async function payFromWallet(
   try {
     await db.$transaction(
       async (tx) => {
+        // The listing first, as every payment path takes it: the first
+        // payment wins, and the rest are not charged.
+        if (!(await claimListing(tx, order))) throw new WalletAbort("taken");
+
         // Recomputed inside the transaction: the figure read before it began
         // is a guess by the time the write happens.
         const [sum, pending] = await Promise.all([
@@ -356,10 +375,24 @@ export async function payFromWallet(
     // reachable by JSON.stringify, because an Error's cause is
     // non-enumerable. Getting this wrong turned a lost race into a 500.
     if (isSerializationFailure(error)) {
-      return { ok: false, reason: "insufficient" };
+      // Lost to another payment for the same listing, or to another spend
+      // of the same balance: the listing says which.
+      const listing = await db.listing.findUnique({
+        where: { id: order.listingId },
+        select: { status: true },
+      });
+      return {
+        ok: false,
+        reason:
+          !order.offerId && listing?.status !== "LIVE"
+            ? "taken"
+            : "insufficient",
+      };
     }
     throw error;
   }
+
+  await settleRivals(order.listingId, order.id, userId);
 
   // After the commit, not inside it: the transaction above is Serializable
   // and reports a lost race as "not enough balance", and a chat line written

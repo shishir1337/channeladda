@@ -57,10 +57,12 @@ test(
     expect(order.steps[5].label).toBe("Pay the seller");
     expect(reference).toMatch(/^CA-\d{5}$/);
 
+    // Opening a deal reserves nothing: only a payment does, so nobody can
+    // keep a listing off sale by opening deals and walking away.
     const after = await db.listing.findUniqueOrThrow({
       where: { id: listing.id },
     });
-    expect(after.status).toBe("RESERVED");
+    expect(after.status).toBe("LIVE");
   }),
 );
 
@@ -117,8 +119,9 @@ test(
 );
 
 test(
-  "only one of two simultaneous buyers wins the listing",
+  "two buyers at once can both open a deal; the listing waits for a payment",
   withCleanDb(async () => {
+    // Who wins is decided by paying, in pay-to-reserve.test.ts.
     const { listing, buyer } = await seedListing();
     const other = await seedUser();
 
@@ -127,9 +130,12 @@ test(
       createDeal({ listingId: listing.id, buyerId: other.id, mode: "SAFEST" }),
     ]);
 
-    expect(results.filter((r) => r.ok)).toHaveLength(1);
-    expect(results.find((r) => !r.ok)).toMatchObject({ reason: "taken" });
-    expect(await db.order.count()).toBe(1);
+    expect(results.filter((r) => r.ok)).toHaveLength(2);
+    expect(await db.order.count()).toBe(2);
+    expect(
+      (await db.listing.findUniqueOrThrow({ where: { id: listing.id } }))
+        .status,
+    ).toBe("LIVE");
   }),
 );
 

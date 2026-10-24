@@ -73,9 +73,13 @@ export function BuyPanel({
 
       {heldForSomeoneElse ? (
         <p className="mt-4 rounded-card border border-line bg-surface-2 p-3.5 text-sm leading-relaxed text-muted">
-          <span className="font-semibold text-fg">Reserved.</span> Somebody is
-          completing a purchase of this account. If it falls through it comes
-          back on sale — save it to hear when.
+          {/* Only a paid deal or an accepted offer reserves a listing, so
+              this is somebody who has paid or agreed a price. */}
+          <span className="font-semibold text-fg">
+            Reserved for another buyer.
+          </span>{" "}
+          If their deal falls through, it comes back on sale — save it to hear
+          when.
         </p>
       ) : (
         <StartDeal

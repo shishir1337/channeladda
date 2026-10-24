@@ -44,9 +44,10 @@ test(
     if (!second.ok) throw new Error(second.reason);
 
     const input = await loadPanelInput(opened.id, "buyer");
+    // Still on sale: an unpaid deal reserves nothing.
     expect(input).toMatchObject({
       viewer: "buyer",
-      listingStatus: "RESERVED",
+      listingStatus: "LIVE",
       askingCents: 10_000,
       latestOffer: null,
       heldOffer: null,

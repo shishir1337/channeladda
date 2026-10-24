@@ -25,6 +25,8 @@ export type DealResult =
 
 const MESSAGES: Record<repo.DealFailure, string> = {
   "not-found": "That deal is no longer available.",
+  "too-many-unpaid":
+    "You have three deals waiting for payment. Pay for one, or cancel one, before starting another.",
   "not-live": "This listing is not accepting deals right now.",
   "own-listing": "You cannot buy your own listing.",
   taken: "Someone else got there first — this listing is no longer available.",

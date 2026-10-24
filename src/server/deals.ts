@@ -38,10 +38,16 @@ import {
   notifyHandoverChanged,
   notifyNextActor,
 } from "@/server/deal-notify";
+import {
+  claimListing,
+  holdingOrders,
+  MAX_UNPAID_DEALS,
+  releaseIfFree,
+  settleRivals,
+} from "@/server/listing-hold";
 import { notify, notifyStaff } from "@/server/notifications";
 import {
   heldByAcceptedOffer,
-  notifyClosedOffers,
   releaseLapsedOfferReservations,
 } from "@/server/offers";
 import { dealFees } from "@/server/reseller-status";
@@ -66,6 +72,8 @@ import { markUploadsAttached } from "@/server/upload-access";
 export type DealFailure =
   | "not-found"
   | "not-live"
+  /** The buyer already has `MAX_UNPAID_DEALS` deals they have not paid for. */
+  | "too-many-unpaid"
   | "own-listing"
   | "taken"
   | "wrong-actor"
@@ -291,6 +299,39 @@ export async function createDeal(input: {
     return { ok: false, reason: "own-listing" };
   }
 
+  // Pressing Start again on a listing they are already buying: the same
+  // deal, not a second one. And a cap on unpaid deals per buyer, so nobody
+  // collects them across the site now that opening one reserves nothing.
+  const [already, unpaid] = await Promise.all([
+    db.order.findFirst({
+      where: {
+        listingId: listing.id,
+        buyerId: input.buyerId,
+        status: "AWAITING_PAYMENT",
+        paymentRef: null,
+      },
+      select: { id: true, reference: true, conversationId: true },
+    }),
+    db.order.count({
+      where: {
+        buyerId: input.buyerId,
+        status: "AWAITING_PAYMENT",
+        paymentRef: null,
+      },
+    }),
+  ]);
+  if (already?.conversationId) {
+    return {
+      ok: true,
+      orderId: already.id,
+      reference: already.reference,
+      conversationId: already.conversationId,
+    };
+  }
+  if (unpaid >= MAX_UNPAID_DEALS) {
+    return { ok: false, reason: "too-many-unpaid" };
+  }
+
   // A listing held by somebody's abandoned deal is the one case worth paying
   // for a write on a read path: without it, opening a deal and walking away
   // takes a listing off the market for good, and anybody could do that to
@@ -305,9 +346,13 @@ export async function createDeal(input: {
   if (listing.status === "RESERVED") {
     offer = await heldByAcceptedOffer(listing.id, input.buyerId);
     if (!offer) {
+      // A listing reserved by nothing that still holds it — an accepted
+      // offer that lapsed, or an unpaid deal from before only payment
+      // reserved — is put back on sale here, where the next buyer hits it.
       const freed =
         (await expireStaleDealsForListing(listing.id)) +
-        (await releaseLapsedOfferReservations(listing.id));
+        (await releaseLapsedOfferReservations(listing.id)) +
+        Number(await releaseIfFree(db, listing.id));
       if (freed > 0) {
         const again = await db.listing.findUnique({
           where: { id: listing.id },
@@ -342,159 +387,104 @@ export async function createDeal(input: {
   for (let attempt = 0; attempt < 5; attempt++) {
     const reference = newReference();
     try {
-      const { orderId, conversationId, closed } = await db.$transaction(
-        async (tx) => {
-          // Compare-and-set, not read-then-write: two buyers pressing buy at the
-          // same moment must not both end up with an order. A zero row count
-          // means somebody else got there between the read above and here.
-          //
-          // From an accepted offer the listing is already reserved — by the
-          // offer — so the check is that it still is, and that no live deal
-          // has been opened against it in the meantime. The unique offerId on
-          // the order then makes a second deal off the same acceptance
-          // impossible rather than merely unlikely.
-          if (offer) {
-            const stillHeld = await tx.listing.count({
-              where: { id: listing.id, status: "RESERVED" },
-            });
-            const live = await tx.order.count({
-              where: {
-                listingId: listing.id,
-                status: { notIn: [...TERMINAL_STATUSES] },
-              },
-            });
-            if (stillHeld !== 1 || live > 0) throw new DealAbort("taken");
-          } else {
-            const reserved = await tx.listing.updateMany({
-              where: { id: listing.id, status: "LIVE" },
-              data: { status: "RESERVED" },
-            });
-            if (reserved.count !== 1) throw new DealAbort("taken");
-          }
+      const { orderId, conversationId } = await db.$transaction(async (tx) => {
+        // Compare-and-set, not read-then-write: two buyers pressing buy at the
+        // same moment must not both end up with an order. A zero row count
+        // means somebody else got there between the read above and here.
+        //
+        // From an accepted offer the listing is already reserved — by the
+        // offer — so the check is that it still is, and that no live deal
+        // has been opened against it in the meantime. The unique offerId on
+        // the order then makes a second deal off the same acceptance
+        // impossible rather than merely unlikely.
+        //
+        // Without an offer, opening a deal reserves nothing: the listing
+        // stays on sale until somebody pays (`claimListing`). It only has
+        // to be on sale still.
+        if (offer) {
+          const stillHeld = await tx.listing.count({
+            where: { id: listing.id, status: "RESERVED" },
+          });
+          const holding = await tx.order.count({
+            where: holdingOrders(listing.id),
+          });
+          if (stillHeld !== 1 || holding > 0) throw new DealAbort("taken");
+        } else {
+          const onSale = await tx.listing.count({
+            where: { id: listing.id, status: "LIVE" },
+          });
+          if (onSale !== 1) throw new DealAbort("taken");
+        }
 
-          // The 10-day chat purge carves out threads with an order on them, and
-          // nothing ever wrote that link — so the carve-out could never fire,
-          // and every deal's conversation was deleted after ten days. That
-          // conversation is what the dispute process and the refund policy both
-          // call the only account of what was agreed.
-          //
-          // Every deal has one now: a buyer who never wrote to the seller gets
-          // the thread here, so the agent has somewhere to talk to both. The
-          // link lives on the deal, not the thread, so a second deal opened in
-          // the same conversation after the first lapsed is linked too. Inside
-          // the transaction: if the order rolls back, the link does too.
-          const conversationId = await ensureConversation(tx, {
+        // The 10-day chat purge carves out threads with an order on them, and
+        // nothing ever wrote that link — so the carve-out could never fire,
+        // and every deal's conversation was deleted after ten days. That
+        // conversation is what the dispute process and the refund policy both
+        // call the only account of what was agreed.
+        //
+        // Every deal has one now: a buyer who never wrote to the seller gets
+        // the thread here, so the agent has somewhere to talk to both. The
+        // link lives on the deal, not the thread, so a second deal opened in
+        // the same conversation after the first lapsed is linked too. Inside
+        // the transaction: if the order rolls back, the link does too.
+        const conversationId = await ensureConversation(tx, {
+          listingId: listing.id,
+          buyerId: input.buyerId,
+          sellerId: listing.sellerId,
+        });
+        const now = new Date();
+
+        const order = await tx.order.create({
+          data: {
+            reference,
             listingId: listing.id,
             buyerId: input.buyerId,
             sellerId: listing.sellerId,
-          });
-          const now = new Date();
-
-          // Anybody still waiting on an offer hears a decision rather than
-          // nothing. Without this a buyer could watch “waiting on seller” for
-          // up to thirty days on a channel somebody else had already bought.
-          //
-          // One at a time, so each closes with a line in its own conversation.
-          // The buyer opening this deal is not "declined": their own open offer
-          // is one they have just superseded, so it reads as withdrawn.
-          const open = await tx.offer.findMany({
-            where: { listingId: listing.id, status: "OPEN" },
-            select: { id: true, buyerId: true, amountUsd: true },
-          });
-          const closed: {
-            buyerId: string;
-            amountUsd: number;
-            thread: string | null;
-          }[] = [];
-          for (const other of open) {
-            const own = other.buyerId === input.buyerId;
-            const moved = await tx.offer.updateMany({
-              where: { id: other.id, status: "OPEN" },
-              data: {
-                status: own ? "WITHDRAWN" : "REJECTED",
-                respondedAt: now,
-              },
-            });
-            if (moved.count !== 1 || own) continue;
-            const thread = await tx.conversation.findUnique({
-              where: {
-                listingId_buyerId: {
-                  listingId: listing.id,
-                  buyerId: other.buyerId,
-                },
-              },
-              select: { id: true },
-            });
-            if (thread) {
-              await postEvent(tx, {
-                conversationId: thread.id,
-                kind: "EVENT",
-                event: {
-                  type: "offer-auto-declined",
-                  amountCents: other.amountUsd,
-                },
-                senderId: null,
-                offerId: other.id,
-                at: now,
-              });
-            }
-            closed.push({ ...other, thread: thread?.id ?? null });
-          }
-
-          const order = await tx.order.create({
-            data: {
-              reference,
-              listingId: listing.id,
-              buyerId: input.buyerId,
-              sellerId: listing.sellerId,
-              conversationId,
-              mode: input.mode,
-              status: "AWAITING_PAYMENT",
-              offerId: offer?.id ?? null,
-              priceUsd: amounts.priceUsd,
-              buyerFeeUsd: amounts.buyerFeeUsd,
-              sellerFeeUsd: amounts.sellerFeeUsd,
-              totalUsd: amounts.totalUsd,
-              // The consent three published policies say we collect. The
-              // column has existed since the schema was written and nothing
-              // ever wrote it, so a dispute about lost monetization was
-              // refused on the strength of an acknowledgement we could not
-              // produce.
-              revenueRiskAcceptedAt: input.acceptedRevenueRisk
-                ? new Date()
-                : null,
-              handoverTo: input.handoverTo ?? null,
-              steps: {
-                create: steps.map((step) => ({
-                  position: step.position,
-                  label: step.label,
-                  actor: step.actor,
-                })),
-              },
-            },
-            select: { id: true },
-          });
-
-          await postEvent(tx, {
             conversationId,
-            kind: "EVENT",
-            event: {
-              type: "deal-opened",
-              name: buyer?.name ?? "",
-              mode: input.mode,
-              reference,
-              priceCents: amounts.priceUsd,
+            mode: input.mode,
+            status: "AWAITING_PAYMENT",
+            offerId: offer?.id ?? null,
+            priceUsd: amounts.priceUsd,
+            buyerFeeUsd: amounts.buyerFeeUsd,
+            sellerFeeUsd: amounts.sellerFeeUsd,
+            totalUsd: amounts.totalUsd,
+            // The consent three published policies say we collect. The
+            // column has existed since the schema was written and nothing
+            // ever wrote it, so a dispute about lost monetization was
+            // refused on the strength of an acknowledgement we could not
+            // produce.
+            revenueRiskAcceptedAt: input.acceptedRevenueRisk
+              ? new Date()
+              : null,
+            handoverTo: input.handoverTo ?? null,
+            steps: {
+              create: steps.map((step) => ({
+                position: step.position,
+                label: step.label,
+                actor: step.actor,
+              })),
             },
-            senderId: input.buyerId,
-            orderId: order.id,
-            at: now,
-          });
+          },
+          select: { id: true },
+        });
 
-          return { orderId: order.id, conversationId, closed };
-        },
-      );
+        await postEvent(tx, {
+          conversationId,
+          kind: "EVENT",
+          event: {
+            type: "deal-opened",
+            name: buyer?.name ?? "",
+            mode: input.mode,
+            reference,
+            priceCents: amounts.priceUsd,
+          },
+          senderId: input.buyerId,
+          orderId: order.id,
+          at: now,
+        });
 
-      await notifyClosedOffers(closed);
+        return { orderId: order.id, conversationId };
+      });
 
       await recordAudit({
         actorId: input.buyerId,
@@ -735,6 +725,55 @@ async function creditUnusablePayment(
   });
 }
 
+/** Another payment holds the listing; this one must not be applied. */
+class ListingTaken extends Error {}
+/** The order moved under the payment; read it again and decide. */
+class LostRace extends Error {}
+
+/**
+ * A deal whose payment arrived after somebody else's had taken the listing:
+ * closed, with a line in its chat and a word to the buyer, whose money has
+ * just been credited to their balance.
+ */
+async function closeLostDeal(order: {
+  id: string;
+  buyerId: string;
+  reference: string;
+  conversationId: string | null;
+}) {
+  const now = new Date();
+  const closed = await db.$transaction(async (tx) => {
+    const moved = await tx.order.updateMany({
+      where: { id: order.id, status: "AWAITING_PAYMENT", paymentRef: null },
+      data: { status: "CANCELLED", cancelledAt: now },
+    });
+    if (moved.count !== 1) return false;
+    if (order.conversationId) {
+      await postEvent(tx, {
+        conversationId: order.conversationId,
+        kind: "EVENT",
+        event: {
+          type: "deal-ended",
+          outcome:
+            "Another buyer paid first, so this deal has closed. Your payment is in your Channel Adda balance",
+        },
+        senderId: null,
+        orderId: order.id,
+        at: now,
+      });
+    }
+    return true;
+  });
+  if (!closed) return;
+  await notify({
+    userId: order.buyerId,
+    kind: "ORDER",
+    title: "Another buyer paid first",
+    body: `Deal ${order.reference} has closed. What you paid is in your Channel Adda balance, to use or withdraw.`,
+    href: "/dashboard/wallet",
+  });
+}
+
 export async function recordOpeningPayment(
   orderId: string,
   ref: string,
@@ -754,6 +793,8 @@ export async function recordOpeningPayment(
       buyerId: true,
       reference: true,
       conversationId: true,
+      listingId: true,
+      offerId: true,
     },
   });
 
@@ -782,66 +823,86 @@ export async function recordOpeningPayment(
 
   const now = new Date();
   let claimed = true;
-  await db.$transaction(async (tx) => {
-    // The early return above catches a webhook replayed after the first call
-    // finished. It does not catch two deliveries in flight at once, which is
-    // what a retry storm actually looks like: both would read a null
-    // paymentRef and both would write a ledger row, and the books would claim
-    // twice the money held. Claiming the null paymentRef inside the
-    // transaction is what makes the second one a no-op.
-    const took = await tx.order.updateMany({
-      // The status belongs in the predicate as well as the reference. The
-      // transition was decided above, outside the transaction, and the
-      // expiry sweep can commit between the two: its own CAS keys on the
-      // status, and without the same key here a terminal order was quietly
-      // resurrected — with the listing already back on the market.
-      where: { id: order.id, paymentRef: null, status: order.status },
-      data: {
-        status: target,
-        paymentRef: ref,
-        paymentAsset: asset,
-        paidAt: now,
-        feePaidAt: now,
-      },
-    });
-    if (took.count !== 1) {
-      claimed = false;
-      return;
-    }
+  let taken = false;
+  try {
+    await db.$transaction(async (tx) => {
+      // The listing first, before the order: the first payment to arrive takes
+      // it, and the same lock order in every payment path means two payments
+      // landing together queue on the listing rather than deadlocking.
+      if (!(await claimListing(tx, order))) throw new ListingTaken();
 
-    await tx.transferStep.updateMany({
-      where: { orderId: order.id, position: 1, completedAt: null },
-      data: { completedAt: now },
-    });
-
-    await tx.ledgerEntry.create({
-      data: {
-        orderId: order.id,
-        // Platform-held funds and platform revenue carry no userId, so they
-        // never count towards anybody's withdrawable balance.
-        userId: null,
-        // Held, in both modes: price and fee on Fastest, the fee on Safest.
-        // None of it is ours until it is earned — at completion, or for a
-        // Safest fee when a deal fails after custody — so a refund before
-        // then is held money going home, not revenue given back.
-        kind: "ESCROW_HOLD",
-        amountUsd: order.totalUsd,
-        note: `${order.mode} opening payment`,
-      },
-    });
-
-    // Nobody pressed a button for this: the processor said so. No sender.
-    if (order.conversationId) {
-      await postEvent(tx, {
-        conversationId: order.conversationId,
-        kind: "EVENT",
-        event: { type: "payment-received", reference: order.reference },
-        senderId: null,
-        orderId: order.id,
-        at: now,
+      // The early return above catches a webhook replayed after the first call
+      // finished. It does not catch two deliveries in flight at once, which is
+      // what a retry storm actually looks like: both would read a null
+      // paymentRef and both would write a ledger row, and the books would claim
+      // twice the money held. Claiming the null paymentRef inside the
+      // transaction is what makes the second one a no-op.
+      const took = await tx.order.updateMany({
+        // The status belongs in the predicate as well as the reference. The
+        // transition was decided above, outside the transaction, and the
+        // expiry sweep can commit between the two: its own CAS keys on the
+        // status, and without the same key here a terminal order was quietly
+        // resurrected — with the listing already back on the market.
+        where: { id: order.id, paymentRef: null, status: order.status },
+        data: {
+          status: target,
+          paymentRef: ref,
+          paymentAsset: asset,
+          paidAt: now,
+          feePaidAt: now,
+        },
       });
-    }
-  });
+      if (took.count !== 1) throw new LostRace();
+
+      await tx.transferStep.updateMany({
+        where: { orderId: order.id, position: 1, completedAt: null },
+        data: { completedAt: now },
+      });
+
+      await tx.ledgerEntry.create({
+        data: {
+          orderId: order.id,
+          // Platform-held funds and platform revenue carry no userId, so they
+          // never count towards anybody's withdrawable balance.
+          userId: null,
+          // Held, in both modes: price and fee on Fastest, the fee on Safest.
+          // None of it is ours until it is earned — at completion, or for a
+          // Safest fee when a deal fails after custody — so a refund before
+          // then is held money going home, not revenue given back.
+          kind: "ESCROW_HOLD",
+          amountUsd: order.totalUsd,
+          note: `${order.mode} opening payment`,
+        },
+      });
+
+      // Nobody pressed a button for this: the processor said so. No sender.
+      if (order.conversationId) {
+        await postEvent(tx, {
+          conversationId: order.conversationId,
+          kind: "EVENT",
+          event: { type: "payment-received", reference: order.reference },
+          senderId: null,
+          orderId: order.id,
+          at: now,
+        });
+      }
+    });
+  } catch (error) {
+    if (error instanceof ListingTaken) taken = true;
+    else if (error instanceof LostRace) claimed = false;
+    else throw error;
+  }
+
+  // The listing was taken under us. Read the order again first: it may be
+  // this very payment, delivered twice at once and applied by the other
+  // delivery, which the re-entry recognises. Only a payment for a deal
+  // somebody else's payment beat becomes the buyer's balance.
+  if (taken) {
+    if (attempt === 0) return recordOpeningPayment(orderId, ref, asset, 1);
+    await creditUnusablePayment(order, ref, asset, order.totalUsd);
+    await closeLostDeal(order);
+    return "credited-to-balance";
+  }
 
   // Lost the compare-and-set. Before `status` joined the predicate the only
   // way to miss was an identical delivery that had already done the work,
@@ -868,6 +929,7 @@ export async function recordOpeningPayment(
     return recordOpeningPayment(orderId, ref, asset, attempt + 1);
   }
 
+  await settleRivals(order.listingId, order.id, order.buyerId);
   await notifyNextActor(order.id);
 
   // No actor: the platform did this on its own, on a cleared payment.
@@ -1671,10 +1733,9 @@ async function expireStale(scope: { listingId?: string }): Promise<number> {
     });
     if (!moved) continue;
 
-    await db.listing.updateMany({
-      where: { id: order.listingId, status: "RESERVED" },
-      data: { status: "LIVE" },
-    });
+    // An unpaid deal holds its listing only when it came from an accepted
+    // offer; either way, back on sale only if nothing else holds it.
+    await releaseIfFree(db, order.listingId);
     // Both sides were left to find out by looking; the listing is back on
     // sale and the buyer can start again.
     await notifyDealEnded(order.id, "Payment window closed");
@@ -2059,10 +2120,9 @@ export async function resolveDeal(input: {
         return;
       }
 
-      await tx.listing.updateMany({
-        where: { id: order.listingId, status: "RESERVED" },
-        data: { status: "LIVE" },
-      });
+      // Back on sale if this deal was what held it. An unpaid deal never
+      // did, and must not free a listing somebody else has paid for.
+      await releaseIfFree(tx, order.listingId);
 
       // A refund is credited to the buyer's Channel Adda balance, whatever
       // they paid with.

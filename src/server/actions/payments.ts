@@ -13,6 +13,7 @@ import {
   reconcileInvoice,
   recordInvoice,
 } from "@/server/invoices";
+import { paymentInProgress } from "@/server/listing-hold";
 import { requireUser } from "@/server/session";
 
 /**
@@ -61,6 +62,33 @@ export async function startPayment(orderId: string): Promise<PayResult> {
       : null;
   if (!stage) {
     return { ok: false, error: "This deal has nothing left to pay." };
+  }
+
+  // Only a payment reserves a listing, so it may have gone to somebody else
+  // since this deal opened, or someone may be paying for it by crypto now.
+  // Said before an invoice is raised: crypto sent for a listing that has
+  // gone would only come back as balance.
+  const order = await db.order.findUniqueOrThrow({
+    where: { id: deal.id },
+    select: {
+      listingId: true,
+      offerId: true,
+      listing: { select: { status: true } },
+    },
+  });
+  if (!order.offerId && order.listing.status !== "LIVE") {
+    return {
+      ok: false,
+      error:
+        "Another buyer paid for this listing first, so it is no longer for sale. You were not charged.",
+    };
+  }
+  if (await paymentInProgress(order.listingId, deal.id)) {
+    return {
+      ok: false,
+      error:
+        "Another buyer is paying for this listing right now. If they have not paid within the hour, you can buy it.",
+    };
   }
 
   if (!isConfigured()) {

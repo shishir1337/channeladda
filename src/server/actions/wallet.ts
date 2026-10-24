@@ -29,6 +29,10 @@ const MESSAGES: Record<repo.WalletFailure, string> = {
     "Your payout address changed in the last 24 hours. Withdrawals are held for a day after a change — it is what stops somebody who gets into your account from emptying it.",
   "already-settled": "That withdrawal has already been dealt with.",
   "not-payable": "This deal is not waiting on a payment.",
+  taken:
+    "Another buyer paid for this listing first, so it is no longer for sale. You were not charged.",
+  "being-paid":
+    "Another buyer is paying for this listing right now. If they have not paid within the hour, you can buy it.",
 };
 
 function toCents(dollars: number): number | null {
