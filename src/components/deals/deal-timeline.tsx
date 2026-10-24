@@ -4,6 +4,7 @@ import {
   CheckIcon,
   CircleXIcon,
   ClockIcon,
+  FastForwardIcon,
   InfoIcon,
   LoaderCircleIcon,
   ShieldAlertIcon,
@@ -44,7 +45,7 @@ import { Price } from "@/components/ui/price";
 import { memberMayCancel } from "@/lib/deal-cancel";
 import { isTerminal } from "@/lib/deal-machine";
 import { cn } from "@/lib/utils";
-import { completeStep, endDeal } from "@/server/actions/deals";
+import { completeStep, endDeal, endWaitNow } from "@/server/actions/deals";
 import type { DealStepView, DealView } from "@/server/deals";
 
 /**
@@ -245,6 +246,7 @@ function Note({
 export function DealNextStep({
   deal,
   staffIds,
+  canEndWait,
 }: {
   deal: DealView;
   /**
@@ -253,6 +255,8 @@ export function DealNextStep({
    * paste a user id.
    */
   staffIds?: StaffList;
+  /** A moderator or the owner, who may end a waiting period early. */
+  canEndWait?: boolean;
 }) {
   const step = deal.nextStep;
   if (!step) return null;
@@ -276,7 +280,13 @@ export function DealNextStep({
           </h2>
           <StepInfo step={step} state={state} className="mt-0.5" />
         </div>
-        <StepDetail deal={deal} step={step} state={state} staffIds={staffIds} />
+        <StepDetail
+          deal={deal}
+          step={step}
+          state={state}
+          staffIds={staffIds}
+          canEndWait={canEndWait}
+        />
       </section>
     </Card>
   );
@@ -292,11 +302,13 @@ function StepDetail({
   step,
   state,
   staffIds,
+  canEndWait,
 }: {
   deal: DealView;
   step: DealStepView;
   state: StepState;
   staffIds?: StaffList;
+  canEndWait?: boolean;
 }) {
   return (
     <>
@@ -342,6 +354,7 @@ function StepDetail({
           {holdNote(deal.mode, deal.platform)}
         </Note>
       ) : null}
+      {state.heldUntil && canEndWait ? <EndWaitNow orderId={deal.id} /> : null}
 
       {state.awaitingAgent && step.actor === deal.viewerRole ? (
         <Note icon={ClockIcon}>
@@ -362,6 +375,85 @@ function StepDetail({
         )
       ) : null}
     </>
+  );
+}
+
+/**
+ * Staff ending the wait before its date, when Google already lets the
+ * transfer go ahead. One press opens a plain check, so it is never done by
+ * a stray tap; the next person is told it is their move.
+ */
+export function EndWaitNow({ orderId }: { orderId: string }) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  if (!open) {
+    return (
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        onClick={() => setOpen(true)}
+        className="mt-3"
+      >
+        <FastForwardIcon aria-hidden="true" />
+        End the wait now
+      </Button>
+    );
+  }
+
+  return (
+    <div className="mt-3 max-w-[62ch] rounded-lg border border-line bg-surface p-3 sm:p-3.5">
+      <p className="text-[0.8125rem] font-semibold text-fg">
+        End the wait now?
+      </p>
+      <p className="mt-0.5 text-[0.8125rem] leading-relaxed text-muted">
+        Only if Google already lets the transfer go ahead. The next step opens
+        straight away and we tell whoever does it.
+      </p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Button
+          type="button"
+          size="sm"
+          disabled={pending}
+          onClick={() => {
+            setError(null);
+            startTransition(async () => {
+              const result = await endWaitNow(orderId);
+              if (!result.ok) {
+                setError(result.error);
+                return;
+              }
+              setOpen(false);
+              router.refresh();
+            });
+          }}
+        >
+          <BusyLabel busy={pending} busyText="Ending…">
+            Yes, end it now
+          </BusyLabel>
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          disabled={pending}
+          onClick={() => setOpen(false)}
+        >
+          Keep waiting
+        </Button>
+      </div>
+      {error ? (
+        <p
+          role="alert"
+          className="mt-2.5 text-[0.8125rem] font-medium text-danger"
+        >
+          {error}
+        </p>
+      ) : null}
+    </div>
   );
 }
 
@@ -516,10 +608,13 @@ export function DealSteps({
   deal,
   staffIds,
   payment,
+  canEndWait,
 }: {
   deal: DealView;
   /** As for `DealNextStep`: who can second a high-value handover. */
   staffIds?: StaffList;
+  /** As for `DealNextStep`: may end a waiting period early. */
+  canEndWait?: boolean;
   /**
    * The buyer's opening payment, drawn in place of the step's own action:
    * the step it completes ticks itself off when the money clears.
@@ -586,6 +681,7 @@ export function DealSteps({
             isLast={index === deal.steps.length - 1}
             staffIds={staffIds}
             payment={payment}
+            canEndWait={canEndWait}
           />
         ))}
       </ol>
@@ -600,6 +696,7 @@ function Step({
   isLast,
   staffIds,
   payment,
+  canEndWait,
 }: {
   deal: DealView;
   step: DealStepView;
@@ -608,6 +705,7 @@ function Step({
   isLast: boolean;
   staffIds?: StaffList;
   payment?: ReactNode;
+  canEndWait?: boolean;
 }) {
   const done = step.completedAt !== null;
 
@@ -654,6 +752,7 @@ function Step({
                 step={step}
                 state={current}
                 staffIds={staffIds}
+                canEndWait={canEndWait}
               />
             )}
           </>

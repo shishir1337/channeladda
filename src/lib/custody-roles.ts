@@ -19,6 +19,15 @@ export function isCustodianRole(role: UserRole): boolean {
   return CUSTODIAN_ROLES.includes(role);
 }
 
+/**
+ * Who may end a deal's waiting period early: the moderators, and the owner.
+ * Not an agent — the person holding the channel does not cut short the wait
+ * that protects the other side — and not finance.
+ */
+export function mayEndHolds(role: UserRole): boolean {
+  return role === "MODERATOR" || role === "SUPERADMIN";
+}
+
 /** Cents. Strict bands: each price belongs to exactly one level. */
 const LEVEL_2_FROM = 1_000_000; // $10,000
 const LEVEL_3_FROM = 10_000_000; // $100,000

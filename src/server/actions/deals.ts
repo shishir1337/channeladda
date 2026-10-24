@@ -42,6 +42,7 @@ const MESSAGES: Record<repo.DealFailure, string> = {
     "One side says this already happened, so reversing it is a decision, not a correction. Pause it for review first — then it can be decided with both accounts of it on the record.",
   "on-hold":
     "The waiting period is still running, so this step is not open yet. The chat shows when it ends, and we email you the moment it does.",
+  "not-on-hold": "The waiting period on this deal has already ended.",
   "not-handed-over":
     "The seller has not handed the channel over yet, so paying them now would leave them with the money and the channel both. Refund the buyer instead.",
   "seller-paid":
@@ -341,6 +342,19 @@ export async function endDeal(
     COMPLETED: "Deal completed.",
   } as const;
   return { ok: true, message: messages[to] };
+}
+
+/**
+ * Staff ending a deal's waiting period early, when Google lets the transfer
+ * through before the date. Moderators and the owner; who may is checked
+ * again in `endHoldNow`.
+ */
+export async function endWaitNow(orderId: string): Promise<DealResult> {
+  const user = await requireRole("MODERATOR");
+  const result = await repo.endHoldNow({ orderId, byUserId: user.id });
+  if (!result.ok) return fail(result.reason);
+  refresh(orderId);
+  return { ok: true, message: "The wait is over. The next step is open now." };
 }
 
 const PAY_TO_MESSAGES: Record<PayToFailure, string> = {

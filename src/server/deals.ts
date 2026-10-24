@@ -7,7 +7,7 @@ import type {
   UserRole,
 } from "@/generated/prisma/enums";
 import { money } from "@/lib/chat-events";
-import { isCustodianRole, withinLevel } from "@/lib/custody-roles";
+import { isCustodianRole, mayEndHolds, withinLevel } from "@/lib/custody-roles";
 import { db } from "@/lib/db";
 import {
   AGENT_HOLDS,
@@ -112,6 +112,8 @@ export type DealFailure =
   | "old-steps"
   /** The deal's hold — Google's wait, or the holding period — is running. */
   | "on-hold"
+  /** Staff ending a hold on a deal that has none running. */
+  | "not-on-hold"
   /**
    * The platform's hold on this deal is not what the deal says it should
    * be, so nothing is paid out or refunded until staff have looked.
@@ -1822,6 +1824,84 @@ export async function announceEndedHolds(): Promise<number> {
     announced += 1;
   }
   return announced;
+}
+
+/**
+ * Staff ending a deal's hold before its date — Google's wait on Safest, the
+ * holding period on Fastest.
+ *
+ * Google sometimes lets the transfer through sooner, and staff were ending
+ * the wait from psql (the owner, 2026-10-24). This does what the sweep does
+ * when a hold runs out — the chat says the wait is over and the next person
+ * is told it is their move — and it goes in the audit trail under the name
+ * of whoever pressed it. A paused deal is left alone: a dispute freezes
+ * every step, so opening the next one would only invite a refusal.
+ */
+export async function endHoldNow(input: {
+  orderId: string;
+  byUserId: string;
+}): Promise<DealOutcome> {
+  const staff = await db.user.findUnique({
+    where: { id: input.byUserId },
+    select: { role: true, bannedAt: true },
+  });
+  if (!staff || staff.bannedAt || !mayEndHolds(staff.role)) {
+    return { ok: false, reason: "wrong-actor" };
+  }
+
+  const order = await db.order.findUnique({
+    where: { id: input.orderId },
+    select: {
+      id: true,
+      status: true,
+      holdUntil: true,
+      conversationId: true,
+    },
+  });
+  if (!order) return { ok: false, reason: "not-found" };
+  if (isTerminal(order.status)) return { ok: false, reason: "terminal" };
+  if (order.status === "DISPUTED") return { ok: false, reason: "disputed" };
+
+  const now = new Date();
+  if (!order.holdUntil || order.holdUntil <= now) {
+    return { ok: false, reason: "not-on-hold" };
+  }
+
+  const ended = await db.$transaction(async (tx) => {
+    // Compare-and-set, so two presses (or a press and the sweep) end it once.
+    const took = await tx.order.updateMany({
+      where: {
+        id: order.id,
+        holdUntil: { gt: now },
+        status: { notIn: [...TERMINAL_STATUSES, "DISPUTED"] },
+      },
+      data: { holdUntil: now, holdNotifiedAt: now },
+    });
+    if (took.count !== 1) return false;
+    if (order.conversationId) {
+      await postEvent(tx, {
+        conversationId: order.conversationId,
+        kind: "EVENT",
+        event: { type: "hold-ended" },
+        senderId: null,
+        orderId: order.id,
+        at: now,
+      });
+    }
+    return true;
+  });
+  if (!ended) return { ok: false, reason: "not-on-hold" };
+
+  await recordAudit({
+    actorId: input.byUserId,
+    action: "deal.hold_ended",
+    entity: "order",
+    entityId: order.id,
+    before: { holdUntil: order.holdUntil.toISOString() },
+    after: { holdUntil: now.toISOString() },
+  });
+  await notifyNextActor(order.id);
+  return { ok: true };
 }
 
 /**

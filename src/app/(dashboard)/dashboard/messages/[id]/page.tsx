@@ -25,6 +25,7 @@ import type { OfferComposerConfig } from "@/components/messages/offer-composer";
 import { toMessageViews, toPanelView } from "@/components/messages/serialize";
 import { ThreadView } from "@/components/messages/thread-view";
 import { Badge } from "@/components/ui/badge";
+import { mayEndHolds } from "@/lib/custody-roles";
 import { db } from "@/lib/db";
 import { dealPanelState } from "@/lib/deal-panel";
 import { templateFor } from "@/lib/deal-templates";
@@ -326,7 +327,11 @@ export default async function ThreadPage({
                   </div>
                 ) : panel.kind === "step" && deal ? (
                   <div className="flex flex-col gap-3">
-                    <DealNextStep deal={deal} staffIds={staffIds} />
+                    <DealNextStep
+                      deal={deal}
+                      staffIds={staffIds}
+                      canEndWait={mayEndHolds(user.role)}
+                    />
                     {/* "The account to invite is on this page": it is, here too,
                       straight under the step that needs it. */}
                     <AgentInvite deal={deal} />

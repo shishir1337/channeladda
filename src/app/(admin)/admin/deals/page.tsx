@@ -34,6 +34,7 @@ import {
   TitleWithInfo,
   Waited,
 } from "@/components/admin/vocab";
+import { WaitingDeals } from "@/components/admin/waiting-deals";
 import { InfoTip } from "@/components/app/info-tip";
 import {
   AllClear,
@@ -61,7 +62,12 @@ import { Button } from "@/components/ui/button";
 import { iconText } from "@/components/ui/icon-hue";
 import { Pagination } from "@/components/ui/pagination";
 import type { OrderStatus } from "@/generated/prisma/enums";
-import { isCustodianRole, levelLabel, withinLevel } from "@/lib/custody-roles";
+import {
+  isCustodianRole,
+  levelLabel,
+  mayEndHolds,
+  withinLevel,
+} from "@/lib/custody-roles";
 import { db } from "@/lib/db";
 import { cn } from "@/lib/utils";
 import {
@@ -716,6 +722,8 @@ export default async function AdminDealsPage({
           </List>
         )}
       </Section>
+
+      {mayEndHolds(viewer.role) ? <WaitingDeals /> : null}
 
       {isStaff ? <StuckDeals canMoveMoney={isFinance} /> : null}
 

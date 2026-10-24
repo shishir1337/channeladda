@@ -39,6 +39,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { iconText } from "@/components/ui/icon-hue";
 import { Price } from "@/components/ui/price";
+import { mayEndHolds } from "@/lib/custody-roles";
 import { db } from "@/lib/db";
 import { isTerminal } from "@/lib/deal-machine";
 import { templateFor } from "@/lib/deal-templates";
@@ -244,6 +245,7 @@ export default async function DealPage({
             <DealSteps
               deal={deal}
               staffIds={staffIds}
+              canEndWait={mayEndHolds(user.role)}
               payment={
                 paying && wallet ? (
                   <PayNow
