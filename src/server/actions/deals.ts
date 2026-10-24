@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import type { DealMode } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
+import { needsEmailVerification } from "@/lib/email-verification";
 import { parseHandoverTo } from "@/lib/handover-target";
 import { agentIdentity } from "@/server/admin-users";
 import * as repo from "@/server/deals";
@@ -90,7 +91,7 @@ export async function startDeal(
   const user = await requireUser();
 
   // As for offers: every update about the deal goes to this address.
-  if (!user.emailVerified) {
+  if (needsEmailVerification(user)) {
     return {
       ok: false,
       error: "Confirm your email address before starting a deal.",

@@ -179,6 +179,7 @@ test(
   withCleanDb(async () => {
     // The dashboard promises buying and selling stay locked until the
     // address is confirmed; only offers were.
+    vi.stubEnv("NEXT_PUBLIC_REQUIRE_EMAIL_VERIFICATION", "true");
     const { listing, buyer } = await seedListing();
     fake.userId = buyer.id;
     fake.emailVerified = false;
@@ -197,11 +198,28 @@ test(
 );
 
 test(
+  "with email confirmation turned off, an unconfirmed email can open a deal",
+  withCleanDb(async () => {
+    // The owner, 2026-10-24: "temporary disable needs otp email
+    // verification". Off unless NEXT_PUBLIC_REQUIRE_EMAIL_VERIFICATION=true.
+    const { listing, buyer } = await seedListing();
+    fake.userId = buyer.id;
+    fake.emailVerified = false;
+    const { startDeal } = await import("@/server/actions/deals");
+
+    expect(
+      await startDeal(listing.id, "FASTEST", true, "buyer@gmail.com"),
+    ).toMatchObject({ ok: true });
+  }),
+);
+
+test(
   "an unconfirmed email cannot send a listing for review",
   withCleanDb(async () => {
     const { listing, seller } = await seedListing({
       listingStatus: "CODE_CHECK",
     });
+    vi.stubEnv("NEXT_PUBLIC_REQUIRE_EMAIL_VERIFICATION", "true");
     fake.userId = seller.id;
     fake.emailVerified = false;
     const { submitForReview } = await import("@/server/actions/listings");

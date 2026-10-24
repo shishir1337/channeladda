@@ -14,6 +14,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { authClient, useSession } from "@/lib/auth-client";
+import { needsEmailVerification } from "@/lib/email-verification";
 import { cn } from "@/lib/utils";
 
 const itemClass =
@@ -96,7 +97,7 @@ export function AccountMenu({ className }: { className?: string }) {
             <p className="truncate text-xs text-subtle">{user.email}</p>
           </div>
 
-          {!user.emailVerified ? (
+          {needsEmailVerification(user) ? (
             <DropdownMenu.Item asChild>
               <Link
                 href="/verify-email"

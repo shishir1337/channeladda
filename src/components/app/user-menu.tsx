@@ -15,6 +15,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ThemeMenuItem } from "@/components/site/theme-toggle";
 import { authClient } from "@/lib/auth-client";
+import { needsEmailVerification } from "@/lib/email-verification";
 import { cn } from "@/lib/utils";
 
 export type ShellUser = {
@@ -164,7 +165,7 @@ export function UserMenu({
             </div>
           </div>
 
-          {!user.emailVerified ? (
+          {needsEmailVerification(user) ? (
             <DropdownMenu.Item asChild>
               <Link
                 href="/verify-email"

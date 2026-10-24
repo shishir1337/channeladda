@@ -4,6 +4,7 @@ import { nextCookies } from "better-auth/next-js";
 import { emailOTP, twoFactor } from "better-auth/plugins";
 import { CLIENT_IP_HEADERS } from "@/lib/client-ip";
 import { db } from "@/lib/db";
+import { emailVerificationRequired } from "@/lib/email-verification";
 import { sendMail } from "@/server/mailer";
 
 /** Matches the "at least 10 characters" promised on the sign-up screen. */
@@ -93,7 +94,9 @@ export const auth = betterAuth({
   // sendVerificationEmail here: Better Auth merges a plugin's settings under
   // these, so one written here would quietly keep sending links.
   emailVerification: {
-    sendOnSignUp: true,
+    // No code on sign-up while confirmation is turned off
+    // (`@/lib/email-verification`); /verify-email still sends one on request.
+    sendOnSignUp: emailVerificationRequired(),
     // Off: a code proves the inbox, not the password, so it must not open a
     // session — on an account with two-factor that would walk round both.
     // Someone who signed up is already signed in and simply stays so.

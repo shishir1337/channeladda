@@ -43,6 +43,7 @@ import { Button } from "@/components/ui/button";
 import { iconText } from "@/components/ui/icon-hue";
 import { Price } from "@/components/ui/price";
 import type { ListingStatus, OfferStatus } from "@/generated/prisma/enums";
+import { needsEmailVerification } from "@/lib/email-verification";
 import { cn } from "@/lib/utils";
 import { getBuyerSummary, getSellerSummary } from "@/server/dashboard";
 import { listDealsFor } from "@/server/deals";
@@ -316,7 +317,8 @@ export default async function DashboardPage() {
   // email outranks everything (nothing can be bought or sold until it is
   // done), then the first-visit card, then anything waiting in the list —
   // and only when none of those is on the page is listing the next move.
-  const listIsNext = user.emailVerified && tasks.length === 0 && !brandNew;
+  const listIsNext =
+    !needsEmailVerification(user) && tasks.length === 0 && !brandNew;
 
   const listButton = (variant: "primary" | "secondary") => (
     <Button asChild size="md" variant={variant}>
@@ -342,7 +344,7 @@ export default async function DashboardPage() {
         actions={listButton(listIsNext ? "primary" : "secondary")}
       />
 
-      {!user.emailVerified ? (
+      {needsEmailVerification(user) ? (
         <Section>
           <Callout
             tone="warning"
@@ -666,7 +668,9 @@ export default async function DashboardPage() {
             body="List an account you own, or make an offer on one you want. An agent from Channel Adda sits in the middle of every deal, so neither side has to trust a stranger."
             action={
               <>
-                {listButton(user.emailVerified ? "primary" : "secondary")}
+                {listButton(
+                  needsEmailVerification(user) ? "secondary" : "primary",
+                )}
                 <Button asChild variant="secondary" size="md">
                   <Link href="/browse">Browse accounts</Link>
                 </Button>

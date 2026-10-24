@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { needsEmailVerification } from "@/lib/email-verification";
 import {
   fieldErrors,
   type ListingDraftInput,
@@ -107,7 +108,7 @@ export async function saveListing(
 /** The seller confirms the code is live on their profile. */
 export async function submitForReview(id: string): Promise<ActionResult> {
   const user = await requireUser();
-  if (!user.emailVerified) return EMAIL_FIRST;
+  if (needsEmailVerification(user)) return EMAIL_FIRST;
   const result = await repo.submitForReview(user.id, id);
   if (!result.ok) {
     if (result.reason === "not-found") return NOT_YOURS;

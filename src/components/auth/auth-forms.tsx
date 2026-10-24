@@ -8,6 +8,7 @@ import { IconTile } from "@/components/app/kit";
 import { FormNotice, PasswordField, TextField } from "@/components/auth/fields";
 import { Button } from "@/components/ui/button";
 import { authClient, signIn, signUp } from "@/lib/auth-client";
+import { emailVerificationRequired } from "@/lib/email-verification";
 import { safeNext } from "@/lib/safe-next";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -134,7 +135,7 @@ export function SignInForm({ next }: { next?: string }) {
   );
 }
 
-export function SignUpForm() {
+export function SignUpForm({ next }: { next?: string }) {
   const nameId = useId();
   const emailId = useId();
   const pwId = useId();
@@ -182,7 +183,10 @@ export function SignUpForm() {
           return;
         }
 
-        router.push("/verify-email");
+        // Straight on to where they were going while confirmation is off.
+        router.push(
+          emailVerificationRequired() ? "/verify-email" : safeNext(next),
+        );
         router.refresh();
       }}
     >

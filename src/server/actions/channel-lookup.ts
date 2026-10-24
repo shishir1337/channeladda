@@ -13,6 +13,7 @@ import {
   suggestHandle,
 } from "@/lib/channel-url";
 import { db } from "@/lib/db";
+import { needsEmailVerification } from "@/lib/email-verification";
 import { approveListing } from "@/server/admin-listings";
 import { recordAudit } from "@/server/audit";
 import { storeRemoteImage } from "@/server/remote-image";
@@ -361,7 +362,7 @@ export async function checkOwnershipCode(
   const user = await requireUser();
 
   // A passing check sends the listing to a moderator, which is selling.
-  if (!user.emailVerified) {
+  if (needsEmailVerification(user)) {
     return {
       ok: false,
       error: "Confirm your email address before sending a listing for review.",

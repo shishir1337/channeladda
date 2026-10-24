@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { needsEmailVerification } from "@/lib/email-verification";
 import { toCents } from "@/lib/listing-form";
 import * as repo from "@/server/offers";
 import { requireUser } from "@/server/session";
@@ -65,7 +66,7 @@ export async function makeOffer(
   message: string,
 ): Promise<OfferResult> {
   const user = await requireUser();
-  if (!user.emailVerified) {
+  if (needsEmailVerification(user)) {
     return {
       ok: false,
       error: "Confirm your email address before making an offer.",
@@ -162,7 +163,7 @@ export async function proposePrice(
   message: string,
 ): Promise<OfferResult> {
   const user = await requireUser();
-  if (!user.emailVerified) {
+  if (needsEmailVerification(user)) {
     return {
       ok: false,
       error: "Confirm your email address before offering a price.",

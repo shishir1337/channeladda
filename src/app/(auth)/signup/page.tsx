@@ -54,7 +54,7 @@ export default async function SignUpPage({
       ) : (
         <GoogleOffNote />
       )}
-      <SignUpForm />
+      <SignUpForm next={typeof next === "string" ? next : undefined} />
     </AuthShell>
   );
 }
