@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { Reference } from "@/components/app/kit";
 import { ResellerBadge } from "@/components/app/reseller-badge";
 import { AgentInvite } from "@/components/deals/agent-invite";
+import { DealComplete } from "@/components/deals/deal-complete";
 import { dealHeadline, STATUS_TONE } from "@/components/deals/deal-status";
 import {
   CancelDeal,
@@ -30,6 +31,7 @@ import { fromCents } from "@/lib/listing-form";
 import { withResellerDiscount } from "@/lib/reseller";
 import { writesInClosedThread } from "@/lib/thread-rules";
 import { cn } from "@/lib/utils";
+import { certificateFor } from "@/server/certificate";
 import { loadPanelInput } from "@/server/deal-panel";
 import { getDealFor } from "@/server/deals";
 import { getThread, markThreadRead } from "@/server/messages";
@@ -99,6 +101,10 @@ export default async function ThreadPage({
   // deal for a deal state, the balance only when paying.
   const dealId = panelInput?.deal?.id ?? null;
   const deal = dealId ? await getDealFor(user.id, dealId) : null;
+  // Only on the deal panel's "finished" state, and only for a deal that
+  // went through: everything else ends as it did.
+  const certificate =
+    deal?.status === "COMPLETED" ? await certificateFor(deal.id) : null;
   const wallet =
     panel?.kind === "pay" && deal ? await getWallet(user.id) : null;
   // How far the deal has got, for the ring on the panel — counted from the
@@ -253,80 +259,97 @@ export default async function ThreadPage({
       >
         {panel ? (
           <div className={cn("min-w-0", PANEL_COLUMN)}>
-            <DealPanel
-              // Remounted when the situation changes, so on a phone it opens
-              // again the moment it becomes the reader's move.
-              key={`${panel.kind}:${"yourMove" in panel ? panel.yourMove : ""}`}
-              state={toPanelView(panel)}
-              viewerRole={thread.viewerRole}
-              otherName={otherSide.split(/\s+/)[0] || otherSide}
-              listingSlug={thread.listingSlug}
-              progress={progress}
-              wait={deal?.wait ?? null}
-            >
-              {panel.kind === "buy" || panel.kind === "start-deal" ? (
-                <StartDeal
-                  listingId={thread.listingId}
-                  listingSlug={thread.listingSlug}
-                  platform={thread.listingPlatform}
-                  // The held price when one was agreed, as createDeal will use.
-                  price={fromCents(
-                    panel.kind === "start-deal"
-                      ? panel.priceCents
-                      : panel.askingCents,
-                  )}
-                  // The rates only: the rest of the settings has no business
-                  // in the browser. A Reseller badge holder's are already
-                  // discounted, so the quote is what the deal will cost.
-                  fees={withResellerDiscount(
-                    settings,
-                    { buyer: viewerIsReseller, seller: false },
-                    settings.resellerDiscountBp,
-                  )}
-                  isOwnListing={false}
-                  after="refresh"
-                />
-              ) : panel.kind === "pay" && deal && wallet ? (
-                <div className="flex flex-col gap-3">
-                  <PayNow
-                    orderId={deal.id}
-                    amountUsd={deal.totalUsd}
-                    priceUsd={deal.priceUsd}
-                    mode={deal.mode}
-                    availableUsd={wallet.availableUsd}
+            {certificate && deal ? (
+              // A deal that went through ends on congratulations and the
+              // certificate, not on "This deal has ended".
+              <DealComplete
+                dealId={deal.id}
+                reference={deal.reference}
+                viewerRole={deal.viewerRole}
+                mode={deal.mode}
+                completedAt={certificate.completedAt}
+                code={
+                  deal.viewerRole === "buyer" || deal.viewerRole === "seller"
+                    ? certificate.code
+                    : null
+                }
+              />
+            ) : (
+              <DealPanel
+                // Remounted when the situation changes, so on a phone it opens
+                // again the moment it becomes the reader's move.
+                key={`${panel.kind}:${"yourMove" in panel ? panel.yourMove : ""}`}
+                state={toPanelView(panel)}
+                viewerRole={thread.viewerRole}
+                otherName={otherSide.split(/\s+/)[0] || otherSide}
+                listingSlug={thread.listingSlug}
+                progress={progress}
+                wait={deal?.wait ?? null}
+              >
+                {panel.kind === "buy" || panel.kind === "start-deal" ? (
+                  <StartDeal
+                    listingId={thread.listingId}
+                    listingSlug={thread.listingSlug}
+                    platform={thread.listingPlatform}
+                    // The held price when one was agreed, as createDeal will use.
+                    price={fromCents(
+                      panel.kind === "start-deal"
+                        ? panel.priceCents
+                        : panel.askingCents,
+                    )}
+                    // The rates only: the rest of the settings has no business
+                    // in the browser. A Reseller badge holder's are already
+                    // discounted, so the quote is what the deal will cost.
+                    fees={withResellerDiscount(
+                      settings,
+                      { buyer: viewerIsReseller, seller: false },
+                      settings.resellerDiscountBp,
+                    )}
+                    isOwnListing={false}
+                    after="refresh"
                   />
-                  <CancelDeal deal={deal} />
-                </div>
-              ) : panel.kind === "step" && deal ? (
-                <div className="flex flex-col gap-3">
-                  <DealNextStep deal={deal} staffIds={staffIds} />
-                  {/* "The account to invite is on this page": it is, here too,
+                ) : panel.kind === "pay" && deal && wallet ? (
+                  <div className="flex flex-col gap-3">
+                    <PayNow
+                      orderId={deal.id}
+                      amountUsd={deal.totalUsd}
+                      priceUsd={deal.priceUsd}
+                      mode={deal.mode}
+                      availableUsd={wallet.availableUsd}
+                    />
+                    <CancelDeal deal={deal} />
+                  </div>
+                ) : panel.kind === "step" && deal ? (
+                  <div className="flex flex-col gap-3">
+                    <DealNextStep deal={deal} staffIds={staffIds} />
+                    {/* "The account to invite is on this page": it is, here too,
                       straight under the step that needs it. */}
-                  <AgentInvite deal={deal} />
-                  {/* Safest: where the buyer pays the seller directly, which
+                    <AgentInvite deal={deal} />
+                    {/* Safest: where the buyer pays the seller directly, which
                       the chat itself cannot carry. */}
-                  <PayToCard deal={deal} />
-                  <HandoverAccount
-                    dealId={deal.id}
-                    viewerRole={deal.viewerRole}
-                    mode={deal.mode}
-                    platform={deal.platform}
-                    handoverTo={deal.handoverTo}
-                    open={deal.handoverOpen}
-                    inUse={deal.handoverInUse}
-                  />
-                  <CancelDeal deal={deal} />
-                  {deal.nextStep ? <RaiseDispute deal={deal} /> : null}
-                </div>
-              ) : panel.kind === "waiting-for-payment" && deal ? (
-                // A Safest seller can say where to be paid from the moment the
-                // deal opens, rather than at the step that needs it.
-                <div className="flex flex-col gap-3">
-                  <PayToCard deal={deal} />
-                  <CancelDeal deal={deal} />
-                </div>
-              ) : null}
-            </DealPanel>
+                    <PayToCard deal={deal} />
+                    <HandoverAccount
+                      dealId={deal.id}
+                      viewerRole={deal.viewerRole}
+                      mode={deal.mode}
+                      platform={deal.platform}
+                      handoverTo={deal.handoverTo}
+                      open={deal.handoverOpen}
+                      inUse={deal.handoverInUse}
+                    />
+                    <CancelDeal deal={deal} />
+                    {deal.nextStep ? <RaiseDispute deal={deal} /> : null}
+                  </div>
+                ) : panel.kind === "waiting-for-payment" && deal ? (
+                  // A Safest seller can say where to be paid from the moment the
+                  // deal opens, rather than at the step that needs it.
+                  <div className="flex flex-col gap-3">
+                    <PayToCard deal={deal} />
+                    <CancelDeal deal={deal} />
+                  </div>
+                ) : null}
+              </DealPanel>
+            )}
           </div>
         ) : null}
 

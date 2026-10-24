@@ -20,6 +20,7 @@ import {
   Reference,
 } from "@/components/app/kit";
 import { AgentInvite } from "@/components/deals/agent-invite";
+import { DealComplete } from "@/components/deals/deal-complete";
 import {
   dealHeadline,
   STATUS_LABELS,
@@ -41,6 +42,7 @@ import { db } from "@/lib/db";
 import { isTerminal } from "@/lib/deal-machine";
 import { templateFor } from "@/lib/deal-templates";
 import { cn } from "@/lib/utils";
+import { certificateFor } from "@/server/certificate";
 import { getDealFor } from "@/server/deals";
 import { requireUser } from "@/server/session";
 import { getWallet } from "@/server/wallet";
@@ -122,6 +124,9 @@ export default async function DealPage({
   const wallet = paying ? await getWallet(user.id) : null;
 
   const ModeIcon = safest ? ShieldCheckIcon : ZapIcon;
+  // Only a deal that went through has one; null otherwise.
+  const certificate =
+    deal.status === "COMPLETED" ? await certificateFor(deal.id) : null;
 
   return (
     <>
@@ -179,6 +184,20 @@ export default async function DealPage({
       <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start lg:gap-6">
         {/* ---- where it is, and every step ---------------------------- */}
         <div className="flex min-w-0 flex-col gap-4">
+          {certificate ? (
+            <DealComplete
+              dealId={deal.id}
+              reference={deal.reference}
+              viewerRole={viewer}
+              mode={deal.mode}
+              completedAt={certificate.completedAt}
+              code={
+                viewer === "buyer" || viewer === "seller"
+                  ? certificate.code
+                  : null
+              }
+            />
+          ) : null}
           {/* A paused deal says so above everything, in the one colour that
               means trouble; otherwise the stage is the first line of the
               card that holds the steps. */}

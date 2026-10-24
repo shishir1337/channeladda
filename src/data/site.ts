@@ -185,6 +185,7 @@ export const footerNav: {
       { label: "Dispute resolution", href: "/help/opening-a-dispute" },
       { label: "Refund policy", href: "/refunds" },
       { label: "Transfer checklist", href: "/help/confirming-a-handover" },
+      { label: "Check a certificate", href: "/certificate" },
     ],
   },
   {
