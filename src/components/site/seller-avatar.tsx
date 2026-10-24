@@ -10,11 +10,28 @@ import { cn } from "@/lib/utils";
  */
 export function SellerAvatar({
   initials,
+  image,
   className,
 }: {
   initials: string;
+  /** The seller's own photo, shown in place of the initials when there is one. */
+  image?: string | null;
   className?: string;
 }) {
+  if (image) {
+    return (
+      // biome-ignore lint/performance/noImgElement: the seller's own upload, a small square served from our origin.
+      <img
+        src={image}
+        alt=""
+        aria-hidden="true"
+        className={cn(
+          "size-12 shrink-0 rounded-full bg-surface-2 object-cover ring-1 ring-line ring-inset",
+          className,
+        )}
+      />
+    );
+  }
   return (
     <span
       aria-hidden="true"

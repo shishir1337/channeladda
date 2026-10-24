@@ -80,6 +80,7 @@ export default async function SellerPage({
             <div className="flex items-center gap-4 sm:gap-5">
               <SellerAvatar
                 initials={seller.initials}
+                image={seller.image}
                 className="size-16 text-lg sm:size-20 sm:text-xl"
               />
               <div className="min-w-0">

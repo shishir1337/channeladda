@@ -15,7 +15,7 @@ export type UploadKind = "cover" | "avatar" | "proof";
 
 const MAX_MB = 8;
 const TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"];
-const ACCEPT = TYPES.join(",");
+export const ACCEPT = TYPES.join(",");
 
 /** What the caller gets back once a file is stored. */
 export type Uploaded = { url: string; sha256: string };
@@ -28,7 +28,7 @@ export type Uploaded = { url: string; sha256: string };
  * to look at a spinner that says nothing. Same origin, so the session cookie
  * goes with it exactly as it did with fetch.
  */
-function send(
+export function sendUpload(
   file: File,
   kind: UploadKind,
   onProgress: (fraction: number) => void,
@@ -73,7 +73,7 @@ function send(
  * so an obvious no is heard at once. A browser that reports no type at all is
  * left to the server rather than refused here, since the bytes may be fine.
  */
-function refusal(file: File): string | null {
+export function uploadRefusal(file: File): string | null {
   if (file.type && !TYPES.includes(file.type)) {
     return "That is not a PNG, JPEG, WebP or GIF image.";
   }
@@ -172,7 +172,7 @@ export function ImageUpload({
   async function upload(item: Item) {
     patch(item.id, { state: "sending", progress: 0, error: null });
     try {
-      const stored = await send(item.file, kind, (progress) =>
+      const stored = await sendUpload(item.file, kind, (progress) =>
         patch(item.id, { progress }),
       );
       // In single mode the new picture replaces whatever failed before it,
@@ -201,7 +201,7 @@ export function ImageUpload({
     const refused: Item[] = [];
     const fine: Item[] = [];
     for (const file of chosen) {
-      const reason = refusal(file);
+      const reason = uploadRefusal(file);
       const item: Item = {
         id: ++seq.current,
         name: file.name,

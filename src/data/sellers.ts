@@ -11,6 +11,8 @@ export type Seller = {
   /** Holds the Reseller badge right now. */
   reseller?: boolean;
   initials: string;
+  /** Their profile photo, when they have added one. */
+  image?: string | null;
   country: string;
   /** Out of 5, one decimal. */
   /** Null until somebody has actually reviewed them. */

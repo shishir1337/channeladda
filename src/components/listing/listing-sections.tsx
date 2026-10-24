@@ -204,7 +204,7 @@ export function SellerPanel({ seller }: { seller: Seller }) {
   return (
     <Panel title="About the seller">
       <div className="flex items-center gap-4">
-        <SellerAvatar initials={seller.initials} />
+        <SellerAvatar initials={seller.initials} image={seller.image} />
         <div className="min-w-0">
           <h3 className="flex items-center gap-1.5 text-[0.9375rem] font-semibold">
             <span className="truncate">{seller.name}</span>

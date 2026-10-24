@@ -75,6 +75,7 @@ async function buildSeller(userId: string): Promise<Seller | null> {
     }),
     reseller,
     initials: initialsOf(user.name),
+    image: user.image,
     country: user.country ?? "Global",
     rating: rating === null ? null : Math.round(rating * 10) / 10,
     reviews: user.reviewsGot.length,

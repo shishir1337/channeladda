@@ -69,7 +69,10 @@ export default async function SellersPage() {
               <li key={seller.slug}>
                 <article className="lift-card group relative flex h-full flex-col rounded-card border border-line bg-surface p-5 hover:border-line-strong">
                   <div className="flex items-center gap-3">
-                    <SellerAvatar initials={seller.initials} />
+                    <SellerAvatar
+                      initials={seller.initials}
+                      image={seller.image}
+                    />
                     <div className="min-w-0">
                       <h2 className="flex items-center gap-1.5 text-[0.9375rem] font-semibold">
                         <Link
