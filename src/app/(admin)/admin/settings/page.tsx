@@ -13,6 +13,7 @@ import {
   Th,
   Tr,
 } from "@/components/app/kit";
+import { settingsDiff } from "@/lib/settings-history";
 import { getAuditTrail } from "@/server/audit";
 import { requireSuperadmin } from "@/server/session";
 import { getSettings } from "@/server/settings";
@@ -21,58 +22,6 @@ export const metadata: Metadata = {
   title: "Platform settings",
   robots: { index: false, follow: false },
 };
-
-/** What each stored setting is called in the change history. */
-const FIELD_LABEL: Record<string, string> = {
-  buyerFeeBp: "Buyer fee (single rate, since split)",
-  buyerFeeBpSafest: "Buyer fee, Safest",
-  buyerFeeBpFastest: "Buyer fee, Fastest",
-  sellerFeeBp: "Seller fee",
-  maxHoldsPerAgent: "Channels one agent may hold",
-  secondApprovalAboveUsd: "Second approval above",
-  offerExpiryHours: "Offers expire after",
-  minWithdrawalUsd: "Smallest withdrawal",
-};
-
-/** Basis points as a percentage, cents as dollars, everything else as typed. */
-function formatValue(key: string, value: unknown): string {
-  if (value === null || value === undefined) return "not set";
-  if (typeof value !== "number") return String(value);
-  if (key.includes("Bp")) return `${value / 100}%`;
-  if (key.endsWith("Usd")) {
-    return (value / 100).toLocaleString("en-US", {
-      style: "currency",
-      currency: "USD",
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    });
-  }
-  if (key === "offerExpiryHours") return `${value} hours`;
-  return value.toLocaleString("en-US");
-}
-
-/**
- * What actually moved between two audit snapshots.
- *
- * The history used to print `before.buyerFeeBp → after.buyerFeeBp` from a
- * hard-coded pair of keys. That key stopped existing when the buyer fee was
- * split per mode, so every row since has read "buyer 0% → 0%, seller 0% → 0%"
- * — a change log that reports nothing changed. Diffing whatever keys the
- * snapshots actually carry survives the next such split too.
- */
-function diffOf(before: unknown, after: unknown) {
-  const from = (before ?? {}) as Record<string, unknown>;
-  const to = (after ?? {}) as Record<string, unknown>;
-  const keys = [...new Set([...Object.keys(from), ...Object.keys(to)])];
-  return keys
-    .filter((key) => from[key] !== to[key])
-    .map((key) => ({
-      key,
-      label: FIELD_LABEL[key] ?? key,
-      from: formatValue(key, from[key]),
-      to: formatValue(key, to[key]),
-    }));
-}
 
 export default async function AdminSettingsPage() {
   await requireSuperadmin();
@@ -147,7 +96,7 @@ export default async function AdminSettingsPage() {
               </thead>
               <tbody>
                 {trail.map((row) => {
-                  const diff = diffOf(row.before, row.after);
+                  const diff = settingsDiff(row.before, row.after);
                   return (
                     <Tr key={row.id}>
                       <Td className="align-top whitespace-nowrap">
