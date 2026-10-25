@@ -23,7 +23,10 @@ import { writesInClosedThread } from "@/lib/thread-rules";
 import { isChatAttachmentKey, keyIsVideo, urlForKey } from "@/lib/upload-keys";
 import { ensureConversation, listingsInThread } from "@/server/chat-events";
 import { mediaExpiryFrom } from "@/server/chat-retention";
-import { notify } from "@/server/notifications";
+import {
+  markConversationNotificationsRead,
+  notify,
+} from "@/server/notifications";
 import { offerTurn } from "@/server/offers";
 import type { CurrentUser } from "@/server/session";
 import { sizeOfUpload } from "@/server/storage";
@@ -1203,6 +1206,11 @@ export async function markThreadRead(
     create: { conversationId, userId: viewer.id, readAt: now },
     update: { readAt: now },
   });
+  // And the bell: what was said here has been seen now.
+  await markConversationNotificationsRead(viewer.id, [
+    threadHref(conversationId),
+    threadHref(conversationId, null, "/admin/messages"),
+  ]);
 }
 
 /** A staff member takes the thread, so two moderators do not both answer it. */

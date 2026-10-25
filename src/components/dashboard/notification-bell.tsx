@@ -1,26 +1,16 @@
 "use client";
 
-import {
-  BadgeCheckIcon,
-  BellIcon,
-  CheckCheckIcon,
-  CircleDollarSignIcon,
-  FileTextIcon,
-  GavelIcon,
-  GemIcon,
-  MessageSquareIcon,
-  StarIcon,
-  TagIcon,
-  WalletIcon,
-} from "lucide-react";
+import { BellIcon, CheckCheckIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { SoundToggle } from "@/components/app/notification-sound";
+import { NotificationLink } from "@/components/dashboard/notification-link";
+import { notificationLook } from "@/components/dashboard/notification-look";
 import { iconTile } from "@/components/ui/icon-hue";
 import type { NotificationKind } from "@/generated/prisma/enums";
 import { cn } from "@/lib/utils";
-import { readAll, readOne } from "@/server/actions/notifications";
+import { readAll } from "@/server/actions/notifications";
 
 /**
  * The bell.
@@ -41,18 +31,6 @@ export type BellItem = {
   href: string | null;
   readAt: string | null;
   createdAt: string;
-};
-
-const ICONS: Record<NotificationKind, typeof BellIcon> = {
-  MESSAGE: MessageSquareIcon,
-  OFFER: TagIcon,
-  ORDER: CircleDollarSignIcon,
-  LISTING: FileTextIcon,
-  PAYOUT: WalletIcon,
-  DISPUTE: GavelIcon,
-  REVIEW: StarIcon,
-  BADGE: GemIcon,
-  IDENTITY: BadgeCheckIcon,
 };
 
 /** "3 days" beats a date: half these readers are not reading in English. */
@@ -188,7 +166,7 @@ export function NotificationBell({
           ) : (
             <ul className="flex-1 divide-y divide-line overflow-y-auto">
               {items.map((item) => {
-                const Icon = ICONS[item.kind] ?? BellIcon;
+                const Icon = notificationLook(item).icon;
                 const unreadRow = item.readAt === null;
 
                 const inner = (
@@ -236,16 +214,15 @@ export function NotificationBell({
                 return (
                   <li key={item.id}>
                     {item.href ? (
-                      <Link
+                      <NotificationLink
+                        id={item.id}
                         href={item.href}
+                        unread={unreadRow}
                         className={className}
-                        onClick={() => {
-                          setOpen(false);
-                          if (unreadRow) void readOne(item.id);
-                        }}
+                        onOpened={() => setOpen(false)}
                       >
                         {inner}
-                      </Link>
+                      </NotificationLink>
                     ) : (
                       <div className={className}>{inner}</div>
                     )}

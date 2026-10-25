@@ -122,7 +122,8 @@ test(
     const told = await db.notification.findFirst({
       where: { userId: viewer.id, kind: "LISTING" },
     });
-    expect(told?.title).toBe("Your listing is live");
+    // Saying which listing: a seller with several could not tell.
+    expect(told?.title).toBe(`Your listing is live: ${row.title}`);
   }),
 );
 

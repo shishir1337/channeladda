@@ -1,15 +1,4 @@
-import {
-  BadgeCheckIcon,
-  BellIcon,
-  CircleDollarSignIcon,
-  FileTextIcon,
-  GavelIcon,
-  GemIcon,
-  MessageSquareIcon,
-  StarIcon,
-  TagIcon,
-  WalletIcon,
-} from "lucide-react";
+import { BellIcon } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { InfoTip } from "@/components/app/info-tip";
@@ -24,39 +13,19 @@ import {
 } from "@/components/app/kit";
 import { SoundToggle } from "@/components/app/notification-sound";
 import { MarkAllRead } from "@/components/dashboard/mark-all-read";
+import { NotificationLink } from "@/components/dashboard/notification-link";
+import { notificationLook } from "@/components/dashboard/notification-look";
 import { Button } from "@/components/ui/button";
-import type { NotificationKind } from "@/generated/prisma/enums";
 import { cn } from "@/lib/utils";
-import { listNotifications, unreadCount } from "@/server/notifications";
+import {
+  listNotifications,
+  type NotificationView,
+  unreadCount,
+} from "@/server/notifications";
 import { requireUser } from "@/server/session";
 
 export const metadata: Metadata = {
   title: "Notifications",
-};
-
-const ICONS: Record<NotificationKind, typeof BellIcon> = {
-  MESSAGE: MessageSquareIcon,
-  OFFER: TagIcon,
-  ORDER: CircleDollarSignIcon,
-  LISTING: FileTextIcon,
-  PAYOUT: WalletIcon,
-  DISPUTE: GavelIcon,
-  REVIEW: StarIcon,
-  BADGE: GemIcon,
-  IDENTITY: BadgeCheckIcon,
-};
-
-/** What each kind is, in the reader's terms rather than the schema's. */
-const KINDS: Record<NotificationKind, string> = {
-  MESSAGE: "Message",
-  OFFER: "Offer",
-  ORDER: "Deal",
-  LISTING: "Listing",
-  PAYOUT: "Payout",
-  DISPUTE: "Dispute",
-  REVIEW: "Review",
-  BADGE: "Reseller badge",
-  IDENTITY: "Verification",
 };
 
 /**
@@ -115,53 +84,21 @@ export default async function NotificationsPage() {
         ) : (
           <List>
             {items.map((item) => {
-              const Icon = ICONS[item.kind] ?? BellIcon;
               const isUnread = item.readAt === null;
-
-              return (
-                <ListItem key={item.id} href={item.href ?? undefined}>
-                  <div className="flex items-start gap-3">
-                    <IconTile icon={Icon} />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-start justify-between gap-3">
-                        <p className="min-w-0 text-sm leading-5">
-                          <span
-                            className={cn(
-                              "text-fg",
-                              isUnread ? "font-medium" : "font-normal",
-                            )}
-                          >
-                            {item.title}
-                          </span>
-                          <span className="ml-2 text-xs whitespace-nowrap text-subtle">
-                            {KINDS[item.kind] ?? item.kind}
-                          </span>
-                          {isUnread ? (
-                            <span className="sr-only"> New</span>
-                          ) : null}
-                        </p>
-                        {/* Unread is a gold dot beside the time — the one
-                            mark on the row that says it still wants you. */}
-                        <span className="flex shrink-0 items-center gap-2 pt-px text-xs leading-5 whitespace-nowrap text-subtle tabular-nums">
-                          <time dateTime={item.createdAt.toISOString()}>
-                            {item.createdAt.toLocaleString("en-GB", {
-                              day: "numeric",
-                              month: "short",
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })}
-                          </time>
-                          <Dot
-                            tone="primary"
-                            className={cn(!isUnread && "invisible")}
-                          />
-                        </span>
-                      </div>
-                      <p className="mt-0.5 text-[0.8125rem] leading-relaxed text-muted">
-                        {item.body}
-                      </p>
-                    </div>
-                  </div>
+              return item.href ? (
+                <ListItem key={item.id} padded={false}>
+                  <NotificationLink
+                    id={item.id}
+                    href={item.href}
+                    unread={isUnread}
+                    className="group block px-3.5 py-3 transition-colors duration-150 hover:bg-surface-2/60 focus-visible:-outline-offset-2 sm:px-5"
+                  >
+                    <Row item={item} />
+                  </NotificationLink>
+                </ListItem>
+              ) : (
+                <ListItem key={item.id}>
+                  <Row item={item} />
                 </ListItem>
               );
             })}
@@ -169,5 +106,50 @@ export default async function NotificationsPage() {
         )}
       </Section>
     </>
+  );
+}
+
+/** One notification: what it is, when, and what it says. */
+function Row({ item }: { item: NotificationView }) {
+  const look = notificationLook(item);
+  const isUnread = item.readAt === null;
+  return (
+    <div className="flex items-start gap-3">
+      <IconTile icon={look.icon} />
+      <div className="min-w-0 flex-1">
+        <div className="flex items-start justify-between gap-3">
+          <p className="min-w-0 text-sm leading-5">
+            <span
+              className={cn(
+                "text-fg",
+                isUnread ? "font-medium" : "font-normal",
+              )}
+            >
+              {item.title}
+            </span>
+            <span className="ml-2 text-xs whitespace-nowrap text-subtle">
+              {look.label}
+            </span>
+            {isUnread ? <span className="sr-only"> New</span> : null}
+          </p>
+          {/* Unread is a gold dot beside the time — the one
+                mark on the row that says it still wants you. */}
+          <span className="flex shrink-0 items-center gap-2 pt-px text-xs leading-5 whitespace-nowrap text-subtle tabular-nums">
+            <time dateTime={item.createdAt.toISOString()}>
+              {item.createdAt.toLocaleString("en-GB", {
+                day: "numeric",
+                month: "short",
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </time>
+            <Dot tone="primary" className={cn(!isUnread && "invisible")} />
+          </span>
+        </div>
+        <p className="mt-0.5 text-[0.8125rem] leading-relaxed text-muted">
+          {item.body}
+        </p>
+      </div>
+    </div>
   );
 }

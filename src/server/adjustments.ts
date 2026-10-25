@@ -2,6 +2,7 @@ import "server-only";
 
 import type { UserRole, WithdrawalStatus } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
+import { BALANCE_CORRECTION_BODY } from "@/lib/notification-text";
 import { isSerializationFailure } from "@/lib/serialization-failure";
 import { recordAudit } from "@/server/audit";
 import { notify } from "@/server/notifications";
@@ -283,7 +284,7 @@ export async function adjustBalance(input: {
     title: credit
       ? `${usd(amount)} added to your balance`
       : `${usd(amount)} taken from your balance`,
-    body: `Channel Adda corrected your balance: ${reason}`,
+    body: `${BALANCE_CORRECTION_BODY}: ${reason}`,
     href: "/dashboard/wallet",
     email: {
       subject: credit

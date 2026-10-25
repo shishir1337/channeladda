@@ -381,17 +381,19 @@ export async function approveListing(
       listedAt: now,
       rejectionReason: null,
     },
-    select: { status: true, slug: true },
+    select: { status: true, slug: true, title: true, handle: true },
   });
 
+  // Which one: a seller with several listings could not tell from the bell.
+  const which = updated.title || updated.handle;
   await notify({
     userId: existing.sellerId,
     kind: "LISTING",
-    title: "Your listing is live",
+    title: `Your listing is live: ${which}`,
     body: "Buyers can find it and make offers on it now.",
     href: `/listing/${updated.slug}`,
     email: {
-      subject: "Your listing is live on Channel Adda",
+      subject: `Your listing is live on Channel Adda: ${which}`,
       body:
         by === "ownership-check"
           ? "We found your code on the channel, so it is on the marketplace. Buyers can find it and make offers on it now, and you can take the code out of your description."

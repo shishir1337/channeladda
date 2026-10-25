@@ -200,6 +200,29 @@ export async function markRead(id: string, userId: string): Promise<void> {
   });
 }
 
+/**
+ * Everything that points at one conversation, read — for when the thread
+ * itself has been read. The chat reply stayed in the bell after it had been
+ * answered. Matched on the link, which is the conversation's own page with
+ * or without `?about=`.
+ */
+export async function markConversationNotificationsRead(
+  userId: string,
+  paths: readonly string[],
+): Promise<void> {
+  await db.notification.updateMany({
+    where: {
+      userId,
+      readAt: null,
+      OR: paths.flatMap((path) => [
+        { href: path },
+        { href: { startsWith: `${path}?` } },
+      ]),
+    },
+    data: { readAt: new Date() },
+  });
+}
+
 export async function markAllRead(userId: string): Promise<void> {
   await db.notification.updateMany({
     where: { userId, readAt: null },
