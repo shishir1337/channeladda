@@ -113,3 +113,32 @@ export function keyFromUrl(url: string): string | null {
   const key = url.slice("/uploads/".length);
   return isServableKey(key) ? key : null;
 }
+
+/**
+ * How long, and by whom, a served file may be kept: the uploads route's
+ * caching headers. Here rather than in the route, which may export only its
+ * HTTP methods.
+ *
+ * Listing artwork — a cover or an account's picture — is on every card and
+ * the same for everybody, so any cache may keep it for a year: a file never
+ * changes under its key. That is what lets the image optimiser and a CDN
+ * hold it, and what spares a phone downloading the same cover on every
+ * page.
+ *
+ * Everything else is private: permission-gated bytes that a shared cache
+ * would serve one person's screenshot to the next requester. The browser's
+ * own cache may still hold them, keyed by the cookie that was let in —
+ * except an ID check's, which is not written to the disk of whatever
+ * computer staff reviewed it on.
+ */
+export function cachingFor(key: string): Record<string, string> {
+  if (isPublicKey(key)) {
+    return { "Cache-Control": "public, max-age=31536000, immutable" };
+  }
+  return {
+    "Cache-Control": isKycKey(key)
+      ? "private, no-store"
+      : "private, max-age=31536000, immutable",
+    Vary: "Cookie",
+  };
+}
