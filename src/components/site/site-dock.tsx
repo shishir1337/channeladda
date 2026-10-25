@@ -11,17 +11,12 @@ import {
   UserRoundIcon,
 } from "lucide-react";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
 import { Dock, DockButton, DockLink } from "@/components/app/dock";
+import { useMemberCounts } from "@/components/site/member-counts";
 import { useSiteMenu } from "@/components/site/site-menu";
 import { HUE_TEXT, iconText } from "@/components/ui/icon-hue";
 import { useSession } from "@/lib/auth-client";
-import {
-  isTabActive,
-  type MemberCounts,
-  type SiteTabIcon,
-  siteTabs,
-} from "@/lib/site-dock";
+import { isTabActive, type SiteTabIcon, siteTabs } from "@/lib/site-dock";
 
 const ICONS = {
   home: HouseIcon,
@@ -62,33 +57,7 @@ export function SiteDock() {
   const menu = useSiteMenu();
   const { data: session } = useSession();
   const signedIn = Boolean(session?.user);
-  const [counts, setCounts] = useState<MemberCounts | null>(null);
-
-  // biome-ignore lint/correctness/useExhaustiveDependencies: pathname is the trigger here, not a value the body reads
-  useEffect(() => {
-    if (!signedIn) {
-      setCounts(null);
-      return;
-    }
-    let live = true;
-    const load = async () => {
-      try {
-        const response = await fetch("/api/waiting", { cache: "no-store" });
-        const body = (await response.json()) as MemberCounts;
-        if (live) setCounts(body);
-      } catch {
-        // A count that fails to load is left off, not an error.
-      }
-    };
-    void load();
-    window.addEventListener("focus", load);
-    return () => {
-      live = false;
-      window.removeEventListener("focus", load);
-    };
-    // Each page asks again, as the balance does: a step taken there may
-    // have changed what is waiting.
-  }, [signedIn, pathname]);
+  const counts = useMemberCounts();
 
   const tabs = siteTabs(pathname, signedIn ? { counts } : null);
 

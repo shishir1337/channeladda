@@ -1,13 +1,11 @@
 import { Categories } from "@/components/home/categories";
 import { Faq } from "@/components/home/faq";
 import { Hero } from "@/components/home/hero";
-import { HowItWorks } from "@/components/home/how-it-works";
 import { ListingsShowcase } from "@/components/home/listings-showcase";
 import { SellerCta } from "@/components/home/seller-cta";
 import { SoldTicker } from "@/components/home/sold-ticker";
 import { Testimonials } from "@/components/home/testimonials";
 import { TopSellers } from "@/components/home/top-sellers";
-import { TrustSafety } from "@/components/home/trust-safety";
 import { databaseGate } from "@/lib/db-gate";
 import {
   getFeaturedListings,
@@ -41,8 +39,8 @@ export default async function HomePage() {
       <SoldTicker items={sold} />
       <Categories counts={counts} floors={floors} />
       <ListingsShowcase listings={featured} />
-      <HowItWorks />
-      <TrustSafety />
+      {/* How it works and Trust & safety have their own pages, linked
+          from the header; the owner took them off the homepage. */}
       <TopSellers sellers={sellers.slice(0, 4)} />
       <Testimonials />
       <SellerCta />

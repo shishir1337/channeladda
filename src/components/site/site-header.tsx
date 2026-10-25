@@ -24,13 +24,20 @@ import {
 import { platforms } from "@/data/platforms";
 import { cn } from "@/lib/utils";
 
-const navLinks = [
+/**
+ * Links shown `from` a width: signed in, the balance and the account name
+ * leave too little room for all five, and the bar ran off the screen. The
+ * footer has every one of them at every width.
+ */
+const navLinks: { label: string; href: string; from?: "xl" | "2xl" }[] = [
   { label: "Browse accounts", href: "/browse" },
-  { label: "How it works", href: "/#how-it-works" },
-  { label: "Trust & safety", href: "/#trust" },
-  { label: "Services", href: "/services" },
-  { label: "FAQ", href: "/#faq" },
+  { label: "How it works", href: "/how-it-works", from: "xl" },
+  { label: "Trust & safety", href: "/trust-safety", from: "xl" },
+  { label: "Services", href: "/services", from: "xl" },
+  { label: "FAQ", href: "/#faq", from: "2xl" },
 ];
+
+const SHOWN_FROM = { xl: "hidden xl:block", "2xl": "hidden 2xl:block" };
 
 export function SiteHeader() {
   const [scrolled, setScrolled] = useState(false);
@@ -53,7 +60,7 @@ export function SiteHeader() {
           : "border-b border-transparent bg-bg",
       )}
     >
-      <div className="mx-auto flex h-16 w-full max-w-[81rem] items-center gap-3 px-4 sm:px-6 lg:gap-6 lg:px-8">
+      <div className="mx-auto flex h-16 w-full max-w-[81rem] items-center gap-3 px-4 sm:px-6 lg:gap-4 lg:px-8 2xl:gap-6">
         <Link
           href="/"
           className="flex min-h-11 shrink-0 items-center gap-2.5 rounded-lg"
@@ -68,10 +75,13 @@ export function SiteHeader() {
         <nav aria-label="Main" className="ml-2 hidden lg:block">
           <ul className="flex items-center gap-1">
             {navLinks.map((link) => (
-              <li key={link.href}>
+              <li
+                key={link.href}
+                className={link.from ? SHOWN_FROM[link.from] : undefined}
+              >
                 <Link
                   href={link.href}
-                  className="inline-flex h-9 items-center rounded-lg px-3 text-sm font-medium text-muted transition-colors duration-150 hover:bg-surface-2 hover:text-fg"
+                  className="inline-flex h-9 items-center rounded-lg px-3 text-sm font-medium whitespace-nowrap text-muted transition-colors duration-150 hover:bg-surface-2 hover:text-fg"
                 >
                   {link.label}
                 </Link>
