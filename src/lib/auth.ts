@@ -65,6 +65,19 @@ export function isGoogleEnabled(): boolean {
 
 export const auth = betterAuth({
   baseURL,
+  // In development the site is opened on whichever port `next dev` took:
+  // 3000, while BETTER_AUTH_URL said 3001, and every sign-in there was
+  // refused as a foreign origin behind "Could not sign you in" (the owner,
+  // 2026-10-26). Production trusts its own address and nothing else.
+  trustedOrigins:
+    process.env.NODE_ENV === "development"
+      ? [
+          "http://localhost:3000",
+          "http://localhost:3001",
+          "http://127.0.0.1:3000",
+          "http://127.0.0.1:3001",
+        ]
+      : [],
   secret: requireSecret(),
   database: prismaAdapter(db, { provider: "postgresql" }),
 
