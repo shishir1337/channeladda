@@ -64,6 +64,17 @@ describe("listingDescription", () => {
   });
 });
 
+describe("listingDescription figures", () => {
+  it("leaves out an engagement rate nobody gave", () => {
+    const text = listingDescription(
+      { ...listing, title: "Food", engagement: 0 },
+      platformMap.instagram,
+    );
+    expect(text).not.toContain("0% engagement");
+    expect(text).toContain("5 years old, not monetized.");
+  });
+});
+
 describe("listingLd", () => {
   it("is a product with one offer at the asking price, and its breadcrumbs", () => {
     const [product, crumbs] = listingLd(

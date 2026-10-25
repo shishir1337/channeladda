@@ -27,12 +27,15 @@ export function listingDescription(
     ? `Sold on ${SITE_NAME}.`
     : `Asking ${money(Math.round(listing.price * 100))}${listing.ownershipVerified ? ", ownership verified" : ""}.`;
   const figures = [
-    `${listing.engagement}% engagement`,
+    // Not given is not "0% engagement".
+    listing.engagement > 0 ? `${listing.engagement}% engagement` : null,
     `${listing.ageYears} ${listing.ageYears === 1 ? "year" : "years"} old`,
     listing.monthlyRevenue > 0
       ? `${money(Math.round(listing.monthlyRevenue * 100))} a month in revenue`
       : "not monetized",
-  ].join(", ");
+  ]
+    .filter(Boolean)
+    .join(", ");
   return clampDescription(`${title} ${about} ${price} ${capitalise(figures)}.`);
 }
 
