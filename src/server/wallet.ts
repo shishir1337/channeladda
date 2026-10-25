@@ -4,6 +4,11 @@ import type { DealMode, WithdrawalStatus } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
 import { canTransition, TERMINAL_STATUSES } from "@/lib/deal-machine";
 import { OPENING_STATUS } from "@/lib/deal-templates";
+import {
+  NOT_YOU,
+  PAYOUT_ADDRESS_ADDED,
+  PAYOUT_ADDRESS_CHANGED,
+} from "@/lib/security-notices";
 import { isSerializationFailure } from "@/lib/serialization-failure";
 import { recordAudit } from "@/server/audit";
 import { postEvent } from "@/server/chat-events";
@@ -81,16 +86,16 @@ export type WalletEntry = {
   id: string;
   kind: string;
   amountUsd: number;
+  /** Written for the books and for staff, not for the member: see `walletDetail`. */
   note: string | null;
   createdAt: Date;
+  /** The deal the money moved for, by the reference the member knows it by. */
+  deal: { reference: string; handle: string } | null;
 };
 
 /**
-  /** Written for the books and for staff, not for the member: see `walletDetail`. */
  * A Fastest sale whose price the buyer has paid to Channel Adda and we are
  * holding until the transfer completes. Not part of the balance: it is still the
-  /** The deal the money moved for, by the reference the member knows it by. */
-  deal: { reference: string; handle: string } | null;
  * buyer's money until then, and can go back to them if the channel never
  * reaches them.
  */
@@ -112,7 +117,12 @@ export type Wallet = {
   /** What can actually be spent or withdrawn now. */
   availableUsd: number;
   entries: WalletEntry[];
-  payoutAddress: { address: string; network: string } | null;
+  /** `lockedUntil`: withdrawals wait until then after a change. */
+  payoutAddress: {
+    address: string;
+    network: string;
+    lockedUntil: Date | null;
+  } | null;
   /** Running sales whose price we hold for this seller, newest first. */
   heldForSales: HeldSale[];
   heldForSalesUsd: number;
@@ -138,19 +148,19 @@ export async function getWallet(userId: string): Promise<Wallet> {
         amountUsd: true,
         note: true,
         createdAt: true,
+        order: {
+          select: { reference: true, listing: { select: { handle: true } } },
+        },
       },
     }),
     db.payoutAddress.findUnique({
       where: { userId },
-      select: { address: true, network: true },
+      select: { address: true, network: true, lockedUntil: true },
     }),
     // The price is on our books once a Fastest deal is paid, until our
     // agent's custody pays it into this balance (`custodyAt`). Never on
     // Safest: the buyer pays the seller directly, and its opening payment
     // is the fee alone — so a Safest buyer's Paid is no promise of ours.
-        order: {
-          select: { reference: true, listing: { select: { handle: true } } },
-        },
     db.order.findMany({
       where: {
         sellerId: userId,
@@ -465,19 +475,24 @@ export const PAYOUT_LOCK_HOURS = 24;
  *
  * Re-saving the same address is not a change and does not restart the clock,
  * or confirming the address you already have would cost you a day.
+ *
+ * A first address is held too: a stolen session adding one is the same
+ * risk as one changing it. Either way the member is told in the bell, and
+ * by email where mail is set up — a change nobody hears about is the one a
+ * hijacker wants.
  */
 export async function setPayoutAddress(
   userId: string,
   address: string,
   network: string,
-): Promise<{ locked: boolean }> {
+): Promise<{ locked: boolean; first: boolean; lockedUntil: Date | null }> {
   const existing = await db.payoutAddress.findUnique({
     where: { userId },
-    select: { address: true, network: true },
+    select: { address: true, network: true, lockedUntil: true },
   });
 
   if (existing?.address === address && existing?.network === network) {
-    return { locked: false };
+    return { locked: false, first: false, lockedUntil: existing.lockedUntil };
   }
 
   const lockedUntil = new Date(Date.now() + PAYOUT_LOCK_HOURS * 3_600_000);
@@ -487,7 +502,45 @@ export async function setPayoutAddress(
     update: { address, network, lockedUntil },
   });
 
-  return { locked: true };
+  const first = existing === null;
+  const ending = `${address.slice(0, 4)}…${address.slice(-4)}`;
+  const body = `Payouts now go to ${network} ${ending}. Withdrawals are held for ${PAYOUT_LOCK_HOURS} hours, until the change has settled. ${NOT_YOU}`;
+  await notify({
+    userId,
+    kind: "PAYOUT",
+    title: first ? PAYOUT_ADDRESS_ADDED : PAYOUT_ADDRESS_CHANGED,
+    body,
+    href: "/dashboard/wallet",
+    email: {
+      subject: first
+        ? "Your Channel Adda payout address was added"
+        : "Your Channel Adda payout address was changed",
+      body,
+    },
+  });
+  await recordAudit({
+    actorId: userId,
+    action: first ? "wallet.address_added" : "wallet.address_changed",
+    entity: "user",
+    entityId: userId,
+    before: existing
+      ? { network: existing.network, ending: existing.address.slice(-4) }
+      : undefined,
+    after: { network, ending: address.slice(-4) },
+  });
+
+  return { locked: true, first, lockedUntil };
+}
+
+/** The network a payout is going out on, for checking finance's hash. */
+export async function withdrawalNetwork(
+  withdrawalId: string,
+): Promise<string | null> {
+  const row = await db.withdrawal.findUnique({
+    where: { id: withdrawalId },
+    select: { network: true },
+  });
+  return row?.network ?? null;
 }
 
 /**

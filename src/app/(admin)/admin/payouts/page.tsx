@@ -18,6 +18,7 @@ import {
 } from "@/components/app/kit";
 import { Badge } from "@/components/ui/badge";
 import { Price } from "@/components/ui/price";
+import { dayAndTime } from "@/lib/when";
 import { requireRole } from "@/server/session";
 import { listPendingWithdrawals } from "@/server/wallet";
 
@@ -61,9 +62,7 @@ export default async function AdminPayoutsPage() {
         title="Payouts"
         description="Every decision here is written to the audit trail under your name."
         info="Every decision here is written to the audit trail under your name, with the hash or the refusal reason attached. Amounts are stored as integer cents and shown in whichever currency the header is set to."
-        meta={
-          <MetaItem label="Read">{new Date().toLocaleString("en-GB")}</MetaItem>
-        }
+        meta={<MetaItem label="Read">{dayAndTime(new Date())}</MetaItem>}
       />
 
       {/* The page's one warning, word for word and in sight: this is the
@@ -122,8 +121,8 @@ export default async function AdminPayoutsPage() {
               <ListItem key={payout.id} padded={false}>
                 <div className="px-4 py-4 sm:px-5 sm:py-5">
                   <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
-                      {/* Once, to the cent: the amount that will leave. */}
                     <div className="min-w-0">
+                      {/* Once, to the cent: the amount that will leave. */}
                       <p className="text-2xl leading-8 font-semibold tracking-[-0.02em] text-fg tabular-nums">
                         <Price usd={payout.amountUsd / 100} exact />
                       </p>
@@ -158,8 +157,8 @@ export default async function AdminPayoutsPage() {
                     <p className="mt-1.5 text-xs leading-relaxed text-subtle">
                       Read it in full. A single wrong character sends{" "}
                       <Price
-                        exact
                         usd={payout.amountUsd / 100}
+                        exact
                         className="text-muted"
                       />{" "}
                       somewhere nobody can recover it from.
@@ -171,6 +170,7 @@ export default async function AdminPayoutsPage() {
                   <PayoutDecision
                     withdrawalId={payout.id}
                     amountCents={payout.amountUsd}
+                    network={payout.network}
                   />
                 </div>
               </ListItem>

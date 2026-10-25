@@ -16,7 +16,17 @@ import { sendSupportMessage } from "@/server/actions/support";
  * ticket now, a moderator sees it in their queue, and the sender gets a
  * reference they can quote back.
  */
-export function SupportForm({ topic }: { topic?: string }) {
+export function SupportForm({
+  topic,
+  message: startMessage,
+  member,
+}: {
+  topic?: string;
+  /** What the page that sent them here says they wanted. */
+  message?: string;
+  /** Signed in: who is writing, so they are not asked again. */
+  member?: { name: string; email: string };
+}) {
   const [reference, setReference] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [failed, setFailed] = useState<string | null>(null);
@@ -104,6 +114,12 @@ export function SupportForm({ topic }: { topic?: string }) {
           type="email"
           autoComplete="email"
           placeholder="you@example.com"
+          defaultValue={member?.email}
+          hint={
+            member
+              ? `Signed in as ${member.name}. We reply to this email.`
+              : undefined
+          }
           error={errors.email}
           required
         />
@@ -157,6 +173,7 @@ export function SupportForm({ topic }: { topic?: string }) {
             aria-invalid={Boolean(errors.message)}
             aria-describedby={errors.message ? `${messageId}-error` : undefined}
             placeholder="What happened, and what were you expecting instead?"
+            defaultValue={startMessage}
             className={cn(siteTextarea, "mt-2")}
           />
           {errors.message ? (

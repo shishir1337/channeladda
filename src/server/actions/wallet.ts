@@ -1,11 +1,13 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { checkPayoutAddress } from "@/lib/payout-address";
+import { checkPayoutAddress, checkTxHash } from "@/lib/payout-address";
 import { safeNext } from "@/lib/safe-next";
+import { supportHref } from "@/lib/support";
 import { createInvoice, isConfigured } from "@/server/cryptomus";
 import { newReference, recordInvoice } from "@/server/invoices";
 import { requireRole, requireUser } from "@/server/session";
+import { getSettings } from "@/server/settings";
 import * as repo from "@/server/wallet";
 
 /**
@@ -16,8 +18,10 @@ import * as repo from "@/server/wallet";
  * line ever sees a float.
  */
 export type WalletResult =
-  | { ok: true; message: string; url?: string }
-  | { ok: false; error: string };
+  /** `until`: when withdrawals open, after an address change (ISO). */
+  | { ok: true; message: string; url?: string; until?: string }
+  /** `help`: somewhere to go next, when the answer is not ours to give here. */
+  | { ok: false; error: string; help?: { href: string; label: string } };
 
 const MESSAGES: Record<repo.WalletFailure, string> = {
   "not-found": "That is no longer available.",
@@ -35,6 +39,15 @@ const MESSAGES: Record<repo.WalletFailure, string> = {
   "being-paid":
     "Another buyer is paying for this listing right now. If they have not paid within the hour, you can buy it.",
 };
+
+/** "$20.00". */
+function usd(cents: number): string {
+  return (cents / 100).toLocaleString("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+  });
+}
 
 function toCents(dollars: number): number | null {
   if (!Number.isFinite(dollars) || dollars <= 0) return null;
@@ -73,12 +86,18 @@ export async function startTopUp(
     return { ok: false, error: "For more than $10,000, talk to us first." };
   }
 
+  // Nothing is created here, so the message does not promise anything is
+  // on its way: it says what is off and who to ask.
   if (!isConfigured()) {
     return {
       ok: false,
       error:
-        "Crypto top-ups are not switched on yet. Channel Adda will send you " +
-        "details and credit your balance by hand.",
+        "Adding funds by crypto is not switched on yet. Ask our team to add " +
+        "funds for you — say how much, and they will reply with how to pay.",
+      help: {
+        href: `${supportHref("Payments or withdrawals")}&message=${encodeURIComponent(`Add funds: $${(cents / 100).toLocaleString("en-US")} to my balance, please.`)}`,
+        label: "Ask to add funds",
+      },
     };
   }
 
@@ -150,17 +169,22 @@ export async function savePayoutAddress(
   const checked = checkPayoutAddress(chain, trimmed);
   if (!checked.ok) return checked;
 
-  const { locked } = await repo.setPayoutAddress(user.id, trimmed, chain);
+  const saved = await repo.setPayoutAddress(user.id, trimmed, chain);
 
   revalidatePath("/dashboard/wallet");
+  if (!saved.locked) {
+    return {
+      ok: true,
+      message: "That is already your payout address, so nothing changed.",
+    };
+  }
+  // The form says the time in the member's own clock, from `until`.
   return {
     ok: true,
-    message: locked
-      ? "Saved. Withdrawals are held for 24 hours after an address change — " +
-        "that delay is what stops somebody who gets into your account from " +
-        "emptying it. Check the address carefully in the meantime: a payout " +
-        "sent to the wrong one cannot be recovered by us or by anybody else."
-      : "That is already your payout address, so nothing changed.",
+    until: saved.lockedUntil?.toISOString(),
+    message: saved.first
+      ? "Saved. Every new address waits 24 hours before a withdrawal can go out to it — that keeps your money safe if somebody gets into your account."
+      : "Changed. Withdrawals are held for 24 hours after a change — that keeps your money safe if somebody gets into your account.",
   };
 }
 
@@ -171,7 +195,30 @@ export async function requestPayout(dollars: number): Promise<WalletResult> {
   if (cents === null) return { ok: false, error: "Enter an amount." };
 
   const result = await repo.requestWithdrawal(user.id, cents);
-  if (!result.ok) return { ok: false, error: MESSAGES[result.reason] };
+  if (!result.ok) {
+    // Said with the figure and the time, not as a rule to go and look up.
+    if (result.reason === "below-minimum") {
+      const { minWithdrawalUsd } = await getSettings();
+      return {
+        ok: false,
+        error: `The smallest withdrawal is ${usd(minWithdrawalUsd)}.`,
+      };
+    }
+    if (result.reason === "address-locked") {
+      const wallet = await repo.getWallet(user.id);
+      const until = wallet.payoutAddress?.lockedUntil;
+      const hours = until
+        ? Math.max(1, Math.ceil((until.getTime() - Date.now()) / 3_600_000))
+        : null;
+      return {
+        ok: false,
+        error: hours
+          ? `Your payout address is new, so withdrawals open in ${hours === 1 ? "about an hour" : `${hours} hours`}. That wait keeps your money safe if somebody gets into your account.`
+          : MESSAGES["address-locked"],
+      };
+    }
+    return { ok: false, error: MESSAGES[result.reason] };
+  }
 
   revalidatePath("/dashboard/wallet");
   revalidatePath("/admin/payouts");
@@ -190,11 +237,12 @@ export async function decidePayout(
 ): Promise<WalletResult> {
   const staff = await requireRole("FINANCE");
 
-  if (to === "SENT" && txHash.trim() === "") {
-    return {
-      ok: false,
-      error: "Paste the transaction hash — it is the only proof it was sent.",
-    };
+  // In the payout's own network's format: "abc" used to settle a payout.
+  if (to === "SENT") {
+    const network = await repo.withdrawalNetwork(withdrawalId);
+    if (network === null) return { ok: false, error: MESSAGES["not-found"] };
+    const checked = checkTxHash(network, txHash);
+    if (!checked.ok) return checked;
   }
   if (to === "REJECTED" && note.trim() === "") {
     return { ok: false, error: "Say why, so the seller can be told." };

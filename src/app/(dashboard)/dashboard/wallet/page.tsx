@@ -358,6 +358,9 @@ export default async function WalletPage({
             availableUsd={wallet.availableUsd}
             hasAddress={wallet.payoutAddress !== null}
             minimumUsd={settings.minWithdrawalUsd}
+            lockedUntil={
+              wallet.payoutAddress?.lockedUntil?.toISOString() ?? null
+            }
           />
         </div>
         <div id="payout-address" className="mt-4 scroll-mt-20">
@@ -399,11 +402,11 @@ export default async function WalletPage({
               const EntryIcon = kind?.icon ?? CoinsIcon;
 
               const title = kind?.title ?? entry.kind;
+              // Never the note as stored: see `walletDetail`.
+              const detail = walletDetail(entry);
 
               return (
                 <ListItem key={entry.id}>
-              // Never the note as stored: see `walletDetail`.
-              const detail = walletDetail(entry);
                   <div className="flex items-center gap-3">
                     {/* Money in is green; money out wears its own icon's
                         colour — a deal payment, a fee — not an alarm. */}

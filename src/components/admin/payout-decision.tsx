@@ -7,15 +7,17 @@ import { BusyLabel } from "@/components/admin/money-parts";
 import { TextArea, TextField } from "@/components/auth/fields";
 import { Button } from "@/components/ui/button";
 import { Price } from "@/components/ui/price";
+import { checkTxHash } from "@/lib/payout-address";
 import { cn } from "@/lib/utils";
 import { decidePayout } from "@/server/actions/wallet";
 
 /**
  * Sending or refusing one payout.
  *
- * Sending requires the transaction hash. That is not bureaucracy: it is the
- * only evidence the money left, and the only thing a seller who says they
- * never received it can be answered with.
+ * Sending requires the transaction hash, in the payout network's own format
+ * — "abc" used to settle one. That is not bureaucracy: it is the only
+ * evidence the money left, and the only thing a seller who says they never
+ * received it can be answered with.
  *
  * Settling is the one irreversible action in the product, so it is also the
  * one control that asks twice. The first press states what is about to happen
@@ -29,10 +31,13 @@ import { decidePayout } from "@/server/actions/wallet";
 export function PayoutDecision({
   withdrawalId,
   amountCents,
+  network,
 }: {
   withdrawalId: string;
   /** Integer cents, so the confirmation can name the amount it is settling. */
   amountCents?: number;
+  /** What the hash is checked against before the question is asked. */
+  network?: string;
 }) {
   const router = useRouter();
   const ids = { tx: useId(), note: useId() };
@@ -142,6 +147,15 @@ export function PayoutDecision({
             disabled={pending || txHash.trim() === ""}
             onClick={() => {
               setMessage(null);
+              // Checked again on the server, against the payout's network.
+              const checked = network
+                ? checkTxHash(network, txHash)
+                : ({ ok: true } as const);
+              if (!checked.ok) {
+                setBad(true);
+                setMessage(checked.error);
+                return;
+              }
               setArmed(true);
             }}
           >

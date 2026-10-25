@@ -1,13 +1,16 @@
 "use client";
 
 import {
+  ArrowRightIcon,
   BanknoteArrowDownIcon,
   BanknoteArrowUpIcon,
   CheckCircle2Icon,
   Loader2Icon,
   LockIcon,
+  TimerIcon,
   TriangleAlertIcon,
 } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type ReactNode, useId, useState, useTransition } from "react";
 import {
@@ -20,8 +23,10 @@ import {
 } from "@/components/app/kit";
 import { TextField } from "@/components/auth/fields";
 import { Button } from "@/components/ui/button";
-import { PAYOUT_NETWORKS } from "@/lib/payout-address";
+import { checkPayoutAddress, PAYOUT_NETWORKS } from "@/lib/payout-address";
+import { useHydrated } from "@/lib/use-hydrated";
 import { cn } from "@/lib/utils";
+import { dayAndTime } from "@/lib/when";
 import {
   requestPayout,
   savePayoutAddress,
@@ -113,7 +118,16 @@ function Note({
  * Money makes people anxious, so a result is never a bare sentence in grey:
  * it is marked good or bad, and it is announced to a screen reader.
  */
-function Notice({ message, bad }: { message: string | null; bad?: boolean }) {
+function Notice({
+  message,
+  bad,
+  help,
+}: {
+  message: string | null;
+  bad?: boolean;
+  /** A next step, when the answer is somebody else's to give. */
+  help?: { href: string; label: string } | null;
+}) {
   if (!message) return null;
   return (
     <p
@@ -136,9 +150,39 @@ function Notice({ message, bad }: { message: string | null; bad?: boolean }) {
           className="mt-0.5 size-4 shrink-0 text-verified"
         />
       )}
-      <span>{message}</span>
+      <span className="min-w-0">
+        {message}
+        {help ? (
+          <Link
+            href={help.href}
+            className="mt-1.5 flex w-fit items-center gap-1 font-medium text-fg underline decoration-line-strong underline-offset-2 hover:decoration-fg"
+          >
+            {help.label}
+            <ArrowRightIcon aria-hidden="true" className="size-3.5" />
+          </Link>
+        ) : null}
+      </span>
     </p>
   );
+}
+
+/**
+ * "26 Oct, 3:53 AM", in the reader's own clock. Drawn after hydration: the
+ * server does not know the reader's time zone, and a time that changed as
+ * the page woke up would be worse than one that appears.
+ */
+function LocalTime({ iso, fallback }: { iso: string; fallback: string }) {
+  const hydrated = useHydrated();
+  return (
+    <time dateTime={iso} className="font-medium text-fg">
+      {hydrated ? dayAndTime(new Date(iso)) : fallback}
+    </time>
+  );
+}
+
+/** Whether an address change still holds withdrawals. */
+function stillLocked(iso: string | null | undefined): iso is string {
+  return Boolean(iso && new Date(iso).getTime() > Date.now());
 }
 
 /**
@@ -184,7 +228,10 @@ const PRESETS = [50, 250, 1_000];
 export function TopUp() {
   const id = useId();
   const [amount, setAmount] = useState("250");
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<{
+    text: string;
+    help?: { href: string; label: string };
+  } | null>(null);
   const [pending, startTransition] = useTransition();
 
   return (
@@ -236,7 +283,7 @@ export function TopUp() {
             startTransition(async () => {
               const result = await startTopUp(Number(amount));
               if (!result.ok) {
-                setError(result.error);
+                setError({ text: result.error, help: result.help });
                 return;
               }
               if (result.url) window.location.href = result.url;
@@ -252,7 +299,7 @@ export function TopUp() {
         <p className="mt-2 text-xs leading-relaxed text-subtle">
           Nothing is charged until you confirm the payment on the next page.
         </p>
-        <Notice message={error} bad />
+        <Notice message={error?.text ?? null} help={error?.help} bad />
       </div>
     </Panel>
   );
@@ -266,15 +313,49 @@ export function PayoutAddressForm({
   current: { address: string; network: string } | null;
 }) {
   const router = useRouter();
-  const ids = { address: useId(), network: useId() };
+  const ids = { address: useId(), network: useId(), confirm: useId() };
   const [address, setAddress] = useState(current?.address ?? "");
   const [network, setNetwork] = useState(current?.network ?? "TRON");
   const [message, setMessage] = useState<string | null>(null);
+  const [until, setUntil] = useState<string | null>(null);
   const [bad, setBad] = useState(false);
+  /** The address has passed its checks; one more press saves it. */
+  const [confirming, setConfirming] = useState(false);
   const [pending, startTransition] = useTransition();
 
+  const trimmed = address.trim();
   const changed =
-    address.trim() !== (current?.address ?? "") || network !== current?.network;
+    trimmed !== (current?.address ?? "") || network !== current?.network;
+
+  function check() {
+    setMessage(null);
+    setUntil(null);
+    if (!changed) {
+      setBad(false);
+      setMessage("That is already your payout address, so nothing changed.");
+      return;
+    }
+    // The server checks again; this is so a typo is caught before the
+    // question rather than after it.
+    const checked = checkPayoutAddress(network, trimmed);
+    if (!checked.ok) {
+      setBad(true);
+      setMessage(checked.error);
+      return;
+    }
+    setConfirming(true);
+  }
+
+  function save() {
+    startTransition(async () => {
+      const result = await savePayoutAddress(trimmed, network);
+      setConfirming(false);
+      setBad(!result.ok);
+      setMessage(result.ok ? result.message : result.error);
+      setUntil(result.ok ? (result.until ?? null) : null);
+      if (result.ok) router.refresh();
+    });
+  }
 
   return (
     <Panel
@@ -296,8 +377,8 @@ export function PayoutAddressForm({
               <strong className="font-semibold">
                 Withdrawals pause for 24 hours
               </strong>{" "}
-              after you set or change it. This keeps your money safe if someone
-              gets into your account.
+              after you add an address or change it. This keeps your money safe
+              if someone gets into your account.
             </li>
             <li>
               <strong className="font-semibold">
@@ -317,9 +398,15 @@ export function PayoutAddressForm({
             label="Wallet address"
             hint="Paste it. Typing it out by hand is how mistakes happen."
             value={address}
-            onChange={(e) => setAddress(e.target.value)}
+            onChange={(e) => {
+              setAddress(e.target.value);
+              setConfirming(false);
+            }}
             // Monospaced, because this is checked character by character.
             className="min-w-0 [&_input]:font-mono"
+            autoComplete="off"
+            spellCheck={false}
+            disabled={pending}
             required
           />
           <div>
@@ -332,7 +419,11 @@ export function PayoutAddressForm({
             <select
               id={ids.network}
               value={network}
-              onChange={(e) => setNetwork(e.target.value)}
+              disabled={pending}
+              onChange={(e) => {
+                setNetwork(e.target.value);
+                setConfirming(false);
+              }}
               aria-describedby={`${ids.network}-hint`}
               className={cn(inputClass, "mt-1.5 cursor-pointer")}
             >
@@ -346,29 +437,76 @@ export function PayoutAddressForm({
         </div>
 
         <div className="mt-5">
-          <Button
-            type="button"
-            size="md"
-            variant={changed ? "primary" : "secondary"}
-            className="w-full sm:w-auto"
-            disabled={pending || !address.trim()}
-            onClick={() => {
-              setMessage(null);
-              startTransition(async () => {
-                const result = await savePayoutAddress(address, network);
-                setBad(!result.ok);
-                setMessage(result.ok ? result.message : result.error);
-                if (result.ok) router.refresh();
-              });
-            }}
-          >
-            <BusyLabel
-              pending={pending}
-              idle={current ? "Update address" : "Save address"}
-              busy="Saving…"
-            />
-          </Button>
+          {confirming ? (
+            // The address read back in full before it is saved: the last
+            // place a wrong character can be caught for nothing.
+            <div
+              role="alertdialog"
+              aria-labelledby={ids.confirm}
+              className="rounded-lg border border-line-strong bg-surface-2/60 p-3.5"
+            >
+              <p
+                id={ids.confirm}
+                className="text-sm leading-5 font-semibold text-fg"
+              >
+                {current
+                  ? "Send payouts here from now on?"
+                  : "Send payouts here?"}
+              </p>
+              <p className="mt-2 rounded-md border border-line bg-surface px-3 py-2 font-mono text-[0.8125rem] leading-relaxed break-all text-fg">
+                {trimmed}
+              </p>
+              <p className="mt-2 text-[0.8125rem] leading-relaxed text-muted">
+                On {network}. Withdrawals pause for 24 hours after you save.
+              </p>
+              <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                <Button
+                  type="button"
+                  size="md"
+                  className="w-full sm:w-auto"
+                  disabled={pending}
+                  onClick={save}
+                >
+                  <BusyLabel
+                    pending={pending}
+                    idle="Yes — save this address"
+                    busy="Saving…"
+                  />
+                </Button>
+                <Button
+                  type="button"
+                  size="md"
+                  variant="ghost"
+                  className="w-full sm:w-auto"
+                  disabled={pending}
+                  onClick={() => setConfirming(false)}
+                >
+                  Back
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <Button
+              type="button"
+              size="md"
+              variant={changed ? "primary" : "secondary"}
+              className="w-full sm:w-auto"
+              disabled={pending || !trimmed}
+              onClick={check}
+            >
+              {current ? "Update address" : "Save address"}
+            </Button>
+          )}
           <Notice message={message} bad={bad} />
+          {until && !bad ? (
+            <p className="mt-2 flex items-center gap-1.5 text-[0.8125rem] text-muted">
+              <TimerIcon aria-hidden="true" className="size-3.5 shrink-0" />
+              <span>
+                Withdrawals open at{" "}
+                <LocalTime iso={until} fallback="24 hours from now" />.
+              </span>
+            </p>
+          ) : null}
         </div>
       </div>
     </Panel>
@@ -379,11 +517,14 @@ export function RequestPayout({
   availableUsd,
   hasAddress,
   minimumUsd,
+  lockedUntil,
 }: {
   availableUsd: number;
   hasAddress: boolean;
   /** Cents. The floor finance will send, set in the admin settings. */
   minimumUsd: number;
+  /** ISO. Withdrawals wait until then after the address was added or changed. */
+  lockedUntil?: string | null;
 }) {
   const router = useRouter();
   const id = useId();
@@ -396,6 +537,7 @@ export function RequestPayout({
     (cents / 100).toLocaleString("en-US", {
       style: "currency",
       currency: "USD",
+      minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     });
 
@@ -405,6 +547,10 @@ export function RequestPayout({
   // to learn the floor used to be to ask for less than it.
   const minLabel = asMoney(minimumUsd);
   const belowMinimum = availableUsd < minimumUsd;
+  // Said before anything is typed: the form used to look ready during the
+  // hold, and the hold was only found out by being refused.
+  const locked = hasAddress && stillLocked(lockedUntil);
+  const closed = !hasAddress || locked || max <= 0;
 
   return (
     <Panel
@@ -412,9 +558,21 @@ export function RequestPayout({
       title="Withdraw"
       info="Finance checks every payout, normally within one working day. The amount is held against your balance while they do, so it cannot be spent twice."
     >
-      {hasAddress && belowMinimum && minimumUsd > 0 ? (
+      {locked ? (
+        <Note icon={TimerIcon} className="mb-4">
+          <p>
+            Withdrawals open at{" "}
+            <LocalTime iso={lockedUntil} fallback="24 hours after the change" />
+            .
+          </p>
+          <p className="mt-0.5">
+            Every new payout address waits 24 hours, so nobody who gets into
+            your account can send your money somewhere else.
+          </p>
+        </Note>
+      ) : hasAddress && belowMinimum && minimumUsd > 0 ? (
         <Note icon={LockIcon} className="mb-4">
-          The smallest payout is {minLabel}. You have {maxLabel}.
+          The smallest withdrawal is {minLabel}. You have {maxLabel}.
         </Note>
       ) : null}
 
@@ -440,7 +598,7 @@ export function RequestPayout({
                 // Below the minimum there is no range to state: "Between $20.00
                 // and $0.00" read as a broken sum.
                 minimumUsd > 0 && belowMinimum
-                  ? `The smallest payout is ${minLabel}.`
+                  ? `The smallest withdrawal is ${minLabel}.`
                   : minimumUsd > 0
                     ? `Between ${minLabel} and ${maxLabel}.`
                     : `You can take out up to ${maxLabel}.`
@@ -449,7 +607,7 @@ export function RequestPayout({
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               className="min-w-0 flex-1 sm:max-w-xs"
-              disabled={!hasAddress || max <= 0}
+              disabled={closed}
               required
             />
             <Button
@@ -457,7 +615,7 @@ export function RequestPayout({
               size="md"
               variant="secondary"
               onClick={() => setAmount(String(max))}
-              disabled={pending || !hasAddress || max <= 0}
+              disabled={pending || closed}
             >
               All of it
             </Button>
@@ -468,9 +626,17 @@ export function RequestPayout({
               type="button"
               size="md"
               className="w-full sm:w-auto"
-              disabled={pending || !hasAddress || max <= 0 || !amount.trim()}
+              disabled={pending || closed || !amount.trim()}
               onClick={() => {
                 setMessage(null);
+                // The floor is known here, so it is said here, with the
+                // figure — not as "below the smallest we can send".
+                const cents = Math.round(Number(amount) * 100);
+                if (Number.isFinite(cents) && cents > 0 && cents < minimumUsd) {
+                  setBad(true);
+                  setMessage(`The smallest withdrawal is ${minLabel}.`);
+                  return;
+                }
                 startTransition(async () => {
                   const result = await requestPayout(Number(amount));
                   setBad(!result.ok);
