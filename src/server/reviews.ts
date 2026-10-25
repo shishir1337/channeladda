@@ -1,5 +1,6 @@
 import "server-only";
 
+import { stripBidi } from "@/lib/bidi";
 import { db } from "@/lib/db";
 import { redactContactDetails } from "@/lib/redact";
 import { postEvent } from "@/server/chat-events";
@@ -42,7 +43,7 @@ function checked(
   if (!Number.isInteger(input.rating) || input.rating < 1 || input.rating > 5) {
     return { ok: false, reason: "rating" };
   }
-  const body = input.body.trim();
+  const body = stripBidi(input.body).trim();
   if (body.length > REVIEW_MAX) return { ok: false, reason: "too-long" };
   return {
     ok: true,

@@ -1,3 +1,4 @@
+import { stripBidi } from "@/lib/bidi";
 import { keyFromUrl } from "@/lib/upload-keys";
 
 /**
@@ -51,11 +52,15 @@ export const BIO_MAX = 300;
 const BIO_CONTACT =
   /@|https?:|www\.|\.(com|net|org|me|io|in|bd|pk)\b|\b(wa|t)\.me\b|(?:\d[\s-]?){9,}/i;
 
-const tidy = (text: string) => text.trim().replace(/\s+/g, " ");
+/**
+ * Direction marks go first: a name drawn as "Support" but stored backwards
+ * behind an override is how a stranger passes for staff in a chat.
+ */
+const tidy = (text: string) => stripBidi(text).trim().replace(/\s+/g, " ");
 
 /** Each line tidied, and no more than one blank line between paragraphs. */
 const tidyLines = (text: string) =>
-  text
+  stripBidi(text)
     .split(/\r?\n/)
     .map((line) => line.trim().replace(/\s+/g, " "))
     .join("\n")

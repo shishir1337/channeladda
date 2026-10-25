@@ -155,6 +155,42 @@ test(
 );
 
 test(
+  "direction marks are taken out of a message, and other scripts kept",
+  withCleanDb(async () => {
+    const { listing, buyer } = await seedListing();
+    const opened = await openConversation({
+      listingId: listing.id,
+      buyerId: buyer.id,
+    });
+    if (!opened.ok) throw new Error(opened.reason);
+
+    const sent = await sendMessage({
+      conversationId: opened.id,
+      listingId: listing.id,
+      sender: asUser(buyer.id),
+      body: "Offer \u202E005$\u202C stands — مرحبا 👍",
+    });
+    expect(sent).toMatchObject({ ok: true });
+
+    const latest = await db.message.findFirstOrThrow({
+      where: { conversationId: opened.id, senderId: buyer.id },
+      orderBy: { createdAt: "desc" },
+    });
+    expect(latest.body).toBe("Offer 005$ stands — مرحبا 👍");
+
+    // Nothing but marks is nothing at all.
+    expect(
+      await sendMessage({
+        conversationId: opened.id,
+        listingId: listing.id,
+        sender: asUser(buyer.id),
+        body: "\u202E\u2066\u200F",
+      }),
+    ).toMatchObject({ ok: false, reason: "empty" });
+  }),
+);
+
+test(
   "contact details are still stripped when a file is attached",
   withCleanDb(async () => {
     // The attachment path must not become a way around the redaction that

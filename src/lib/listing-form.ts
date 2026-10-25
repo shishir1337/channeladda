@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { stripBidi } from "@/lib/bidi";
 
 /**
  * What a seller may set on a listing.
@@ -44,8 +45,11 @@ const listingFields = z.object({
       "Use letters, numbers, dots, dashes or underscores.",
     ),
 
+  // Direction marks out first, on everything a buyer reads: an override
+  // can make a title or a description seem to say something it does not.
   title: z
     .string()
+    .overwrite(stripBidi)
     .trim()
     .min(
       10,
@@ -53,10 +57,16 @@ const listingFields = z.object({
     )
     .max(120, "Keep the title under 120 characters."),
 
-  niche: z.string().trim().min(2, "What is it about?").max(60, "Too long."),
+  niche: z
+    .string()
+    .overwrite(stripBidi)
+    .trim()
+    .min(2, "What is it about?")
+    .max(60, "Too long."),
 
   country: z
     .string()
+    .overwrite(stripBidi)
     .trim()
     .min(2, "Where is most of the audience?")
     .max(60, "Too long."),
@@ -121,6 +131,7 @@ const listingFields = z.object({
 
   description: z
     .string()
+    .overwrite(stripBidi)
     .trim()
     .max(
       4_000,

@@ -7,6 +7,7 @@ import type {
   Platform,
   UserRole,
 } from "@/generated/prisma/enums";
+import { stripBidi } from "@/lib/bidi";
 import { OPENING_MESSAGE } from "@/lib/chat-opening";
 import { isCustodianRole } from "@/lib/custody-roles";
 import { db } from "@/lib/db";
@@ -293,7 +294,7 @@ export async function askSeller(input: {
 > {
   // Checked before the thread exists, so a refused question leaves no
   // empty thread in the seller's inbox.
-  const question = input.question.trim();
+  const question = stripBidi(input.question).trim();
   if (!question) return { ok: false, reason: "empty" };
   if (question.length > MAX_MESSAGE) return { ok: false, reason: "too-long" };
 
@@ -1005,7 +1006,7 @@ export async function sendMessage(input: {
    */
   joinsListing?: boolean;
 }): Promise<SendResult> {
-  const text = input.body.trim();
+  const text = stripBidi(input.body).trim();
   // A photo or a clip on its own is a message. Requiring words alongside it
   // would just make people type a full stop.
   if (!text && !input.attachmentKey) return { ok: false, reason: "empty" };

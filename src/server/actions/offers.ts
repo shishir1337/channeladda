@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { stripBidi } from "@/lib/bidi";
 import { needsEmailVerification } from "@/lib/email-verification";
 import { toCents } from "@/lib/listing-form";
 import * as repo from "@/server/offers";
@@ -82,7 +83,7 @@ export async function makeOffer(
     buyerId: user.id,
     listingId,
     amountCents: toCents(amount),
-    message: message.trim() || null,
+    message: stripBidi(message).trim() || null,
     expiryHours: settings.offerExpiryHours,
   });
   if (!result.ok) return fail(result.reason);
@@ -142,7 +143,7 @@ export async function counterOffer(
     responderId: user.id,
     as: side.as,
     amountCents: toCents(amount),
-    message: message.trim() || null,
+    message: stripBidi(message).trim() || null,
     expiryHours: settings.offerExpiryHours,
   });
   if (!result.ok) return fail(result.reason);
@@ -182,7 +183,7 @@ export async function proposePrice(
     conversationId,
     listingId,
     amountCents: toCents(amount),
-    message: message.trim() || null,
+    message: stripBidi(message).trim() || null,
     expiryHours: settings.offerExpiryHours,
   });
   if (!result.ok) {

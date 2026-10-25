@@ -87,6 +87,25 @@ test(
 );
 
 test(
+  "a review is kept without its direction marks",
+  withCleanDb(async () => {
+    const { order, buyer } = await seedDeal();
+    expect(
+      await reviewSeller({
+        orderId: order.id,
+        userId: buyer.id,
+        rating: 4,
+        body: "\u202BSmooth\u202C handover — شكرا",
+      }),
+    ).toEqual({ ok: true });
+    expect(
+      (await db.review.findUniqueOrThrow({ where: { orderId: order.id } }))
+        .body,
+    ).toBe("Smooth handover — شكرا");
+  }),
+);
+
+test(
   "only the buyer of a completed deal rates its seller",
   withCleanDb(async () => {
     const { order, seller } = await seedDeal();

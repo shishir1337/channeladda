@@ -149,3 +149,40 @@ test("a draft still refuses a handle that is not one", () => {
   } as ListingDraftInput;
   expect(fields(listingDraftSchema.safeParse(bad))).toContain("handle");
 });
+
+test("direction marks are taken out of what a buyer reads", () => {
+  // An override can make a title seem to say something it does not.
+  const result = listingDraftSchema.safeParse({
+    ...TYPED,
+    title: "\u202EMonetized gaming channel\u202C with 6 years of watch time",
+    niche: "\u2066Gaming\u2069",
+    country: "\u200FUnited States",
+    description: "Uploads \u202Bdaily\u202C.",
+  });
+  expect(result.success).toBe(true);
+  if (!result.success) return;
+  expect(result.data.title).toBe(
+    "Monetized gaming channel with 6 years of watch time",
+  );
+  expect(result.data.niche).toBe("Gaming");
+  expect(result.data.country).toBe("United States");
+  expect(result.data.description).toBe("Uploads daily.");
+});
+
+test("a title in Arabic is kept as typed", () => {
+  const title = "قناة ألعاب مع ست سنوات من المشاهدة";
+  const result = listingDraftSchema.safeParse({ ...TYPED, title });
+  expect(result.success && result.data.title).toBe(title);
+});
+
+test("a title of nothing but direction marks is still too short", () => {
+  expect(
+    fields(
+      listingSubmitSchema.safeParse({
+        ...TYPED,
+        title:
+          "\u202E\u202E\u202E\u202E\u202E\u202E\u202E\u202E\u202E\u202E\u202E",
+      }),
+    ),
+  ).toContain("title");
+});

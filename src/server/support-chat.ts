@@ -1,5 +1,6 @@
 import "server-only";
 
+import { stripBidi } from "@/lib/bidi";
 import { db } from "@/lib/db";
 import { MAX_MESSAGE } from "@/lib/messages";
 import {
@@ -286,7 +287,7 @@ async function checkLine(input: {
 }): Promise<
   { ok: true; text: string } | { ok: false; reason: SupportSendFailure }
 > {
-  const text = input.body.trim();
+  const text = stripBidi(input.body).trim();
   if (!text && !input.attachmentKey) return { ok: false, reason: "empty" };
   if (input.attachmentKey) {
     if (!isChatAttachmentKey(input.attachmentKey)) {

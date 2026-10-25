@@ -21,6 +21,42 @@ describe("parseProfile", () => {
     });
   });
 
+  it("drops direction marks from a name, a country and a bio", () => {
+    const result = parseProfile({
+      name: "\u202Etroppu\u2066S",
+      country: "\u200FIndia\u200E",
+      image: "",
+      bio: "Hand over \u202Bin a day\u202C.",
+    });
+    expect(result).toEqual({
+      ok: true,
+      value: {
+        name: "troppuS",
+        country: "India",
+        image: null,
+        bio: "Hand over in a day.",
+      },
+    });
+  });
+
+  it("keeps a name written in Arabic or Hebrew as typed", () => {
+    for (const name of ["نادية رحمن", "דנה כהן"]) {
+      expect(parseProfile({ name, country: "", image: "" })).toMatchObject({
+        ok: true,
+        value: { name },
+      });
+    }
+  });
+
+  it("refuses a name that is nothing but direction marks", () => {
+    expect(
+      parseProfile({ name: "\u202E\u202E\u2066", country: "", image: "" }),
+    ).toMatchObject({
+      ok: false,
+      errors: { name: "Enter your name." },
+    });
+  });
+
   it("treats a blank country and no photo as none", () => {
     const result = parseProfile({ name: "Ravi", country: "  ", image: "" });
     expect(result).toEqual({
