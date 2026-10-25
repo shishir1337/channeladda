@@ -4,7 +4,7 @@ import { MessagesSquareIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useId, useState, useTransition } from "react";
 import { textareaClass } from "@/components/app/kit";
-import { BusyLabel } from "@/components/deals/deal-timeline";
+import { BusyLabel } from "@/components/ui/busy-label";
 import { Button } from "@/components/ui/button";
 import { useSession } from "@/lib/auth-client";
 import { OPENING_MESSAGE } from "@/lib/chat-opening";
