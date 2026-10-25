@@ -8,6 +8,7 @@ import {
   ChevronRightIcon,
   CoinsIcon,
   GavelIcon,
+  GlobeIcon,
   HandshakeIcon,
   LayoutDashboardIcon,
   LifeBuoyIcon,
@@ -35,7 +36,7 @@ import { ChannelAddaLogo } from "@/components/icons/brand-icons";
 import { ThemeRow, ThemeToggle } from "@/components/site/theme-toggle";
 import { WalletChip } from "@/components/site/wallet-balance";
 import { Button } from "@/components/ui/button";
-import { HUE_TEXT, type Hue, hueOf } from "@/components/ui/icon-hue";
+import { HUE_TEXT, type Hue, hueOf, iconText } from "@/components/ui/icon-hue";
 import {
   Sheet,
   SheetContent,
@@ -378,6 +379,36 @@ function Wordmark({
 
 const iconButton =
   "inline-flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted transition-colors duration-150 hover:bg-black/[0.05] hover:text-fg dark:hover:bg-white/[0.06] pointer-fine:size-8";
+
+/**
+ * The way out to the website, beside the balance in the top bar.
+ *
+ * The owner could not find one: the logo does it, and the rail has a
+ * "Website" group, but neither says so where the eye goes. It is the
+ * wallet's shape — height, corners, hover — so the two read as one row;
+ * a globe and the word on a wider screen, the globe alone on a phone,
+ * where the word is still the link's name for a screen reader. 40px wide
+ * there, not 44: at 360px every pixel it takes comes out of the page's
+ * name beside the logo.
+ *
+ * In the staff area too: there the logo goes to the staff desk, so this is
+ * the only way to the website at all.
+ */
+function WebsiteLink() {
+  return (
+    <Link
+      href="/"
+      title="Go to the Channel Adda website"
+      className="inline-flex h-11 min-w-10 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-md text-[0.8125rem] font-medium text-muted transition-colors duration-150 hover:bg-black/[0.05] hover:text-fg sm:px-2.5 dark:hover:bg-white/[0.06] pointer-fine:h-8 pointer-fine:min-w-8"
+    >
+      <GlobeIcon
+        aria-hidden="true"
+        className={cn("size-4 shrink-0", iconText(GlobeIcon))}
+      />
+      <span className="max-sm:sr-only">Website</span>
+    </Link>
+  );
+}
 
 /**
  * The application shell.
@@ -865,10 +896,13 @@ export function AppShell({
               <Trail crumbs={crumbs} />
 
               <div className="flex shrink-0 items-center gap-0.5">
+                <WebsiteLink />
+                {/* 6px a side on a phone, with the globe beside it: the
+                    icons in this row then sit an even ~20px apart. */}
                 {balanceCents !== undefined ? (
                   <WalletChip
                     cents={balanceCents}
-                    className="rounded-md px-2 text-[0.8125rem] hover:bg-black/[0.05] sm:px-2.5 dark:hover:bg-white/[0.06] pointer-fine:h-8"
+                    className="rounded-md px-1.5 text-[0.8125rem] hover:bg-black/[0.05] sm:px-2.5 dark:hover:bg-white/[0.06] pointer-fine:h-8"
                   />
                 ) : null}
                 {bell}
