@@ -57,8 +57,9 @@ function usd(value: number) {
   });
 }
 
+/** "26 Oct", as the rest of the dashboard writes a day. */
 function day(date: Date) {
-  return date.toLocaleDateString("en-US", { day: "numeric", month: "short" });
+  return date.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 }
 
 /**
@@ -69,7 +70,8 @@ function day(date: Date) {
  * keeping, not worth leading with.
  */
 const NEEDS_YOU: readonly ListingStatus[] = ["CODE_CHECK", "REJECTED"];
-const ON_SALE: readonly ListingStatus[] = ["LIVE", "RESERVED", "PAUSED"];
+// Paused is not on sale: buyers cannot see it. It has a tab of its own.
+const ON_SALE: readonly ListingStatus[] = ["LIVE", "RESERVED"];
 const IN_PROGRESS: readonly ListingStatus[] = ["DRAFT", "ADMIN_REVIEW"];
 
 /** How much of the archive to show before it becomes noise. */
@@ -110,20 +112,26 @@ const FIRST_STEPS = [
 /**
  * Removed listings have a tab of their own, last, and only once there is one:
  * off the marketplace for good, they are a record and not something to work
- * on, and they were mixed in with the sales before.
+ * on, and they were mixed in with the sales before. Paused ones likewise,
+ * beside On sale: they were counted as on sale while no buyer could see them.
  */
-type ListingTab = "yours" | "sale" | "draft" | "sold" | "removed";
+type ListingTab = "yours" | "sale" | "paused" | "draft" | "sold" | "removed";
 const LISTING_TABS: readonly ListingTab[] = [
   "yours",
   "sale",
+  "paused",
   "draft",
   "sold",
   "removed",
 ];
 
+/** Tabs shown only once something is in them. */
+const ONLY_WHEN_USED: readonly ListingTab[] = ["paused", "removed"];
+
 const TAB_LABEL: Record<ListingTab, string> = {
   yours: "Your turn",
   sale: "On sale",
+  paused: "Paused",
   draft: "Not live yet",
   sold: "Sold",
   removed: "Removed",
@@ -132,6 +140,7 @@ const TAB_LABEL: Record<ListingTab, string> = {
 const TAB_EMPTY: Record<ListingTab, string> = {
   yours: "Nothing needs you right now.",
   sale: "Nothing is on sale right now.",
+  paused: "Nothing is paused.",
   draft: "No drafts or listings in review.",
   sold: "Nothing sold yet.",
   removed: "Nothing removed.",
@@ -153,6 +162,7 @@ export default async function MyListingsPage({
 
   const needsYou = listings.filter((l) => NEEDS_YOU.includes(l.status));
   const onSale = listings.filter((l) => ON_SALE.includes(l.status));
+  const paused = listings.filter((l) => l.status === "PAUSED");
   const inProgress = listings.filter((l) => IN_PROGRESS.includes(l.status));
   const archive = listings.filter((l) => l.status === "SOLD");
   const removed = listings.filter((l) => l.status === "REMOVED");
@@ -160,6 +170,7 @@ export default async function MyListingsPage({
   const groups: Record<ListingTab, typeof listings> = {
     yours: needsYou,
     sale: onSale,
+    paused,
     draft: inProgress,
     sold: archive.slice(0, ARCHIVE_SHOWN),
     removed: removed.slice(0, ARCHIVE_SHOWN),
@@ -167,6 +178,7 @@ export default async function MyListingsPage({
   const counts: Record<ListingTab, number> = {
     yours: needsYou.length,
     sale: onSale.length,
+    paused: paused.length,
     draft: inProgress.length,
     sold: archive.length,
     removed: removed.length,
@@ -250,10 +262,17 @@ export default async function MyListingsPage({
         </Card>
       ) : (
         <>
-          <FilterBar label="Your listings by stage" className="mb-5">
+          {/* Wrapped, not scrolled: on a phone the last tabs sat off the
+              edge with nothing to say they were there. */}
+          <FilterBar
+            label="Your listings by stage"
+            className="mx-0 mb-5 px-0 [&>div]:min-w-0 [&>div]:flex-wrap [&>div]:gap-x-4"
+          >
             {LISTING_TABS.filter(
               (name) =>
-                name !== "removed" || counts.removed > 0 || tab === name,
+                !ONLY_WHEN_USED.includes(name) ||
+                counts[name] > 0 ||
+                tab === name,
             ).map((name) => (
               <FilterLink
                 key={name}
@@ -373,6 +392,13 @@ function ListingRow({
   const platform = platforms.find((p) => p.id === listing.platform);
   const editHref = editHrefFor(listing, locked);
   const canRemove = REMOVABLE.includes(listing.status) && !locked;
+  // A paused listing a deal still holds stays paused until the deal ends.
+  const pause =
+    listing.status === "LIVE"
+      ? ("pause" as const)
+      : listing.status === "PAUSED" && !locked
+        ? ("resume" as const)
+        : null;
   const href = `/dashboard/listings/${listing.id}`;
 
   const body = (
@@ -414,11 +440,17 @@ function ListingRow({
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="flex min-w-0 items-center gap-1.5 text-sm leading-5 font-medium text-fg">
-              <span className="truncate">
+            {/* Two lines before it is cut: one cut "Crypto Signals …" on a
+                phone with room to spare below. */}
+            <p className="flex min-w-0 items-start gap-1.5 text-sm leading-5 font-medium text-fg">
+              <span className="line-clamp-2 break-words">
                 {listing.title || listing.handle}
               </span>
-              {listing.ownershipVerifiedAt ? <VerifiedMark /> : null}
+              {listing.ownershipVerifiedAt ? (
+                <span className="mt-0.5 inline-flex">
+                  <VerifiedMark />
+                </span>
+              ) : null}
             </p>
             <p className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-1.5 text-[0.8125rem] leading-5 text-muted">
               <span className="capitalize">
@@ -488,7 +520,7 @@ function ListingRow({
         ) : null}
       </div>
 
-      {editHref || canRemove ? null : (
+      {editHref || canRemove || pause ? null : (
         <ChevronRightIcon
           aria-hidden="true"
           className="mt-0.5 hidden size-4 shrink-0 text-subtle transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-muted sm:block"
@@ -497,7 +529,7 @@ function ListingRow({
     </div>
   );
 
-  if (!editHref && !canRemove) {
+  if (!editHref && !canRemove && !pause) {
     return <ListItem href={href}>{body}</ListItem>;
   }
 
@@ -521,6 +553,7 @@ function ListingRow({
           name={listing.title || listing.handle}
           editHref={editHref}
           canRemove={canRemove}
+          pause={pause}
         />
       </div>
     </ListItem>
