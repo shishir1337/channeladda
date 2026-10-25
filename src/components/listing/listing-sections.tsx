@@ -22,6 +22,7 @@ import type { Listing } from "@/data/listings";
 import type { Platform } from "@/data/platforms";
 import type { Seller } from "@/data/sellers";
 import { countOf } from "@/lib/plural";
+import { revenueLine } from "@/lib/revenue-line";
 import { formatCompact } from "@/lib/utils";
 
 export function Panel({
@@ -56,6 +57,7 @@ export function MetricsPanel({
   listing: Listing;
   platform: Platform;
 }) {
+  const revenue = revenueLine(listing);
   const rows = [
     {
       icon: UsersIcon,
@@ -70,16 +72,20 @@ export function MetricsPanel({
     {
       icon: CalendarIcon,
       label: "Account age",
-      value: `${listing.ageYears} years`,
+      value: countOf(listing.ageYears, "year"),
     },
     { icon: MapPinIcon, label: "Main audience", value: listing.country },
     { icon: GlobeIcon, label: "Niche", value: listing.niche },
     {
       icon: CircleDollarSignIcon,
       label: "Monthly revenue",
+      // From whether it is monetized, not from a missing figure: a
+      // monetized account with no figure given said "Not monetized".
       value:
-        listing.monthlyRevenue > 0 ? (
-          <Price usd={listing.monthlyRevenue} />
+        revenue.kind === "revenue" ? (
+          <Price usd={revenue.usd} />
+        ) : revenue.kind === "monetized" ? (
+          "Monetized"
         ) : (
           "Not monetized"
         ),

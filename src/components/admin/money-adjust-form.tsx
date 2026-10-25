@@ -385,7 +385,9 @@ export function MoneyAdjustForm({
               .
             </p>
             <p className="mt-1.5 text-[0.8125rem] leading-relaxed text-muted">
-              They will see: &ldquo;{reason.trim().replace(/\s+/g, " ")}&rdquo;.
+              They will see: &ldquo;{reason.trim().replace(/\s+/g, " ")}&rdquo;
+              {/* A reason that ends its own sentence gets no second full stop. */}
+              {/[.!?]$/.test(reason.trim()) ? " " : ". "}
               The platform&rsquo;s own side of the books moves by the opposite
               amount, so the ledger still balances. Recorded under your name.
             </p>

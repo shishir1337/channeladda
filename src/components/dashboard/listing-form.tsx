@@ -761,7 +761,14 @@ export function ListingForm({
             label="How much of this listing is filled in"
             tone={percent === 100 ? "verified" : "primary"}
           />
-          <ul className="no-scrollbar -mx-1 mt-1.5 flex gap-0.5 overflow-x-auto px-1">
+          {/* The step links stay off a phone's pinned card until one has a
+              problem to jump to: with them it took a quarter of the screen. */}
+          <ul
+            className={cn(
+              "no-scrollbar -mx-1 mt-1.5 flex gap-0.5 overflow-x-auto px-1",
+              !steps.some((s) => stepState(s) === "error") && "max-sm:hidden",
+            )}
+          >
             {steps.map((s, i) => {
               const state = stepState(s);
               return (
@@ -1640,12 +1647,18 @@ export function ListingForm({
 
         {/* The save buttons follow the page down. A draft being safe is the
             thing sellers most need to believe on a form this long, and it
-            cannot be believable if the button is only at the bottom. */}
-        <div className="sticky bottom-3 z-10 rounded-card border border-line bg-bg/85 p-3 shadow-lift backdrop-blur-xl sm:bottom-4 sm:py-2.5 sm:pr-2.5 sm:pl-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            cannot be believable if the button is only at the bottom. On a
+            phone it sits above the tab bar, not behind it, and is one row of
+            buttons: the bar and the progress card took half the screen. */}
+        <div className="sticky bottom-[calc(4.375rem+env(safe-area-inset-bottom))] z-10 rounded-card border border-line bg-bg/85 p-2.5 shadow-lift backdrop-blur-xl sm:py-2.5 sm:pr-2.5 sm:pl-4 lg:bottom-4">
+          <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
             <p
               aria-live="polite"
-              className="flex min-w-0 items-start gap-2 text-xs leading-relaxed text-muted sm:items-center sm:text-[0.8125rem]"
+              className={cn(
+                "flex min-w-0 items-start gap-2 text-xs leading-relaxed text-muted sm:items-center sm:text-[0.8125rem]",
+                // The reassurance waits for a wider screen; "saved" does not.
+                !saved && "max-sm:hidden",
+              )}
             >
               {saved ? (
                 <>
@@ -1670,12 +1683,12 @@ export function ListingForm({
                 </>
               )}
             </p>
-            <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
+            <div className="flex shrink-0 flex-wrap gap-2 sm:flex-nowrap">
               <Button
                 type="submit"
                 variant="secondary"
                 size="md"
-                className="w-full sm:w-auto sm:min-w-[6.5rem]"
+                className="flex-none sm:min-w-[6.5rem]"
                 disabled={busy}
               >
                 {sending === "draft" ? (
@@ -1690,7 +1703,7 @@ export function ListingForm({
               <Button
                 type="button"
                 size="md"
-                className="w-full sm:w-auto sm:min-w-[13.5rem]"
+                className="min-w-0 flex-1 basis-48 sm:flex-none sm:basis-auto sm:min-w-[13.5rem]"
                 disabled={busy}
                 onClick={() => submit(true)}
               >

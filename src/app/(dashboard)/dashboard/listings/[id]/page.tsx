@@ -37,6 +37,8 @@ import { Button } from "@/components/ui/button";
 import { platforms } from "@/data/platforms";
 import type { ListingStatus } from "@/generated/prisma/enums";
 import { LOCK_TEXT, removedBySeller } from "@/lib/listing-lock";
+import { countOf } from "@/lib/plural";
+import { revenueLine } from "@/lib/revenue-line";
 import { cn } from "@/lib/utils";
 import {
   EDITABLE,
@@ -154,8 +156,10 @@ export default async function SellerListingPage({
       (listing.status === "LIVE" ||
         listing.status === "PAUSED" ||
         listing.status === "ADMIN_REVIEW"));
-  const platformName =
-    platforms.find((p) => p.id === listing.platform)?.name ?? listing.platform;
+  const platform = platforms.find((p) => p.id === listing.platform);
+  const platformName = platform?.name ?? listing.platform;
+  // The platform's own word: followers, members, subscribers, visits.
+  const audienceWord = (platform?.metricLabel ?? "Audience").toLowerCase();
   const editable = EDITABLE.includes(listing.status);
   const verified = listing.ownershipVerifiedAt !== null;
 
@@ -278,7 +282,7 @@ export default async function SellerListingPage({
                 <span className="tabular-nums">
                   {listing.audience.toLocaleString("en-US")}
                 </span>{" "}
-                audience
+                {audienceWord}
               </span>
             </p>
           </div>
@@ -532,9 +536,9 @@ function ReadOnlySummary({
     ["Audience country", listing.country],
     ["Audience", listing.audience.toLocaleString("en-US")],
     ["Engagement", `${listing.engagement}%`],
-    ["Account age", `${listing.ageYears} years`],
+    ["Account age", countOf(listing.ageYears, "year")],
     ["Monetized", listing.monetized ? "Yes" : "No"],
-    ["Monthly revenue", usd(listing.monthlyRevenue)],
+    ["Monthly revenue", revenueText(listing)],
     ["Asking price", usd(listing.price)],
   ];
 
@@ -576,7 +580,12 @@ function ReadOnlySummary({
           <div className="border-t border-line p-4 sm:p-5">
             <h3 className="flex items-center gap-2 text-sm font-semibold text-fg">
               Proof you sent
-              <Count value={listing.proofs.length} label="screenshots" />
+              <Count
+                value={listing.proofs.length}
+                label={
+                  listing.proofs.length === 1 ? "screenshot" : "screenshots"
+                }
+              />
             </h3>
             <ul className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
               {listing.proofs.map((proof) => (
@@ -601,4 +610,15 @@ function ReadOnlySummary({
       </Card>
     </Section>
   );
+}
+
+/**
+ * Monthly revenue as the public page says it: "Not monetized" for an
+ * account that is not, rather than "$0.00", and the figure otherwise.
+ */
+function revenueText(listing: { monetized: boolean; monthlyRevenue: number }) {
+  const line = revenueLine(listing);
+  if (line.kind === "none") return "Not monetized";
+  if (line.kind === "monetized") return "Monetized, no figure given";
+  return usd(line.usd);
 }

@@ -43,6 +43,7 @@ import { Button } from "@/components/ui/button";
 import { iconText } from "@/components/ui/icon-hue";
 import { money } from "@/lib/chat-events";
 import { chatTime } from "@/lib/chat-time";
+import { fileSize } from "@/lib/file-size";
 import { MAX_MESSAGE } from "@/lib/messages";
 import { cn } from "@/lib/utils";
 import {
@@ -1021,7 +1022,7 @@ export function ThreadView({
                     {attachment.name}
                   </span>
                   <span className="block text-xs text-subtle tabular-nums">
-                    {(attachment.bytes / 1024 / 1024).toFixed(1)}MB · deleted
+                    {fileSize(attachment.bytes)} · deleted
                     after 48 hours
                   </span>
                 </span>

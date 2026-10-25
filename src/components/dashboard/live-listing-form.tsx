@@ -457,25 +457,21 @@ export function LiveListingForm({
       </Card>
 
       {/* Follows the page down, as the listing form's does: on a phone the
-          form is long and the one button should never be a scroll away. */}
-      <div className="sticky bottom-3 z-10 rounded-card border border-line bg-bg/85 p-3 shadow-lift backdrop-blur-xl sm:bottom-4 sm:py-2.5 sm:pr-2.5 sm:pl-4">
+          form is long and the one button should never be a scroll away. It
+          sits above the phone's tab bar, as one row of buttons. */}
+      <div className="sticky bottom-[calc(4.375rem+env(safe-area-inset-bottom))] z-10 rounded-card border border-line bg-bg/85 p-2.5 shadow-lift backdrop-blur-xl sm:py-2.5 sm:pr-2.5 sm:pl-4 lg:bottom-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-xs leading-relaxed text-muted sm:text-[0.8125rem]">
+          <p className="text-xs leading-relaxed text-muted max-sm:hidden sm:text-[0.8125rem]">
             Buyers see your changes as soon as you save.
           </p>
-          <div className="flex shrink-0 flex-col-reverse gap-2 sm:flex-row">
-            <Button
-              asChild
-              variant="ghost"
-              size="md"
-              className="w-full sm:w-auto"
-            >
+          <div className="flex shrink-0 gap-2">
+            <Button asChild variant="ghost" size="md" className="flex-none">
               <Link href={`/dashboard/listings/${listingId}`}>Cancel</Link>
             </Button>
             <Button
               type="submit"
               size="md"
-              className="w-full sm:w-auto sm:min-w-[9rem]"
+              className="min-w-0 flex-1 sm:flex-none sm:min-w-[9rem]"
               disabled={pending}
             >
               {pending ? (

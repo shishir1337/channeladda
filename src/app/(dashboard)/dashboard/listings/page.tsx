@@ -433,7 +433,7 @@ function ListingRow({
                 <span className="tabular-nums">
                   {listing.audience.toLocaleString("en-US")}
                 </span>{" "}
-                audience
+                {(platform?.metricLabel ?? "Audience").toLowerCase()}
               </span>
             </p>
           </div>

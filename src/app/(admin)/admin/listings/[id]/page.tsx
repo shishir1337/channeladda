@@ -41,6 +41,8 @@ import { Button } from "@/components/ui/button";
 import { Price } from "@/components/ui/price";
 import { platforms } from "@/data/platforms";
 import { removedBySeller } from "@/lib/listing-lock";
+import { countOf } from "@/lib/plural";
+import { revenueLine } from "@/lib/revenue-line";
 import { getListingForReview } from "@/server/admin-listings";
 import { getAuditTrail } from "@/server/audit";
 import { requireStaff } from "@/server/session";
@@ -79,17 +81,27 @@ export default async function ReviewListingPage({
   // control, so the decisions are drawn for the people who can make them.
   const canModerate = staff.role === "MODERATOR" || staff.role === "SUPERADMIN";
 
+  const revenue = revenueLine(listing);
   const facts: [string, ReactNode][] = [
     [
       platform?.metricLabel ?? "Audience",
       listing.audience.toLocaleString("en-US"),
     ],
     ["Engagement", `${listing.engagement}%`],
-    ["Account age", `${listing.ageYears} years`],
+    ["Account age", countOf(listing.ageYears, "year")],
     ["Niche", listing.niche],
     ["Audience country", listing.country],
     ["Monetized", listing.monetized ? "Yes" : "No"],
-    ["Monthly revenue", <Price key="rev" usd={listing.monthlyRevenue} />],
+    [
+      "Monthly revenue",
+      revenue.kind === "revenue" ? (
+        <Price key="rev" usd={revenue.usd} />
+      ) : revenue.kind === "monetized" ? (
+        "Monetized, no figure given"
+      ) : (
+        "Not monetized"
+      ),
+    ],
     ["Asking price", <Price key="price" usd={listing.price} />],
   ];
 
