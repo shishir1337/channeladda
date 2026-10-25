@@ -27,7 +27,9 @@ import {
 } from "@/components/dashboard/camera-recorder";
 import { BusyLabel } from "@/components/messages/chat-parts";
 import { Button } from "@/components/ui/button";
+import { CountrySelect } from "@/components/ui/country-select";
 import { sendUpload } from "@/components/upload/image-upload";
+import { canonicalCountry } from "@/data/countries";
 import {
   documentOption,
   KYC_DOCUMENTS,
@@ -465,7 +467,10 @@ export function VerificationForm({
 
   const [documentType, setDocumentType] = useState<KycDocumentId | "">("");
   const [fullName, setFullName] = useState(defaultName);
-  const [country, setCountry] = useState(defaultCountry);
+  // The profile's country when it is one from the list; chosen otherwise.
+  const [country, setCountry] = useState(
+    () => canonicalCountry(defaultCountry) ?? "",
+  );
   const [front, setFront] = useState<Picked | null>(null);
   const [back, setBack] = useState<Picked | null>(null);
   const [video, setVideo] = useState<Picked | null>(null);
@@ -572,16 +577,15 @@ export function VerificationForm({
             maxLength={80}
             required
           />
-          <TextField
+          <CountrySelect
             id={countryId}
-            name="country"
             label="Country of the ID"
             value={country}
-            onChange={(event) => setCountry(event.target.value)}
+            onChange={(picked) => {
+              setCountry(picked);
+              setErrors(({ country: _, ...rest }) => rest);
+            }}
             error={errors.country}
-            placeholder="India"
-            autoComplete="country-name"
-            maxLength={56}
             required
           />
         </div>

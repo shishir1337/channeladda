@@ -1,3 +1,4 @@
+import { canonicalCountry } from "@/data/countries";
 import { isKycImageKey, isKycVideoKey, keyFromUrl } from "@/lib/upload-keys";
 
 /**
@@ -122,11 +123,9 @@ export type ParsedKyc =
 
 const NAME_MIN = 2;
 const NAME_MAX = 80;
-const COUNTRY_MAX = 56;
 
 /** Letters in any script, and the marks some scripts write vowels with. */
 const PERSON = /^[\p{L}\p{M} .'’-]+$/u;
-const PLACE = /^[\p{L}\p{M} .'’()-]+$/u;
 
 const tidy = (text: string) => text.trim().replace(/\s+/g, " ");
 
@@ -144,14 +143,14 @@ export function parseKyc(input: KycFields): ParsedKyc {
     errors.fullName = "Use letters only, as printed on your ID.";
   }
 
-  const country = tidy(input.country);
-  if (!country) errors.country = "Enter the country that issued your ID.";
-  else if (
-    country.length < 2 ||
-    country.length > COUNTRY_MAX ||
-    !PLACE.test(country)
-  ) {
-    errors.country = "Enter a country, like India.";
+  // Chosen from the list (the owner, 2026-10-26), so the badge's
+  // "Citizenship: India" is always spelled one way. Kept as the list spells
+  // it, whatever case it arrived in.
+  const country = canonicalCountry(input.country) ?? "";
+  if (!input.country.trim()) {
+    errors.country = "Choose the country that issued your ID.";
+  } else if (!country) {
+    errors.country = "Choose your country from the list.";
   }
 
   // Only our own `kyc/` uploads, of the right kind. A URL to anything else —
