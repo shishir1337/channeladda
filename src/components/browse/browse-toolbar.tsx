@@ -1,12 +1,19 @@
 "use client";
 
-import { SearchIcon, SlidersHorizontalIcon, XIcon } from "lucide-react";
+import {
+  RotateCcwIcon,
+  SearchIcon,
+  SlidersHorizontalIcon,
+  XIcon,
+} from "lucide-react";
 import { useEffect, useId, useState } from "react";
 import { FilterPanel } from "@/components/browse/filter-panel";
 import { useFilterNav } from "@/components/browse/use-filter-nav";
+import { Button } from "@/components/ui/button";
 import { siteInput } from "@/components/ui/field";
 import {
   Sheet,
+  SheetClose,
   SheetContent,
   SheetDescription,
   SheetTitle,
@@ -33,7 +40,7 @@ export function BrowseToolbar({
   total: number;
   hidePlatform?: boolean;
 }) {
-  const { apply } = useFilterNav(filters, hidePlatform);
+  const { apply, clearAll } = useFilterNav(filters, hidePlatform);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [q, setQ] = useState(filters.q);
   const searchId = useId();
@@ -65,7 +72,8 @@ export function BrowseToolbar({
             type="search"
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Search by handle, niche or country"
+            // Short enough to show whole in a phone's search box.
+            placeholder="Handle, niche or country"
             className={cn(siteInput, "pr-10 pl-11")}
           />
           {q ? (
@@ -106,14 +114,35 @@ export function BrowseToolbar({
               <SheetDescription className="sr-only">
                 Narrow the listings by platform, price, audience and more
               </SheetDescription>
+              {/* Open until Show: each choice updates the listings behind
+                  it, and several can be picked in one go. It used to close
+                  after every tick. */}
               <div className="flex-1 overflow-y-auto overscroll-contain px-6 py-6">
                 <FilterPanel
                   filters={filters}
                   facets={facets}
                   priceBounds={priceBounds}
                   hidePlatform={hidePlatform}
-                  onNavigate={() => setSheetOpen(false)}
+                  heading={false}
                 />
+              </div>
+              <div className="flex items-center gap-2.5 border-t border-line bg-surface px-6 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+                {count > 0 ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="md"
+                    onClick={clearAll}
+                  >
+                    <RotateCcwIcon aria-hidden="true" className="size-4" />
+                    Clear all
+                  </Button>
+                ) : null}
+                <SheetClose asChild>
+                  <Button type="button" size="md" className="flex-1">
+                    Show {total} {total === 1 ? "listing" : "listings"}
+                  </Button>
+                </SheetClose>
               </div>
             </SheetContent>
           </Sheet>

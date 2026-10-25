@@ -80,7 +80,9 @@ function Details({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
   return (
     <div className="flex items-start gap-1 rounded-lg border border-line bg-surface-2/60 py-1 pr-1 pl-3">
-      <p className="min-w-0 flex-1 py-1.5 font-mono text-[0.8125rem] leading-relaxed break-all whitespace-pre-wrap text-fg select-all">
+      {/* Breaks inside a word only when one is too long for the line, an
+          account number or an address; break-all split names ("Nadi / a"). */}
+      <p className="min-w-0 flex-1 py-1.5 font-mono text-[0.8125rem] leading-relaxed whitespace-pre-wrap wrap-anywhere text-fg select-all">
         {text}
       </p>
       <Button

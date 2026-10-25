@@ -704,6 +704,10 @@ export function StatGrid({
   );
 }
 
+/** A stat's label: under the marks, on a line of its own, in a narrow tile. */
+const STAT_LABEL =
+  "min-w-0 wrap-break-word @max-[12rem]/stat:order-last @max-[12rem]/stat:basis-full";
+
 /**
  * One figure and what it counts.
  *
@@ -741,13 +745,16 @@ export function Stat({
   return (
     <div
       className={cn(
-        "group relative flex min-w-0 flex-col rounded-card border border-line bg-surface p-3.5 shadow-xs sm:p-4",
+        "group @container/stat relative flex min-w-0 flex-col rounded-card border border-line bg-surface p-3.5 shadow-xs sm:p-4",
         href &&
           "transition-[border-color,background-color] duration-150 hover:border-line-strong hover:bg-surface-2/40 has-[a:focus-visible]:outline-2 has-[a:focus-visible]:outline-offset-2 has-[a:focus-visible]:outline-ring",
         className,
       )}
     >
-      <div className="flex items-center gap-2 text-[0.8125rem] leading-5 font-medium text-muted">
+      {/* In a tile two-up on a phone the label has a line of its own, under
+          the marks, rather than the few letters' width left beside them:
+          "Listings for review", not "Listing / s for / review". */}
+      <div className="flex items-center gap-x-2 gap-y-1 text-[0.8125rem] leading-5 font-medium text-muted @max-[12rem]/stat:flex-wrap">
         {tone !== "neutral" ? <Dot tone={tone} /> : null}
         {IconCmp ? (
           <IconCmp
@@ -755,15 +762,20 @@ export function Stat({
             className={cn("size-3.5 shrink-0", iconText(IconCmp))}
           />
         ) : null}
+        {/* Whole words to a line: a word is split only when it is longer
+            than the line. */}
         {href ? (
           <Link
             href={href}
-            className="min-w-0 [overflow-wrap:anywhere] outline-none after:absolute after:inset-0 after:rounded-[inherit] after:content-['']"
+            className={cn(
+              STAT_LABEL,
+              "outline-none after:absolute after:inset-0 after:rounded-[inherit] after:content-['']",
+            )}
           >
             {label}
           </Link>
         ) : (
-          <span className="min-w-0 [overflow-wrap:anywhere]">{label}</span>
+          <span className={STAT_LABEL}>{label}</span>
         )}
         {info ? (
           <InfoTip

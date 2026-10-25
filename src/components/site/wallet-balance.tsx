@@ -17,9 +17,15 @@ import { cn } from "@/lib/utils";
  */
 export function WalletChip({
   cents,
+  short = false,
   className,
 }: {
   cents: number;
+  /**
+   * "$27.6K" rather than "$27,645.00" on a phone, where the site's bar has
+   * no room for a large balance in full.
+   */
+  short?: boolean;
   className?: string;
 }) {
   return (
@@ -35,7 +41,14 @@ export function WalletChip({
         className={`size-4 shrink-0 ${iconText(WalletIcon)}`}
       />
       <span className="sr-only">Wallet balance: </span>
-      <Price usd={cents / 100} className="tabular-nums" />
+      {short ? (
+        <>
+          <Price usd={cents / 100} compact className="tabular-nums sm:hidden" />
+          <Price usd={cents / 100} className="hidden tabular-nums sm:inline" />
+        </>
+      ) : (
+        <Price usd={cents / 100} className="tabular-nums" />
+      )}
     </Link>
   );
 }
@@ -78,5 +91,5 @@ export function HeaderWallet({ className }: { className?: string }) {
   }, [signedIn, pathname]);
 
   if (cents === null) return null;
-  return <WalletChip cents={cents} className={className} />;
+  return <WalletChip cents={cents} short className={className} />;
 }

@@ -402,15 +402,17 @@ export default async function DashboardPage() {
                   // amount, and an offer cut off before its price is no use.
                   title={<span className="whitespace-normal">{task.what}</span>}
                   meta={
-                    <>
-                      <span className="min-w-0 grow basis-0 truncate">
-                        {task.detail}
-                      </span>
+                    // One line that does not wrap, so a long detail is cut
+                    // short and a short one has the dot right after it. The
+                    // detail used to fill the line, leaving the "·" adrift
+                    // beside the time on a wide screen.
+                    <span className="flex min-w-0 flex-1 items-center gap-x-1.5">
+                      <span className="min-w-0 truncate">{task.detail}</span>
                       <Sep />
                       <span className="shrink-0 tabular-nums">
                         {howLong(task.since, now)}
                       </span>
-                    </>
+                    </span>
                   }
                   trailing={
                     <span className="hidden text-[0.8125rem] font-medium text-muted transition-colors duration-150 group-hover:text-fg sm:inline">
@@ -655,13 +657,12 @@ export default async function DashboardPage() {
                       <span className="whitespace-normal">{event.what}</span>
                     }
                     meta={
-                      <>
-                        <span className="min-w-0 grow basis-0 truncate">
-                          {event.detail}
-                        </span>
+                      // As the list above: the dot right after the detail.
+                      <span className="flex min-w-0 flex-1 items-center gap-x-1.5">
+                        <span className="min-w-0 truncate">{event.detail}</span>
                         <Sep />
                         <span className="shrink-0">{ago(event.at, now)}</span>
-                      </>
+                      </span>
                     }
                     trailing={
                       event.outcome ? (
@@ -741,7 +742,12 @@ function WalletDoor() {
           Open your wallet
         </span>
       </Link>
-      <InfoTip label="About Wallet" className="absolute top-4 right-9">
+      {/* 24px, not the tip's usual 20, floating over the card's link: the
+          same centre as before, a size a checker counts as a target. */}
+      <InfoTip
+        label="About Wallet"
+        className="absolute top-3.5 right-8.5 size-6"
+      >
         Balance, adding funds, withdrawing, and every movement explained.
       </InfoTip>
     </div>

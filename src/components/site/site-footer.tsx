@@ -12,11 +12,12 @@ import { iconText } from "@/components/ui/icon-hue";
 import { Container } from "@/components/ui/section";
 import { footerNav } from "@/data/site";
 
-const socials = [
-  { label: "Channel Adda on Telegram", icon: TelegramIcon },
-  { label: "Channel Adda on YouTube", icon: YouTubeIcon },
-  { label: "Channel Adda on Instagram", icon: InstagramIcon },
-  { label: "Channel Adda on Facebook", icon: FacebookIcon },
+/** The platforms whose accounts are traded here: not our own pages. */
+const traded = [
+  { label: "Telegram", icon: TelegramIcon },
+  { label: "YouTube", icon: YouTubeIcon },
+  { label: "Instagram", icon: InstagramIcon },
+  { label: "Facebook", icon: FacebookIcon },
 ];
 
 export function SiteFooter() {
@@ -55,18 +56,19 @@ export function SiteFooter() {
                 on Telegram” and so on, so clicking one reloaded the
                 marketplace. Until there are real accounts to point at, they
                 say which platforms we trade rather than pretending to be
-                somewhere we are not. */}
+                somewhere we are not — to a screen reader too, which heard
+                "Channel Adda on Telegram" and expected a link. */}
             <ul
               aria-label="Platforms we trade"
               className="mt-6 flex items-center gap-2"
             >
-              {socials.map((social) => (
+              {traded.map((platform) => (
                 <li
-                  key={social.label}
+                  key={platform.label}
                   className="inline-flex size-9 items-center justify-center rounded-lg border border-line text-subtle"
                 >
-                  <social.icon aria-hidden="true" className="size-4" />
-                  <span className="sr-only">{social.label}</span>
+                  <platform.icon aria-hidden="true" className="size-4" />
+                  <span className="sr-only">{platform.label}</span>
                 </li>
               ))}
             </ul>

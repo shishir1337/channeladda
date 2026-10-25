@@ -191,7 +191,7 @@ export function AccountMenu({ className }: { className?: string }) {
     <DropdownMenu.Root>
       <DropdownMenu.Trigger
         className={cn(
-          "inline-flex h-11 cursor-pointer items-center gap-2 rounded-[10px] pr-3 pl-1.5 text-sm font-medium text-muted transition-colors duration-150 hover:bg-surface-2 hover:text-fg data-[state=open]:bg-surface-2 data-[state=open]:text-fg",
+          "inline-flex h-11 cursor-pointer items-center gap-2 rounded-[10px] px-1.5 text-sm font-medium text-muted transition-colors duration-150 hover:bg-surface-2 hover:text-fg data-[state=open]:bg-surface-2 data-[state=open]:text-fg lg:pr-3",
           className,
         )}
         aria-label={`Account menu for ${user.name}`}
@@ -202,7 +202,10 @@ export function AccountMenu({ className }: { className?: string }) {
         >
           {initialsOf(user.name)}
         </span>
-        <span className="max-w-[7rem] truncate">
+        {/* The initials alone until the bar has room for the name too, and
+            a long name cut short once the links join it: in full it ran the bar
+            past its edge. */}
+        <span className="hidden max-w-28 truncate lg:inline xl:max-w-18">
           {user.name.split(/\s+/)[0]}
         </span>
       </DropdownMenu.Trigger>

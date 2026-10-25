@@ -2,8 +2,10 @@
 
 import { MessageSquareIcon } from "lucide-react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useMemberCounts } from "@/components/site/member-counts";
 import { useSession } from "@/lib/auth-client";
+import { cn } from "@/lib/utils";
 
 /**
  * Messages, one click from anywhere on the website: a round button in the
@@ -15,11 +17,17 @@ import { useSession } from "@/lib/auth-client";
  * Brand gold, not the page's surface: on the light theme a white button on
  * a white page could not be found (the owner, 2026-10-26). The count is
  * red so it reads against the gold.
+ *
+ * On a listing it waits for a window wider than 1400px: narrower, it sat on
+ * the buy panel's button, pinned to the same corner. The listing has its own
+ * way to message the seller.
  */
 export function MessagesButton() {
   const { data: session } = useSession();
   const counts = useMemberCounts();
+  const pathname = usePathname();
   if (!session?.user) return null;
+  const onListing = pathname.startsWith("/listing/");
 
   const unread = counts?.messages ?? 0;
   const label =
@@ -32,7 +40,10 @@ export function MessagesButton() {
       href="/dashboard/messages"
       aria-label={label}
       title="Messages"
-      className="fixed right-6 bottom-6 z-40 hidden size-14 items-center justify-center rounded-full bg-primary text-primary-fg shadow-[0_8px_24px_-6px_rgb(0_0_0/0.35),0_2px_6px_rgb(0_0_0/0.15)] ring-1 ring-black/10 transition-[background-color,translate] duration-150 ring-inset hover:-translate-y-0.5 hover:bg-primary-hover focus-visible:rounded-full lg:inline-flex"
+      className={cn(
+        "fixed right-6 bottom-6 z-40 hidden size-14 items-center justify-center rounded-full bg-primary text-primary-fg shadow-[0_8px_24px_-6px_rgb(0_0_0/0.35),0_2px_6px_rgb(0_0_0/0.15)] ring-1 ring-black/10 transition-[background-color,translate] duration-150 ring-inset hover:-translate-y-0.5 hover:bg-primary-hover focus-visible:rounded-full",
+        onListing ? "min-[87.5rem]:inline-flex" : "lg:inline-flex",
+      )}
     >
       <MessageSquareIcon aria-hidden="true" className="size-6" />
       {unread > 0 ? (

@@ -38,7 +38,7 @@ export function FilterPanel({
   facets,
   priceBounds,
   hidePlatform,
-  onNavigate,
+  heading = true,
 }: {
   filters: ListingFilters;
   facets: QueryResult["facets"];
@@ -46,32 +46,32 @@ export function FilterPanel({
   priceBounds: QueryResult["priceBounds"];
   /** True on /browse/[platform], where the platform is fixed by the route. */
   hidePlatform?: boolean;
-  /** Lets the mobile sheet close itself once a filter is applied. */
-  onNavigate?: () => void;
+  /**
+   * The "Filters" heading and Clear all. Left out in the phone's sheet,
+   * which has its own title, and Clear all beside Show results.
+   */
+  heading?: boolean;
 }) {
   const { apply, toggle, clearAll } = useFilterNav(filters, hidePlatform);
   const count = activeFilterCount(filters);
 
-  const act = (fn: () => void) => {
-    fn();
-    onNavigate?.();
-  };
-
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between gap-3">
-        <h2 className="text-base font-semibold">Filters</h2>
-        {count > 0 ? (
-          <button
-            type="button"
-            onClick={() => act(clearAll)}
-            className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-lg px-2 text-xs font-medium text-muted transition-colors hover:text-fg"
-          >
-            <RotateCcwIcon aria-hidden="true" className="size-3.5" />
-            Clear all
-          </button>
-        ) : null}
-      </div>
+      {heading ? (
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-base font-semibold">Filters</h2>
+          {count > 0 ? (
+            <button
+              type="button"
+              onClick={clearAll}
+              className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-lg px-2 text-xs font-medium text-muted transition-colors hover:text-fg"
+            >
+              <RotateCcwIcon aria-hidden="true" className="size-3.5" />
+              Clear all
+            </button>
+          ) : null}
+        </div>
+      ) : null}
 
       {!hidePlatform ? (
         <Section title="Platform">
@@ -87,7 +87,7 @@ export function FilterPanel({
                     )}
                     disabled={facet.count === 0}
                     count={facet.count}
-                    onChange={() => act(() => toggle("platforms", facet.value))}
+                    onChange={() => toggle("platforms", facet.value)}
                   >
                     <platform.icon
                       className="size-4 shrink-0"
@@ -105,7 +105,7 @@ export function FilterPanel({
       <PriceSection
         filters={filters}
         bounds={priceBounds}
-        onApply={(p) => act(() => apply(p))}
+        onApply={(p) => apply(p)}
       />
 
       <Section title="Audience size">
@@ -115,8 +115,7 @@ export function FilterPanel({
             label: b.label,
             selected:
               filters.audienceMin === b.min && filters.audienceMax === b.max,
-            onSelect: () =>
-              act(() => apply({ audienceMin: b.min, audienceMax: b.max })),
+            onSelect: () => apply({ audienceMin: b.min, audienceMax: b.max }),
           }))}
         />
       </Section>
@@ -131,7 +130,7 @@ export function FilterPanel({
           ].map((o) => ({
             label: o.label,
             selected: filters.monetized === o.value,
-            onSelect: () => act(() => apply({ monetized: o.value })),
+            onSelect: () => apply({ monetized: o.value }),
           }))}
         />
       </Section>
@@ -142,7 +141,7 @@ export function FilterPanel({
           options={revenueBands.map((b) => ({
             label: b.label,
             selected: filters.revenueMin === b.value,
-            onSelect: () => act(() => apply({ revenueMin: b.value })),
+            onSelect: () => apply({ revenueMin: b.value }),
           }))}
         />
       </Section>
@@ -153,7 +152,7 @@ export function FilterPanel({
           options={ageBands.map((b) => ({
             label: b.label,
             selected: filters.ageMin === b.value,
-            onSelect: () => act(() => apply({ ageMin: b.value })),
+            onSelect: () => apply({ ageMin: b.value }),
           }))}
         />
       </Section>
@@ -167,7 +166,7 @@ export function FilterPanel({
                   checked={filters.niches.includes(facet.value)}
                   disabled={facet.count === 0}
                   count={facet.count}
-                  onChange={() => act(() => toggle("niches", facet.value))}
+                  onChange={() => toggle("niches", facet.value)}
                 >
                   {facet.label}
                 </CheckRow>
@@ -186,7 +185,7 @@ export function FilterPanel({
                   checked={filters.countries.includes(facet.value)}
                   disabled={facet.count === 0}
                   count={facet.count}
-                  onChange={() => act(() => toggle("countries", facet.value))}
+                  onChange={() => toggle("countries", facet.value)}
                 >
                   {facet.label}
                 </CheckRow>
@@ -199,9 +198,7 @@ export function FilterPanel({
       <Section title="Verification">
         <CheckRow
           checked={filters.verifiedOnly}
-          onChange={() =>
-            act(() => apply({ verifiedOnly: !filters.verifiedOnly }))
-          }
+          onChange={() => apply({ verifiedOnly: !filters.verifiedOnly })}
         >
           <BadgeCheckIcon aria-hidden="true" className="size-4 text-verified" />
           Ownership verified only

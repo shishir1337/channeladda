@@ -159,11 +159,11 @@ export function ThreadHeader({
 }) {
   const brand = channel ? platformMap[toPlatformId(channel.platform)] : null;
   return (
-    // Pinned under the app bar (h-14) on a computer: in a long conversation
-    // the one thing that must not scroll away is who it is with and where the
-    // deal stands. Not on a phone, where every line it pinned was a line of
-    // conversation lost; there it scrolls away and the message box stays.
-    <header className="-mt-3 border-b border-line pt-1 pb-3 lg:sticky lg:top-14 lg:z-10 lg:-mt-4 lg:bg-bg/85 lg:pt-4 lg:backdrop-blur-xl lg:backdrop-saturate-150">
+    // Pinned under the app bar (h-14): in a long conversation the one thing
+    // that must not scroll away is who it is with and where the deal stands.
+    // On a phone too: left to scroll there, a message sent moved the page and
+    // slid the name under the see-through app bar.
+    <header className="sticky top-14 z-10 -mt-3 border-b border-line bg-bg/85 pt-1 pb-3 backdrop-blur-xl backdrop-saturate-150 lg:-mt-4 lg:pt-4">
       {back && !back.phoneOnly ? (
         <Link
           href={back.href}

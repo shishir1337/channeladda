@@ -36,7 +36,11 @@ export function VerifiedMark({
       label="Verified seller: ID checked by Channel Adda. What this means"
       className={cn(
         "z-10 size-auto rounded-full text-verified hover:text-verified focus-visible:text-verified data-[state=delayed-open]:text-verified data-[state=instant-open]:text-verified",
-        pill && "pointer-coarse:after:inset-0",
+        // The bare mark is 16px: 24px to a mouse, 44px under a finger. The
+        // pill is big enough as it is.
+        pill
+          ? "after:inset-0 pointer-coarse:after:inset-0"
+          : "after:-inset-1 pointer-coarse:after:-inset-3.5",
       )}
       icon={
         pill ? (

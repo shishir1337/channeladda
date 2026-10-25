@@ -26,7 +26,8 @@
 
   --db-fg: #18181b;
   --db-fg-muted: #52525b;
-  --db-fg-subtle: #71717a;
+  /* Small print still clears 4.5:1 on the greyest surface (#ebebed). */
+  --db-fg-subtle: #696972;
 
   --db-primary: #ffb020;
   --db-primary-hover: #f5a30d;
@@ -36,7 +37,9 @@
   --db-primary-text: #96590a;
   --db-primary-soft: #fff6e3;
 
-  --db-verified: #0c8a57;
+  /* 4.5:1 and over as text on white and on its own soft tint, and under
+     light text as a fill. */
+  --db-verified: #0a7d50;
   --db-verified-soft: #e9f6ef;
   --db-info: #2457d6;
   --db-info-soft: #ebf0fc;
@@ -74,7 +77,7 @@
 
   --db-fg: #ededef;
   --db-fg-muted: #a1a1aa;
-  --db-fg-subtle: #80808a;
+  --db-fg-subtle: #8a8a93;
 
   --db-primary: #ffb020;
   --db-primary-hover: #ffc04d;
@@ -384,6 +387,34 @@
   }
 }
 
+/* The faded width at each end of a .scroll-fade-x strip, moved by its
+   scrolling (below). Registered so the fade can be animated. */
+@property --fade-l {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+@property --fade-r {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+@keyframes scroll-fade-x {
+  0% {
+    --fade-l: 0px;
+    --fade-r: 2rem;
+  }
+  8%,
+  92% {
+    --fade-l: 2rem;
+    --fade-r: 2rem;
+  }
+  100% {
+    --fade-l: 2rem;
+    --fade-r: 0px;
+  }
+}
+
 @layer utilities {
   /* Horizontal card rails on mobile: snap, no visible scrollbar. */
   .no-scrollbar {
@@ -402,6 +433,30 @@
       transparent 100%
     );
     mask-image: linear-gradient(to right, #000 0, #000 85%, transparent 100%);
+  }
+
+  /* A sideways strip that fades at an edge only while there is more to
+     scroll to that way. Nothing to scroll, no fade; a browser without
+     scroll-driven animations shows the strip plain. */
+  @supports (animation-timeline: scroll()) {
+    .scroll-fade-x {
+      -webkit-mask-image: linear-gradient(
+        to right,
+        transparent 0,
+        #000 var(--fade-l),
+        #000 calc(100% - var(--fade-r)),
+        transparent 100%
+      );
+      mask-image: linear-gradient(
+        to right,
+        transparent 0,
+        #000 var(--fade-l),
+        #000 calc(100% - var(--fade-r)),
+        transparent 100%
+      );
+      animation: scroll-fade-x linear both;
+      animation-timeline: scroll(self inline);
+    }
   }
 
   .glow-primary {

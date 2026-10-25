@@ -22,19 +22,26 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { platforms } from "@/data/platforms";
+import { useSession } from "@/lib/auth-client";
 import { cn } from "@/lib/utils";
 
 /**
  * Links shown `from` a width: signed in, the balance and the account name
- * leave too little room for all five, and the bar ran off the screen. The
- * footer has every one of them at every width.
+ * leave too little room for all five, and the bar ran off the screen. FAQ is
+ * for visitors alone: signed in, the bar never has room for it, however wide
+ * the screen. The footer has every one of them at every width.
  */
-const navLinks: { label: string; href: string; from?: "xl" | "2xl" }[] = [
+const navLinks: {
+  label: string;
+  href: string;
+  from?: "xl" | "2xl";
+  visitorsOnly?: boolean;
+}[] = [
   { label: "Browse accounts", href: "/browse" },
   { label: "How it works", href: "/how-it-works", from: "xl" },
   { label: "Trust & safety", href: "/trust-safety", from: "xl" },
   { label: "Services", href: "/services", from: "xl" },
-  { label: "FAQ", href: "/#faq", from: "2xl" },
+  { label: "FAQ", href: "/#faq", from: "2xl", visitorsOnly: true },
 ];
 
 const SHOWN_FROM = { xl: "hidden xl:block", "2xl": "hidden 2xl:block" };
@@ -43,6 +50,8 @@ export function SiteHeader() {
   const [scrolled, setScrolled] = useState(false);
   // Shared with "More" on the phone's tab bar, which opens this same menu.
   const { open: menuOpen, setOpen: setMenuOpen, returnFocus } = useSiteMenu();
+  const { data: session } = useSession();
+  const signedIn = Boolean(session?.user);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8);
@@ -67,44 +76,61 @@ export function SiteHeader() {
           aria-label="Channel Adda home"
         >
           <ChannelAddaLogo className="size-8" />
-          <span className="text-[1.0625rem] font-semibold tracking-[-0.02em]">
+          {/* Signed in on the narrowest phones, the mark alone: the balance
+              needs the room. */}
+          <span
+            className={cn(
+              "text-[1.0625rem] font-semibold tracking-[-0.02em]",
+              signedIn && "max-[22.5rem]:sr-only",
+            )}
+          >
             Channel <span className="text-primary-text">Adda</span>
           </span>
         </Link>
 
         <nav aria-label="Main" className="ml-2 hidden lg:block">
           <ul className="flex items-center gap-1">
-            {navLinks.map((link) => (
-              <li
-                key={link.href}
-                className={link.from ? SHOWN_FROM[link.from] : undefined}
-              >
-                <Link
-                  href={link.href}
-                  className="inline-flex h-9 items-center rounded-lg px-3 text-sm font-medium whitespace-nowrap text-muted transition-colors duration-150 hover:bg-surface-2 hover:text-fg"
+            {navLinks
+              .filter((link) => !(link.visitorsOnly && signedIn))
+              .map((link) => (
+                <li
+                  key={link.href}
+                  className={link.from ? SHOWN_FROM[link.from] : undefined}
                 >
-                  {link.label}
-                </Link>
-              </li>
-            ))}
+                  <Link
+                    href={link.href}
+                    className="inline-flex h-9 items-center rounded-lg px-3 text-sm font-medium whitespace-nowrap text-muted transition-colors duration-150 hover:bg-surface-2 hover:text-fg"
+                  >
+                    {link.label}
+                  </Link>
+                </li>
+              ))}
           </ul>
         </nav>
 
         <div className="ml-auto flex items-center gap-2">
+          {/* Left out on a phone once signed in: the balance takes its place, and
+              Browse on the tab bar below goes to the same page. */}
           <Link
             href="/browse"
             aria-label="Search accounts"
-            className="inline-flex size-11 cursor-pointer items-center justify-center rounded-[10px] text-muted transition-colors duration-150 hover:bg-surface-2 hover:text-fg lg:hidden"
+            className={cn(
+              "inline-flex size-11 cursor-pointer items-center justify-center rounded-[10px] text-muted transition-colors duration-150 hover:bg-surface-2 hover:text-fg lg:hidden",
+              signedIn && "max-sm:hidden",
+            )}
           >
             <SearchIcon aria-hidden="true" className="size-[1.15rem]" />
           </Link>
-          <CurrencySwitcher className="hidden sm:inline-flex" />
-          {/* In the menu on a phone: a theme is chosen once in a while,
-              and the header there has room for what is used every visit. */}
-          <ThemeToggle className="hidden sm:inline-flex" />
+          {/* Each control joins the bar once there is room for it, and is in
+              the menu until then: the currency and the theme are chosen once
+              in a while, and the bar has room first for what is used every
+              visit. Signed in with a large balance, all of them at once ran
+              the bar off the screen below 1024px. */}
+          <CurrencySwitcher className="hidden lg:inline-flex" />
+          <ThemeToggle className="hidden md:inline-flex" />
           <HeaderWallet className="px-2 sm:px-3" />
           <AccountMenu className="hidden sm:inline-flex" />
-          <Button asChild size="sm" className="hidden sm:inline-flex">
+          <Button asChild size="sm" className="hidden md:inline-flex">
             <Link href="/sell">Sell an account</Link>
           </Button>
 
@@ -168,13 +194,13 @@ export function SiteHeader() {
               </div>
 
               <div className="grid gap-2.5 border-t border-line bg-surface px-6 py-5">
-                <div className="sm:hidden">
+                <div className="lg:hidden">
                   <p className="mb-2 text-[0.8125rem] font-medium text-subtle">
                     Currency
                   </p>
                   <CurrencySwitcher fullWidth />
                 </div>
-                <ThemeRow className="-mx-3 w-auto sm:hidden" />
+                <ThemeRow className="-mx-3 w-auto md:hidden" />
                 <Button asChild size="md">
                   <Link href="/sell">Sell an account</Link>
                 </Button>

@@ -63,8 +63,9 @@ export function InfoTip({
             }}
             className={cn(
               "relative inline-flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-full align-middle text-subtle transition-colors duration-150 hover:text-fg focus-visible:text-fg data-[state=delayed-open]:text-fg data-[state=instant-open]:text-fg",
-              // A 44px target under a finger without moving the icon.
-              "pointer-coarse:after:absolute pointer-coarse:after:-inset-3 pointer-coarse:after:content-['']",
+              // A bigger target than the icon, without moving it: 24px for
+              // a mouse, 44px under a finger.
+              "after:absolute after:-inset-0.5 after:content-[''] pointer-coarse:after:-inset-3",
               className,
             )}
           >

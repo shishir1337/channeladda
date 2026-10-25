@@ -89,7 +89,9 @@ export function HeroSearch() {
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder={placeholder}
                 // 16px minimum keeps iOS from auto-zooming the field on focus.
-                className="h-12 w-full rounded-xl bg-transparent pr-4 pl-12 text-base text-fg placeholder:text-subtle focus:outline-none sm:h-13"
+                // The site's gold focus outline, as the budget beside it: with
+                // no border of its own, nothing else shows where typing goes.
+                className="h-12 w-full rounded-xl bg-transparent pr-4 pl-12 text-base text-fg placeholder:text-subtle sm:h-13"
               />
             </div>
 
@@ -106,7 +108,7 @@ export function HeroSearch() {
                 id={budgetId}
                 value={budget}
                 onChange={(e) => setBudget(e.target.value)}
-                className="h-12 w-full cursor-pointer appearance-none rounded-xl bg-surface-2 pr-11 pl-4 text-[0.9375rem] font-medium text-fg focus:outline-none sm:h-13 sm:w-auto sm:min-w-[10.5rem] sm:bg-transparent"
+                className="h-12 w-full cursor-pointer appearance-none rounded-xl bg-surface-2 pr-11 pl-4 text-[0.9375rem] font-medium text-fg sm:h-13 sm:w-auto sm:min-w-[10.5rem] sm:bg-transparent"
               >
                 {budgets.map((b) => (
                   <option key={b.value} value={b.value}>

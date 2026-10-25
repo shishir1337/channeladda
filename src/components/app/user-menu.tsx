@@ -112,10 +112,13 @@ export function UserMenu({
 
   return (
     <DropdownMenu.Root>
+      {/* outline-solid on focus: the resting outline-hidden sets Tailwind
+          4's outline style to none, which the width and colour alone kept,
+          so the focus outline never showed. */}
       <DropdownMenu.Trigger
         aria-label={`Account menu for ${user.name}`}
         className={cn(
-          "group flex cursor-pointer items-center rounded-md text-left outline-none transition-colors duration-150 hover:bg-black/[0.04] focus-visible:outline-2 focus-visible:outline-ring data-[state=open]:bg-black/[0.04] dark:hover:bg-white/[0.06] dark:data-[state=open]:bg-white/[0.06]",
+          "group flex cursor-pointer items-center rounded-md text-left outline-hidden transition-colors duration-150 hover:bg-black/[0.04] focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-solid data-[state=open]:bg-black/[0.04] dark:hover:bg-white/[0.06] dark:data-[state=open]:bg-white/[0.06]",
           // One shape open or folded: the avatar holds its place and the
           // rail's own width decides how much of the rest shows.
           variant === "sidebar" && "w-full gap-2.5 overflow-hidden p-1.5",

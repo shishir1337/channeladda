@@ -6,9 +6,9 @@ import { platformMap } from "@/data/platforms";
 import { formatCompact } from "@/lib/utils";
 
 export function SoldTicker({ items }: { items: SoldItem[] }) {
-  // Duplicated once so the -50% marquee keyframe loops seamlessly.
-  // Two copies, so the marquee loops without a gap. Each copy is named, so
-  // a key never depends on position.
+  // Two copies, so the -50% marquee keyframe loops without a gap. Each copy
+  // is named, so a key never depends on position. The second is there for
+  // the eye alone: hidden from screen readers, which read each sale once.
   const track = [0, 1].flatMap((copy) =>
     items.map((item) => ({ ...item, copy })),
   );
@@ -43,6 +43,8 @@ export function SoldTicker({ items }: { items: SoldItem[] }) {
               return (
                 <li
                   key={`${item.id}-${item.copy}`}
+                  aria-hidden={item.copy === 1 ? true : undefined}
+                  inert={item.copy === 1 ? true : undefined}
                   className="flex shrink-0 items-center gap-2.5 rounded-full border border-line bg-surface py-1.5 pr-3.5 pl-2"
                 >
                   <span

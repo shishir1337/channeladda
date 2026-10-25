@@ -15,13 +15,17 @@ export function Faq() {
   return (
     <Section id="faq" className="scroll-mt-24 border-t border-line">
       <Container>
-        <div className="grid gap-10 lg:grid-cols-[22rem_1fr] lg:gap-16">
-          <div className="lg:sticky lg:top-28 lg:self-start">
+        {/* On a computer the heading and "Still unsure?" sit together,
+            pinned beside the questions. On a phone the card comes after the
+            questions it offers help with, not before them: the column lets
+            go of its box (contents) and the card goes last. */}
+        <div className="grid gap-6 lg:grid-cols-[22rem_1fr] lg:gap-16">
+          <div className="max-lg:contents lg:sticky lg:top-28 lg:self-start">
             <h2 className="text-[1.625rem] leading-[1.15] font-semibold tracking-[-0.025em] sm:text-[2rem]">
               Common questions
             </h2>
 
-            <div className="mt-6 rounded-card border border-line bg-surface p-5">
+            <div className="rounded-card border border-line bg-surface p-5 max-lg:order-last max-lg:mt-4 lg:mt-6">
               <span
                 className={`flex size-9 items-center justify-center rounded-lg border ${iconTile(MessagesSquareIcon)}`}
               >

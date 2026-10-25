@@ -1056,6 +1056,10 @@ export function ThreadView({
                 accept="image/png,image/jpeg,image/webp,image/gif,video/mp4,video/quicktime,video/webm"
                 className="sr-only"
                 id="attach"
+                aria-label="Attach a photo or video"
+                // The button beside it opens it; one stop on the way
+                // through, not two.
+                tabIndex={-1}
                 onChange={(event) => {
                   const file = event.target.files?.[0];
                   if (file) void upload(file);
