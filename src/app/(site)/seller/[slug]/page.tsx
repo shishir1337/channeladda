@@ -94,6 +94,7 @@ export default async function SellerPage({
                   {seller.verified ? (
                     <VerifiedMark
                       detail={seller.verifiedWith}
+                      country={seller.country}
                       className="size-6"
                     />
                   ) : null}

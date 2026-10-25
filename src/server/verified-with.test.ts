@@ -43,12 +43,15 @@ test(
 );
 
 test(
-  "a badge approved by hand, with nothing on file, names nothing",
+  "a badge approved by hand, with nothing on file, has no ID check to name",
   withCleanDb(async () => {
+    // The note then says "ID" and takes the citizenship from the profile's
+    // country, leaving it out when that is "Global".
     const seller = await approvedWith(null);
     const page = await getSeller(seller.slug ?? "");
     expect(page?.verified).toBe(true);
     expect(page?.verifiedWith).toBeNull();
+    expect(page?.country).toBe("Global");
   }),
 );
 

@@ -210,7 +210,10 @@ export function SellerPanel({ seller }: { seller: Seller }) {
           <h3 className="flex items-center gap-1.5 text-[0.9375rem] font-semibold">
             <span className="truncate">{seller.name}</span>
             {seller.verified ? (
-              <VerifiedMark detail={seller.verifiedWith} />
+              <VerifiedMark
+                detail={seller.verifiedWith}
+                country={seller.country}
+              />
             ) : null}
             {seller.reseller ? <ResellerBadge /> : null}
           </h3>
@@ -254,7 +257,11 @@ export function SellerPanel({ seller }: { seller: Seller }) {
         </Button>
         {/* The person's ID check, not the listing's ownership check. */}
         {seller.verified ? (
-          <VerifiedMark detail={seller.verifiedWith} pill />
+          <VerifiedMark
+            detail={seller.verifiedWith}
+            country={seller.country}
+            pill
+          />
         ) : null}
       </div>
     </Panel>

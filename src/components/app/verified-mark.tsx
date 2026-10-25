@@ -9,17 +9,24 @@ import { cn } from "@/lib/utils";
 /**
  * The Verified mark beside a seller's name, and what it means on hover or
  * a tap (the owner, 2026-10-26): which ID they gave us with a video selfie,
- * that it can go to the police in a fraud, and their citizenship.
+ * that it can go to the police in a fraud, and their citizenship. The tip
+ * is that statement and nothing else.
  *
  * `relative z-10` because in the sellers lists the whole row is a link
  * stretched over everything; the mark has to sit above it to be tapped.
  */
 export function VerifiedMark({
   detail,
+  country,
   pill = false,
   className,
 }: {
   detail: VerifiedWith | null | undefined;
+  /**
+   * The seller's profile country, for the citizenship when there is no ID
+   * check on file to take it from. "Global" means unknown and is left out.
+   */
+  country?: string | null;
   /** The "ID verified" pill rather than the bare mark. */
   pill?: boolean;
   className?: string;
@@ -45,8 +52,7 @@ export function VerifiedMark({
         )
       }
     >
-      <span className="block font-semibold text-fg">ID verified</span>
-      <span className="mt-1 block">{verifiedNote(detail ?? null)}</span>
+      {verifiedNote(detail ?? null, country)}
     </InfoTip>
   );
 }

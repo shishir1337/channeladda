@@ -20,9 +20,23 @@ test("names the ID they sent and their citizenship", () => {
   );
 });
 
-test("an ID checked before the form existed still says what the badge means", () => {
-  // Approved by hand, with no submission on file to name.
-  expect(verifiedNote(null)).toBe(
-    "Channel Adda's team has checked this person's ID.",
+test("a badge approved by hand still gives the whole statement", () => {
+  // No submission on file to name: "ID", and the profile's country.
+  expect(verifiedNote(null, "India")).toBe(
+    "This person has given us their ID details and a video selfie to confirm their identity. This means we can share this data with the police, at their request, in case of fraud on their part. Citizenship: India.",
   );
+});
+
+test("an unknown country leaves the citizenship out", () => {
+  const withoutCitizenship =
+    "This person has given us their ID details and a video selfie to confirm their identity. This means we can share this data with the police, at their request, in case of fraud on their part.";
+  expect(verifiedNote(null)).toBe(withoutCitizenship);
+  expect(verifiedNote(null, null)).toBe(withoutCitizenship);
+  expect(verifiedNote(null, "Global")).toBe(withoutCitizenship);
+});
+
+test("the ID check's country wins over the profile's", () => {
+  expect(
+    verifiedNote({ document: "PASSPORT", country: "India" }, "Global"),
+  ).toMatch(/Citizenship: India\.$/);
 });

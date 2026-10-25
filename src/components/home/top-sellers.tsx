@@ -52,7 +52,10 @@ export function TopSellers({ sellers }: { sellers: Seller[] }) {
                         />
                       </Link>
                       {seller.verified ? (
-                        <VerifiedMark detail={seller.verifiedWith} />
+                        <VerifiedMark
+                          detail={seller.verifiedWith}
+                          country={seller.country}
+                        />
                       ) : null}
                       {seller.reseller ? <ResellerBadge /> : null}
                     </h3>

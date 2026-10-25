@@ -66,12 +66,20 @@ const IN_A_SENTENCE: Record<KycDocumentId, string> = {
 /**
  * What the Verified badge says on hover or tap (the owner, 2026-10-26):
  * which ID they gave and a video selfie, that it can go to the police if
- * they commit fraud, and their citizenship. A badge approved by hand, with
- * no submission on file, says only what the badge means.
+ * they commit fraud, and their citizenship. Always the whole statement: a
+ * badge approved by hand, with no submission on file, says "ID" and takes
+ * the citizenship from `profileCountry`, and leaves the citizenship out
+ * when that is unknown ("Global") rather than print it.
  */
-export function verifiedNote(detail: VerifiedWith | null): string {
-  if (!detail) return "Channel Adda's team has checked this person's ID.";
-  return `This person has given us their ${IN_A_SENTENCE[detail.document]} details and a video selfie to confirm their identity. This means we can share this data with the police, at their request, in case of fraud on their part. Citizenship: ${detail.country}.`;
+export function verifiedNote(
+  detail: VerifiedWith | null,
+  profileCountry?: string | null,
+): string {
+  const id = detail ? IN_A_SENTENCE[detail.document] : "ID";
+  const country = (detail?.country || profileCountry || "").trim();
+  const citizenship =
+    country && country !== "Global" ? ` Citizenship: ${country}.` : "";
+  return `This person has given us their ${id} details and a video selfie to confirm their identity. This means we can share this data with the police, at their request, in case of fraud on their part.${citizenship}`;
 }
 
 /** Who reviews ID checks and may see the files. FINANCE and AGENT may not. */

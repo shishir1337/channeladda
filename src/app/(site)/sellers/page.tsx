@@ -158,7 +158,10 @@ function SellerRow({ seller }: { seller: RankedSeller }) {
             <span aria-hidden="true" className="absolute inset-0" />
           </Link>
           {seller.verified ? (
-            <VerifiedMark detail={seller.verifiedWith} />
+            <VerifiedMark
+              detail={seller.verifiedWith}
+              country={seller.country}
+            />
           ) : null}
           {seller.reseller ? <ResellerBadge /> : null}
         </h2>
