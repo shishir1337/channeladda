@@ -4,6 +4,11 @@ import type { OfferStatus } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
 import { fromCents } from "@/lib/listing-form";
 import {
+  type AmountProblem,
+  amountProblem,
+  MIN_OFFER_FRACTION,
+} from "@/lib/offer-rules";
+import {
   mentionsOffPlatform,
   type RedactionKind,
   redactContactDetails,
@@ -39,8 +44,8 @@ import { getSettings } from "@/server/settings";
  * so the thread is the record of the negotiation whichever page acted.
  */
 
-/** Below this an offer is not a negotiation, it is noise. */
-export const MIN_OFFER_FRACTION = 0.5;
+// The amount rules live with the forms that explain them; still importable here.
+export { MIN_OFFER_FRACTION };
 
 export type OfferView = {
   id: string;
@@ -221,11 +226,33 @@ export async function getOfferFor(userId: string, offerId: string) {
   return row ? toView(row) : null;
 }
 
+/**
+ * The negotiation a buyer has open on one listing, if any: their own offer
+ * waiting on the seller, or the seller's number waiting on them.
+ *
+ * For the listing page, which used to show an empty offer form and only
+ * said "you already have an offer open" once they had typed another.
+ */
+export async function openOfferOn(listingId: string, buyerId: string) {
+  const row = await db.offer.findFirst({
+    where: {
+      listingId,
+      buyerId,
+      status: "OPEN",
+      expiresAt: { gt: new Date() },
+    },
+    select,
+    orderBy: { createdAt: "desc" },
+  });
+  return row ? toView(row) : null;
+}
+
 export type OfferFailure =
   | "not-found"
   | "not-live"
   | "own-listing"
-  | "too-low"
+  /** An amount outside what this offer may be: see `amountProblem`. */
+  | AmountProblem
   | "already-open"
   | "expired"
   | "wrong-turn"
@@ -254,6 +281,24 @@ function asMoney(cents: number): string {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
+}
+
+/**
+ * When an accepted offer's hold ends, as a stored notification can say it.
+ *
+ * In UTC and saying so: the text is written once on the server and read in
+ * Dhaka, Delhi and Karachi alike, so a bare "04:00" would be wrong for most.
+ */
+export function holdEnds(at: Date): string {
+  const when = at.toLocaleString("en-GB", {
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+    timeZone: "UTC",
+  });
+  return `${when} UTC`;
 }
 
 type Note = { text: string | null; kinds: RedactionKind[]; flagged: boolean };
@@ -356,9 +401,13 @@ export async function createOffer(input: {
   if (listing.sellerId === input.buyerId) {
     return { ok: false, reason: "own-listing" };
   }
-  if (input.amountCents < listing.priceUsd * MIN_OFFER_FRACTION) {
-    return { ok: false, reason: "too-low" };
-  }
+  // Below the asking price: at it or above, the buyer can simply start a
+  // deal, and an offer of ten times the price read back as "1000% of asking".
+  const problem = amountProblem({
+    amountCents: input.amountCents,
+    askingCents: listing.priceUsd,
+  });
+  if (problem) return { ok: false, reason: problem };
 
   const note = filterNote(input.message, listing.handle);
   if (
@@ -666,11 +715,31 @@ export async function acceptOffer(
     throw error;
   }
 
-  await tellTheOtherSide(row, responderId, conversationId, {
-    title: `Your offer of ${asMoney(row.amountUsd)} was accepted`,
-    body: "The listing is held for you. Open it to start the deal — it does not stay held for ever.",
-    email: true,
-  });
+  // Each side in its own words. Whoever pressed Accept made it; the other
+  // side is told. A buyer accepting the seller's counter used to send the
+  // seller the buyer's text — "the listing is held for you".
+  const { paymentWindowHours } = await getSettings();
+  const until = holdEnds(
+    new Date(now.getTime() + paymentWindowHours * 3_600_000),
+  );
+  const amount = asMoney(row.amountUsd);
+  const buyerName = row.buyer.name || "The buyer";
+  await tellTheOtherSide(
+    row,
+    responderId,
+    conversationId,
+    as === "seller"
+      ? {
+          title: `Your offer of ${amount} was accepted`,
+          body: `The listing is held for you until ${until}. Open it and start the deal before then, or it goes back on sale.`,
+          email: true,
+        }
+      : {
+          title: `${buyerName} accepted your price of ${amount}`,
+          body: `The listing is held for ${buyerName} until ${until}. Nothing to do until they start the deal; if they don't, it goes back on sale.`,
+          email: true,
+        },
+  );
   await notifyClosedOffers(closed);
 
   return { ok: true };
@@ -751,9 +820,14 @@ export async function counterOffer(input: {
   const { row } = loaded;
 
   if (row.listing.status !== "LIVE") return { ok: false, reason: "taken" };
-  if (input.amountCents < row.listing.priceUsd * MIN_OFFER_FRACTION) {
-    return { ok: false, reason: "too-low" };
-  }
+  // Between the two numbers on the table: a seller countering $650 to a
+  // buyer's $700 was asking for less than they had been offered.
+  const problem = amountProblem({
+    amountCents: input.amountCents,
+    askingCents: row.listing.priceUsd,
+    answering: { amountCents: row.amountUsd, bySeller: row.bySeller },
+  });
+  if (problem) return { ok: false, reason: problem };
 
   const note = filterNote(input.message, row.listing.handle);
   if (

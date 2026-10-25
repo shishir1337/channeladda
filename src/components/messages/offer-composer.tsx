@@ -12,6 +12,12 @@ import {
 import { FormNotice } from "@/components/auth/fields";
 import { BusyLabel } from "@/components/messages/chat-parts";
 import { Button } from "@/components/ui/button";
+import { toCents } from "@/lib/listing-form";
+import {
+  amountProblem,
+  OFFER_PROBLEM_TEXT,
+  parseAmount,
+} from "@/lib/offer-rules";
 import { cn } from "@/lib/utils";
 import { makeOffer, proposePrice } from "@/server/actions/offers";
 
@@ -58,10 +64,25 @@ export function OfferComposerForm({
   const [pending, startTransition] = useTransition();
 
   const seller = config.mode === "price";
-  const parsed = Number(amount);
+  // "2,100" and "$150" are amounts too, and a refused one says why.
+  const parsed = parseAmount(amount);
   const entered = Number.isFinite(parsed) && parsed > 0;
-  const tooLow = entered && parsed < config.askingPrice / 2;
-  const tooHigh = seller && entered && parsed >= config.askingPrice;
+  const unreadable = amount.trim() !== "" && !entered;
+  const problem = entered
+    ? amountProblem({
+        amountCents: toCents(parsed),
+        askingCents: toCents(config.askingPrice),
+      })
+    : null;
+  // A seller's own price has the buyer's rule's words wrong: "start a deal".
+  const hint =
+    problem === "at-asking" && seller
+      ? "At the asking price the buyer can simply buy. Offer less."
+      : problem
+        ? OFFER_PROBLEM_TEXT[problem]
+        : unreadable
+          ? "Enter an amount in dollars, like 2,100."
+          : null;
 
   return (
     <form
@@ -121,19 +142,18 @@ export function OfferComposerForm({
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
           placeholder={String(Math.round(config.askingPrice * 0.9))}
-          aria-invalid={tooLow || tooHigh}
+          aria-invalid={Boolean(hint)}
+          aria-describedby={hint ? `${amountId}-hint` : undefined}
           className={cn(inputClass, "pl-7 tabular-nums")}
           required
         />
       </div>
-      {tooLow ? (
-        <p className="mt-1.5 text-[0.8125rem] text-danger">
-          That is less than half the asking price and will be refused.
-        </p>
-      ) : null}
-      {tooHigh ? (
-        <p className="mt-1.5 text-[0.8125rem] text-danger">
-          At the asking price the buyer can simply buy. Offer less.
+      {hint ? (
+        <p
+          id={`${amountId}-hint`}
+          className="mt-1.5 text-[0.8125rem] text-danger"
+        >
+          {hint}
         </p>
       ) : null}
 
@@ -152,7 +172,7 @@ export function OfferComposerForm({
         <Button
           type="submit"
           size="sm"
-          disabled={pending || !entered || tooLow || tooHigh}
+          disabled={pending || !entered || Boolean(hint)}
         >
           <BusyLabel
             busy={pending}

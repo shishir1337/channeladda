@@ -4,9 +4,17 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useId, useState, useTransition } from "react";
 import { FormNotice } from "@/components/auth/fields";
+import { OfferActions } from "@/components/offers/offer-actions";
 import { Button } from "@/components/ui/button";
 import { siteInput, siteTextarea } from "@/components/ui/field";
 import { useSession } from "@/lib/auth-client";
+import { timeLeft } from "@/lib/chat-time";
+import { toCents } from "@/lib/listing-form";
+import {
+  amountProblem,
+  OFFER_PROBLEM_TEXT,
+  parseAmount,
+} from "@/lib/offer-rules";
 import { threadHref } from "@/lib/thread-href";
 import { useHydrated } from "@/lib/use-hydrated";
 import { cn } from "@/lib/utils";
@@ -21,11 +29,24 @@ function usd(value: number) {
   });
 }
 
+/** The negotiation this buyer already has open here, as the page sends it. */
+export type OpenOfferOnListing = {
+  id: string;
+  /** Dollars. */
+  amount: number;
+  bySeller: boolean;
+  awaiting: "buyer" | "seller" | null;
+  conversationId: string | null;
+  expiresAt: string;
+};
+
 /**
  * Make an offer.
  *
  * Signed-out visitors see what this does and where to sign in, rather than a
- * form that will reject them after they have typed into it.
+ * form that will reject them after they have typed into it. A buyer with an
+ * offer already open sees that offer, not an empty form that would only say
+ * "withdraw it first" once they had typed another.
  */
 export function OfferForm({
   listingId,
@@ -33,12 +54,14 @@ export function OfferForm({
   askingPrice,
   expiryHours,
   isOwnListing,
+  openOffer = null,
 }: {
   listingId: string;
   listingSlug: string;
   askingPrice: number;
   expiryHours: number;
   isOwnListing: boolean;
+  openOffer?: OpenOfferOnListing | null;
 }) {
   const amountId = useId();
   const messageId = useId();
@@ -110,9 +133,73 @@ export function OfferForm({
     );
   }
 
-  const parsed = Number(amount);
-  const tooLow =
-    Number.isFinite(parsed) && parsed > 0 && parsed < askingPrice / 2;
+  if (openOffer) {
+    const yours = !openOffer.bySeller;
+    return (
+      <div className="rounded-xl border border-line bg-surface-2 p-4">
+        <p className="text-sm text-fg">
+          <span className="font-medium">
+            {yours ? "Your offer" : "The seller's price"}:{" "}
+            <span className="tabular-nums">{usd(openOffer.amount)}</span>
+          </span>
+          <span className="text-muted">
+            {" · "}
+            {yours ? "waiting for the seller" : "your move"}
+            {" · "}
+            <span className="tabular-nums">
+              {timeLeft(openOffer.expiresAt)}
+            </span>
+          </span>
+        </p>
+        <p className="mt-1 text-[0.8125rem] leading-relaxed text-muted">
+          {yours
+            ? "One offer at a time. To change the number, withdraw this one first."
+            : "Accept it, counter, or turn it down."}
+        </p>
+        <div className="mt-4 flex flex-col items-start gap-3">
+          <OfferActions
+            offer={{
+              id: openOffer.id,
+              amount: openOffer.amount,
+              awaiting: openOffer.awaiting,
+              bySeller: openOffer.bySeller,
+              effectiveStatus: "OPEN",
+            }}
+            viewingAs="buyer"
+            askingPrice={askingPrice}
+          />
+          <Button asChild variant="secondary" size="md">
+            <Link
+              href={
+                openOffer.conversationId
+                  ? threadHref(openOffer.conversationId, listingId)
+                  : "/dashboard/offers"
+              }
+            >
+              {openOffer.conversationId ? "Open the chat" : "See your offers"}
+            </Link>
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  // "2,100" and "$150" are amounts too; a refusal says why rather than
+  // greying the button out.
+  const parsed = parseAmount(amount);
+  const entered = Number.isFinite(parsed) && parsed > 0;
+  const unreadable = amount.trim() !== "" && !entered;
+  const problem = entered
+    ? amountProblem({
+        amountCents: toCents(parsed),
+        askingCents: toCents(askingPrice),
+      })
+    : null;
+  const hint = problem
+    ? OFFER_PROBLEM_TEXT[problem]
+    : unreadable
+      ? "Enter an amount in dollars, like 2,100."
+      : null;
 
   return (
     <form
@@ -120,7 +207,7 @@ export function OfferForm({
         e.preventDefault();
         setError(null);
         startTransition(async () => {
-          const result = await makeOffer(listingId, Number(amount), message);
+          const result = await makeOffer(listingId, parsed, message);
           if (!result.ok) {
             setError(result.error);
             return;
@@ -147,14 +234,14 @@ export function OfferForm({
         value={amount}
         onChange={(e) => setAmount(e.target.value)}
         placeholder={String(Math.round(askingPrice * 0.9))}
-        aria-invalid={tooLow || undefined}
-        aria-describedby={tooLow ? `${amountId}-error` : undefined}
+        aria-invalid={hint ? true : undefined}
+        aria-describedby={hint ? `${amountId}-error` : undefined}
         className={cn(siteInput, "tnum mt-2")}
         required
       />
-      {tooLow ? (
+      {hint ? (
         <p id={`${amountId}-error`} className="mt-2 text-sm text-danger">
-          That is less than half the asking price and will be refused.
+          {hint}
         </p>
       ) : null}
 
@@ -178,7 +265,7 @@ export function OfferForm({
         type="submit"
         size="md"
         className="mt-4"
-        disabled={pending || !amount.trim() || tooLow}
+        disabled={pending || !entered || Boolean(hint)}
       >
         {pending ? "Sending…" : "Send offer"}
       </Button>

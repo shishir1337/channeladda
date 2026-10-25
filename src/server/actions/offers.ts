@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { stripBidi } from "@/lib/bidi";
 import { needsEmailVerification } from "@/lib/email-verification";
 import { toCents } from "@/lib/listing-form";
+import { OFFER_PROBLEM_TEXT } from "@/lib/offer-rules";
 import * as repo from "@/server/offers";
 import { requireUser } from "@/server/session";
 import { getSettings } from "@/server/settings";
@@ -22,10 +23,11 @@ export type OfferResult =
   | { ok: false; error: string };
 
 const MESSAGES: Record<repo.OfferFailure, string> = {
+  // The amount rules, in the same words the forms show before sending.
+  ...OFFER_PROBLEM_TEXT,
   "not-found": "That offer is no longer available.",
   "not-live": "This listing is not accepting offers right now.",
   "own-listing": "You cannot make an offer on your own listing.",
-  "too-low": "That is less than half the asking price. Try a serious number.",
   "already-open":
     "You already have an offer open on this listing. Withdraw it first.",
   expired: "That offer has expired. Ask for a fresh one.",

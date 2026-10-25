@@ -33,7 +33,7 @@ import {
   getProofCount,
   getSimilarListings,
 } from "@/server/listings";
-import { heldByAcceptedOffer } from "@/server/offers";
+import { heldByAcceptedOffer, openOfferOn } from "@/server/offers";
 import { activeResellers } from "@/server/reseller-status";
 import { getSeller } from "@/server/sellers";
 import { getCurrentUser } from "@/server/session";
@@ -110,6 +110,21 @@ export default async function ListingPage({
       ? await heldByAcceptedOffer(listing.id, viewer.id)
       : null;
   const heldOfferUsd = heldOffer ? heldOffer.amountUsd / 100 : null;
+  // The offer this buyer already has open here, shown in place of the form.
+  const mine =
+    viewer && !isOwnListing && !listing.reserved
+      ? await openOfferOn(listing.id, viewer.id)
+      : null;
+  const openOffer = mine
+    ? {
+        id: mine.id,
+        amount: mine.amount,
+        bySeller: mine.bySeller,
+        awaiting: mine.awaiting,
+        conversationId: mine.conversationId,
+        expiresAt: mine.expiresAt.toISOString(),
+      }
+    : null;
   const PlatformIcon = platform.icon;
 
   return (
@@ -258,6 +273,7 @@ export default async function ListingPage({
                         Boolean(viewer?.slug) &&
                         viewer?.slug === listing.sellerSlug
                       }
+                      openOffer={openOffer}
                     />
                   </div>
                 </Panel>

@@ -7,6 +7,12 @@ import { FormNotice } from "@/components/auth/fields";
 import { BusyLabel } from "@/components/messages/chat-parts";
 import { Button } from "@/components/ui/button";
 import type { OfferStatus } from "@/generated/prisma/enums";
+import { toCents } from "@/lib/listing-form";
+import {
+  amountProblem,
+  OFFER_PROBLEM_TEXT,
+  parseAmount,
+} from "@/lib/offer-rules";
 import { cn } from "@/lib/utils";
 import {
   acceptOffer,
@@ -35,10 +41,14 @@ function usd(value: number) {
  *
  * It draws no box of its own: it always sits inside a card that already has
  * one, and a box in a box is just another edge to read past.
+ *
+ * Decline and Withdraw ask once before they act: each closes the offer for
+ * good, and QA found both went through on a single tap.
  */
 export function OfferActions({
   offer,
   viewingAs,
+  askingPrice,
 }: {
   offer: {
     id: string;
@@ -49,11 +59,16 @@ export function OfferActions({
     effectiveStatus: OfferStatus;
   };
   viewingAs: "buyer" | "seller";
+  /** Dollars, when the caller knows it: lets the counter box say more. */
+  askingPrice?: number;
 }) {
   const router = useRouter();
   const [countering, setCountering] = useState(false);
   const [counterAmount, setCounterAmount] = useState("");
   const [counterMessage, setCounterMessage] = useState("");
+  const [confirming, setConfirming] = useState<"decline" | "withdraw" | null>(
+    null,
+  );
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -62,10 +77,27 @@ export function OfferActions({
   // Whoever made an open offer is the side it is not waiting on.
   const yours = open && offer.awaiting !== null && !yourTurn;
 
+  // Said while typing, not found out by pressing: a counter sits between the
+  // two numbers on the table. The server checks it again either way.
+  const counterValue = parseAmount(counterAmount);
+  const counterEntered = Number.isFinite(counterValue) && counterValue > 0;
+  const counterUnreadable = counterAmount.trim() !== "" && !counterEntered;
+  const counterProblem = counterEntered
+    ? amountProblem({
+        amountCents: toCents(counterValue),
+        askingCents: askingPrice === undefined ? null : toCents(askingPrice),
+        answering: {
+          amountCents: toCents(offer.amount),
+          bySeller: offer.bySeller,
+        },
+      })
+    : null;
+
   function run(fn: () => Promise<{ ok: boolean; error?: string }>) {
     setError(null);
     startTransition(async () => {
       const result = await fn();
+      setConfirming(null);
       if (!result.ok) {
         setError(result.error ?? "That did not work. Try again.");
         // Whatever made it fail — answered elsewhere, lapsed — is worth
@@ -79,6 +111,63 @@ export function OfferActions({
   }
 
   if (!yourTurn && !yours) return null;
+
+  if (confirming) {
+    const declining = confirming === "decline";
+    return (
+      <div
+        role="alertdialog"
+        aria-labelledby={`${offer.id}-confirm-title`}
+        aria-describedby={`${offer.id}-confirm-body`}
+        className="rounded-lg border border-danger/25 bg-danger-soft/60 p-3.5"
+      >
+        <p
+          id={`${offer.id}-confirm-title`}
+          className="text-sm leading-5 font-semibold text-fg"
+        >
+          {declining
+            ? `Decline ${usd(offer.amount)}?`
+            : `Withdraw your ${offer.bySeller ? "price" : "offer"} of ${usd(offer.amount)}?`}
+        </p>
+        <p
+          id={`${offer.id}-confirm-body`}
+          className="mt-1 text-[0.8125rem] leading-relaxed text-muted"
+        >
+          {declining
+            ? "The offer closes and they are told. To ask for a different price instead, counter."
+            : "It closes for good and the other side is told. You can make a new one afterwards."}
+        </p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Button
+            type="button"
+            variant="danger"
+            size="sm"
+            disabled={pending}
+            onClick={() =>
+              run(() =>
+                declining ? declineOffer(offer.id) : withdrawOffer(offer.id),
+              )
+            }
+          >
+            <BusyLabel
+              busy={pending}
+              idle={declining ? "Yes, decline" : "Yes, withdraw"}
+              working="Working…"
+            />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            disabled={pending}
+            onClick={() => setConfirming(null)}
+          >
+            Keep it open
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -117,7 +206,10 @@ export function OfferActions({
             variant="danger-outline"
             size="sm"
             disabled={pending}
-            onClick={() => run(() => declineOffer(offer.id))}
+            onClick={() => {
+              setError(null);
+              setConfirming("decline");
+            }}
           >
             Decline
           </Button>
@@ -142,10 +234,31 @@ export function OfferActions({
                 placeholder="Your price"
                 value={counterAmount}
                 onChange={(e) => setCounterAmount(e.target.value)}
+                aria-invalid={Boolean(counterProblem) || counterUnreadable}
+                aria-describedby={`${offer.id}-counter-hint`}
                 className={cn(inputClass, "pl-7 font-normal tabular-nums")}
               />
             </span>
           </label>
+          <p
+            id={`${offer.id}-counter-hint`}
+            className={cn(
+              "-mt-1.5 text-[0.8125rem] leading-relaxed",
+              counterProblem || counterUnreadable
+                ? "text-danger"
+                : "text-subtle",
+            )}
+          >
+            {counterProblem
+              ? OFFER_PROBLEM_TEXT[counterProblem]
+              : counterUnreadable
+                ? "Enter an amount in dollars, like 2,100."
+                : offer.bySeller
+                  ? `Less than ${usd(offer.amount)}.`
+                  : askingPrice === undefined
+                    ? `More than ${usd(offer.amount)}.`
+                    : `More than ${usd(offer.amount)}, up to ${usd(askingPrice)}.`}
+          </p>
           <label className={labelClass}>
             Message (optional)
             <textarea
@@ -159,11 +272,9 @@ export function OfferActions({
             <Button
               type="button"
               size="sm"
-              disabled={pending || !counterAmount.trim()}
+              disabled={pending || !counterEntered || Boolean(counterProblem)}
               onClick={() =>
-                run(() =>
-                  counterOffer(offer.id, Number(counterAmount), counterMessage),
-                )
+                run(() => counterOffer(offer.id, counterValue, counterMessage))
               }
             >
               <BusyLabel
@@ -190,7 +301,10 @@ export function OfferActions({
           variant="danger-outline"
           size="sm"
           disabled={pending}
-          onClick={() => run(() => withdrawOffer(offer.id))}
+          onClick={() => {
+            setError(null);
+            setConfirming("withdraw");
+          }}
         >
           {offer.bySeller ? "Withdraw price" : "Withdraw offer"}
         </Button>

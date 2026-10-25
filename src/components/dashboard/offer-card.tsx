@@ -210,7 +210,11 @@ export function OfferCard({
             )}
           >
             <div className="w-full empty:hidden">
-              <OfferActions offer={offer} viewingAs={viewingAs} />
+              <OfferActions
+                offer={offer}
+                viewingAs={viewingAs}
+                askingPrice={offer.listingPrice}
+              />
             </div>
             {offer.conversationId ? (
               <Button asChild variant="ghost" size="sm">
