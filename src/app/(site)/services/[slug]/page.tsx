@@ -7,14 +7,14 @@ import {
 } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { ServiceIcon, serviceIcon } from "@/components/site/service-icon";
 import { Button } from "@/components/ui/button";
 import { iconText, iconTile } from "@/components/ui/icon-hue";
 import { PageHeader } from "@/components/ui/page-header";
 import { Price } from "@/components/ui/price";
 import { Container, Section } from "@/components/ui/section";
-import { serviceMap, services } from "@/data/site";
+import { SERVICES_OPEN, serviceMap, services } from "@/data/site";
 import { supportHref } from "@/lib/support";
 
 export function generateStaticParams() {
@@ -41,6 +41,10 @@ export async function generateMetadata({
 export default async function ServicePage({
   params,
 }: PageProps<"/services/[slug]">) {
+  // Not taking orders yet: the list says so, and a "Request this service"
+  // here would promise work nobody is doing.
+  if (!SERVICES_OPEN) redirect("/services");
+
   const { slug } = await params;
   const service = serviceMap[slug];
   if (!service) notFound();

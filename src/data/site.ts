@@ -14,6 +14,14 @@ export type Service = {
   caution?: string;
 };
 
+/**
+ * Whether services take orders. Off for the first release (the owner,
+ * 2026-10-25): every card says "Coming soon", nothing links to a service's
+ * own page, and those pages send people back to the list. Work on them
+ * starts after launch; turning this on brings everything back as it was.
+ */
+export const SERVICES_OPEN: boolean = false;
+
 export const services: Service[] = [
   {
     slug: "channel-promotion",
