@@ -24,6 +24,7 @@ import { Badge } from "@/components/ui/badge";
 import { Breadcrumbs } from "@/components/ui/page-header";
 import { Container } from "@/components/ui/section";
 import { platformMap } from "@/data/platforms";
+import { artworkProps } from "@/lib/artwork";
 import { databaseGate } from "@/lib/db-gate";
 import { withResellerDiscount } from "@/lib/reseller";
 import { formatCompact } from "@/lib/utils";
@@ -128,13 +129,16 @@ export default async function ListingPage({
           <div className="min-w-0">
             {/* Identity */}
             <div className="flex flex-wrap items-start gap-4">
-              {/* biome-ignore lint/performance/noImgElement: static SVG avatar. */}
+              {/* biome-ignore lint/performance/noImgElement: the account's picture, resized by `artworkProps` (an uploaded one) or left as it is (the sample SVGs). */}
               <img
-                src={listing.avatarUrl}
+                {...artworkProps({
+                  src: listing.avatarUrl,
+                  width: 72,
+                  height: 72,
+                  eager: true,
+                })}
                 alt=""
-                width={128}
-                height={128}
-                className="size-16 shrink-0 rounded-xl bg-surface-2 ring-1 ring-line sm:size-[4.5rem]"
+                className="size-16 shrink-0 rounded-xl bg-surface-2 object-cover ring-1 ring-line sm:size-[4.5rem]"
               />
               <div className="min-w-0 flex-1 pt-0.5">
                 <div className="flex flex-wrap items-center gap-2">

@@ -10,10 +10,13 @@ import { getCurrentUser } from "@/server/session";
  * icon.
  */
 export async function GET() {
+  // One person's saved listings: no cache, shared or the browser's own, may
+  // keep them and hand them to whoever signs in on that machine next.
+  const headers = { "Cache-Control": "no-store" };
   const user = await getCurrentUser();
   // Signed out is not an error here; it just means nothing is saved.
-  if (!user) return Response.json({ ids: [] });
-  return Response.json({ ids: await getFavouriteIds(user.id) });
+  if (!user) return Response.json({ ids: [] }, { headers });
+  return Response.json({ ids: await getFavouriteIds(user.id) }, { headers });
 }
 
 export async function POST(request: Request) {

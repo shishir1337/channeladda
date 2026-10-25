@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Price } from "@/components/ui/price";
 import type { Listing } from "@/data/listings";
 import { platformMap } from "@/data/platforms";
+import { artworkProps } from "@/lib/artwork";
 import { countOf } from "@/lib/plural";
 import { revenueLine } from "@/lib/revenue-line";
 import { cn, formatCompact } from "@/lib/utils";
@@ -21,6 +22,13 @@ const tagStyles = {
   new: { label: "New", variant: "info" as const },
   ending: { label: "Price drop", variant: "neutral" as const },
 };
+
+/**
+ * How wide a card's cover is drawn: a third of the browse grid on a wide
+ * screen, half of it from a tablet up, and most of the screen in a phone's
+ * swipe row.
+ */
+const CARD_SIZES = "(min-width: 1280px) 340px, (min-width: 640px) 50vw, 85vw";
 
 /**
  * One listing in a grid.
@@ -48,12 +56,15 @@ export function ListingCard({
   className?: string;
 }) {
   if (phoneRow) {
+    // Both are in the page and CSS hides one. A lazy picture that is
+    // hidden is never fetched, but an eager one is — so a phone was
+    // downloading the full card's cover for every row at the top of the
+    // list. Only the row, whose picture is small, is fetched at once.
     return (
       <>
         <PhoneRow listing={listing} priority={priority} className="sm:hidden" />
         <ListingCard
           listing={listing}
-          priority={priority}
           className={cn("max-sm:hidden", className)}
         />
       </>
@@ -74,17 +85,19 @@ export function ListingCard({
       <div className="relative">
         {/* Clipped on its own wrapper so the card keeps its hover shadow. */}
         <div className="overflow-hidden rounded-t-[calc(var(--radius-card)-1px)] bg-surface-2">
-          {/* biome-ignore lint/performance/noImgElement: static SVG artwork —
-              next/image cannot optimise vectors and would need the global
-              dangerouslyAllowSVG flag, which is unsafe once sellers upload
-              their own images. Dimensions are set, so there is no CLS. */}
+          {/* biome-ignore lint/performance/noImgElement: a plain img with
+              the optimiser's attributes (`artworkProps`), so the sample SVG
+              artwork and an uploaded cover share one element. Dimensions are
+              set, so there is no layout shift. */}
           <img
-            src={listing.coverUrl}
+            {...artworkProps({
+              src: listing.coverUrl,
+              width: 480,
+              height: 240,
+              sizes: CARD_SIZES,
+              eager: priority,
+            })}
             alt=""
-            width={480}
-            height={240}
-            loading={priority ? "eager" : "lazy"}
-            decoding="async"
             className="aspect-[2/1] w-full object-cover"
           />
         </div>
@@ -115,14 +128,15 @@ export function ListingCard({
         </div>
 
         {/* The account's own picture, straddling the cover and the body. */}
-        {/* biome-ignore lint/performance/noImgElement: static SVG avatar, see above. */}
+        {/* biome-ignore lint/performance/noImgElement: see the cover above. */}
         <img
-          src={listing.avatarUrl}
+          {...artworkProps({
+            src: listing.avatarUrl,
+            width: 48,
+            height: 48,
+            eager: priority,
+          })}
           alt=""
-          width={96}
-          height={96}
-          loading={priority ? "eager" : "lazy"}
-          decoding="async"
           className="absolute -bottom-5 left-4 size-12 rounded-full border-[3px] border-surface bg-surface-2 object-cover"
         />
       </div>
@@ -236,14 +250,15 @@ function PhoneRow({
       )}
     >
       <div className="relative shrink-0 self-start">
-        {/* biome-ignore lint/performance/noImgElement: static SVG avatar, as on the card. */}
+        {/* biome-ignore lint/performance/noImgElement: as on the card. */}
         <img
-          src={listing.avatarUrl}
+          {...artworkProps({
+            src: listing.avatarUrl,
+            width: 64,
+            height: 64,
+            eager: priority,
+          })}
           alt=""
-          width={64}
-          height={64}
-          loading={priority ? "eager" : "lazy"}
-          decoding="async"
           className="size-16 rounded-xl bg-surface-2 object-cover"
         />
         <span

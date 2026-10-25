@@ -44,6 +44,19 @@ export function isServableKey(key: string): boolean {
 }
 
 /**
+ * Listing artwork and profile photos: the same for everybody who asks, so
+ * public (`canReadUpload`), and the only uploads any shared cache or the
+ * image optimiser may hold.
+ */
+const PUBLIC = new RegExp(
+  `^(?:cover|avatar)/[0-9a-f]{32}\\.(?:${IMAGE_EXT.join("|")})$`,
+);
+
+export function isPublicKey(key: string): boolean {
+  return PUBLIC.test(key);
+}
+
+/**
  * An ID check's file: a photo of the ID or the selfie video.
  *
  * Private, like nothing else here: only the member who sent it and the staff

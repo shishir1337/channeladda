@@ -1,3 +1,4 @@
+import { artworkProps } from "@/lib/artwork";
 import { cn } from "@/lib/utils";
 
 /**
@@ -20,9 +21,9 @@ export function SellerAvatar({
 }) {
   if (image) {
     return (
-      // biome-ignore lint/performance/noImgElement: the seller's own upload, a small square served from our origin.
+      // biome-ignore lint/performance/noImgElement: the seller's own upload, resized by `artworkProps` for the largest circle it is drawn in (80px on a seller's page).
       <img
-        src={image}
+        {...artworkProps({ src: image, width: 80, height: 80 })}
         alt=""
         aria-hidden="true"
         className={cn(

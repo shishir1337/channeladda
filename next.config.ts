@@ -25,6 +25,41 @@ const securityHeaders = [
   { key: "X-DNS-Prefetch-Control", value: "on" },
 ];
 
+/**
+ * The parts of a Content-Security-Policy that cannot break a page: no
+ * framing (the modern form of X-Frame-Options), no <base> pointing links
+ * somewhere else, no form posting off the site, no plugins. Script and
+ * style sources are deliberately not restricted — Next inlines its own
+ * bootstrapping scripts, and a policy that blocked them would blank every
+ * page. Payment pages are reached by navigation, not by a form, so
+ * form-action 'self' leaves checkout alone.
+ *
+ * Not on /uploads: a header set here replaces the one a route sets, and the
+ * uploads route sends its own, stricter `default-src 'none'; sandbox` so an
+ * uploaded file can never run as a page on our origin.
+ */
+const pagePolicy = [
+  {
+    key: "Content-Security-Policy",
+    value:
+      "frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'",
+  },
+];
+
+/**
+ * Artwork shipped with the site: the sample covers and avatars, the email
+ * mark. Without this Next sends them with max-age=0, so every page view
+ * asked for every picture again. A month, then served stale while it is
+ * fetched again, because these files can change on a deploy — they are not
+ * named by their contents the way /_next/static is.
+ */
+const staticMediaCache = [
+  {
+    key: "Cache-Control",
+    value: "public, max-age=2592000, stale-while-revalidate=86400",
+  },
+];
+
 const nextConfig: NextConfig = {
   reactCompiler: true,
 
@@ -45,7 +80,30 @@ const nextConfig: NextConfig = {
   logging: { serverFunctions: false },
 
   async headers() {
-    return [{ source: "/:path*", headers: securityHeaders }];
+    return [
+      { source: "/:path*", headers: securityHeaders },
+      { source: "/:path((?!uploads/).*)", headers: pagePolicy },
+      { source: "/media/:path*", headers: staticMediaCache },
+      { source: "/email/:path*", headers: staticMediaCache },
+    ];
+  },
+
+  // Listing covers and account pictures are uploaded at full size — a
+  // 1600-pixel cover was sent to a 290-pixel card, a 600-pixel avatar to a
+  // 48-pixel circle. They go through the image optimiser, which resizes them
+  // for the screen and caches the result. Only the public kinds: a proof
+  // screenshot, a chat file or an ID photo is permission-checked, and the
+  // optimiser fetches without the visitor's cookie, so those are never
+  // allowed here (see `src/lib/image.ts`).
+  images: {
+    localPatterns: [
+      { pathname: "/uploads/cover/**", search: "" },
+      { pathname: "/uploads/avatar/**", search: "" },
+    ],
+    qualities: [75],
+    // A file never changes under its key, so a resized copy is good for as
+    // long as the original is.
+    minimumCacheTTL: 31_536_000,
   },
 
   // One address for the whole site. Sign-in only answers requests from

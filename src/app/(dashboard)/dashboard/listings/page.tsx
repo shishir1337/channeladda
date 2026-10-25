@@ -32,6 +32,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { platforms } from "@/data/platforms";
 import type { ListingStatus } from "@/generated/prisma/enums";
+import { artworkProps } from "@/lib/artwork";
 import { LIVE_EDITABLE, REMOVABLE, removedBySeller } from "@/lib/listing-lock";
 import { pickTab } from "@/lib/tabs";
 import { cn } from "@/lib/utils";
@@ -380,12 +381,15 @@ function ListingRow({
         {listing.coverUrl ? (
           <>
             {/* biome-ignore lint/performance/noImgElement: the seller's own
-                  upload at 96px. Dimensions are set, so nothing shifts. */}
+                  upload at 80px, resized by `artworkProps`. Dimensions are
+                  set, so nothing shifts. */}
             <img
-              src={listing.coverUrl}
+              {...artworkProps({
+                src: listing.coverUrl,
+                width: 80,
+                height: 48,
+              })}
               alt=""
-              width={96}
-              height={56}
               className="h-10 w-16 rounded-md border border-line bg-surface-2 object-cover sm:h-12 sm:w-20"
             />
           </>
