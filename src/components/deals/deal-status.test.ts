@@ -141,7 +141,7 @@ test("the presses that decide where the money and the channel go ask first", () 
   );
   expect(confirmFirst("SAFEST", "Pay the seller")).toMatch(/sent/);
   // Our agent's last press ends the deal, in both modes.
-  expect(confirmFirst("SAFEST", "Transfer ownership to the buyer")).toMatch(
+  expect(confirmFirst("SAFEST", "Make the buyer primary owner")).toMatch(
     /completes the deal/,
   );
   expect(confirmFirst("FASTEST", "Make the buyer primary owner")).toMatch(
@@ -267,15 +267,41 @@ describe("the headline follows the open step, not just the status", () => {
     expect(buyer.sentence).not.toMatch(/^Pay/);
   });
 
-  test("a safest deal ends with our agent transferring the channel", () => {
-    const agent = dealHeadline(
+  test("a safest deal ends with an owner invite, Google's wait, then primary owner", () => {
+    const invite = dealHeadline(
       "AWAITING_HANDOVER",
       "SAFEST",
       "agent",
       8,
       "YOUTUBE",
     );
-    expect(agent.sentence).toMatch(/^Transfer ownership to the buyer/);
+    expect(invite.sentence).toMatch(/^Invite the buyer's account/);
+    expect(invite.sentence).toMatch(/Google's 7-day wait/);
+
+    const buyer = dealHeadline(
+      "AWAITING_HANDOVER",
+      "SAFEST",
+      "buyer",
+      9,
+      "YOUTUBE",
+    );
+    expect(buyer.label).toBe("You become primary owner next");
+    expect(buyer.sentence).toMatch(/^Accept our agent's owner invite/);
+    const agent = dealHeadline(
+      "AWAITING_HANDOVER",
+      "SAFEST",
+      "agent",
+      9,
+      "YOUTUBE",
+    );
+    expect(agent.sentence).toMatch(/make the buyer primary owner/);
+    expect(agent.sentence).toMatch(/completes the deal/);
+
+    // Nobody waits on Google for an Instagram account.
+    expect(
+      dealHeadline("AWAITING_HANDOVER", "SAFEST", "buyer", 9, "INSTAGRAM")
+        .sentence,
+    ).not.toMatch(/Google/);
   });
 
   test("on Fastest the seller invites our agent, and our agent invites the buyer", () => {

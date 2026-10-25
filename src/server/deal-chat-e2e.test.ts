@@ -202,12 +202,22 @@ test(
     await step(6, "buyer");
     expect((await kinds(id)).seller).toBe("step:mine");
     await step(7, "seller");
-    // Our agent's transfer ends the deal: the buyer presses nothing after
-    // paying the seller.
+    // Our agent invites the buyer as owner, and Google's wait runs again
+    // before our agent can make them primary owner, which ends the deal.
+    expect((await kinds(id)).agent).toBe("step:mine");
+    const invited = await advanceStep({
+      orderId: order.id,
+      position: 8,
+      userId: agent.id,
+    });
+    if (!invited.ok) throw new Error(invited.reason);
+    expect((await lastLine(id)).body).toMatch(/^Waiting period until/);
+    expect((await kinds(id)).agent).toBe("step:theirs");
+    await passHold(order.id);
     expect((await kinds(id)).agent).toBe("step:mine");
     const done = await advanceStep({
       orderId: order.id,
-      position: 8,
+      position: 9,
       userId: agent.id,
     });
     if (!done.ok) throw new Error(done.reason);

@@ -3,7 +3,6 @@ import type { OrderStatus } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
 import { templateFor } from "@/lib/deal-templates";
 import {
-  advanceStep,
   assignAgent,
   createDeal,
   holdsFor,
@@ -233,7 +232,7 @@ test(
   }),
 );
 
-/** Drives a Safest deal to the handover step, which is the guarded one. */
+/** Drives a Safest deal to its handover step, the guarded one, past the owner invite. */
 async function atHandover(priceUsd: number) {
   const seeded = await dealFor("SAFEST", { priceUsd });
   const staff = await seedUser("MODERATOR");
@@ -249,7 +248,7 @@ async function atHandover(priceUsd: number) {
     agent: seeded.agent.id,
   };
   for (const step of templateFor("SAFEST")) {
-    if (step.position < 2 || step.position >= 8) continue;
+    if (step.position < 2 || step.position >= 9) continue;
     const r = await runStep({
       orderId: seeded.orderId,
       position: step.position,
@@ -266,20 +265,20 @@ test(
     const { orderId, actors, staff } = await atHandover(600_000);
 
     expect(
-      await advanceStep({ orderId, position: 8, userId: actors.agent }),
+      await runStep({ orderId, position: 9, userId: actors.agent }),
     ).toMatchObject({ ok: false, reason: "needs-approval" });
 
     expect(
-      await advanceStep({
+      await runStep({
         orderId,
-        position: 8,
+        position: 9,
         userId: actors.agent,
         approvedById: staff.id,
       }),
     ).toMatchObject({ ok: true });
 
     const step = await db.transferStep.findFirstOrThrow({
-      where: { orderId, position: 8 },
+      where: { orderId, position: 9 },
     });
     expect(step.approvedById).toBe(staff.id);
   }),
@@ -290,7 +289,7 @@ test(
   withCleanDb(async () => {
     const { orderId, actors } = await atHandover(10_000);
     expect(
-      await advanceStep({ orderId, position: 8, userId: actors.agent }),
+      await runStep({ orderId, position: 9, userId: actors.agent }),
     ).toMatchObject({ ok: true });
   }),
 );
@@ -300,9 +299,9 @@ test(
   withCleanDb(async () => {
     const { orderId, actors } = await atHandover(600_000);
     expect(
-      await advanceStep({
+      await runStep({
         orderId,
-        position: 8,
+        position: 9,
         userId: actors.agent,
         approvedById: actors.agent,
       }),
@@ -315,9 +314,9 @@ test(
   withCleanDb(async () => {
     const { orderId, actors } = await atHandover(600_000);
     expect(
-      await advanceStep({
+      await runStep({
         orderId,
-        position: 8,
+        position: 9,
         userId: actors.agent,
         approvedById: actors.buyer,
       }),

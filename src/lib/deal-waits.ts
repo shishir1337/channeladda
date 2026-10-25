@@ -16,11 +16,12 @@ export const OWNER_WAIT_DAYS: Readonly<Record<Platform, number>> = {
 };
 
 /**
- * How long a deal's one hold lasts, in days. 0 means there is none.
+ * How long a deal's hold lasts, in days. 0 means there is none.
  *
- * Safest waits on Google's own clock before our agent can be made primary
- * owner; Fastest runs the platform's holding period while the buyer is a
- * manager, before they are made primary owner and the seller is paid.
+ * Safest waits on Google's own clock, twice: before our agent can be made
+ * primary owner, and before the buyer can. Fastest runs the platform's
+ * holding period while the buyer is an owner, before they are made primary
+ * owner and the seller is paid.
  */
 export function holdDaysFor(mode: DealMode, platform: Platform): number {
   if (mode === "SAFEST") return OWNER_WAIT_DAYS[platform];

@@ -47,7 +47,7 @@ export const helpArticles: HelpArticle[] = [
       "The seller invites our agent as owner, and on a Fastest deal our agent invites you",
       "The waiting period passes, and our agent becomes primary owner",
       "On a Fastest deal that is when we pay the seller. On a Safest deal our agent verifies the account, you pay the seller directly, and they confirm it arrived",
-      "Our agent transfers the account to you, and the deal completes",
+      "Our agent invites you as owner and then makes you primary owner, and the deal completes. On a Safest deal Google's 7-day wait runs again in between, on YouTube",
     ],
   },
   {

@@ -162,7 +162,7 @@ export const DEAL_MODE: Record<
     label: "Safest",
     escrow: "channel escrowed",
     blurb:
-      "The buyer pays us the admin fee, an agent becomes the channel's primary owner after Google's wait and verifies it, the buyer pays the seller directly, and once the seller confirms it arrived the agent transfers it to the buyer. We never hold the price.",
+      "The buyer pays us the admin fee, an agent becomes the channel's primary owner after Google's wait and verifies it, the buyer pays the seller directly, and once the seller confirms it arrived the agent invites the buyer as owner and, after Google's wait again, makes them primary owner. We never hold the price.",
   },
   FASTEST: {
     label: "Fastest",

@@ -125,7 +125,7 @@ export const faqs = [
   },
   {
     q: "What is the difference between a Fastest and a Safest deal?",
-    a: "Safest means we hold the account: one of our agents takes ownership of it first, you pay the seller directly once it is verifiably in our hands, and when the seller confirms the payment arrived our agent transfers it to you. You pay us only our fee. Fastest means we hold the money: you pay us the price and our fee together, the seller hands the account to our agent, our agent invites you as owner, and after the holding period we pay the seller and our agent makes you primary owner. You choose on every listing; there is no price threshold.",
+    a: "Safest means we hold the account: one of our agents takes ownership of it first, you pay the seller directly once it is verifiably in our hands, and when the seller confirms the payment arrived our agent invites you as owner and makes you primary owner — on YouTube after Google's 7-day wait. You pay us only our fee. Fastest means we hold the money: you pay us the price and our fee together, the seller hands the account to our agent, our agent invites you as owner, and after the holding period we pay the seller and our agent makes you primary owner. You choose on every listing; there is no price threshold.",
   },
   {
     q: "Which payment methods do you accept?",

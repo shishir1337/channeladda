@@ -533,7 +533,7 @@ test(
     expect((await getDealFor(seller.id, orderId))?.agentEmail).toBe(
       "transfers@channeladda.test",
     );
-    expect(asBuyer?.steps).toHaveLength(8);
+    expect(asBuyer?.steps).toHaveLength(9);
     expect(asBuyer?.totalUsd).toBe(300);
 
     expect((await getDealFor(seller.id, orderId))?.viewerRole).toBe("seller");

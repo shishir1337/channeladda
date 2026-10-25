@@ -90,7 +90,8 @@ type Transition = {
 const TRANSITIONS: readonly Transition[] = Object.freeze([
   // ---- Safest: the agent takes the channel, the buyer pays the seller
   // directly while we hold it, the seller says the money arrived, and the
-  // agent transfers it to the buyer, which ends the deal.
+  // agent hands it to the buyer — an owner invite, Google's wait, then
+  // primary owner — which ends the deal.
   {
     mode: "SAFEST",
     from: "AWAITING_PAYMENT",

@@ -143,6 +143,7 @@ export const STEP_TITLES: Readonly<
     seller: "You confirm the payment arrived",
     agent: "The seller confirms the payment",
   },
+  // Safest's last step before 2026-10-25, on the deals finished with it.
   "Transfer ownership to the buyer": {
     buyer: "Our agent hands you the channel",
     seller: "Our agent hands the channel to the buyer",
@@ -154,22 +155,22 @@ export const STEP_TITLES: Readonly<
     seller: "The buyer pays us",
     agent: "The buyer pays us",
   },
-  "Invite the buyer as owner": {
-    buyer: "Our agent invites you as owner",
-    seller: "Our agent invites the buyer",
-    agent: "You invite the buyer as owner",
-  },
   "Confirm primary ownership": {
     buyer: "Our agent confirms they own it",
     seller: "Our agent confirms, and you are paid",
     agent: "You confirm you are primary owner",
+  },
+  // Both
+  "Invite the buyer as owner": {
+    buyer: "Our agent invites you as owner",
+    seller: "Our agent invites the buyer",
+    agent: "You invite the buyer as owner",
   },
   "Make the buyer primary owner": {
     buyer: "Our agent makes you primary owner",
     seller: "Our agent makes the buyer primary owner",
     agent: "You make the buyer primary owner",
   },
-  // Both
   "Invite the agent as owner": {
     buyer: "The seller invites our agent",
     seller: "You invite our agent as owner",
@@ -288,12 +289,12 @@ export function statusSentence(
     case "AWAITING_HANDOVER":
       if (safest) {
         if (viewer === "buyer") {
-          return "The seller confirmed your payment. Our agent is transferring the channel to you.";
+          return "The seller confirmed your payment. Our agent is handing the channel to you.";
         }
         if (viewer === "seller") {
-          return "You confirmed the buyer's payment, so your part is done. Our agent is transferring the channel to the buyer.";
+          return "You confirmed the buyer's payment, so your part is done. Our agent is handing the channel to the buyer.";
         }
-        return "Transfer ownership to the buyer, using the account on this page.";
+        return "Hand the channel to the buyer, using the account on this page.";
       }
       if (viewer === "buyer") {
         return "Accept our agent's owner invite if you have not yet. After the holding period our agent becomes primary owner, the seller is paid, and our agent makes you primary owner.";
@@ -422,7 +423,7 @@ const BY_OPEN_STEP: Partial<Record<string, Override>> = {
     short: "Seller confirming",
     sentence: () => ({
       buyer:
-        "You have marked it paid. Once the seller confirms the money arrived, our agent transfers the channel to you.",
+        "You have marked it paid. Once the seller confirms the money arrived, our agent starts handing the channel to you.",
       seller:
         "The buyer says they have paid you. When the money is in your account, press Received. If it has not arrived, say so in the deal chat.",
       agent:
@@ -430,15 +431,34 @@ const BY_OPEN_STEP: Partial<Record<string, Override>> = {
     }),
   },
   "SAFEST:AWAITING_HANDOVER:8": {
-    label: "Our agent is transferring the channel",
-    short: "Transferring",
-    sentence: () => ({
-      buyer:
-        "The seller confirmed your payment. Our agent is transferring ownership to the account you gave.",
+    label: "Our agent is inviting the buyer",
+    labelFor: { buyer: "Our agent is inviting you" },
+    short: "Agent inviting",
+    sentence: (w) => ({
+      buyer: w.googleWait
+        ? "The seller confirmed your payment. Our agent invites your account as owner next. Then Google's 7-day wait starts, and after it you are made primary owner."
+        : "The seller confirmed your payment. Our agent invites your account as owner next, then makes you primary owner.",
       seller:
-        "You confirmed the buyer's payment, so your part is done. Our agent is transferring the channel to the buyer.",
-      agent:
-        "Transfer ownership to the buyer, using the account on this page. That completes the deal.",
+        "You confirmed the buyer's payment, so your part is done. Our agent hands the channel to the buyer now.",
+      agent: w.googleWait
+        ? "Invite the buyer's account on this page as owner, then confirm here. That starts Google's 7-day wait before you can make them primary owner."
+        : "Invite the buyer's account on this page as owner, then confirm here.",
+    }),
+  },
+  "SAFEST:AWAITING_HANDOVER:9": {
+    label: "The buyer becomes primary owner next",
+    labelFor: { buyer: "You become primary owner next" },
+    short: "Buyer to primary",
+    sentence: (w) => ({
+      buyer: w.googleWait
+        ? "Accept our agent's owner invite if you have not yet. Our agent makes you primary owner once Google's 7-day wait is over — we email you then."
+        : "Accept our agent's owner invite if you have not yet. Our agent makes you primary owner next.",
+      seller: w.googleWait
+        ? "Your part is done. Our agent makes the buyer primary owner once Google's 7-day wait is over."
+        : "Your part is done. Our agent makes the buyer primary owner next.",
+      agent: w.googleWait
+        ? "Once Google's 7-day wait is over, make the buyer primary owner, using the account on this page. That completes the deal."
+        : "Make the buyer primary owner, using the account on this page. That completes the deal.",
     }),
   },
   "FASTEST:AGENT_VERIFYING:2": {
@@ -662,8 +682,17 @@ const STEP_HELP: Readonly<
       "The buyer pays the seller the price directly, to the details the seller gave on this page — crypto, bank, bKash, whatever they agreed — then presses Paid. Put the transaction id or a screenshot in the chat: it is your proof.",
     "Confirm the payment arrived": () =>
       "The seller presses Received once the money is in their account. Only then does our agent transfer the channel. If it has not arrived, say so in the chat and a moderator will look.",
+    "Invite the buyer as owner": (w) =>
+      w.googleWait
+        ? "Our agent invites the buyer's account, named on this page, as an owner. That starts Google's 7-day wait before the buyer can be made primary owner."
+        : "Our agent invites the buyer's account, named on this page, as an owner.",
+    "Make the buyer primary owner": (w) =>
+      w.googleWait
+        ? "Once Google's 7-day wait is over, our agent makes the buyer's account primary owner and leaves the channel. That completes the deal."
+        : "Our agent makes the buyer's account primary owner and leaves the channel. That completes the deal.",
+    // Deals finished on the steps of 2026-10-20 still show this one.
     "Transfer ownership to the buyer": () =>
-      "Our agent transfers ownership to the buyer's account, named on this page. That completes the deal.",
+      "Our agent transferred ownership to the buyer's account. That completed the deal.",
   },
   FASTEST: {
     "Pay the full amount": () =>
@@ -712,8 +741,8 @@ const CONFIRM_FIRST: Readonly<Record<string, string>> = {
     "Only once you have sent the money. The seller is asked to confirm it arrived, and the moment you press this is the record.",
   "SAFEST:Confirm the payment arrived":
     "Only if the money is in your account. Once you press it our agent transfers the channel to the buyer, and it cannot come back to you.",
-  "SAFEST:Transfer ownership to the buyer":
-    "Only once the buyer's account owns the channel. This completes the deal, and cannot be undone.",
+  "SAFEST:Make the buyer primary owner":
+    "Only once the buyer's account is primary owner. This completes the deal, and cannot be undone.",
   "FASTEST:Confirm primary ownership":
     "Only once you are the channel's primary owner. This pays the seller from the buyer's money, and cannot be undone.",
   "FASTEST:Make the buyer primary owner":

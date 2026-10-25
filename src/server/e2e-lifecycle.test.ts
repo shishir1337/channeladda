@@ -4,7 +4,6 @@ import { templateFor } from "@/lib/deal-templates";
 import { purgeChat } from "@/server/chat-retention";
 import { listDealActivity } from "@/server/deal-feed";
 import {
-  advanceStep,
   assignAgent,
   balanceOf,
   createDeal,
@@ -95,7 +94,7 @@ test(
 
     expect(order.status).toBe("COMPLETED");
     expect(order.steps.every((s) => s.completedAt !== null)).toBe(true);
-    expect(order.steps).toHaveLength(8);
+    expect(order.steps).toHaveLength(9);
     // The buyer's Paid and the seller's Received are the record of the price.
     expect(order.buyerPaidAt).not.toBeNull();
     expect(order.sellerConfirmedAt).not.toBeNull();
@@ -260,7 +259,7 @@ test(
       agent: seeded.agent.id,
     };
     for (const step of templateFor("SAFEST")) {
-      if (step.position < 2 || step.position >= 8) continue;
+      if (step.position < 2 || step.position >= 9) continue;
       const r = await runStep({
         orderId: created.orderId,
         position: step.position,
@@ -270,17 +269,17 @@ test(
     }
 
     expect(
-      await advanceStep({
+      await runStep({
         orderId: created.orderId,
-        position: 8,
+        position: 9,
         userId: actors.agent,
       }),
     ).toMatchObject({ ok: false, reason: "needs-approval" });
 
     expect(
-      await advanceStep({
+      await runStep({
         orderId: created.orderId,
-        position: 8,
+        position: 9,
         userId: actors.agent,
         approvedById: staff.id,
       }),

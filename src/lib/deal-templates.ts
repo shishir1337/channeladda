@@ -60,11 +60,11 @@ export type StepTemplate = {
    */
   usesHandover?: boolean;
   /**
-   * Completing this step starts the deal's one hold — Google's wait before
-   * our agent can be made primary owner on Safest, the holding period on
-   * Fastest, which is our agent's own wait to become primary owner too.
-   * While it runs no step can be done, and when it ends the next person is
-   * told (`announceEndedHolds`).
+   * Completing this step starts a hold — on Safest Google's wait, before
+   * first our agent and then the buyer can be made primary owner; on
+   * Fastest the holding period, which is our agent's own wait to become
+   * primary owner too. While it runs no step can be done, and when it ends
+   * the next person is told (`announceEndedHolds`).
    */
   startsHold?: boolean;
 };
@@ -91,8 +91,9 @@ export const OPENING_STATUS: Readonly<Record<DealMode, OrderStatus>> =
  * channel, which our agent must do at the end. Our agent then verifies it
  * (ownership, monetization, strikes, that it is genuine) and posts the
  * latest proof for the buyer. Only then does the buyer pay the seller,
- * directly, and once the seller says the money arrived our agent transfers
- * ownership to the buyer, which ends the deal.
+ * directly, and once the seller says the money arrived our agent invites the
+ * buyer as owner, Google's wait runs again, and our agent makes the buyer
+ * primary owner, which ends the deal.
  *
  * That ordering is the whole protection: the buyer pays nobody until the
  * channel is verifiably out of the seller's hands, and the seller loses it
@@ -130,14 +131,24 @@ const SAFEST_STEPS: readonly StepTemplate[] = Object.freeze([
     actor: "seller",
     entersStatus: "AWAITING_HANDOVER",
   },
+  // The client, 2026-10-25: once the seller is paid, the wait runs again.
+  // Google makes the buyer wait seven days as an owner before they can be
+  // made primary owner, just as it made our agent, so the handover is two
+  // steps with Google's wait between them — as on Fastest.
   {
     position: 8,
-    label: "Transfer ownership to the buyer",
+    label: "Invite the buyer as owner",
+    actor: "agent",
+    usesHandover: true,
+    startsHold: true,
+  },
+  {
+    position: 9,
+    label: "Make the buyer primary owner",
     actor: "agent",
     entersStatus: "COMPLETED",
     needsApprovalAbove: true,
     handsOver: true,
-    usesHandover: true,
   },
 ]);
 

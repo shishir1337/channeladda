@@ -37,12 +37,14 @@ test("a deal seeded with the steps of an earlier template is told apart", () => 
   ).toBe(false);
 });
 
-test("safest has the owner's eight steps, in order", () => {
+test("safest has the owner's nine steps, in order", () => {
   // The owner's final process of 2026-10-20: the seller gives our agent
   // owner access, the 7-day wait, our agent verifies the channel, the buyer
   // pays the seller directly, and once the seller confirms it our agent
   // transfers ownership to the buyer. Our agent has to be primary owner to
-  // transfer it, which YouTube allows only after those 7 days.
+  // transfer it, which YouTube allows only after those 7 days — and the
+  // buyer waits the same 7 days as an owner before our agent can make them
+  // primary owner (the client, 2026-10-25).
   const steps = templateFor("SAFEST");
   expect(steps.map((s) => [s.label, s.actor])).toEqual([
     ["Pay the admin fee", "buyer"],
@@ -52,7 +54,8 @@ test("safest has the owner's eight steps, in order", () => {
     ["Verify the channel", "agent"],
     ["Pay the seller", "buyer"],
     ["Confirm the payment arrived", "seller"],
-    ["Transfer ownership to the buyer", "agent"],
+    ["Invite the buyer as owner", "agent"],
+    ["Make the buyer primary owner", "agent"],
   ]);
 });
 
@@ -72,15 +75,16 @@ test("fastest has the owner's six steps, in order", () => {
   ]);
 });
 
-test("each mode has one hold, started by our agent's third step", () => {
-  // Safest: Google's wait before our agent can be made primary owner.
-  // Fastest: the holding period, which starts when our agent invites the
-  // buyer and is also the agent's own wait to become primary owner.
+test("safest waits for Google twice, fastest holds once", () => {
+  // Safest: Google's wait before our agent can be made primary owner, and
+  // again before the buyer can. Fastest: the holding period, which starts
+  // when our agent invites the buyer and is also the agent's own wait to
+  // become primary owner.
   expect(
     templateFor("SAFEST")
       .filter((s) => s.startsHold)
       .map((s) => s.label),
-  ).toEqual(["Accept the owner invite"]);
+  ).toEqual(["Accept the owner invite", "Invite the buyer as owner"]);
   expect(
     templateFor("FASTEST")
       .filter((s) => s.startsHold)
@@ -128,7 +132,7 @@ test("the irreversible handover is the step that gives the channel to the buyer"
     templateFor("SAFEST")
       .filter((s) => s.handsOver)
       .map((s) => s.position),
-  ).toEqual([8]);
+  ).toEqual([9]);
   expect(
     templateFor("FASTEST")
       .filter((s) => s.handsOver)
@@ -150,7 +154,7 @@ test("the steps that hand value across need a second approval above the threshol
     templateFor("SAFEST")
       .filter((s) => s.needsApprovalAbove)
       .map((s) => s.position),
-  ).toEqual([8]);
+  ).toEqual([9]);
   expect(
     templateFor("FASTEST")
       .filter((s) => s.needsApprovalAbove)

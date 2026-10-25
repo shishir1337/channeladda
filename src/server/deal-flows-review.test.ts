@@ -250,8 +250,10 @@ test("each step that uses the buyer's account says what to do with it", () => {
   expect(handoverAction("FASTEST", 6)).toBe(
     "Make this account the primary owner",
   );
-  expect(handoverAction("SAFEST", 8)).toBe(
-    "Transfer ownership to this account",
+  // Safest the same since 2026-10-25: an owner invite, then primary owner.
+  expect(handoverAction("SAFEST", 8)).toBe("Invite this account as an owner");
+  expect(handoverAction("SAFEST", 9)).toBe(
+    "Make this account the primary owner",
   );
   // Steps that do not touch it — every one of the seller's among them —
   // are not sent it.

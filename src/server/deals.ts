@@ -34,6 +34,7 @@ import { keyFromUrl } from "@/lib/upload-keys";
 import { recordAudit } from "@/server/audit";
 import { ensureConversation, postEvent } from "@/server/chat-events";
 import {
+  notifyBuyerWaitOver,
   notifyDealEnded,
   notifyHandoverChanged,
   notifyNextActor,
@@ -1069,7 +1070,7 @@ const STEP_TIMESTAMP: Partial<
     // us, so these two moments are the whole record of it.
     6: "buyerPaidAt",
     7: "sellerConfirmedAt",
-    8: "handoverAt",
+    9: "handoverAt",
   },
   // Our agent becoming primary owner, which pays the seller, and the
   // channel reaching the buyer.
@@ -1356,10 +1357,10 @@ export async function advanceStep(input: {
   const stamp = STEP_TIMESTAMP[order.mode]?.[input.position];
   const completing = template.entersStatus === "COMPLETED";
 
-  // The deal's one hold gates the step after it: Google will not let our
-  // agent become primary owner before its wait is over, and a Fastest buyer
-  // is a manager through the whole holding period before they are made
-  // primary owner. Pressing it early would record a handover Google has
+  // A running hold gates the step after it: Google will not let our agent,
+  // and then a Safest buyer, become primary owner before its wait is over,
+  // and a Fastest buyer is an owner through the whole holding period before
+  // they are made primary owner. Pressing it early would record a handover Google has
   // not allowed, or one the holding period exists to delay.
   if (order.holdUntil && order.holdUntil > now) {
     return { ok: false, reason: "on-hold" };
@@ -1504,6 +1505,28 @@ export async function advanceStep(input: {
     const body = `${money(order.priceUsd - order.sellerFeeUsd)} is in your Channel Adda wallet. Our agent makes the buyer primary owner next.`;
     await notify({
       userId: order.sellerId,
+      kind: "ORDER",
+      title,
+      body,
+      href: order.conversationId
+        ? `/dashboard/messages/${order.conversationId}`
+        : `/dashboard/deals/${order.id}`,
+      email: { subject: title, body },
+    });
+  }
+
+  // Our agent has invited the buyer's account as owner. Accepting it is the
+  // one thing a buyer does after paying, and the wait to become primary
+  // owner runs from here, so they hear it by email too.
+  if (template.usesHandover && !template.handsOver) {
+    const title = `Accept our agent's owner invite — ${order.reference}`;
+    const body = !startsHold
+      ? "Our agent has invited the account you gave on the deal as an owner. Accept it, and our agent makes you primary owner next."
+      : order.mode === "SAFEST"
+        ? "Our agent has invited the account you gave on the deal as an owner. Accept it. Google's 7-day wait has started, and when it ends our agent makes you primary owner."
+        : "Our agent has invited the account you gave on the deal as an owner. Accept it. The holding period has started, and when it ends the seller is paid and our agent makes you primary owner.";
+    await notify({
+      userId: order.buyerId,
       kind: "ORDER",
       title,
       body,
@@ -1821,6 +1844,7 @@ export async function announceEndedHolds(): Promise<number> {
     });
     if (!told) continue;
     await notifyNextActor(order.id);
+    await notifyBuyerWaitOver(order.id);
     announced += 1;
   }
   return announced;
@@ -1901,6 +1925,7 @@ export async function endHoldNow(input: {
     after: { holdUntil: now.toISOString() },
   });
   await notifyNextActor(order.id);
+  await notifyBuyerWaitOver(order.id);
   return { ok: true };
 }
 

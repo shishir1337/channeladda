@@ -99,9 +99,7 @@ export function handoverAction(
   const step = templateFor(mode).find((s) => s.position === position);
   if (!step || !(step.usesHandover || step.handsOver)) return null;
   if (!step.handsOver) return "Invite this account as an owner";
-  return mode === "FASTEST"
-    ? "Make this account the primary owner"
-    : "Transfer ownership to this account";
+  return "Make this account the primary owner";
 }
 
 /**
@@ -298,6 +296,53 @@ export async function notifyHandoverChanged(input: {
     });
   } catch (error) {
     console.error(`[deal-notify] handover ${input.orderId}`, error);
+  }
+}
+
+/**
+ * The buyer, when the wait before the step that makes them primary owner
+ * ends — Safest's second Google wait. That step is our agent's, so
+ * `notifyNextActor` tells only them, and the buyer, who has been counting
+ * the days, would hear nothing until it was done. Best effort.
+ */
+export async function notifyBuyerWaitOver(orderId: string): Promise<void> {
+  try {
+    const order = await db.order.findUnique({
+      where: { id: orderId },
+      select: {
+        id: true,
+        reference: true,
+        mode: true,
+        buyerId: true,
+        conversationId: true,
+        steps: {
+          where: { completedAt: null },
+          orderBy: { position: "asc" },
+          take: 1,
+          select: { position: true },
+        },
+      },
+    });
+    const next = order?.steps[0];
+    if (!order || !next) return;
+    const step = templateFor(order.mode as DealMode).find(
+      (s) => s.position === next.position,
+    );
+    if (!step?.handsOver || step.actor === "buyer") return;
+
+    const title = `You become primary owner next — ${order.reference}`;
+    const body =
+      "The wait is over. Our agent makes your account primary owner now. Accept their owner invite first, if you have not yet.";
+    await notify({
+      userId: order.buyerId,
+      kind: "ORDER",
+      title,
+      body,
+      href: dealHref(order),
+      email: { subject: title, body },
+    });
+  } catch (error) {
+    console.error(`[deal-notify] wait over ${orderId}`, error);
   }
 }
 
