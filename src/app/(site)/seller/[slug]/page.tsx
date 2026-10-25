@@ -1,13 +1,9 @@
-import {
-  BadgeCheckIcon,
-  MessageSquareIcon,
-  ShieldCheckIcon,
-  StarIcon,
-} from "lucide-react";
+import { MessageSquareIcon, ShieldCheckIcon, StarIcon } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { pointsLabel, ResellerBadge } from "@/components/app/reseller-badge";
+import { VerifiedMark } from "@/components/app/verified-mark";
 import { ListingCard } from "@/components/home/listing-card";
 import { SellerAvatar } from "@/components/site/seller-avatar";
 import { Badge } from "@/components/ui/badge";
@@ -96,10 +92,9 @@ export default async function SellerPage({
                 <h1 className="flex flex-wrap items-center gap-2 text-[1.875rem] leading-[1.1] font-semibold tracking-[-0.03em] sm:text-[2.5rem]">
                   {seller.name}
                   {seller.verified ? (
-                    <BadgeCheckIcon
-                      role="img"
-                      aria-label="Verified seller: ID checked by Channel Adda"
-                      className="size-6 shrink-0 text-verified"
+                    <VerifiedMark
+                      detail={seller.verifiedWith}
+                      className="size-6"
                     />
                   ) : null}
                   {seller.reseller ? <ResellerBadge /> : null}

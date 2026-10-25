@@ -2,6 +2,7 @@ import "server-only";
 import type { PlatformId } from "@/data/platforms";
 import type { Seller } from "@/data/sellers";
 import { db } from "@/lib/db";
+import type { VerifiedWith } from "@/lib/kyc";
 import { ratingPoints } from "@/lib/reseller";
 import { rankSellers } from "@/lib/seller-rank";
 import { activeResellers } from "@/server/reseller-status";
@@ -25,6 +26,24 @@ const initialsOf = (name: string) =>
     .toUpperCase() || "DB";
 
 /**
+ * What the Verified badge's note names: the ID and the citizenship of the
+ * approved check. Nothing for a badge approved by hand with no submission,
+ * or while a new one waits.
+ */
+function verifiedWith(
+  status: string,
+  submission: {
+    status: string;
+    documentType: VerifiedWith["document"] | null;
+    country: string;
+  } | null,
+): VerifiedWith | null {
+  if (status !== "APPROVED" || submission?.status !== "APPROVED") return null;
+  if (!submission.documentType) return null;
+  return { document: submission.documentType, country: submission.country };
+}
+
+/**
  * A seller's public numbers are derived, never stored — settled volume and
  * rating come from completed orders and real reviews, so they cannot drift
  * from what actually happened.
@@ -44,6 +63,9 @@ async function buildSeller(userId: string): Promise<Seller | null> {
         distinct: ["platform"],
         // A fixed order, the same one /sellers lists them in.
         orderBy: { platform: "asc" },
+      },
+      kycSubmission: {
+        select: { status: true, documentType: true, country: true },
       },
     },
   });
@@ -79,6 +101,7 @@ async function buildSeller(userId: string): Promise<Seller | null> {
     reseller,
     // The Verified badge: an approved ID check, and nothing else.
     verified: user.kycStatus === "APPROVED",
+    verifiedWith: verifiedWith(user.kycStatus, user.kycSubmission),
     initials: initialsOf(user.name),
     image: user.image,
     country: user.country ?? "Global",
@@ -135,6 +158,9 @@ export async function getSellers(): Promise<RankedSeller[]> {
       responseMins: true,
       createdAt: true,
       kycStatus: true,
+      kycSubmission: {
+        select: { status: true, documentType: true, country: true },
+      },
     },
   });
   if (users.length === 0) return [];
@@ -189,6 +215,7 @@ export async function getSellers(): Promise<RankedSeller[]> {
         points: points.get(user.id) ?? 0,
         reseller: holders.has(user.id),
         verified: user.kycStatus === "APPROVED",
+        verifiedWith: verifiedWith(user.kycStatus, user.kycSubmission),
         initials: initialsOf(user.name),
         image: user.image,
         country: user.country ?? "Global",

@@ -18,12 +18,15 @@ export function InfoTip({
   label = "More about this",
   side = "top",
   className,
+  icon,
 }: {
   children: ReactNode;
   /** What the button is called to a screen reader. */
   label?: string;
   side?: "top" | "right" | "bottom" | "left";
   className?: string;
+  /** What the button shows, when it is not the (i): the Verified mark. */
+  icon?: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   // Radix closes the tip on pointerdown, before the click arrives, so the
@@ -65,7 +68,7 @@ export function InfoTip({
               className,
             )}
           >
-            <InfoIcon aria-hidden="true" className="size-3.5" />
+            {icon ?? <InfoIcon aria-hidden="true" className="size-3.5" />}
           </button>
         </Tooltip.Trigger>
         <Tooltip.Portal>

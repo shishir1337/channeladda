@@ -1,7 +1,8 @@
-import { BadgeCheckIcon, ChevronRightIcon, UsersIcon } from "lucide-react";
+import { ChevronRightIcon, UsersIcon } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { pointsLabel, ResellerBadge } from "@/components/app/reseller-badge";
+import { VerifiedMark } from "@/components/app/verified-mark";
 import { SellerAvatar } from "@/components/site/seller-avatar";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -157,11 +158,7 @@ function SellerRow({ seller }: { seller: RankedSeller }) {
             <span aria-hidden="true" className="absolute inset-0" />
           </Link>
           {seller.verified ? (
-            <BadgeCheckIcon
-              role="img"
-              aria-label="Verified seller: ID checked by Channel Adda"
-              className="size-4 shrink-0 text-verified"
-            />
+            <VerifiedMark detail={seller.verifiedWith} />
           ) : null}
           {seller.reseller ? <ResellerBadge /> : null}
         </h2>

@@ -1,6 +1,7 @@
-import { ArrowRightIcon, BadgeCheckIcon } from "lucide-react";
+import { ArrowRightIcon } from "lucide-react";
 import Link from "next/link";
 import { pointsLabel, ResellerBadge } from "@/components/app/reseller-badge";
+import { VerifiedMark } from "@/components/app/verified-mark";
 import { SellerAvatar } from "@/components/site/seller-avatar";
 import { Badge } from "@/components/ui/badge";
 import { Price } from "@/components/ui/price";
@@ -51,11 +52,7 @@ export function TopSellers({ sellers }: { sellers: Seller[] }) {
                         />
                       </Link>
                       {seller.verified ? (
-                        <BadgeCheckIcon
-                          role="img"
-                          aria-label="Verified seller: ID checked by Channel Adda"
-                          className="size-4 shrink-0 text-verified"
-                        />
+                        <VerifiedMark detail={seller.verifiedWith} />
                       ) : null}
                       {seller.reseller ? <ResellerBadge /> : null}
                     </h3>

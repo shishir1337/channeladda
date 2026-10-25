@@ -51,6 +51,28 @@ export function documentLabel(id: string | null | undefined): string {
   return (id && documentOption(id)?.label) || "ID";
 }
 
+/** What an approved check was made with, for the badge's note. */
+export type VerifiedWith = { document: KycDocumentId; country: string };
+
+/** The ID as it reads mid-sentence: "their passport details". */
+const IN_A_SENTENCE: Record<KycDocumentId, string> = {
+  AADHAAR: "Aadhaar card",
+  PAN: "PAN card",
+  PASSPORT: "passport",
+  OTHER: "government ID",
+};
+
+/**
+ * What the Verified badge says on hover or tap (the owner, 2026-10-26):
+ * which ID they gave and a video selfie, that it can go to the police if
+ * they commit fraud, and their citizenship. A badge approved by hand, with
+ * no submission on file, says only what the badge means.
+ */
+export function verifiedNote(detail: VerifiedWith | null): string {
+  if (!detail) return "Channel Adda's team has checked this person's ID.";
+  return `This person has given us their ${IN_A_SENTENCE[detail.document]} details and a video selfie to confirm their identity. This means we can share this data with the police, at their request, in case of fraud on their part. Citizenship: ${detail.country}.`;
+}
+
 /** Who reviews ID checks and may see the files. FINANCE and AGENT may not. */
 export const KYC_REVIEWER_ROLES = ["MODERATOR", "SUPERADMIN"] as const;
 

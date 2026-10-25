@@ -1,4 +1,5 @@
 import type { PlatformId } from "@/data/platforms";
+import type { VerifiedWith } from "@/lib/kyc";
 import type { TrackRecord } from "@/lib/track-record";
 
 export type Seller = {
@@ -19,6 +20,11 @@ export type Seller = {
   /** Their profile photo, when they have added one. */
   image?: string | null;
   country: string;
+  /**
+   * What their approved ID check was made with, for the badge's note. Null
+   * for a badge approved by hand with nothing on file.
+   */
+  verifiedWith?: VerifiedWith | null;
   /** What they say about themselves, on their public page. */
   bio?: string | null;
   /** Out of 5, one decimal. */

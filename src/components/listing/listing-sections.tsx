@@ -1,5 +1,4 @@
 import {
-  BadgeCheckIcon,
   CalendarIcon,
   CircleDollarSignIcon,
   GlobeIcon,
@@ -13,9 +12,9 @@ import {
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { pointsLabel, ResellerBadge } from "@/components/app/reseller-badge";
+import { VerifiedMark } from "@/components/app/verified-mark";
 import { TrackRecordStats } from "@/components/deals/track-record";
 import { SellerAvatar } from "@/components/site/seller-avatar";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { iconText } from "@/components/ui/icon-hue";
 import { Price } from "@/components/ui/price";
@@ -211,11 +210,7 @@ export function SellerPanel({ seller }: { seller: Seller }) {
           <h3 className="flex items-center gap-1.5 text-[0.9375rem] font-semibold">
             <span className="truncate">{seller.name}</span>
             {seller.verified ? (
-              <BadgeCheckIcon
-                role="img"
-                aria-label="Verified seller: ID checked by Channel Adda"
-                className="size-4 shrink-0 text-verified"
-              />
+              <VerifiedMark detail={seller.verifiedWith} />
             ) : null}
             {seller.reseller ? <ResellerBadge /> : null}
           </h3>
@@ -259,10 +254,7 @@ export function SellerPanel({ seller }: { seller: Seller }) {
         </Button>
         {/* The person's ID check, not the listing's ownership check. */}
         {seller.verified ? (
-          <Badge variant="verified" size="md">
-            <BadgeCheckIcon aria-hidden="true" />
-            ID verified
-          </Badge>
+          <VerifiedMark detail={seller.verifiedWith} pill />
         ) : null}
       </div>
     </Panel>
