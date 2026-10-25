@@ -459,7 +459,7 @@ export function SettingsForm({
           name="paymentWindowHours"
           label="Unpaid deals lapse after"
           unit="hours"
-          tip="How long a buyer has to pay before the listing goes back on sale. A buyer who walks away holds it off the market this long."
+          tip="How long a buyer has to pay before the deal lapses. A change applies to unpaid deals already open too, counted from when each was opened."
           inputMode="numeric"
           value={paymentWindow}
           onChange={setPaymentWindow}

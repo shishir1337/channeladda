@@ -689,14 +689,7 @@ export default async function AdminDealsPage({
                   />
                   {isAgent ? (
                     withinLevel(myLevel, viewer.role, order.priceUsd) ? (
-                      <ClaimDeal
-                        orderId={order.id}
-                        defaultEmail={identity?.email ?? viewer.email}
-                        defaultBrand={
-                          identity?.brand ?? "Channel Adda Transfers"
-                        }
-                        locked={identity !== null}
-                      />
+                      <ClaimDeal orderId={order.id} identity={identity} />
                     ) : (
                       <p className="mt-2 text-xs text-subtle">
                         Outside your level ({levelLabel(myLevel).toLowerCase()}

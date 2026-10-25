@@ -48,8 +48,10 @@ export default async function AdminSettingsPage() {
       {/* The promise that matters most on this page, kept word for word from
           the old header and given its own line so it is not lost in it. */}
       <Callout title="Nothing here rewrites a past sale" className="mb-6">
-        An order keeps the fee it was charged, and a deal in flight keeps the
-        safeguards it started under.
+        An order keeps the fee it was charged. The rest applies from the moment
+        you save, to deals already open as well: a new payment window is counted
+        from when each unpaid deal was opened, and the second-approval amount
+        and the hold cap are checked at the next press.
       </Callout>
 
       <SettingsForm

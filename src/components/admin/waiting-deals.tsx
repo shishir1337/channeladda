@@ -4,6 +4,7 @@ import { List, ListItem, Section } from "@/components/app/kit";
 import { EndWaitNow } from "@/components/deals/deal-timeline";
 import { db } from "@/lib/db";
 import { TERMINAL_STATUSES } from "@/lib/deal-machine";
+import { siteDayMonth } from "@/lib/site-time";
 
 /**
  * Deals in their waiting period — Google's wait on Safest, the holding
@@ -28,7 +29,7 @@ export async function WaitingDeals() {
       reference: true,
       mode: true,
       holdUntil: true,
-      listing: { select: { title: true } },
+      listing: { select: { title: true, platform: true } },
     },
   });
   if (deals.length === 0) return null;
@@ -38,7 +39,7 @@ export async function WaitingDeals() {
       id="waiting"
       title="In the waiting period"
       count={deals.length}
-      info="Each one opens its next step on the date shown. End a wait early only when Google already lets the transfer go ahead."
+      info="Each one opens its next step on the date shown (India time). On YouTube, end a wait early only when Google already lets the transfer go ahead; elsewhere, only when the holding period can safely end early."
     >
       <List>
         {deals.map((order) => (
@@ -59,15 +60,18 @@ export async function WaitingDeals() {
                   <DealModeBadge mode={order.mode} />
                   <span className="text-xs text-muted tabular-nums">
                     opens{" "}
-                    {order.holdUntil?.toLocaleDateString("en-GB", {
-                      day: "numeric",
-                      month: "short",
-                    })}
+                    {order.holdUntil
+                      ? siteDayMonth(order.holdUntil, "short")
+                      : null}
                   </span>
                 </>
               }
             />
-            <EndWaitNow orderId={order.id} />
+            <EndWaitNow
+              orderId={order.id}
+              platform={order.listing.platform}
+              mode={order.mode}
+            />
           </ListItem>
         ))}
       </List>

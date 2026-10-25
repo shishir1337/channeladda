@@ -6,6 +6,7 @@ import {
   GavelIcon,
   TriangleAlertIcon,
 } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type ComponentProps, useId, useState, useTransition } from "react";
 import { custodyFacts } from "@/components/admin/vocab";
@@ -16,7 +17,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { DealMode, OrderStatus } from "@/generated/prisma/enums";
 import { levelLabel } from "@/lib/custody-roles";
-import { ENDINGS, type Ending, type EndingTo } from "@/lib/deal-endings";
+import {
+  ENDINGS,
+  type Ending,
+  type EndingTo,
+  MAX_DEAL_NOTE,
+  undoLine,
+} from "@/lib/deal-endings";
 import { movesHeldMoney } from "@/lib/outcomes";
 import { cn } from "@/lib/utils";
 import {
@@ -132,98 +139,91 @@ function ControlBox({
   );
 }
 
-/**
- * Fields the server fills from a stored identity are shown read-only, and
- * look it: a well rather than a white input, so nobody tries to edit them.
- */
-const lockedField =
-  "[&_input]:cursor-default [&_input]:bg-surface-2 [&_input]:text-muted [&_input]:shadow-none";
-
 /** An agent taking the next unheld deal. */
 export function ClaimDeal({
   orderId,
-  defaultEmail,
-  defaultBrand,
-  locked = false,
+  identity,
 }: {
   orderId: string;
-  defaultEmail: string;
-  defaultBrand: string;
   /**
-   * The agent has a stored identity, set by a superadmin on their member
-   * page. The server uses it whatever is typed, so the fields are shown
-   * read-only rather than offering an edit that would be silently ignored.
+   * The agent's transfer identity: the account sellers hand the deal to,
+   * and the name it shows up as. Without one there is nothing to claim
+   * with — a sign-in email is never shown to a seller in its place.
    */
-  locked?: boolean;
+  identity: { email: string; brand: string } | null;
 }) {
   const router = useRouter();
-  const ids = { email: useId(), brand: useId() };
-  const [email, setEmail] = useState(defaultEmail);
-  const [brand, setBrand] = useState(defaultBrand);
   const [message, setMessage] = useState<string | null>(null);
   const [ok, setOk] = useState(false);
   const [pending, startTransition] = useTransition();
 
+  if (!identity) {
+    return (
+      <ControlBox
+        title="Take this deal"
+        hint="Sellers hand the deal to your transfer identity — the account they invite, and the name it shows as. You have not set one yet."
+      >
+        <p className="mt-2 text-[0.8125rem] leading-relaxed text-muted">
+          Set it under Your deal desk on your{" "}
+          <Link
+            href="/dashboard/security"
+            className="font-medium text-fg underline underline-offset-4"
+          >
+            Security page
+          </Link>
+          , then come back to take this deal.
+        </p>
+      </ControlBox>
+    );
+  }
+
   return (
     <ControlBox
       title="Take this deal"
-      hint="You become the agent of record. On both kinds of deal the seller invites you as owner, and you personally own the channel until you transfer it on to the buyer."
+      hint="You become the agent of record. The seller hands the deal to your transfer identity, and you hold it until you hand it on to the buyer."
     >
-      <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
-        <TextField
-          id={ids.email}
-          name="agentEmail"
-          label="Account the seller invites"
-          hint={
-            locked
-              ? "Your transfer identity, set by a superadmin."
-              : "The seller invites this as channel owner."
-          }
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          readOnly={locked}
-          className={locked ? lockedField : undefined}
-          required
-        />
-        <TextField
-          id={ids.brand}
-          name="agentBrand"
-          label="Shown to the seller as"
-          value={brand}
-          onChange={(e) => setBrand(e.target.value)}
-          readOnly={locked}
-          className={locked ? lockedField : undefined}
-          required
-        />
-        <Button
-          type="button"
-          size="md"
-          disabled={pending || !email.trim() || !brand.trim()}
-          onClick={() => {
-            setMessage(null);
-            startTransition(async () => {
-              const result = await claimDeal(
-                orderId,
-                email.trim(),
-                brand.trim(),
-              );
-              setOk(result.ok);
-              setMessage(result.ok ? result.message : result.error);
-              if (result.ok) router.refresh();
-            });
-          }}
-        >
-          <SteadyLabel
-            pending={pending}
-            idle="Take this deal"
-            busy="Claiming…"
-          />
-        </Button>
-        <div className="sm:col-span-3">
-          <Outcome message={message} ok={ok} />
-        </div>
-      </div>
+      <IdentityLines identity={identity} />
+      <Button
+        type="button"
+        size="md"
+        className="mt-3"
+        disabled={pending}
+        onClick={() => {
+          setMessage(null);
+          startTransition(async () => {
+            const result = await claimDeal(orderId);
+            setOk(result.ok);
+            setMessage(result.ok ? result.message : result.error);
+            if (result.ok) router.refresh();
+          });
+        }}
+      >
+        <SteadyLabel pending={pending} idle="Take this deal" busy="Claiming…" />
+      </Button>
+      <Outcome message={message} ok={ok} />
     </ControlBox>
+  );
+}
+
+/** Who sellers hand the deal to, and the name it shows as. */
+function IdentityLines({
+  identity,
+}: {
+  identity: { email: string; brand: string };
+}) {
+  return (
+    <dl className="mt-3 grid gap-x-6 gap-y-1.5 text-xs leading-relaxed sm:grid-cols-2">
+      <div className="flex min-w-0 gap-2">
+        <dt className="shrink-0 text-subtle">Sellers hand it to</dt>
+        <dd className="min-w-0 font-mono break-all text-fg">
+          {identity.email}
+        </dd>
+      </div>
+      <div className="flex min-w-0 gap-2">
+        <dt className="shrink-0 text-subtle">Shown as</dt>
+        <dd className="min-w-0 text-fg">{identity.brand}</dd>
+      </div>
+    </dl>
   );
 }
 
@@ -354,12 +354,15 @@ export function AssignAgent({
   currentAgentId?: string | null;
 }) {
   const router = useRouter();
-  const ids = { agent: useId(), email: useId(), brand: useId() };
+  const ids = { agent: useId() };
   const [agentId, setAgentId] = useState("");
-  const [email, setEmail] = useState("");
-  const [brand, setBrand] = useState("Channel Adda Transfers");
   const chosen = agents.find((agent) => agent.id === agentId);
-  const locked = Boolean(chosen?.agentEmail && chosen.agentBrand);
+  // A deal goes only to someone sellers can hand it to: their stored
+  // transfer identity. Nobody's sign-in email stands in for one.
+  const identity =
+    chosen?.agentEmail && chosen.agentBrand
+      ? { email: chosen.agentEmail, brand: chosen.agentBrand }
+      : null;
   const choices = agents.filter((agent) => agent.id !== currentAgentId);
   const [message, setMessage] = useState<string | null>(null);
   const [ok, setOk] = useState(false);
@@ -373,89 +376,79 @@ export function AssignAgent({
       title={fresh ? "Give it to someone" : "Move it to another agent"}
       hint={
         fresh
-          ? "Only people whose level covers this deal's price are listed. The seller is told the address to invite as soon as it is assigned."
-          : "The new agent is invited as channel owner. Ownership does not move until the seller accepts that invitation, so tell them it is coming."
+          ? "Only people whose level covers this deal's price are listed. The seller is told who to hand it to as soon as it is assigned."
+          : "The seller hands it to the new agent instead. Nothing moves until they do, so tell them it is coming."
       }
     >
       {choices.length === 0 ? (
         <p className="mt-2 text-[0.8125rem] text-muted">
           Nobody whose level covers this deal is free to take it. Set levels, or
-          invite somebody, from the Team page.
+          invite somebody, from the{" "}
+          <Link
+            href="/admin/team"
+            className="font-medium text-fg underline underline-offset-4"
+          >
+            Team page
+          </Link>
+          .
         </p>
       ) : null}
-      <div className="mt-3 grid gap-3 sm:grid-cols-3 sm:items-end">
-        <div>
-          <label htmlFor={ids.agent} className={labelClass}>
-            {fresh ? "Runs the deal" : "New agent"}
-            <span className="ml-0.5 text-danger">*</span>
-          </label>
-          <div className="relative mt-1.5">
-            <select
-              id={ids.agent}
-              name="agentId"
-              value={agentId}
-              required
-              onChange={(e) => {
-                const next = agents.find((a) => a.id === e.target.value);
-                setAgentId(e.target.value);
-                // Their stored identity is what the server will use, so the
-                // fields show it; without one, they start empty to be typed.
-                setEmail(next?.agentEmail ?? "");
-                setBrand(next?.agentBrand ?? "Channel Adda Transfers");
-              }}
-              className={cn(inputClass, "cursor-pointer appearance-none pr-9")}
-            >
-              <option value="">Choose who runs it…</option>
-              {choices.map((agent) => (
-                <option key={agent.id} value={agent.id} disabled={agent.atCap}>
-                  {agent.name} · {levelLabel(agent.dealLevel)} — holding{" "}
-                  {agent.holds}
-                  {agent.atCap ? " (at their limit)" : ""}
-                </option>
-              ))}
-            </select>
-            <ChevronDownIcon
-              aria-hidden="true"
-              className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-subtle"
-            />
-          </div>
+      <div className="mt-3 max-w-md">
+        <label htmlFor={ids.agent} className={labelClass}>
+          {fresh ? "Runs the deal" : "New agent"}
+          <span className="ml-0.5 text-danger">*</span>
+        </label>
+        <div className="relative mt-1.5">
+          <select
+            id={ids.agent}
+            name="agentId"
+            value={agentId}
+            required
+            onChange={(e) => setAgentId(e.target.value)}
+            className={cn(inputClass, "cursor-pointer appearance-none pr-9")}
+          >
+            <option value="">Choose who runs it…</option>
+            {choices.map((agent) => (
+              <option key={agent.id} value={agent.id} disabled={agent.atCap}>
+                {agent.name} · {levelLabel(agent.dealLevel)} — holding{" "}
+                {agent.holds}
+                {agent.atCap ? " (at their limit)" : ""}
+                {agent.agentEmail && agent.agentBrand
+                  ? ""
+                  : " (no transfer identity)"}
+              </option>
+            ))}
+          </select>
+          <ChevronDownIcon
+            aria-hidden="true"
+            className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-subtle"
+          />
         </div>
-        <TextField
-          id={ids.email}
-          name="agentEmail"
-          label="Account the seller invites"
-          hint={locked ? "Their stored identity." : undefined}
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          readOnly={locked}
-          className={locked ? lockedField : undefined}
-          required
-        />
-        <TextField
-          id={ids.brand}
-          name="agentBrand"
-          label="Shown to the seller as"
-          value={brand}
-          onChange={(e) => setBrand(e.target.value)}
-          readOnly={locked}
-          className={locked ? lockedField : undefined}
-          required
-        />
       </div>
+      {chosen && identity ? (
+        <IdentityLines identity={identity} />
+      ) : chosen ? (
+        <p className="mt-3 text-[0.8125rem] leading-relaxed text-danger">
+          {chosen.name} has no transfer identity yet — the account sellers hand
+          deals to. Set it on{" "}
+          <Link
+            href={`/admin/users/${chosen.id}`}
+            className="font-medium underline underline-offset-4"
+          >
+            their Team page
+          </Link>{" "}
+          first.
+        </p>
+      ) : null}
       <Button
         type="button"
         size="sm"
         className="mt-3"
-        disabled={pending || !agentId.trim() || !email.trim()}
+        disabled={pending || !chosen || !identity}
         onClick={() => {
           setMessage(null);
           startTransition(async () => {
-            const result = await assignDealAgent(
-              orderId,
-              agentId.trim(),
-              email.trim(),
-              brand.trim(),
-            );
+            const result = await assignDealAgent(orderId, agentId.trim());
             setOk(result.ok);
             setMessage(result.ok ? result.message : result.error);
             if (result.ok) router.refresh();
@@ -548,6 +541,11 @@ export function EndDeal({
         )
       : null;
   const selected = ENDINGS.find((e) => e.to === choice) ?? null;
+  // A disputed deal is already paused; offering it again only produced a
+  // refusal.
+  const shown = ENDINGS.filter(
+    (ending) => !(ending.to === "DISPUTED" && status === "DISPUTED"),
+  );
   const ready = selected !== null && note.trim() !== "";
 
   function run(to: EndingTo) {
@@ -611,7 +609,7 @@ export function EndDeal({
             {/* What cannot be undone stays on the panel; only the why of a
                 refusal is behind the (i). */}
             <p className="mt-0.5 max-w-[72ch] text-xs leading-relaxed text-muted">
-              Four of these five cannot be undone.
+              {undoLine(shown)}
             </p>
           </div>
         </div>
@@ -660,11 +658,7 @@ export function EndDeal({
           What should happen
         </legend>
         <div className="mt-2 divide-y divide-line overflow-hidden rounded-lg border border-line">
-          {ENDINGS.filter(
-            // A disputed deal is already paused; offering it again only
-            // produced a refusal.
-            (ending) => !(ending.to === "DISPUTED" && status === "DISPUTED"),
-          ).map((ending) => {
+          {shown.map((ending) => {
             const active = choice === ending.to;
             const priceMissing =
               ending.to === "COMPLETED" &&
@@ -739,6 +733,7 @@ export function EndDeal({
         label="Why"
         hint="Goes in the audit trail under your name, and cannot be edited afterwards. This is what a dispute is settled from."
         rows={2}
+        maxLength={MAX_DEAL_NOTE}
         value={note}
         onChange={(e) => setNote(e.target.value)}
         className="mt-4"

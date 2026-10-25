@@ -139,3 +139,42 @@ test(
     });
   }),
 );
+
+test(
+  "without a transfer identity nobody can take or be given a deal, and no sign-in email stands in",
+  withCleanDb(async () => {
+    // QA, 2026-10-26: the desk prefilled demo-admin's sign-in email, and
+    // the seller was told to invite it as owner.
+    const moderator = await seedUser("MODERATOR");
+    fake.userId = moderator.id;
+    fake.role = "MODERATOR";
+    const { listing, buyer } = await seedListing();
+    const { createDeal, recordOpeningPayment } = await import("@/server/deals");
+    const created = await createDeal({
+      listingId: listing.id,
+      buyerId: buyer.id,
+      mode: "FASTEST",
+      acceptedRevenueRisk: true,
+    });
+    if (!created.ok) throw new Error(created.reason);
+    await recordOpeningPayment(created.orderId, "pay-x", "USDT");
+
+    const { assignDealAgent, claimDeal } = await import(
+      "@/server/actions/deals"
+    );
+    expect(await claimDeal(created.orderId)).toMatchObject({
+      ok: false,
+      error: expect.stringMatching(/transfer identity/),
+    });
+    const agent = await seedUser("AGENT");
+    expect(await assignDealAgent(created.orderId, agent.id)).toMatchObject({
+      ok: false,
+      error: expect.stringMatching(/transfer identity/),
+    });
+    const order = await db.order.findUniqueOrThrow({
+      where: { id: created.orderId },
+    });
+    expect(order.agentId).toBeNull();
+    expect(order.agentEmail).toBeNull();
+  }),
+);

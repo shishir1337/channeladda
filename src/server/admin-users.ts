@@ -12,7 +12,8 @@ import type {
 } from "@/generated/prisma/enums";
 import { isCustodianRole } from "@/lib/custody-roles";
 import { db } from "@/lib/db";
-import { AGENT_HOLDS, TERMINAL_STATUSES } from "@/lib/deal-machine";
+import { TERMINAL_STATUSES } from "@/lib/deal-machine";
+import { HELD_CHANNEL } from "@/server/deals";
 import { getSettings } from "@/server/settings";
 
 /**
@@ -302,19 +303,17 @@ export async function getUserDetail(id: string): Promise<UserDetail | null> {
 // -------------------------------------------------------------------- team
 
 /**
- * Safest channels one agent is holding this second.
+ * Channels one agent is holding this second, in either mode.
  *
- * Counted exactly the way `assignAgent` counts it when it enforces the cap —
- * same status list, same mode — because a staff screen saying "3 of 10" while
- * the assignment refuses at 3 would be worse than saying nothing.
+ * Counted with the very filter `assignAgent` enforces the cap with
+ * (`HELD_CHANNEL`): Safest and Fastest holds, and disputed deals whose
+ * channel is still in our hands. This once counted Safest alone, so Team
+ * said "5 of 10" and "Free to take a deal" while taking one was refused for
+ * being at the cap (QA, CA-17139).
  */
 export async function countAgentHolds(userId: string): Promise<number> {
   return db.order.count({
-    where: {
-      agentId: userId,
-      mode: "SAFEST",
-      status: { in: [...AGENT_HOLDS] },
-    },
+    where: { agentId: userId, ...HELD_CHANNEL },
   });
 }
 
@@ -381,11 +380,7 @@ export async function listTeam(): Promise<Team> {
     ids.length > 0
       ? db.order.groupBy({
           by: ["agentId"],
-          where: {
-            agentId: { in: ids },
-            mode: "SAFEST",
-            status: { in: [...AGENT_HOLDS] },
-          },
+          where: { agentId: { in: ids }, ...HELD_CHANNEL },
           _count: { _all: true },
         })
       : [],
@@ -594,8 +589,15 @@ export type UserDeal = {
   status: OrderStatus;
   /** Which side of the deal this person is on. */
   side: "buyer" | "seller" | "agent";
-  /** Cents. What the buyer pays: price plus the buyer fee. */
+  /**
+   * Cents. What the buyer pays Channel Adda: price plus fee on Fastest, the
+   * fee alone on Safest — so it is never shown on its own as "Total".
+   */
   totalUsd: number;
+  /** Cents. The listing's agreed price. */
+  priceUsd: number;
+  /** Cents. Our fee, paid by the buyer. */
+  buyerFeeUsd: number;
   createdAt: Date;
 };
 
@@ -625,6 +627,8 @@ export async function listUserDeals(
         mode: true,
         status: true,
         totalUsd: true,
+        priceUsd: true,
+        buyerFeeUsd: true,
         createdAt: true,
         buyerId: true,
         sellerId: true,
@@ -648,6 +652,8 @@ export async function listUserDeals(
             ? "seller"
             : "agent",
       totalUsd: row.totalUsd,
+      priceUsd: row.priceUsd,
+      buyerFeeUsd: row.buyerFeeUsd,
       createdAt: row.createdAt,
     })),
   };

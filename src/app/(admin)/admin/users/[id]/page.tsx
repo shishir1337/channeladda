@@ -541,7 +541,7 @@ export default async function AdminUserPage({
                       <Th>Their side</Th>
                       <Th>Status</Th>
                       <Th>Opened</Th>
-                      {canSeeMoney ? <Th numeric>Total</Th> : null}
+                      {canSeeMoney ? <Th numeric>Price</Th> : null}
                     </tr>
                   </thead>
                   <tbody>
@@ -576,7 +576,14 @@ export default async function AdminUserPage({
                         </Td>
                         {canSeeMoney ? (
                           <Td numeric>
-                            <Amount cents={deal.totalUsd} size="sm" />
+                            {/* The price, with our fee under it: a Safest
+                                deal's "Total" was the admin fee alone, and
+                                read as a $43.50 sale of a $1,450 channel. */}
+                            <Amount
+                              cents={deal.priceUsd}
+                              size="sm"
+                              caption={`our fee ${(deal.buyerFeeUsd / 100).toLocaleString("en-US", { style: "currency", currency: "USD" })}`}
+                            />
                           </Td>
                         ) : null}
                       </Tr>
