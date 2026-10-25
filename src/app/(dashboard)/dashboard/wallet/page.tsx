@@ -72,7 +72,7 @@ const KINDS: Record<string, KindWords> = {
   ESCROW_RELEASE: {
     title: "A sale was paid out to you",
     meaning:
-      "A deal finished and the channel is the buyer's, so the price Channel Adda was holding became yours.",
+      "Our agent became the channel's primary owner, so the price Channel Adda was holding became yours.",
     icon: BanknoteIcon,
   },
   SELLER_FEE: {
@@ -326,7 +326,8 @@ export default async function WalletPage({
                       >
                         {sale.reference}
                       </Link>{" "}
-                      · Moves to your balance when the transfer completes.
+                      · Moves to your balance when our agent becomes primary
+                      owner.
                     </p>
                   </div>
                   <div className="shrink-0 text-right">

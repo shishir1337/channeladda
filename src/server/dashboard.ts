@@ -54,23 +54,49 @@ export type SellerSummary = {
   live: number;
   drafts: number;
   inReview: number;
-  sold: number;
-  /** Dollars earned from completed sales, after the platform fee. */
-  earned: number;
+  /**
+   * Dollars paid into the seller's wallet for Fastest sales, after our fee,
+   * and how many sales. Read from the wallet's own entries, so the two can
+   * never disagree.
+   */
+  paidToWallet: number;
+  walletSales: number;
+  /**
+   * Dollars Safest buyers paid the seller directly — never through the
+   * wallet — counted once the seller pressed Received, and how many sales.
+   * One figure for both was "showing in earnings but not added in wallet"
+   * (the client, 2026-10-25).
+   */
+  paidDirect: number;
+  directSales: number;
   watching: number;
 };
 
 export async function getSellerSummary(userId: string): Promise<SellerSummary> {
-  const [byStatus, sold, watching] = await Promise.all([
+  const [byStatus, toWallet, direct, watching] = await Promise.all([
     db.listing.groupBy({
       by: ["status"],
       where: { sellerId: userId },
       _count: { _all: true },
     }),
+    // The sale credited, less the seller fee taken from it, per deal.
+    db.ledgerEntry.groupBy({
+      by: ["orderId"],
+      where: {
+        userId,
+        orderId: { not: null },
+        kind: { in: ["ESCROW_RELEASE", "SELLER_FEE"] },
+      },
+      _sum: { amountUsd: true },
+    }),
     db.order.aggregate({
-      where: { sellerId: userId, status: "COMPLETED" },
+      where: {
+        sellerId: userId,
+        mode: "SAFEST",
+        sellerConfirmedAt: { not: null },
+      },
       _count: { _all: true },
-      _sum: { priceUsd: true, sellerFeeUsd: true },
+      _sum: { priceUsd: true },
     }),
     db.listing.aggregate({
       where: { sellerId: userId, status: "LIVE" },
@@ -85,9 +111,11 @@ export async function getSellerSummary(userId: string): Promise<SellerSummary> {
     live: count("LIVE"),
     drafts: count("DRAFT"),
     inReview: count("CODE_CHECK") + count("ADMIN_REVIEW"),
-    sold: sold._count._all,
-    // Paid out, not gross: what actually reached them.
-    earned: ((sold._sum.priceUsd ?? 0) - (sold._sum.sellerFeeUsd ?? 0)) / 100,
+    paidToWallet:
+      toWallet.reduce((sum, row) => sum + (row._sum.amountUsd ?? 0), 0) / 100,
+    walletSales: toWallet.length,
+    paidDirect: (direct._sum.priceUsd ?? 0) / 100,
+    directSales: direct._count._all,
     watching: watching._sum.watching ?? 0,
   };
 }

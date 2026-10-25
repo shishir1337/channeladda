@@ -44,6 +44,7 @@ import { iconText } from "@/components/ui/icon-hue";
 import { Price } from "@/components/ui/price";
 import type { ListingStatus, OfferStatus } from "@/generated/prisma/enums";
 import { needsEmailVerification } from "@/lib/email-verification";
+import { countOf } from "@/lib/plural";
 import { cn } from "@/lib/utils";
 import { getBuyerSummary, getSellerSummary } from "@/server/dashboard";
 import { listDealsFor } from "@/server/deals";
@@ -442,25 +443,36 @@ export default async function DashboardPage() {
           <>
             <p>Lifetime totals. Your spendable balance lives in the wallet.</p>
             <p className="mt-1.5">
-              A Fastest sale reaches your balance once our agent holds the
-              account; until then the wallet shows it as held. A Safest buyer
-              pays you directly, so that money never comes through here.
+              A Fastest sale is paid into your wallet once our agent is primary
+              owner; until then the wallet shows it as held. A Safest buyer pays
+              you directly, so that money is counted here but never reaches your
+              wallet.
             </p>
           </>
         }
       >
         {/* One per row on a phone: these are lifetime money figures, and in
             a wide currency a large one does not fit a half-width card. */}
-        <StatGrid columns={3} className="grid-cols-1 sm:grid-cols-2">
+        <StatGrid columns={4} className="grid-cols-1 sm:grid-cols-2">
           <Stat
-            label="Earned from sales"
-            value={<Price usd={selling.earned} />}
+            label="Paid into your wallet"
+            value={<Price usd={selling.paidToWallet} />}
             note={
-              selling.sold > 0
-                ? `After our fee, across ${selling.sold} ${selling.sold === 1 ? "sale" : "sales"}.`
-                : "Nothing sold yet."
+              selling.walletSales > 0
+                ? `${countOf(selling.walletSales, "Fastest sale")}, after our fee.`
+                : "Fastest sales are paid here."
             }
-            tone={selling.earned > 0 ? "verified" : "neutral"}
+            tone={selling.paidToWallet > 0 ? "verified" : "neutral"}
+          />
+          <Stat
+            label="Paid to you directly"
+            value={<Price usd={selling.paidDirect} />}
+            note={
+              selling.directSales > 0
+                ? `${countOf(selling.directSales, "Safest sale")}. Not in your wallet.`
+                : "Safest buyers pay you directly."
+            }
+            tone={selling.paidDirect > 0 ? "verified" : "neutral"}
           />
           <Stat
             label="Spent on purchases"
