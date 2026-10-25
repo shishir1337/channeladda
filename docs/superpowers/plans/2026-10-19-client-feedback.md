@@ -19,7 +19,7 @@
 
 ## Owner's answers (binding)
 
-1. Deal levels are strict bands with no overlap: level 1 takes deals under $10,000, level 2 takes $10,000 up to $99,999.99, level 3 takes $100,000 and up.
+1. Deal levels are strict bands with no overlap: level 1 takes deals under $100, level 2 takes $100 up to $999.99, level 3 takes $1,000 and up. (The owner lowered the bands on 2026-10-26; the enum names below keep the first amounts.)
 2. Moderators act as agents. There is no separation of duties between desks.
 3. Sellers may see a buyer's track record.
 4. These changes go before the site polish.
@@ -71,7 +71,7 @@
 ### Task 6: Moderators act as agents, with levels
 **Files:** migration `add_user_deal_level`; create `src/lib/custody-roles.ts` (+ test); modify `src/server/deals.ts` (`roleOnDeal`, `assignAgent`, `resolveDeal`), `src/server/thread-access.ts`, `src/server/messages.ts` (`roleInThread` checks the agent before staff; `listThreads`), `src/server/upload-access.ts`, `src/server/deal-feed.ts`, `src/server/session.ts` (`requireAgent`), `src/server/actions/deals.ts` (`claimDeal`), `src/server/admin-users.ts` (`setUserRole` keeps the identity for custodian roles, `setAgentIdentity`, `listAssignableAgents` with level, new `setDealLevel`), `src/server/actions/admin-users.ts`, `src/app/(admin)/admin/deals/page.tsx`, `src/components/admin/deal-controls.tsx`, `src/app/(admin)/admin/team/page.tsx`, `src/components/admin/user-controls.tsx`, `src/app/(admin)/admin/users/[id]/page.tsx`, `src/app/(admin)/layout.tsx`, `src/components/app/user-menu.tsx`.
 - `prisma`: `enum DealLevel { UNDER_10K UNDER_100K FROM_100K }`, `User.dealLevel DealLevel?`.
-- `isCustodianRole(role)`, `levelFor(priceCents): DealLevel`, `withinLevel(level | null, priceCents): boolean`. The bands are strict, with boundaries at 1,000,000 and 10,000,000 cents.
+- `isCustodianRole(role)`, `levelFor(priceCents): DealLevel`, `withinLevel(level | null, priceCents): boolean`. The bands are strict, with boundaries at 10,000 and 100,000 cents.
 - `assignAgent`: the assignee must hold a custodian role and be within level, otherwise the new failure `"out-of-level"` with the message "This deal is outside {name}'s level."
 - `roleOnDeal`: "agent" when they are the deal's agent and hold a custodian role. `resolveDeal`: when the actor is "agent" and the user is staff, a transition legal for staff is allowed too.
 - Tests: the bands at their exact boundaries; a moderator assigned and able to complete agent steps; a moderator refused outside their level; claiming refused outside level; a superadmin assigned; the moderator-agent seeing the thread as "agent"; `setUserRole` to MODERATOR keeping the identity; an AGENT with no level still taking any deal.

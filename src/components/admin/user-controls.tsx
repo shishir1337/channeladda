@@ -548,10 +548,10 @@ export function UserControls({
 /**
  * Which deals this person may run, by agreed price.
  *
- * The owner's levels are strict bands: level 1 takes only deals under
- * $10,000, level 2 only $10,000 to under $100,000, level 3 only $100,000 and
- * up. "Any size" is how agents worked before levels, and the superadmin is
- * never limited whatever is set here.
+ * The owner's levels are strict bands: level 1 takes only deals under $100,
+ * level 2 only $100 to under $1,000, level 3 only $1,000 and up. "Any size"
+ * is how agents worked before levels, and the superadmin is never limited
+ * whatever is set here.
  */
 function DealLevelControl({
   userId,
@@ -570,10 +570,10 @@ function DealLevelControl({
       value,
       detail:
         value === "UNDER_10K"
-          ? "Deals under $10,000, and nothing larger."
+          ? "Deals under $100, and nothing larger."
           : value === "UNDER_100K"
-            ? "Deals from $10,000 to under $100,000 only."
-            : "Deals of $100,000 and up only.",
+            ? "Deals from $100 to under $1,000 only."
+            : "Deals of $1,000 and up only.",
     })),
     { value: null, detail: "No limit. How agents worked before levels." },
   ];

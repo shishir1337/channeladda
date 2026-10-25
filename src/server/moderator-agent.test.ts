@@ -14,8 +14,8 @@ import { roleInThread } from "@/server/messages";
 import { seedListing, seedUser, withCleanDb } from "@/test/db";
 
 // The client's ask: moderators run deals as the agent, not only agents, each
-// at a level by deal size — level 1 under $10,000, level 2 under $100,000,
-// level 3 from $100,000 — and the superadmin can run one too.
+// at a level by deal size — level 1 under $100, level 2 under $1,000, level
+// 3 from $1,000 — and the superadmin can run one too.
 
 async function staff(role: UserRole, dealLevel: DealLevel | null = null) {
   const user = await seedUser(role);
@@ -58,7 +58,7 @@ test(
   withCleanDb(async () => {
     const admin = await staff("SUPERADMIN");
     const moderator = await staff("MODERATOR", "UNDER_10K");
-    const deal = await paidDeal(250_000, "SAFEST"); // $2,500
+    const deal = await paidDeal(5_000, "SAFEST"); // $50
 
     expect(await assign(deal.orderId, moderator.id, admin.id)).toEqual({
       ok: true,
@@ -89,7 +89,7 @@ test(
     const admin = await staff("SUPERADMIN");
     const level1 = await staff("MODERATOR", "UNDER_10K");
     const level3 = await staff("MODERATOR", "FROM_100K");
-    const deal = await paidDeal(1_000_000); // exactly $10,000: level 2
+    const deal = await paidDeal(10_000); // exactly $100: level 2
 
     expect(await assign(deal.orderId, level1.id, admin.id)).toEqual({
       ok: false,
@@ -148,7 +148,7 @@ test(
   withCleanDb(async () => {
     const admin = await staff("SUPERADMIN");
     const moderator = await staff("MODERATOR", "UNDER_10K");
-    const deal = await paidDeal(250_000);
+    const deal = await paidDeal(5_000); // $50: level 1
     await assign(deal.orderId, moderator.id, admin.id);
 
     const order = await db.order.findUniqueOrThrow({
@@ -180,7 +180,7 @@ test(
     // There is nobody else to hand a dispute to: the owner said so.
     const admin = await staff("SUPERADMIN");
     const moderator = await staff("MODERATOR", "UNDER_10K");
-    const deal = await paidDeal(250_000);
+    const deal = await paidDeal(5_000); // $50: level 1
     await assign(deal.orderId, moderator.id, admin.id);
 
     expect(

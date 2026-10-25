@@ -66,7 +66,7 @@ const MESSAGES: Record<repo.DealFailure, string> = {
   "seller-started":
     "The seller has already invited our agent, so this can't just be cancelled — the access has to be handed back first. Use Report a problem and our team will sort it out.",
   "out-of-level":
-    "This deal's price is outside that person's level. Level 1 runs deals under $10,000, level 2 from $10,000 to under $100,000, level 3 from $100,000.",
+    "This deal's price is outside that person's level. Level 1 runs deals under $100, level 2 from $100 to under $1,000, level 3 from $1,000.",
   "price-not-paid":
     "The buyer has not marked the price paid, so this deal cannot be finished for them — the channel would go for the fee alone. Return the channel to the seller instead.",
   "books-mismatch":

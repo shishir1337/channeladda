@@ -28,9 +28,15 @@ export function mayEndHolds(role: UserRole): boolean {
   return role === "MODERATOR" || role === "SUPERADMIN";
 }
 
-/** Cents. Strict bands: each price belongs to exactly one level. */
-const LEVEL_2_FROM = 1_000_000; // $10,000
-const LEVEL_3_FROM = 10_000_000; // $100,000
+/**
+ * Cents. Strict bands: each price belongs to exactly one level.
+ *
+ * The level names (UNDER_10K, UNDER_100K, FROM_100K) are historical: they
+ * date from the first bands, at $10,000 and $100,000, and are kept because
+ * they are stored on each user. The amounts here are the ones that apply.
+ */
+const LEVEL_2_FROM = 10_000; // $100
+const LEVEL_3_FROM = 100_000; // $1,000
 
 export function levelFor(priceCents: number): DealLevel {
   if (priceCents >= LEVEL_3_FROM) return "FROM_100K";
@@ -55,9 +61,9 @@ export function withinLevel(
 }
 
 const LABELS: Record<DealLevel, string> = {
-  UNDER_10K: "Level 1 · under $10K",
-  UNDER_100K: "Level 2 · $10K to $100K",
-  FROM_100K: "Level 3 · $100K and up",
+  UNDER_10K: "Level 1 · under $100",
+  UNDER_100K: "Level 2 · $100 to $1,000",
+  FROM_100K: "Level 3 · $1,000 and up",
 };
 
 export function levelLabel(level: DealLevel | null): string {
