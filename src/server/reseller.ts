@@ -21,6 +21,10 @@ export {
  * Buying the Reseller badge: 30 days at a time, from the balance or by
  * Cryptomus, and the reminder before it ends.
  *
+ * One pass at a time. Paying again while one ran used to add 30 days on to
+ * its end; the owner does not want that (2026-10-26), so a member holding
+ * the badge cannot buy it again until it has ended.
+ *
  * There is one way to buy a pass — spending the balance — and Cryptomus
  * reaches it by first crediting what arrived as a deposit, then buying at
  * the price its invoice asked. So a settled payment that cannot buy one (it
@@ -35,7 +39,9 @@ type BuyOutcome =
    * `busy`: the database kept losing a serialisable race to other writes —
    * not to this member running short. Worth trying again; never a refusal.
    */
-  | { ok: false; reason: "insufficient" | "busy" };
+  | { ok: false; reason: "insufficient" | "busy" }
+  /** They hold the badge already, until `endsAt`. Nothing was charged. */
+  | { ok: false; reason: "active"; endsAt: Date };
 
 /** How many times a purchase that lost a serialisable race is tried again. */
 const ATTEMPTS = 6;
@@ -43,6 +49,13 @@ const ATTEMPTS = 6;
 const pause = (ms: number) => new Promise((done) => setTimeout(done, ms));
 
 class PassAbort extends Error {}
+
+/** Holding the badge already: it cannot be bought again until it ends. */
+class StillActive extends Error {
+  constructor(readonly endsAt: Date) {
+    super("still active");
+  }
+}
 
 function isUniqueViolation(error: unknown): boolean {
   return (
@@ -100,15 +113,19 @@ export async function buyResellerPass(input: {
             _sum: { amountUsd: true },
           }),
         ]);
-        const available =
-          (sum._sum.amountUsd ?? 0) - (pending._sum.amountUsd ?? 0);
-        if (available < price) throw new PassAbort();
-
+        // Inside the transaction, so two purchases at once cannot both see
+        // no badge and both buy one.
         const latest = await tx.resellerPass.findFirst({
           where: { userId: input.userId },
           orderBy: { endsAt: "desc" },
           select: { endsAt: true },
         });
+        if (latest && latest.endsAt > now) throw new StillActive(latest.endsAt);
+
+        const available =
+          (sum._sum.amountUsd ?? 0) - (pending._sum.amountUsd ?? 0);
+        if (available < price) throw new PassAbort();
+
         const period = nextPassPeriod(latest?.endsAt ?? null, now);
         await tx.resellerPass.create({
           data: {
@@ -148,6 +165,9 @@ export async function buyResellerPass(input: {
     } catch (error) {
       if (error instanceof PassAbort) {
         return { ok: false, reason: "insufficient" };
+      }
+      if (error instanceof StillActive) {
+        return { ok: false, reason: "active", endsAt: error.endsAt };
       }
       // The same reference won a race to the insert: that pass is this one.
       if (isUniqueViolation(error)) {
@@ -224,20 +244,30 @@ export async function settleBadgePayment(
     if (pass.reason === "busy") {
       throw new Error(`Badge ${reference}: the database stayed busy.`);
     }
-    await tellPaymentKept(invoice.userId);
+    // Short of the price, or the badge was bought another way meanwhile.
+    await tellPaymentKept(
+      invoice.userId,
+      pass.reason === "active" ? "active" : "short",
+    );
     return "credited-only";
   }
   return pass.already ? "already" : "bought";
 }
 
 /** A badge payment that could not buy the badge is in the balance. */
-async function tellPaymentKept(userId: string) {
+async function tellPaymentKept(
+  userId: string,
+  why: "short" | "active" = "short",
+) {
   await db.notification.create({
     data: {
       userId,
       kind: "BADGE",
       title: "Your payment is in your balance",
-      body: "It did not cover the Reseller badge, so nothing was bought. The money is in your balance, to spend or withdraw.",
+      body:
+        why === "active"
+          ? "You already hold the Reseller badge, so nothing was bought. The money is in your balance, to spend or withdraw."
+          : "It did not cover the Reseller badge, so nothing was bought. The money is in your balance, to spend or withdraw.",
       href: "/dashboard/wallet#reseller",
     },
   });
@@ -299,9 +329,10 @@ const REMIND_DAYS = 3;
 /**
  * Telling holders, once, that their badge ends within three days.
  *
- * Only about the last pass: one already extended by a later pass ends
- * nothing. There is no renewal on its own, so without this the first a
- * holder heard was their fee going back up on a deal.
+ * Only about the last pass: one already extended by a later pass, bought
+ * before passes stopped stacking, ends nothing. There is no renewal on its
+ * own, so without this the first a holder heard was their fee going back
+ * up on a deal.
  */
 export async function remindEndingPasses(
   now: Date = new Date(),
@@ -342,7 +373,7 @@ export async function remindEndingPasses(
         userId: pass.userId,
         kind: "BADGE",
         title: `Your Reseller badge ends on ${day}`,
-        body: `Extend it to keep your points counting ${times}x and your ${discount} fee discount.`,
+        body: `Once it ends you can take it again for 30 days, to keep your points counting ${times}x and your ${discount} fee discount.`,
         href: "/dashboard/wallet#reseller",
       },
     });
@@ -356,10 +387,10 @@ export async function remindEndingPasses(
             "",
             `Your Reseller badge ends on ${day}. After that your rating points count once instead of ${times} times, and the ${discount} discount on our fees ends.`,
             "",
-            "You can extend it by 30 days from your wallet, from your balance or with crypto. Paying early adds the days on to the end.",
+            "Once it has ended you can take it again for 30 days from your wallet, from your balance or with crypto.",
           ].join("\n"),
           link: `${process.env.NEXT_PUBLIC_SITE_URL ?? process.env.BETTER_AUTH_URL ?? "http://localhost:3000"}/dashboard/wallet#reseller`,
-          action: "Extend the badge",
+          action: "Open your wallet",
         });
       } catch (error) {
         console.error(`[reseller] reminder for ${pass.userId}`, error);

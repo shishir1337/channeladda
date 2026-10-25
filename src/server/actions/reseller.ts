@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { createInvoice, isConfigured } from "@/server/cryptomus";
 import { newReference, recordInvoice } from "@/server/invoices";
-import { buyResellerPass } from "@/server/reseller";
+import { buyResellerPass, resellerStatus } from "@/server/reseller";
 import { requireUser } from "@/server/session";
 import { getSettings } from "@/server/settings";
 
@@ -53,9 +53,11 @@ export async function buyResellerFromBalance(
     return {
       ok: false,
       error:
-        result.reason === "busy"
-          ? "We could not finish that just now. Nothing was charged — try again."
-          : "Your available balance does not cover it. Top up, or pay with crypto instead.",
+        result.reason === "active"
+          ? `You already have the badge until ${until(result.endsAt)}. You can take it again once it ends.`
+          : result.reason === "busy"
+            ? "We could not finish that just now. Nothing was charged — try again."
+            : "Your available balance does not cover it. Top up, or pay with crypto instead.",
     };
   }
   revalidatePath("/dashboard/wallet");
@@ -67,6 +69,15 @@ export async function buyResellerFromBalance(
 
 export async function startResellerCheckout(): Promise<ResellerResult> {
   const user = await requireUser();
+  // Asked before any invoice: crypto sent while the badge runs could only
+  // come back as balance.
+  const status = await resellerStatus(user.id);
+  if (status.endsAt) {
+    return {
+      ok: false,
+      error: `You already have the badge until ${until(status.endsAt)}. You can take it again once it ends.`,
+    };
+  }
   if (!isConfigured()) {
     return {
       ok: false,

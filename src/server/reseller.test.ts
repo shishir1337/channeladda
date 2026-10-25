@@ -144,8 +144,10 @@ test(
 );
 
 test(
-  "paying early extends the badge from the end of the running pass",
+  "a member holding the badge cannot buy it again until it ends",
   withCleanDb(async () => {
+    // The owner, 2026-10-26: paying again added more days, and they do not
+    // want that. One pass at a time; the next once this one is over.
     const member = await seedUser();
     await creditDeposit(member.id, 4_000, "dep-1", "USDT");
     const first = await buyResellerPass({
@@ -153,14 +155,67 @@ test(
       reference: "badge-1",
       via: "BALANCE",
     });
-    const second = await buyResellerPass({
+    if (!first.ok) throw new Error("not bought");
+
+    expect(
+      await buyResellerPass({
+        userId: member.id,
+        reference: "badge-2",
+        via: "BALANCE",
+      }),
+    ).toEqual({ ok: false, reason: "active", endsAt: first.endsAt });
+    // Nothing was charged for the refusal.
+    expect(await balanceOf(member.id)).toBe(2_000);
+    expect(await db.resellerPass.count({ where: { userId: member.id } })).toBe(
+      1,
+    );
+
+    // Once it has ended, it can be bought again, from that day.
+    await db.resellerPass.updateMany({
+      where: { userId: member.id },
+      data: { endsAt: new Date(Date.now() - 1000) },
+    });
+    const again = await buyResellerPass({
       userId: member.id,
-      reference: "badge-2",
+      reference: "badge-3",
       via: "BALANCE",
     });
-    if (!first.ok || !second.ok) throw new Error("not bought");
-    expect(second.endsAt.getTime() - first.endsAt.getTime()).toBe(30 * DAY);
-    expect((await resellerStatus(member.id)).endsAt).toEqual(second.endsAt);
+    expect(again.ok).toBe(true);
+    expect((await resellerStatus(member.id)).active).toBe(true);
+  }),
+);
+
+test(
+  "a crypto badge payment that lands while a badge is running goes to the balance",
+  withCleanDb(async () => {
+    const member = await seedUser();
+    await creditDeposit(member.id, 2_000, "dep-1", "USDT");
+    await buyResellerPass({
+      userId: member.id,
+      reference: "badge-1",
+      via: "BALANCE",
+    });
+    await recordInvoice({
+      reference: "BADGE-late",
+      purpose: "BADGE",
+      amountUsd: 2_000,
+      userId: member.id,
+    });
+
+    expect(await settleBadgePayment("BADGE-late", 2_000, "USDT")).toBe(
+      "credited-only",
+    );
+    expect(await db.resellerPass.count({ where: { userId: member.id } })).toBe(
+      1,
+    );
+    expect(await balanceOf(member.id)).toBe(2_000);
+    const told = await db.notification.findMany({
+      where: { userId: member.id, kind: "BADGE" },
+      select: { title: true },
+    });
+    expect(told.map((n) => n.title)).toContain(
+      "Your payment is in your balance",
+    );
   }),
 );
 

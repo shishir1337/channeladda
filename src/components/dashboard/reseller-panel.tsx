@@ -125,7 +125,7 @@ export function ResellerPanel({
         as="h2"
         icon={GemIcon}
         title="Reseller badge"
-        info="Bought 30 days at a time. Paying while it is active adds 30 days on to the end, so nothing is lost by paying early. A deal keeps the fee it was opened at."
+        info="Bought 30 days at a time, one at a time: once it has ended you can take it again. A deal keeps the fee it was opened at."
       />
       <CardBody className="flex flex-1 flex-col">
         <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-fg">
@@ -161,91 +161,95 @@ export function ResellerPanel({
           </Benefit>
         </ul>
 
-        <div className="mt-auto pt-5">
-          <p className="text-sm">
-            <strong className="text-base font-semibold text-fg tabular-nums">
-              {price}
-            </strong>{" "}
-            <span className="text-muted">for 30 days</span>
+        {active ? (
+          // One pass at a time (the owner, 2026-10-26): nothing to buy
+          // until this one ends.
+          <p className="mt-auto rounded-lg border border-line bg-surface-2/50 px-3.5 py-3 text-[0.8125rem] leading-relaxed text-muted">
+            You can take it again once it ends on{" "}
+            <strong className="font-semibold text-fg">{until}</strong>. We
+            remind you three days before.
           </p>
-          <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-            <Button
-              type="button"
-              size="md"
-              className="w-full sm:w-auto"
-              disabled={pending || !covered}
-              onClick={() => {
-                setMessage(null);
-                setVia("balance");
-                startTransition(async () => {
-                  const result = await buyResellerFromBalance(nonce);
-                  if (!result.ok) {
-                    setMessage({ text: result.error, bad: true });
-                    return;
-                  }
-                  setNonce(newNonce());
-                  setMessage({ text: result.message, bad: false });
-                  router.refresh();
-                });
-              }}
-            >
-              <Busy
-                pending={pending && via === "balance"}
-                idle={
-                  active
-                    ? `Add 30 days for ${price}`
-                    : `Pay ${price} from balance`
-                }
-                busy="Paying…"
-              />
-            </Button>
-            <Button
-              type="button"
-              size="md"
-              variant="secondary"
-              className="w-full sm:w-auto"
-              disabled={pending}
-              onClick={() => {
-                setMessage(null);
-                setVia("crypto");
-                startTransition(async () => {
-                  const result = await startResellerCheckout();
-                  if (!result.ok) {
-                    setMessage({ text: result.error, bad: true });
-                    return;
-                  }
-                  if (result.url) window.location.href = result.url;
-                });
-              }}
-            >
-              <Busy
-                pending={pending && via === "crypto"}
-                idle="Pay with crypto"
-                busy="Opening the payment page…"
-              />
-            </Button>
-          </div>
-          <p className="mt-2 text-xs leading-relaxed text-subtle">
-            {!covered
-              ? `Your available balance is ${dollars(availableUsd)}. Pay with crypto, or add funds first.`
-              : active
-                ? "Paying again adds 30 days on to the end."
-                : "From your balance it is active at once."}
-          </p>
-          {message ? (
-            <p
-              role={message.bad ? "alert" : "status"}
-              className={cn(
-                "mt-3 rounded-lg border px-3.5 py-2.5 text-[0.8125rem] leading-relaxed text-fg",
-                message.bad
-                  ? "border-danger/25 bg-danger-soft/70"
-                  : "border-verified/25 bg-verified-soft/70",
-              )}
-            >
-              {message.text}
+        ) : (
+          <div className="mt-auto pt-5">
+            <p className="text-sm">
+              <strong className="text-base font-semibold text-fg tabular-nums">
+                {price}
+              </strong>{" "}
+              <span className="text-muted">for 30 days</span>
             </p>
-          ) : null}
-        </div>
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+              <Button
+                type="button"
+                size="md"
+                className="w-full sm:w-auto"
+                disabled={pending || !covered}
+                onClick={() => {
+                  setMessage(null);
+                  setVia("balance");
+                  startTransition(async () => {
+                    const result = await buyResellerFromBalance(nonce);
+                    if (!result.ok) {
+                      setMessage({ text: result.error, bad: true });
+                      return;
+                    }
+                    setNonce(newNonce());
+                    setMessage({ text: result.message, bad: false });
+                    router.refresh();
+                  });
+                }}
+              >
+                <Busy
+                  pending={pending && via === "balance"}
+                  idle={`Pay ${price} from balance`}
+                  busy="Paying…"
+                />
+              </Button>
+              <Button
+                type="button"
+                size="md"
+                variant="secondary"
+                className="w-full sm:w-auto"
+                disabled={pending}
+                onClick={() => {
+                  setMessage(null);
+                  setVia("crypto");
+                  startTransition(async () => {
+                    const result = await startResellerCheckout();
+                    if (!result.ok) {
+                      setMessage({ text: result.error, bad: true });
+                      return;
+                    }
+                    if (result.url) window.location.href = result.url;
+                  });
+                }}
+              >
+                <Busy
+                  pending={pending && via === "crypto"}
+                  idle="Pay with crypto"
+                  busy="Opening the payment page…"
+                />
+              </Button>
+            </div>
+            <p className="mt-2 text-xs leading-relaxed text-subtle">
+              {!covered
+                ? `Your available balance is ${dollars(availableUsd)}. Pay with crypto, or add funds first.`
+                : "From your balance it is active at once."}
+            </p>
+            {message ? (
+              <p
+                role={message.bad ? "alert" : "status"}
+                className={cn(
+                  "mt-3 rounded-lg border px-3.5 py-2.5 text-[0.8125rem] leading-relaxed text-fg",
+                  message.bad
+                    ? "border-danger/25 bg-danger-soft/70"
+                    : "border-verified/25 bg-verified-soft/70",
+                )}
+              >
+                {message.text}
+              </p>
+            ) : null}
+          </div>
+        )}
       </CardBody>
     </Card>
   );

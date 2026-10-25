@@ -109,7 +109,7 @@ export const helpArticles: HelpArticle[] = [
     body: [
       "Every deal that completes earns rating points for both sides: half of what the deal was worth, in US dollars. A $500 deal is 250 points for the buyer and 250 for the seller. Points come from completed deals only, so they cannot be typed in or bought one by one, and they show on your profile and to anyone you are dealing with.",
       "The Reseller badge is bought 30 days at a time from your wallet, from your balance or with crypto. While it is active it shows beside your name, your rating points count {multiplier} times — 250 becomes {multiplied250} — and every Channel Adda fee you pay is {discount}% lower. When it ends your points count once again and fees go back to normal; a deal keeps the fee it was opened at.",
-      "Paying while the badge is active adds 30 days on to the end, so nothing is lost by renewing early. We remind you three days before it ends.",
+      "You hold one badge at a time: once it has ended you can take it again for another 30 days. We remind you three days before it ends.",
     ],
   },
   {
