@@ -44,6 +44,7 @@ import {
   holdingOrders,
   MAX_UNPAID_DEALS,
   releaseIfFree,
+  saleState,
   settleRivals,
 } from "@/server/listing-hold";
 import { notify, notifyStaff } from "@/server/notifications";
@@ -823,6 +824,11 @@ export async function recordOpeningPayment(
     await creditUnusablePayment(order, ref, asset, order.totalUsd);
     return "credited-to-balance";
   }
+
+  // A listing reserved by nobody — by this very deal, opened when opening
+  // one reserved it — goes back on sale first, or the claim below refuses
+  // the buyer's own payment and turns it into balance.
+  await saleState(order);
 
   const now = new Date();
   let claimed = true;

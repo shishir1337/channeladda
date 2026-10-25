@@ -103,6 +103,83 @@ export async function releaseIfFree(
   return freed.count === 1;
 }
 
+/**
+ * Whether an unpaid deal's listing can still be paid for, asked before any
+ * money moves.
+ *
+ * A listing reserved by nobody is put back on sale first. A deal opened
+ * before 2026-10-24, when opening one reserved the listing, left it so, and
+ * its own buyer pressing Pay was told another buyer had paid first (the
+ * owner, 2026-10-26); an accepted offer that lapsed before its sweep ran
+ * leaves one too. "held" is the seller's accepted offer to somebody else,
+ * still inside its window, which can still come back. "gone" is anything
+ * else: paid for by another buyer, sold, paused or removed.
+ *
+ * A deal from an accepted offer is always "for-sale" here: its listing is
+ * reserved for it, and `claimListing` checks that hold itself.
+ */
+export type SaleState = "for-sale" | "held" | "gone";
+
+export async function saleState(order: {
+  listingId: string;
+  offerId: string | null;
+}): Promise<SaleState> {
+  if (order.offerId) return "for-sale";
+  const read = async () =>
+    (
+      await db.listing.findUnique({
+        where: { id: order.listingId },
+        select: { status: true },
+      })
+    )?.status;
+  let status = await read();
+  if (status === "RESERVED" && (await releaseIfFree(db, order.listingId))) {
+    return "for-sale";
+  }
+  // Read again: another request may have freed it, or taken it, meanwhile.
+  status = await read();
+  if (status === "LIVE") return "for-sale";
+  if (status !== "RESERVED") return "gone";
+  const paid = await db.order.count({
+    where: {
+      listingId: order.listingId,
+      status: { notIn: [...TERMINAL_STATUSES] },
+      paymentRef: { not: null },
+    },
+  });
+  return paid > 0 ? "gone" : "held";
+}
+
+const GONE = "This account is no longer for sale, so this deal has closed";
+
+/**
+ * An unpaid deal on a listing that has gone, closed when its buyer tries
+ * to pay. They were told it had gone and the deal stayed open, waiting for
+ * a payment it could never take. Nothing was paid, so nothing is refunded.
+ */
+export async function closeGoneDeal(orderId: string): Promise<void> {
+  const now = new Date();
+  await db.$transaction(async (tx) => {
+    const order = await tx.order.findUnique({
+      where: { id: orderId },
+      select: { conversationId: true },
+    });
+    const moved = await tx.order.updateMany({
+      where: { id: orderId, status: "AWAITING_PAYMENT", paymentRef: null },
+      data: { status: "CANCELLED", cancelledAt: now },
+    });
+    if (moved.count !== 1 || !order?.conversationId) return;
+    await postEvent(tx, {
+      conversationId: order.conversationId,
+      kind: "EVENT",
+      event: { type: "deal-ended", outcome: GONE },
+      senderId: null,
+      orderId,
+      at: now,
+    });
+  });
+}
+
 export type ClosedRival = {
   orderId: string;
   buyerId: string;

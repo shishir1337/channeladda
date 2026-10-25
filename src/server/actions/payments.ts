@@ -13,7 +13,11 @@ import {
   reconcileInvoice,
   recordInvoice,
 } from "@/server/invoices";
-import { paymentInProgress } from "@/server/listing-hold";
+import {
+  closeGoneDeal,
+  paymentInProgress,
+  saleState,
+} from "@/server/listing-hold";
 import { requireUser } from "@/server/session";
 
 /**
@@ -70,17 +74,26 @@ export async function startPayment(orderId: string): Promise<PayResult> {
   // gone would only come back as balance.
   const order = await db.order.findUniqueOrThrow({
     where: { id: deal.id },
-    select: {
-      listingId: true,
-      offerId: true,
-      listing: { select: { status: true } },
-    },
+    select: { listingId: true, offerId: true },
   });
-  if (!order.offerId && order.listing.status !== "LIVE") {
+  // A listing reserved by nobody goes back on sale for this buyer; one that
+  // has gone closes the deal, which would otherwise wait for a payment it
+  // can never take (the owner, 2026-10-26).
+  const sale = await saleState(order);
+  if (sale === "gone") {
+    await closeGoneDeal(deal.id);
+    revalidatePath(`/dashboard/deals/${deal.id}`);
     return {
       ok: false,
       error:
-        "Another buyer paid for this listing first, so it is no longer for sale. You were not charged.",
+        "This account is no longer for sale, so we closed this deal. You were not charged.",
+    };
+  }
+  if (sale === "held") {
+    return {
+      ok: false,
+      error:
+        "The seller has accepted another buyer's offer for this account. If they do not pay in time, it comes back on sale and you can pay.",
     };
   }
   if (await paymentInProgress(order.listingId, deal.id)) {

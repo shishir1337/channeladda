@@ -10,7 +10,9 @@ import { postEvent } from "@/server/chat-events";
 import { notifyNextActor } from "@/server/deal-notify";
 import {
   claimListing,
+  closeGoneDeal,
   paymentInProgress,
+  saleState,
   settleRivals,
 } from "@/server/listing-hold";
 import { notify, notifyStaff } from "@/server/notifications";
@@ -44,8 +46,10 @@ export type WalletFailure =
   | "address-locked"
   | "already-settled"
   | "not-payable"
-  /** Somebody else has paid for this listing: it is no longer for sale. */
+  /** The listing has gone — paid for by somebody else, sold or taken off sale. */
   | "taken"
+  /** The seller accepted another buyer's offer, which can still lapse. */
+  | "held"
   /** Another buyer is part-way through paying for it by crypto. */
   | "being-paid";
 
@@ -288,6 +292,15 @@ export async function payFromWallet(
   if (await paymentInProgress(order.listingId, order.id)) {
     return { ok: false, reason: "being-paid" };
   }
+  // A listing reserved by nobody goes back on sale for this buyer; one that
+  // has gone closes the deal, rather than leave it waiting for a payment it
+  // can never take.
+  const sale = await saleState(order);
+  if (sale === "gone") {
+    await closeGoneDeal(order.id);
+    return { ok: false, reason: "taken" };
+  }
+  if (sale === "held") return { ok: false, reason: "held" };
 
   const target = OPENING_STATUS[order.mode];
   if (!canTransition(order.mode, order.status, target, "system")) {

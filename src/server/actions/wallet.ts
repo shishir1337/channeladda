@@ -30,7 +30,8 @@ const MESSAGES: Record<repo.WalletFailure, string> = {
   "already-settled": "That withdrawal has already been dealt with.",
   "not-payable": "This deal is not waiting on a payment.",
   taken:
-    "Another buyer paid for this listing first, so it is no longer for sale. You were not charged.",
+    "This account is no longer for sale, so we closed this deal. You were not charged.",
+  held: "The seller has accepted another buyer's offer for this account. If they do not pay in time, it comes back on sale and you can pay.",
   "being-paid":
     "Another buyer is paying for this listing right now. If they have not paid within the hour, you can buy it.",
 };
