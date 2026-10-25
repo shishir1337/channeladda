@@ -3,9 +3,7 @@
 import { MessageSquareIcon } from "lucide-react";
 import Link from "next/link";
 import { useMemberCounts } from "@/components/site/member-counts";
-import { iconText } from "@/components/ui/icon-hue";
 import { useSession } from "@/lib/auth-client";
-import { cn } from "@/lib/utils";
 
 /**
  * Messages, one click from anywhere on the website: a round button in the
@@ -13,6 +11,10 @@ import { cn } from "@/lib/utils";
  * (the owner, 2026-10-26). Desktop only — below 1024px the tab bar carries
  * Messages already. Signed in only: a visitor has no chats, and the
  * header's Sign in is the way in for them.
+ *
+ * Brand gold, not the page's surface: on the light theme a white button on
+ * a white page could not be found (the owner, 2026-10-26). The count is
+ * red so it reads against the gold.
  */
 export function MessagesButton() {
   const { data: session } = useSession();
@@ -30,16 +32,13 @@ export function MessagesButton() {
       href="/dashboard/messages"
       aria-label={label}
       title="Messages"
-      className="fixed right-6 bottom-6 z-40 hidden size-14 items-center justify-center rounded-full border border-line bg-surface shadow-lift transition-[border-color,translate] duration-150 hover:-translate-y-0.5 hover:border-line-strong lg:inline-flex"
+      className="fixed right-6 bottom-6 z-40 hidden size-14 items-center justify-center rounded-full bg-primary text-primary-fg shadow-[0_8px_24px_-6px_rgb(0_0_0/0.35),0_2px_6px_rgb(0_0_0/0.15)] ring-1 ring-black/10 transition-[background-color,translate] duration-150 ring-inset hover:-translate-y-0.5 hover:bg-primary-hover focus-visible:rounded-full lg:inline-flex"
     >
-      <MessageSquareIcon
-        aria-hidden="true"
-        className={cn("size-6", iconText(MessageSquareIcon))}
-      />
+      <MessageSquareIcon aria-hidden="true" className="size-6" />
       {unread > 0 ? (
         <span
           aria-hidden="true"
-          className="absolute -top-1 -right-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[0.6875rem] leading-none font-semibold text-primary-fg tabular-nums ring-2 ring-bg"
+          className="absolute -top-1 -right-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-danger px-1.5 text-[0.6875rem] leading-none font-semibold text-white tabular-nums ring-2 ring-bg"
         >
           {unread > 99 ? "99+" : unread}
         </span>
