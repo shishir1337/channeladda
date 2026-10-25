@@ -152,13 +152,16 @@ export async function counterOffer(
 }
 
 /**
- * A seller putting a price to the buyer in one of their conversations.
+ * A seller putting a price to the buyer in one of their conversations, on
+ * one of the listings it is about.
  *
- * Which conversation is named by the request; whether the signed-in person is
- * its seller is checked by the repository, never assumed.
+ * Which conversation and listing are named by the request; whether the
+ * signed-in person is its seller, and the listing one of theirs already
+ * talked about there, is checked by the repository, never assumed.
  */
 export async function proposePrice(
   conversationId: string,
+  listingId: string,
   amount: number,
   message: string,
 ): Promise<OfferResult> {
@@ -177,6 +180,7 @@ export async function proposePrice(
   const result = await repo.proposePrice({
     sellerId: user.id,
     conversationId,
+    listingId,
     amountCents: toCents(amount),
     message: message.trim() || null,
     expiryHours: settings.offerExpiryHours,
@@ -188,7 +192,7 @@ export async function proposePrice(
       return {
         ok: false,
         error:
-          "There is an offer open in this conversation already. Answer that one first.",
+          "There is an offer open on this listing already. Answer that one first.",
       };
     }
     return fail(result.reason);

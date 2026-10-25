@@ -7,7 +7,7 @@ import { answersSupportChats } from "@/lib/support-chat";
 import { keyFromUrl, urlForKey } from "@/lib/upload-keys";
 import type { CurrentUser } from "@/server/session";
 import { deleteUpload } from "@/server/storage";
-import { agentOnThread } from "@/server/thread-access";
+import { agentListingsOnThread } from "@/server/thread-access";
 
 /**
  * Who may read an uploaded file.
@@ -28,8 +28,9 @@ import { agentOnThread } from "@/server/thread-access";
 // desks, and an agent is 404'd from /admin/messages. Reading every
 // seller's analytics screenshots and every private thread's attachments
 // from a URL is a wider grant than the page that would show them. What an
-// agent reaches is the conversation of a deal they are running, and the
-// Escrow Agent chats every live agent answers — see the message branch below.
+// agent reaches is what was sent about the listing of a deal they are
+// running, and the Escrow Agent chats every live agent answers — see the
+// message branch below.
 const STAFF_ROLES = ["MODERATOR", "FINANCE", "SUPERADMIN"] as const;
 
 function isStaff(user: CurrentUser | null): boolean {
@@ -98,12 +99,14 @@ export async function canReadUpload(
 
   if (kind === "message") {
     // The two people in the conversation it was sent in, and the agent of a
-    // deal running there — by the same rule as reading the thread, so a file
-    // never reaches someone who could not see the message it came with.
+    // deal running there on the listing it was sent about — by the same
+    // rule as reading the thread, so a file never reaches someone who could
+    // not see the message it came with.
     const message = await db.message.findFirst({
       where: { attachmentUrl: urlForKey(key) },
       select: {
         conversationId: true,
+        listingId: true,
         conversation: { select: { buyerId: true, sellerId: true } },
       },
     });
@@ -116,7 +119,9 @@ export async function canReadUpload(
     }
     return (
       isCustodianRole(user.role) &&
-      (await agentOnThread(user.id, message.conversationId))
+      (await agentListingsOnThread(user.id, message.conversationId)).includes(
+        message.listingId,
+      )
     );
   }
 

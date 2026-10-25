@@ -28,7 +28,8 @@ async function threadFor() {
   return { ...seeded, conversationId: opened.id };
 }
 
-const propose = (
+/** A price on the listing the conversation is about. */
+const propose = async (
   sellerId: string,
   conversationId: string,
   amountCents: number,
@@ -37,6 +38,13 @@ const propose = (
   proposePrice({
     sellerId,
     conversationId,
+    listingId:
+      (
+        await db.message.findFirst({
+          where: { conversationId },
+          orderBy: { createdAt: "asc" },
+        })
+      )?.listingId ?? "no-such-listing",
     amountCents,
     message,
     expiryHours: 48,

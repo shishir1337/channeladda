@@ -113,6 +113,7 @@ test(
     await db.message.create({
       data: {
         conversationId,
+        listingId: listing.id,
         senderId: buyer.id,
         body: "Receipt attached.",
         attachmentUrl: "/uploads/message/0123456789abcdef0123456789abcdef.png",
@@ -129,10 +130,11 @@ test(
 test(
   "messages survive the ten-day purge once any deal exists",
   withCleanDb(async () => {
-    const { buyer, conversationId } = await threadWithLapsedDeal();
+    const { listing, buyer, conversationId } = await threadWithLapsedDeal();
     await db.message.create({
       data: {
         conversationId,
+        listingId: listing.id,
         senderId: buyer.id,
         body: "What we agreed.",
         createdAt: new Date(Date.now() - 11 * 24 * HOUR),

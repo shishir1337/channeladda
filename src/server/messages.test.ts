@@ -106,6 +106,7 @@ test(
 
     const result = await sendMessage({
       conversationId: opened.id,
+      listingId: listing.id,
       sender: asUser(buyer.id),
       body: "",
       attachmentKey: await uploadedBy(
@@ -145,6 +146,7 @@ test(
     expect(
       await sendMessage({
         conversationId: opened.id,
+        listingId: listing.id,
         sender: asUser(buyer.id),
         body: "   ",
       }),
@@ -166,6 +168,7 @@ test(
 
     await sendMessage({
       conversationId: opened.id,
+      listingId: listing.id,
       sender: asUser(buyer.id),
       body: "here it is, whatsapp me on +1 555 0100",
       attachmentKey: await uploadedBy(

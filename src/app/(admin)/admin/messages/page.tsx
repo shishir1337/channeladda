@@ -40,8 +40,8 @@ export default async function AdminMessagesPage({
 
   const rows: ThreadRow[] = threads.map((thread) => ({
     id: thread.id,
-    listingTitle: thread.listingTitle,
-    listingHandle: thread.listingHandle,
+    listingTitle: thread.latestListingTitle,
+    listingHandle: thread.listingHandles[0] ?? "",
     withName: thread.withName,
     lastMessageAt: thread.lastMessageAt.toISOString(),
     preview: thread.preview,

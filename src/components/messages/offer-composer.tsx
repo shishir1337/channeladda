@@ -71,7 +71,12 @@ export function OfferComposerForm({
         setError(null);
         startTransition(async () => {
           const result = seller
-            ? await proposePrice(config.conversationId, parsed, note)
+            ? await proposePrice(
+                config.conversationId,
+                config.listingId,
+                parsed,
+                note,
+              )
             : await makeOffer(config.listingId, parsed, note);
           if (!result.ok) {
             setError(result.error);

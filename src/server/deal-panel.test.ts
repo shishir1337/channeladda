@@ -43,7 +43,7 @@ test(
     });
     if (!second.ok) throw new Error(second.reason);
 
-    const input = await loadPanelInput(opened.id, "buyer");
+    const input = await loadPanelInput(opened.id, listing.id, "buyer");
     // Still on sale: an unpaid deal reserves nothing.
     expect(input).toMatchObject({
       viewer: "buyer",
@@ -81,7 +81,11 @@ test(
       where: { id: made.value.offerId },
     });
 
-    const input = await loadPanelInput(made.value.conversationId, "seller");
+    const input = await loadPanelInput(
+      made.value.conversationId,
+      listing.id,
+      "seller",
+    );
     expect(input?.heldOffer).toEqual({
       id: made.value.offerId,
       amountCents: 8_000,
@@ -97,6 +101,8 @@ test(
 test(
   "an unknown conversation gives nothing",
   withCleanDb(async () => {
-    expect(await loadPanelInput("no-such-thread", "buyer")).toBeNull();
+    expect(
+      await loadPanelInput("no-such-thread", "no-such-listing", "buyer"),
+    ).toBeNull();
   }),
 );

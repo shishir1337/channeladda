@@ -67,7 +67,14 @@ async function threeReaders() {
   for (const reader of [buyer, seller, agent]) {
     await markThreadRead(opened.id, reader);
   }
-  return { id: opened.id, buyer, seller, agent, staff };
+  return {
+    id: opened.id,
+    listingId: seeded.listing.id,
+    buyer,
+    seller,
+    agent,
+    staff,
+  };
 }
 
 const unreadIn = async (id: string, reader: CurrentUser) =>
@@ -79,6 +86,7 @@ test(
     const t = await threeReaders();
     await sendMessage({
       conversationId: t.id,
+      listingId: t.listingId,
       sender: t.agent,
       body: "Invite sent to the seller.",
     });
@@ -97,6 +105,7 @@ test(
     // A reply from the seller is unread for the buyer and for the agent.
     await sendMessage({
       conversationId: t.id,
+      listingId: t.listingId,
       sender: t.seller,
       body: "Accepted it.",
     });
@@ -112,6 +121,7 @@ test(
     await db.notification.deleteMany();
     await sendMessage({
       conversationId: t.id,
+      listingId: t.listingId,
       sender: t.agent,
       body: "Invite sent.",
     });
@@ -134,6 +144,7 @@ test(
     await db.notification.deleteMany();
     await sendMessage({
       conversationId: t.id,
+      listingId: t.listingId,
       sender: asUser(t.staff.id, "MODERATOR"),
       body: "Please keep the deal on Channel Adda.",
     });
@@ -156,6 +167,7 @@ test(
       kind: "EVENT",
       event: { type: "payment-received", reference: "CA-55555" },
       senderId: null,
+      listingId: t.listingId,
     });
     for (const reader of [t.buyer, t.seller, t.agent]) {
       expect(await unreadIn(t.id, reader)).toBe(0);

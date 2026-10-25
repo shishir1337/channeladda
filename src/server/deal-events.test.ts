@@ -293,6 +293,7 @@ test(
         payFromWallet(orderId, seeded.buyer.id),
         sendMessage({
           conversationId: opened.id,
+          listingId: seeded.listing.id,
           sender: asUser(seeded.seller.id, seeded.seller.name),
           body: "Sending the invite as soon as it clears.",
         }),
@@ -325,6 +326,7 @@ test(
         }),
         sendMessage({
           conversationId: opened.id,
+          listingId: seeded.listing.id,
           sender: asUser(seeded.buyer.id, seeded.buyer.name),
           body: "Who is the agent on this one?",
         }),

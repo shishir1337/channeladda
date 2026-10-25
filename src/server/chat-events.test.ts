@@ -9,7 +9,6 @@ test(
   withCleanDb(async () => {
     const { listing, buyer, seller } = await seedListing();
     const id = await ensureConversation(db, {
-      listingId: listing.id,
       buyerId: buyer.id,
       sellerId: seller.id,
     });
@@ -20,6 +19,7 @@ test(
       kind: "EVENT",
       event: { type: "payment-received", reference: "CA-12345" },
       senderId: null,
+      listingId: listing.id,
       at,
     });
 
@@ -31,6 +31,7 @@ test(
     expect(message.senderId).toBeNull();
     expect(message.body).toContain("CA-12345");
     expect(message.createdAt).toEqual(at);
+    expect(message.listingId).toBe(listing.id);
     expect(thread.lastMessageAt).toEqual(message.createdAt);
   }),
 );
@@ -40,9 +41,8 @@ test(
   withCleanDb(async () => {
     // The canned "is it still available?" is for a buyer who has not said
     // anything yet. One who has just made an offer has said plenty.
-    const { listing, buyer, seller } = await seedListing();
+    const { buyer, seller } = await seedListing();
     const id = await ensureConversation(db, {
-      listingId: listing.id,
       buyerId: buyer.id,
       sellerId: seller.id,
     });
@@ -51,7 +51,6 @@ test(
     // And asking again finds the same thread.
     expect(
       await ensureConversation(db, {
-        listingId: listing.id,
         buyerId: buyer.id,
         sellerId: seller.id,
       }),
@@ -72,7 +71,6 @@ test(
         openConversation({ listingId: listing.id, buyerId: buyer.id }),
         db.$transaction((tx) =>
           ensureConversation(tx, {
-            listingId: listing.id,
             buyerId: buyer.id,
             sellerId: seller.id,
           }),
@@ -82,9 +80,48 @@ test(
       expect(offered).toBe(asked.id);
       expect(
         await db.conversation.count({
-          where: { listingId: listing.id, buyerId: buyer.id },
+          where: { buyerId: buyer.id, sellerId: seller.id },
         }),
       ).toBe(1);
     }
+  }),
+);
+
+test(
+  "an event is about its deal's or its offer's listing, and never about nothing",
+  withCleanDb(async () => {
+    const { listing, buyer, seller } = await seedListing();
+    const id = await ensureConversation(db, {
+      buyerId: buyer.id,
+      sellerId: seller.id,
+    });
+    const offer = await db.offer.create({
+      data: {
+        listingId: listing.id,
+        buyerId: buyer.id,
+        amountUsd: 8_000,
+        expiresAt: new Date(Date.now() + 3_600_000),
+      },
+    });
+    await postEvent(db, {
+      conversationId: id,
+      kind: "EVENT",
+      event: { type: "offer-expired", amountCents: 8_000 },
+      senderId: null,
+      offerId: offer.id,
+    });
+    expect(
+      (await db.message.findFirstOrThrow({ where: { conversationId: id } }))
+        .listingId,
+    ).toBe(listing.id);
+
+    await expect(
+      postEvent(db, {
+        conversationId: id,
+        kind: "EVENT",
+        event: { type: "hold-ended" },
+        senderId: null,
+      }),
+    ).rejects.toThrow(/listing/);
   }),
 );

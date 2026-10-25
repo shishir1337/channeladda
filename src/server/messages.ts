@@ -1,7 +1,12 @@
 import "server-only";
 
 import type { Prisma } from "@/generated/prisma/client";
-import type { DealMode, OfferStatus, Platform } from "@/generated/prisma/enums";
+import type {
+  DealMode,
+  OfferStatus,
+  Platform,
+  UserRole,
+} from "@/generated/prisma/enums";
 import { OPENING_MESSAGE } from "@/lib/chat-opening";
 import { isCustodianRole } from "@/lib/custody-roles";
 import { db } from "@/lib/db";
@@ -14,6 +19,7 @@ import {
 } from "@/lib/redact";
 import { writesInClosedThread } from "@/lib/thread-rules";
 import { isChatAttachmentKey, keyIsVideo, urlForKey } from "@/lib/upload-keys";
+import { ensureConversation, listingsInThread } from "@/server/chat-events";
 import { mediaExpiryFrom } from "@/server/chat-retention";
 import { notify } from "@/server/notifications";
 import { offerTurn } from "@/server/offers";
@@ -21,9 +27,13 @@ import type { CurrentUser } from "@/server/session";
 import { sizeOfUpload } from "@/server/storage";
 import { escrowAgentUnread } from "@/server/support-chat";
 import {
+  agentListings,
+  agentListingsOnThread,
   agentOnThread,
+  readsWholeThread,
   runningDealsOf,
   stillAnAgent,
+  visibleListings,
 } from "@/server/thread-access";
 import { markUploadsAttached } from "@/server/upload-access";
 
@@ -31,12 +41,12 @@ import { markUploadsAttached } from "@/server/upload-access";
  * Every conversation on Channel Adda.
  *
  * There is no direct buyer-to-seller channel in this product and there is no
- * function here that would create one. A message belongs to a conversation, a
- * conversation belongs to a listing, both sides are named on it, and staff can
- * read and join any of them. Contact details are stripped on the way in, so
- * the pair cannot agree to finish the deal somewhere the escrow does not
- * reach — which is the whole point, because off-platform is where the scam
- * happens and where we can do nothing about it.
+ * function here that would create one. A conversation is one buyer and one
+ * seller; every message in it is about one listing, both sides are named on
+ * it, and staff can read and join any of them. Contact details are stripped
+ * on the way in, so the pair cannot agree to finish the deal somewhere the
+ * escrow does not reach — which is the whole point, because off-platform is
+ * where the scam happens and where we can do nothing about it.
  */
 
 export { MAX_MESSAGE };
@@ -72,6 +82,10 @@ export type ThreadMessage = {
   id: string;
   /** What somebody typed, an offer card, or one line of the deal's history. */
   kind: "TEXT" | "OFFER" | "EVENT";
+  /** The listing this line is about. Null in the Escrow Agent chat. */
+  listingId: string | null;
+  /** The first line of a deal: "opened a Safest deal". */
+  opensDeal: boolean;
   body: string;
   createdAt: Date;
   mine: boolean;
@@ -95,22 +109,33 @@ export type ThreadMessage = {
   attachmentRemoved: boolean;
 };
 
-export type Thread = {
+/** One listing a conversation is about. */
+export type ThreadListing = {
   id: string;
-  listingId: string;
-  listingSlug: string;
-  listingTitle: string;
-  listingHandle: string;
-  listingPrice: number;
-  listingPlatform: Platform;
+  slug: string;
+  title: string;
+  handle: string;
+  priceCents: number;
+  platform: Platform;
   /** The account's own page, as the seller gave it; checked before it is linked. */
-  listingSourceUrl: string | null;
+  sourceUrl: string | null;
   /**
    * Whether the listing's public page exists: on sale or reserved. A sold
    * listing's page is a 404, which the buyer who just bought it was sent to
    * from their own deal chat.
    */
-  listingOnSale: boolean;
+  onSale: boolean;
+  /** The newest deal on it in this conversation, if there is one. */
+  dealReference: string | null;
+};
+
+export type Thread = {
+  id: string;
+  /**
+   * Every listing this conversation is about that the reader may see, in
+   * the order they were first talked about.
+   */
+  listings: ThreadListing[];
   buyerId: string;
   sellerId: string;
   buyerName: string;
@@ -124,20 +149,33 @@ export type Thread = {
   messages: ThreadMessage[];
 };
 
+/** A deal still running in a conversation, as its inbox row shows it. */
+export type ThreadDeal = {
+  reference: string;
+  mode: DealMode;
+  listingId: string;
+};
+
 export type ThreadSummary = {
   id: string;
-  listingSlug: string;
-  listingTitle: string;
-  listingHandle: string;
+  /** The listing of the newest line: what the two are talking about now. */
+  latestListingTitle: string;
+  /** Every listing talked about here, newest first. For the filter. */
+  listingTitles: string[];
+  listingHandles: string[];
   /** The other side, named for whoever is reading the list. */
   withName: string;
+  /** The other side's id, when the reader is one of the two sides. */
+  withId: string | null;
+  /** How the reader is involved: buying, selling, or the deal's agent. */
+  role: ThreadRole;
   lastMessageAt: Date;
   preview: string;
   unread: number;
   flagged: boolean;
   closed: boolean;
-  /** The deal still running in this conversation, if there is one. */
-  deal: { reference: string; mode: DealMode } | null;
+  /** The deals still running in this conversation, newest first. */
+  deals: ThreadDeal[];
 };
 
 const STAFF_ROLES = ["MODERATOR", "FINANCE", "SUPERADMIN"];
@@ -146,12 +184,15 @@ function isStaff(user: CurrentUser) {
   return STAFF_ROLES.includes(user.role);
 }
 
+const ON_SALE = new Set(["LIVE", "RESERVED"]);
+
 /**
  * Start talking about a listing, or pick up where it left off.
  *
- * One thread per buyer per listing. A buyer with three questions should not
- * leave a seller with three threads, and staff reviewing a dispute should have
- * one place to read the whole history.
+ * One thread per buyer and seller. A buyer with three questions, or with
+ * three of the same seller's listings in mind, should not leave the seller
+ * with three threads, and staff reviewing a dispute should have one place
+ * to read the whole history between the two.
  */
 // What a new thread starts with; shared with the listing page, which offers
 // it to the buyer to edit.
@@ -161,8 +202,9 @@ export async function openConversation(input: {
   listingId: string;
   buyerId: string;
   /**
-   * Write the standard opener as the buyer. False when the buyer's own
-   * question follows at once, through `sendMessage` — see `askSeller`.
+   * Write the standard opener as the buyer, the first time this listing is
+   * talked about here. False when the buyer's own question follows at once,
+   * through `sendMessage` — see `askSeller`.
    */
   opening?: boolean;
 }): Promise<
@@ -177,64 +219,55 @@ export async function openConversation(input: {
     return { ok: false, reason: "own-listing" };
   }
 
-  // Racing double-clicks both land here. The unique index decides, and the
+  // Racing double-clicks both land here. The unique pair decides, and the
   // loser reads back the row the winner made rather than failing at the user.
-  const existing = await db.conversation.findUnique({
-    where: {
-      listingId_buyerId: { listingId: listing.id, buyerId: input.buyerId },
-    },
-    select: { id: true },
+  const id = await ensureConversation(db, {
+    buyerId: input.buyerId,
+    sellerId: listing.sellerId,
   });
-  if (existing) return { ok: true, id: existing.id };
 
-  try {
-    const created = await db.conversation.create({
-      data: {
-        listingId: listing.id,
-        buyerId: input.buyerId,
-        sellerId: listing.sellerId,
-        // Written as the buyer, so the thread arrives in the seller's inbox
-        // as a question rather than as an empty row. An empty thread tells
-        // the seller somebody looked and nothing more, and it gives the buyer
-        // a blank box to work out what to say into.
-        ...(input.opening === false
-          ? {}
-          : {
-              messages: {
-                create: {
-                  senderId: input.buyerId,
-                  body: OPENING_MESSAGE,
-                },
-              },
-            }),
-      },
+  // Written as the buyer, so the listing arrives in the seller's inbox as a
+  // question rather than as nothing. Once per listing: the same seller's
+  // next listing is new to talk about, the same one is not.
+  if (input.opening !== false) {
+    const talkedAbout = await db.message.findFirst({
+      where: { conversationId: id, listingId: listing.id },
       select: { id: true },
     });
-
-    // Deals may already exist — the buyer can pay first and ask questions
-    // after. Linked here so the thread is part of their record from the
-    // moment it is created, rather than waiting for a sweep to notice. Every
-    // one of them, not the latest: each needs its conversation.
-    await db.order.updateMany({
-      where: {
-        listingId: listing.id,
-        buyerId: input.buyerId,
-        conversationId: null,
-      },
-      data: { conversationId: created.id },
-    });
-
-    return { ok: true, id: created.id };
-  } catch {
-    const raced = await db.conversation.findUnique({
-      where: {
-        listingId_buyerId: { listingId: listing.id, buyerId: input.buyerId },
-      },
-      select: { id: true },
-    });
-    if (raced) return { ok: true, id: raced.id };
-    return { ok: false, reason: "not-found" };
+    if (!talkedAbout) {
+      const now = new Date();
+      await db.$transaction([
+        db.message.create({
+          data: {
+            conversationId: id,
+            listingId: listing.id,
+            senderId: input.buyerId,
+            body: OPENING_MESSAGE,
+            createdAt: now,
+          },
+        }),
+        db.conversation.update({
+          where: { id },
+          data: { lastMessageAt: now },
+        }),
+      ]);
+    }
   }
+
+  // Deals may already exist — the buyer can pay first and ask questions
+  // after. Linked here so the thread is part of their record from the
+  // moment it exists, rather than waiting for a sweep to notice. Every one
+  // between the two of them, not the latest: each needs its conversation.
+  await db.order.updateMany({
+    where: {
+      buyerId: input.buyerId,
+      sellerId: listing.sellerId,
+      conversationId: null,
+    },
+    data: { conversationId: id },
+  });
+
+  return { ok: true, id };
 }
 
 /**
@@ -244,7 +277,7 @@ export async function openConversation(input: {
  * on one click, before the buyer could change a word of it. The question now
  * goes through `sendMessage` like any other message, so contact details are
  * filtered out of it, and it lands in the thread whether that thread is new
- * or the one they already have.
+ * or the one they already have with this seller — about this listing.
  */
 export async function askSeller(input: {
   listingId: string;
@@ -272,8 +305,10 @@ export async function askSeller(input: {
 
   const sent = await sendMessage({
     conversationId: opened.id,
+    listingId: input.listingId,
     sender: input.buyer,
     body: question,
+    joinsListing: true,
   });
   if (!sent.ok) return { ok: false, reason: sent.reason };
   return { ok: true, id: opened.id };
@@ -283,7 +318,8 @@ export async function askSeller(input: {
  * Read a thread, if this person is allowed to.
  *
  * Not being a participant returns null rather than an error: a stranger
- * guessing conversation ids learns nothing about which ones exist.
+ * guessing conversation ids learns nothing about which ones exist. The
+ * agent of a deal reads only the lines about their deal's listing.
  */
 export async function getThread(
   conversationId: string,
@@ -298,48 +334,9 @@ export async function getThread(
       flaggedAt: true,
       flagReason: true,
       closedAt: true,
-      listing: {
-        select: {
-          id: true,
-          slug: true,
-          title: true,
-          handle: true,
-          priceUsd: true,
-          platform: true,
-          sourceUrl: true,
-          status: true,
-        },
-      },
       buyer: { select: { id: true, name: true } },
       seller: { select: { id: true, name: true } },
       staff: { select: { name: true } },
-      messages: {
-        orderBy: { createdAt: "asc" },
-        select: {
-          attachmentUrl: true,
-          attachmentKind: true,
-          attachmentExpiresAt: true,
-          attachmentRemovedAt: true,
-          id: true,
-          body: true,
-          createdAt: true,
-          senderId: true,
-          fromStaff: true,
-          redactedKinds: true,
-          kind: true,
-          sender: { select: { name: true, slug: true } },
-          offer: {
-            select: {
-              id: true,
-              amountUsd: true,
-              bySeller: true,
-              message: true,
-              status: true,
-              expiresAt: true,
-            },
-          },
-        },
-      },
     },
   });
   if (!row) return null;
@@ -347,19 +344,95 @@ export async function getThread(
   const viewerRole = await roleInThread(viewer, row);
   if (!viewerRole) return null;
 
+  const visible = await visibleListings(viewer, row);
+  const only = visible ? { listingId: { in: visible } } : {};
+
+  const [messages, deals] = await Promise.all([
+    db.message.findMany({
+      where: { conversationId, ...only },
+      orderBy: { createdAt: "asc" },
+      select: {
+        attachmentUrl: true,
+        attachmentKind: true,
+        attachmentExpiresAt: true,
+        attachmentRemovedAt: true,
+        id: true,
+        listingId: true,
+        orderId: true,
+        body: true,
+        createdAt: true,
+        senderId: true,
+        fromStaff: true,
+        redactedKinds: true,
+        kind: true,
+        sender: { select: { name: true, slug: true } },
+        offer: {
+          select: {
+            id: true,
+            amountUsd: true,
+            bySeller: true,
+            message: true,
+            status: true,
+            expiresAt: true,
+          },
+        },
+      },
+    }),
+    db.order.findMany({
+      where: { conversationId, ...only },
+      orderBy: { createdAt: "desc" },
+      select: { listingId: true, reference: true },
+    }),
+  ]);
+
+  // In the order they were first talked about; a deal with no line about it
+  // yet (one from before the deal chat) after them.
+  const order = [
+    ...new Set([
+      ...messages.map((message) => message.listingId),
+      ...[...deals].reverse().map((deal) => deal.listingId),
+    ]),
+  ];
+  const rows = await db.listing.findMany({
+    where: { id: { in: order } },
+    select: {
+      id: true,
+      slug: true,
+      title: true,
+      handle: true,
+      priceUsd: true,
+      platform: true,
+      sourceUrl: true,
+      status: true,
+    },
+  });
+  const byId = new Map(rows.map((listing) => [listing.id, listing]));
+  const listings: ThreadListing[] = order.flatMap((id) => {
+    const listing = byId.get(id);
+    if (!listing) return [];
+    return [
+      {
+        id: listing.id,
+        slug: listing.slug,
+        title: listing.title,
+        handle: listing.handle,
+        priceCents: listing.priceUsd,
+        platform: listing.platform,
+        sourceUrl: listing.sourceUrl,
+        onSale: ON_SALE.has(listing.status),
+        dealReference:
+          deals.find((deal) => deal.listingId === id)?.reference ?? null,
+      },
+    ];
+  });
+
   const now = new Date();
+  // A deal's first line is the one that opened it.
+  const opened = new Set<string>();
 
   return {
     id: row.id,
-    listingId: row.listing.id,
-    listingSlug: row.listing.slug,
-    listingTitle: row.listing.title,
-    listingHandle: row.listing.handle,
-    listingPrice: row.listing.priceUsd,
-    listingPlatform: row.listing.platform,
-    listingSourceUrl: row.listing.sourceUrl,
-    listingOnSale:
-      row.listing.status === "LIVE" || row.listing.status === "RESERVED",
+    listings,
     buyerId: row.buyerId,
     sellerId: row.sellerId,
     buyerName: row.buyer.name,
@@ -369,32 +442,66 @@ export async function getThread(
     flaggedAt: row.flaggedAt,
     flagReason: row.flagReason,
     closedAt: row.closedAt,
-    messages: row.messages.map((message) => ({
-      id: message.id,
-      kind: message.kind,
-      body: message.body,
-      createdAt: message.createdAt,
-      mine: message.senderId === viewer.id,
-      fromStaff: message.fromStaff,
-      ...senderOf(message, row),
-      offer:
-        message.kind === "OFFER" && message.offer
-          ? {
-              id: message.offer.id,
-              amountCents: message.offer.amountUsd,
-              bySeller: message.offer.bySeller,
-              note: message.offer.message,
-              expiresAt: message.offer.expiresAt,
-              ...offerTurn(message.offer, now),
-            }
-          : null,
-      redactedKinds: message.redactedKinds,
-      attachmentUrl: message.attachmentUrl,
-      attachmentKind: message.attachmentKind,
-      attachmentExpiresAt: message.attachmentExpiresAt,
-      attachmentRemoved: message.attachmentRemovedAt !== null,
-    })),
+    messages: messages.map((message) => {
+      const opensDeal =
+        message.kind === "EVENT" &&
+        message.orderId !== null &&
+        !opened.has(message.orderId);
+      if (message.orderId) opened.add(message.orderId);
+      return {
+        id: message.id,
+        kind: message.kind,
+        listingId: message.listingId,
+        opensDeal,
+        body: message.body,
+        createdAt: message.createdAt,
+        mine: message.senderId === viewer.id,
+        fromStaff: message.fromStaff,
+        ...senderOf(message, row),
+        offer:
+          message.kind === "OFFER" && message.offer
+            ? {
+                id: message.offer.id,
+                amountCents: message.offer.amountUsd,
+                bySeller: message.offer.bySeller,
+                note: message.offer.message,
+                expiresAt: message.offer.expiresAt,
+                ...offerTurn(message.offer, now),
+              }
+            : null,
+        redactedKinds: message.redactedKinds,
+        attachmentUrl: message.attachmentUrl,
+        attachmentKind: message.attachmentKind,
+        attachmentExpiresAt: message.attachmentExpiresAt,
+        attachmentRemoved: message.attachmentRemovedAt !== null,
+      };
+    }),
   };
+}
+
+/**
+ * Where an old thread's link goes now.
+ *
+ * Until 2026-10-27 a buyer had one thread per listing; those were merged
+ * into one conversation per buyer and seller, and each old id kept as an
+ * alias. A link to one — in a notification, an email, a bookmark — opens
+ * the conversation it became, on the listing it was about, for somebody
+ * who may read that conversation. Anyone else gets null, as for an id that
+ * never existed.
+ */
+export async function resolveThreadAlias(
+  oldId: string,
+  viewer: CurrentUser,
+): Promise<{ conversationId: string; listingId: string } | null> {
+  const alias = await db.conversationAlias.findUnique({
+    where: { id: oldId },
+    select: {
+      listingId: true,
+      conversation: { select: { id: true, buyerId: true, sellerId: true } },
+    },
+  });
+  if (!alias || !(await roleInThread(viewer, alias.conversation))) return null;
+  return { conversationId: alias.conversation.id, listingId: alias.listingId };
 }
 
 /**
@@ -469,31 +576,164 @@ export async function roleInThread(
 }
 
 /**
+ * The listings a reader is limited to in each of these threads, for the
+ * ones they do not read whole: the agent of a deal there sees only their
+ * deal's listing (`@/server/thread-access`). A thread they read whole is
+ * absent from the map.
+ */
+async function limitsFor(
+  viewer: { id: string; role: UserRole },
+  rows: { id: string; buyerId: string; sellerId: string }[],
+): Promise<Map<string, string[]>> {
+  const limited = rows.filter((row) => !readsWholeThread(viewer, row));
+  if (limited.length === 0) return new Map();
+  const theirs = await agentListings(
+    viewer.id,
+    limited.map((row) => row.id),
+  );
+  return new Map(limited.map((row) => [row.id, theirs.get(row.id) ?? []]));
+}
+
+/**
  * How many entries in each of these threads this person has not read.
  *
  * Unread means written by somebody else — never by the reader, never by the
  * platform itself (a payment clearing is told by its own notification) —
- * after the reader's own marker, or ever when they have none. One query for
- * all of them: a per-thread threshold is not something Prisma's filters can
- * say, and an inbox of fifty threads should not be fifty queries.
+ * after the reader's own marker, or ever when they have none, and about a
+ * listing they may see. One query for the threads they read whole and one
+ * for the rest: a per-thread threshold is not something Prisma's filters
+ * can say, and an inbox of fifty threads should not be fifty queries.
  */
 async function unreadByThread(
   userId: string,
   conversationIds: string[],
+  limits: Map<string, string[]> = new Map(),
 ): Promise<Map<string, number>> {
   if (conversationIds.length === 0) return new Map();
-  const rows = await db.$queryRaw<{ conversationId: string; unread: number }[]>`
-    SELECT m."conversationId", COUNT(*)::int AS unread
-    FROM "Message" AS m
-    LEFT JOIN "ConversationRead" AS r
-      ON r."conversationId" = m."conversationId" AND r."userId" = ${userId}
-    WHERE m."conversationId" = ANY(${conversationIds})
-      AND m."senderId" IS NOT NULL
-      AND m."senderId" <> ${userId}
-      AND (r."readAt" IS NULL OR m."createdAt" > r."readAt")
-    GROUP BY m."conversationId"
-  `;
-  return new Map(rows.map((row) => [row.conversationId, row.unread]));
+  const whole = conversationIds.filter((id) => !limits.has(id));
+  const pairs = [...limits].flatMap(([conversationId, listingIds]) =>
+    listingIds.map((listingId) => ({ conversationId, listingId })),
+  );
+
+  const [wholeRows, limitedRows] = await Promise.all([
+    whole.length === 0
+      ? []
+      : db.$queryRaw<{ conversationId: string; unread: number }[]>`
+          SELECT m."conversationId", COUNT(*)::int AS unread
+          FROM "Message" AS m
+          LEFT JOIN "ConversationRead" AS r
+            ON r."conversationId" = m."conversationId" AND r."userId" = ${userId}
+          WHERE m."conversationId" = ANY(${whole})
+            AND m."senderId" IS NOT NULL
+            AND m."senderId" <> ${userId}
+            AND (r."readAt" IS NULL OR m."createdAt" > r."readAt")
+          GROUP BY m."conversationId"
+        `,
+    pairs.length === 0
+      ? []
+      : db.$queryRaw<{ conversationId: string; unread: number }[]>`
+          SELECT m."conversationId", COUNT(*)::int AS unread
+          FROM "Message" AS m
+          JOIN unnest(
+            ${pairs.map((pair) => pair.conversationId)}::text[],
+            ${pairs.map((pair) => pair.listingId)}::text[]
+          ) AS seen("conversationId", "listingId")
+            ON seen."conversationId" = m."conversationId"
+            AND seen."listingId" = m."listingId"
+          LEFT JOIN "ConversationRead" AS r
+            ON r."conversationId" = m."conversationId" AND r."userId" = ${userId}
+          WHERE m."senderId" IS NOT NULL
+            AND m."senderId" <> ${userId}
+            AND (r."readAt" IS NULL OR m."createdAt" > r."readAt")
+          GROUP BY m."conversationId"
+        `,
+  ]);
+  return new Map(
+    [...wholeRows, ...limitedRows].map((row) => [
+      row.conversationId,
+      row.unread,
+    ]),
+  );
+}
+
+type Latest = {
+  body: string;
+  fromStaff: boolean;
+  listingId: string;
+  createdAt: Date;
+};
+
+/**
+ * The newest line of each thread a reader is limited in, among the lines
+ * they may see: what their inbox previews and sorts by. The thread's own
+ * newest line and `lastMessageAt` are about anything said there, and would
+ * tell the agent of one deal that something happened in another.
+ */
+async function latestVisible(
+  limits: Map<string, string[]>,
+): Promise<Map<string, Latest>> {
+  const latest = new Map<string, Latest>();
+  await Promise.all(
+    [...limits].map(async ([conversationId, listingIds]) => {
+      const line = await db.message.findFirst({
+        where: { conversationId, listingId: { in: listingIds } },
+        orderBy: { createdAt: "desc" },
+        select: {
+          body: true,
+          fromStaff: true,
+          listingId: true,
+          createdAt: true,
+        },
+      });
+      if (line) latest.set(conversationId, line);
+    }),
+  );
+  return latest;
+}
+
+/**
+ * The listings each thread is about, newest line first, limited as the
+ * reader is. One grouped query for every thread in the list.
+ */
+async function listingsByThread(
+  conversationIds: string[],
+  limits: Map<string, string[]>,
+): Promise<Map<string, { title: string; handle: string }[]>> {
+  if (conversationIds.length === 0) return new Map();
+  const groups = await db.message.groupBy({
+    by: ["conversationId", "listingId"],
+    where: { conversationId: { in: conversationIds } },
+    _max: { createdAt: true },
+  });
+  const seen = groups
+    .filter((group) => {
+      const only = limits.get(group.conversationId);
+      return !only || only.includes(group.listingId);
+    })
+    .sort(
+      (a, b) =>
+        (b._max.createdAt?.getTime() ?? 0) - (a._max.createdAt?.getTime() ?? 0),
+    );
+  const rows = await db.listing.findMany({
+    where: { id: { in: [...new Set(seen.map((group) => group.listingId))] } },
+    select: { id: true, title: true, handle: true },
+  });
+  const byId = new Map(rows.map((listing) => [listing.id, listing]));
+  const listings = new Map<string, { title: string; handle: string }[]>();
+  for (const group of seen) {
+    const listing = byId.get(group.listingId);
+    if (!listing) continue;
+    const list = listings.get(group.conversationId) ?? [];
+    list.push({ title: listing.title, handle: listing.handle });
+    listings.set(group.conversationId, list);
+  }
+  return listings;
+}
+
+function previewOf(line: { body: string; fromStaff: boolean } | undefined) {
+  return line
+    ? `${line.fromStaff ? "Channel Adda: " : ""}${line.body}`
+    : "No messages yet.";
 }
 
 const RUNNING = { status: { notIn: [...TERMINAL_STATUSES] } };
@@ -505,19 +745,17 @@ const THREAD_ROW = {
   lastMessageAt: true,
   flaggedAt: true,
   closedAt: true,
-  listing: { select: { slug: true, title: true, handle: true } },
   buyer: { select: { name: true } },
   seller: { select: { name: true } },
   messages: {
     orderBy: { createdAt: "desc" },
     take: 1,
-    select: { body: true, fromStaff: true },
+    select: { body: true, fromStaff: true, listingId: true, createdAt: true },
   },
   orders: {
     where: RUNNING,
     orderBy: { createdAt: "desc" },
-    take: 1,
-    select: { reference: true, mode: true },
+    select: { reference: true, mode: true, listingId: true },
   },
 } satisfies Prisma.ConversationSelect;
 
@@ -562,35 +800,62 @@ export async function listThreads(
     }),
   ]);
   const rows = [...dealRows, ...otherRows];
-  const unread = await unreadByThread(
-    viewer.id,
-    rows.map((row) => row.id),
-  );
+  const ids = rows.map((row) => row.id);
+  const limits = await limitsFor(viewer, rows);
+  const [unread, listings, latest] = await Promise.all([
+    unreadByThread(viewer.id, ids, limits),
+    listingsByThread(ids, limits),
+    latestVisible(limits),
+  ]);
 
-  return rows.map((row) => {
-    const iAmBuyer = row.buyerId === viewer.id;
-    const iAmSeller = row.sellerId === viewer.id;
+  const summary = (row: (typeof rows)[number]): ThreadSummary => {
+    const role: ThreadRole =
+      row.buyerId === viewer.id
+        ? "buyer"
+        : row.sellerId === viewer.id
+          ? "seller"
+          : "agent";
+    const only = limits.get(row.id);
+    const newest = only ? latest.get(row.id) : row.messages[0];
+    const about = listings.get(row.id) ?? [];
     return {
       id: row.id,
-      listingSlug: row.listing.slug,
-      listingTitle: row.listing.title,
-      listingHandle: row.listing.handle,
+      latestListingTitle: about[0]?.title ?? "",
+      listingTitles: about.map((listing) => listing.title),
+      listingHandles: about.map((listing) => listing.handle),
       // An agent is talking to both of them.
-      withName: iAmBuyer
-        ? row.seller.name
-        : iAmSeller
-          ? row.buyer.name
-          : `${row.buyer.name} and ${row.seller.name}`,
-      lastMessageAt: row.lastMessageAt,
-      preview: row.messages[0]
-        ? `${row.messages[0].fromStaff ? "Channel Adda: " : ""}${row.messages[0].body}`
-        : "No messages yet.",
+      withName:
+        role === "buyer"
+          ? row.seller.name
+          : role === "seller"
+            ? row.buyer.name
+            : `${row.buyer.name} and ${row.seller.name}`,
+      withId:
+        role === "buyer"
+          ? row.sellerId
+          : role === "seller"
+            ? row.buyerId
+            : null,
+      role,
+      lastMessageAt: only
+        ? (newest?.createdAt ?? row.lastMessageAt)
+        : row.lastMessageAt,
+      preview: previewOf(newest),
       unread: unread.get(row.id) ?? 0,
       flagged: row.flaggedAt !== null,
       closed: row.closedAt !== null,
-      deal: row.orders[0] ?? null,
+      deals: row.orders.filter(
+        (deal) => !only || only.includes(deal.listingId),
+      ),
     };
-  });
+  };
+  // Within each group, newest first by what this reader can see.
+  const byTime = (a: ThreadSummary, b: ThreadSummary) =>
+    b.lastMessageAt.getTime() - a.lastMessageAt.getTime();
+  return [
+    ...dealRows.map(summary).sort(byTime),
+    ...otherRows.map(summary).sort(byTime),
+  ];
 }
 
 /**
@@ -599,7 +864,12 @@ export async function listThreads(
  * The Escrow Agent chat counts as one more when a reply is unread.
  */
 export async function countUnreadThreads(userId: string): Promise<number> {
-  const asAgent = await stillAnAgent(userId);
+  const user = await db.user.findUnique({
+    where: { id: userId },
+    select: { role: true, bannedAt: true },
+  });
+  if (!user) return 0;
+  const asAgent = isCustodianRole(user.role) && !user.bannedAt;
   const [threads, escrowAgent] = await Promise.all([
     db.conversation.findMany({
       where: {
@@ -609,21 +879,24 @@ export async function countUnreadThreads(userId: string): Promise<number> {
           ...(asAgent ? [{ orders: runningDealsOf(userId) }] : []),
         ],
       },
-      select: { id: true },
+      select: { id: true, buyerId: true, sellerId: true },
     }),
     escrowAgentUnread(userId),
   ]);
+  const limits = await limitsFor({ id: userId, role: user.role }, threads);
   const unread = await unreadByThread(
     userId,
     threads.map((row) => row.id),
+    limits,
   );
   return (
     [...unread.values()].filter((n) => n > 0).length + (escrowAgent > 0 ? 1 : 0)
   );
 }
 
-// The staff queue has its own order (flagged first) and no deal tag.
-export type StaffThread = Omit<ThreadSummary, "deal"> & {
+// The staff queue has its own order (flagged first), and staff are neither
+// side and no deal's agent.
+export type StaffThread = Omit<ThreadSummary, "deals" | "withId" | "role"> & {
   buyerName: string;
   sellerName: string;
   flagReason: string | null;
@@ -647,7 +920,6 @@ export async function listStaffThreads(
       flaggedAt: true,
       flagReason: true,
       closedAt: true,
-      listing: { select: { slug: true, title: true, handle: true } },
       buyer: { select: { name: true } },
       seller: { select: { name: true } },
       staff: { select: { name: true } },
@@ -658,25 +930,30 @@ export async function listStaffThreads(
       },
     },
   });
+  const listings = await listingsByThread(
+    rows.map((row) => row.id),
+    new Map(),
+  );
 
-  return rows.map((row) => ({
-    id: row.id,
-    listingSlug: row.listing.slug,
-    listingTitle: row.listing.title,
-    listingHandle: row.listing.handle,
-    withName: `${row.buyer.name} and ${row.seller.name}`,
-    buyerName: row.buyer.name,
-    sellerName: row.seller.name,
-    staffName: row.staff?.name ?? null,
-    lastMessageAt: row.lastMessageAt,
-    preview: row.messages[0]
-      ? `${row.messages[0].fromStaff ? "Channel Adda: " : ""}${row.messages[0].body}`
-      : "No messages yet.",
-    unread: 0,
-    flagged: row.flaggedAt !== null,
-    flagReason: row.flagReason,
-    closed: row.closedAt !== null,
-  }));
+  return rows.map((row) => {
+    const about = listings.get(row.id) ?? [];
+    return {
+      id: row.id,
+      latestListingTitle: about[0]?.title ?? "",
+      listingTitles: about.map((listing) => listing.title),
+      listingHandles: about.map((listing) => listing.handle),
+      withName: `${row.buyer.name} and ${row.seller.name}`,
+      buyerName: row.buyer.name,
+      sellerName: row.seller.name,
+      staffName: row.staff?.name ?? null,
+      lastMessageAt: row.lastMessageAt,
+      preview: previewOf(row.messages[0]),
+      unread: 0,
+      flagged: row.flaggedAt !== null,
+      flagReason: row.flagReason,
+      closed: row.closedAt !== null,
+    };
+  });
 }
 
 export async function countFlaggedThreads(): Promise<number> {
@@ -703,6 +980,11 @@ export type SendResult =
  */
 export async function sendMessage(input: {
   conversationId: string;
+  /**
+   * The listing it is about: one already talked about in this conversation
+   * or with a deal in it, and for the agent of a deal, their deal's.
+   */
+  listingId: string;
   sender: CurrentUser;
   body: string;
   /**
@@ -715,6 +997,12 @@ export async function sendMessage(input: {
    * retention sweep would then delete.
    */
   attachmentKey?: string;
+  /**
+   * The buyer asking about another of the same seller's listings, from its
+   * page (`askSeller`): the one way a listing joins a conversation by a
+   * message. Never from the message box, which writes about what is here.
+   */
+  joinsListing?: boolean;
 }): Promise<SendResult> {
   const text = input.body.trim();
   // A photo or a clip on its own is a message. Requiring words alongside it
@@ -743,13 +1031,7 @@ export async function sendMessage(input: {
 
   const row = await db.conversation.findUnique({
     where: { id: input.conversationId },
-    select: {
-      id: true,
-      buyerId: true,
-      sellerId: true,
-      closedAt: true,
-      listing: { select: { handle: true, title: true } },
-    },
+    select: { id: true, buyerId: true, sellerId: true, closedAt: true },
   });
   if (!row) return { ok: false, reason: "not-allowed" };
 
@@ -762,10 +1044,32 @@ export async function sendMessage(input: {
   // they need to explain why — and so can the agent running a deal in it.
   if (row.closedAt && !ours) return { ok: false, reason: "closed" };
 
-  // The listing's own handle is the subject of the conversation, not a way out
-  // of it, so it is never mistaken for a contact detail.
+  // About a listing of this conversation, and for an agent, their own deal's.
+  const visible = await visibleListings(input.sender, row);
+  if (visible && !visible.includes(input.listingId)) {
+    return { ok: false, reason: "not-allowed" };
+  }
+  const here = await listingsInThread(db, row.id);
+  if (!here.includes(input.listingId)) {
+    const listing = input.joinsListing
+      ? await db.listing.findUnique({
+          where: { id: input.listingId },
+          select: { sellerId: true },
+        })
+      : null;
+    if (role !== "buyer" || listing?.sellerId !== row.sellerId) {
+      return { ok: false, reason: "not-allowed" };
+    }
+  }
+
+  // The listings' own handles are the subject of the conversation, not a
+  // way out of it, so none of them is mistaken for a contact detail.
+  const subjects = await db.listing.findMany({
+    where: { id: { in: [...new Set([...here, input.listingId])] } },
+    select: { handle: true },
+  });
   const { body, kinds } = redactContactDetails(text, {
-    allowHandles: [row.listing.handle],
+    allowHandles: subjects.map((listing) => listing.handle),
   });
 
   const flagged = kinds.length > 0 || mentionsOffPlatform(text);
@@ -775,6 +1079,7 @@ export async function sendMessage(input: {
     await tx.message.create({
       data: {
         conversationId: row.id,
+        listingId: input.listingId,
         senderId: input.sender.id,
         body,
         fromStaff: role === "staff",
@@ -819,14 +1124,15 @@ export async function sendMessage(input: {
     await markUploadsAttached([urlForKey(input.attachmentKey)]);
   }
 
-  // Everyone else in the thread: both sides, and the agent of a deal running
-  // here. Not staff, who work from their own queue. Worked out as "everyone
-  // but the sender" rather than "the other side", which used to send a staff
-  // note to the buyer alone. Collapsed per conversation, because a burst of
-  // ten lines should say "there is something to read in here" and it stops
-  // saying that the moment the bell shows ten. No email: chat arrives in
-  // bursts and an inbox is the wrong place for it.
-  for (const userId of await readersOf(row)) {
+  // Everyone else in the thread who may read this line: both sides, and the
+  // agent of a deal running here on its listing. Not staff, who work from
+  // their own queue. Worked out as "everyone but the sender" rather than
+  // "the other side", which used to send a staff note to the buyer alone.
+  // Collapsed per conversation, because a burst of ten lines should say
+  // "there is something to read in here" and it stops saying that the
+  // moment the bell shows ten. No email: chat arrives in bursts and an inbox
+  // is the wrong place for it.
+  for (const userId of await readersOf(row, input.listingId)) {
     if (userId === input.sender.id) continue;
     await notify({
       userId,
@@ -843,21 +1149,31 @@ export async function sendMessage(input: {
 }
 
 /**
- * Who reads a thread as part of it: the buyer, the seller, and the agent of
- * each deal running in it who still holds the desk.
+ * Who reads a line about this listing as part of the thread: the buyer, the
+ * seller, and the agent of each deal running here on that listing who still
+ * holds the desk. The agent of a deal on another listing is not told.
  */
-async function readersOf(row: {
-  id: string;
-  buyerId: string;
-  sellerId: string;
-}): Promise<string[]> {
+async function readersOf(
+  row: { id: string; buyerId: string; sellerId: string },
+  listingId: string,
+): Promise<string[]> {
   const running = await db.order.findMany({
-    where: { conversationId: row.id, agentId: { not: null } },
+    where: {
+      conversationId: row.id,
+      listingId,
+      agentId: { not: null },
+      ...RUNNING,
+    },
     select: { agentId: true },
   });
   const agents: string[] = [];
-  for (const { agentId } of running) {
-    if (agentId && (await agentOnThread(agentId, row.id))) agents.push(agentId);
+  for (const agentId of new Set(running.map((deal) => deal.agentId))) {
+    if (
+      agentId &&
+      (await agentListingsOnThread(agentId, row.id)).includes(listingId)
+    ) {
+      agents.push(agentId);
+    }
   }
   return [...new Set([row.buyerId, row.sellerId, ...agents])];
 }
@@ -904,7 +1220,10 @@ export async function clearThreadFlag(conversationId: string) {
   });
 }
 
-/** Close a thread. Staff only — neither side can shut the other out. */
+/**
+ * Close a thread. Staff only — neither side can shut the other out. It is
+ * the whole conversation between the two people, every listing in it.
+ */
 export async function setThreadClosed(conversationId: string, closed: boolean) {
   await db.conversation.update({
     where: { id: conversationId },

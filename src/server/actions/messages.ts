@@ -75,6 +75,8 @@ export async function askSellerQuestion(
 
 export async function postMessage(
   conversationId: string,
+  /** The listing it is about: one this conversation is about already. */
+  listingId: string,
   body: string,
   /** A key this app stored, not a URL. See `sendMessage`. */
   attachmentKey?: string,
@@ -82,6 +84,7 @@ export async function postMessage(
   const user = await requireUser();
   const result = await repo.sendMessage({
     conversationId,
+    listingId,
     sender: user,
     body,
     attachmentKey,

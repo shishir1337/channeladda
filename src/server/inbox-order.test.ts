@@ -48,11 +48,10 @@ test(
     const inbox = await listThreads(asUser(dealt.buyer.id));
 
     expect(inbox.map((row) => row.id)).toEqual([deal.conversationId, asked.id]);
-    expect(inbox[0].deal).toEqual({
-      reference: deal.reference,
-      mode: "SAFEST",
-    });
-    expect(inbox[1].deal).toBeNull();
+    expect(inbox[0].deals).toEqual([
+      expect.objectContaining({ reference: deal.reference, mode: "SAFEST" }),
+    ]);
+    expect(inbox[1].deals).toEqual([]);
   }),
 );
 
@@ -74,6 +73,6 @@ test(
     const [row] = await listThreads(asUser(dealt.buyer.id));
 
     expect(row.id).toBe(deal.conversationId);
-    expect(row.deal).toBeNull();
+    expect(row.deals).toEqual([]);
   }),
 );

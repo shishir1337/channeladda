@@ -28,6 +28,12 @@ export default async function AdminThreadPage({
   const thread = await getThread(id, staff);
   if (!thread || !fingerprint) notFound();
 
+  // The listing the page is about: the one the newest line is about.
+  const lastListing = thread.messages.at(-1)?.listingId;
+  const focus =
+    thread.listings.find((listing) => listing.id === lastListing) ??
+    thread.listings[0] ??
+    null;
   const flagged = thread.flaggedAt !== null;
   const closed = thread.closedAt !== null;
 
@@ -47,14 +53,16 @@ export default async function AdminThreadPage({
           back={{ href: "/admin/messages", label: "All conversations" }}
           people={[thread.buyerName, thread.sellerName]}
           title={`${thread.buyerName} and ${thread.sellerName}`}
-          listing={{
-            href: thread.listingOnSale
-              ? `/listing/${thread.listingSlug}`
-              : null,
-            handle: thread.listingHandle,
-            title: thread.listingTitle,
-          }}
-          channel={channelOf(thread.listingPlatform, thread.listingSourceUrl)}
+          listing={
+            focus
+              ? {
+                  href: focus.onSale ? `/listing/${focus.slug}` : null,
+                  handle: focus.handle,
+                  title: focus.title,
+                }
+              : null
+          }
+          channel={focus ? channelOf(focus.platform, focus.sourceUrl) : null}
           meta={
             flagged || closed || thread.staffName ? (
               <>
@@ -96,6 +104,7 @@ export default async function AdminThreadPage({
           <div className="flex min-h-0 min-w-0 flex-col">
             <ThreadView
               conversationId={thread.id}
+              listingId={focus?.id ?? null}
               otherSide={`${thread.buyerName} and ${thread.sellerName}`}
               closed={false}
               viewerRole="staff"

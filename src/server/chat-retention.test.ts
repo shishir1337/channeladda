@@ -7,11 +7,13 @@ import { seedListing, withCleanDb } from "@/test/db";
 const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000);
 const hoursAgo = (n: number) => new Date(Date.now() - n * 3_600_000);
 
+/** Which listing each test thread is about, for the lines written into it. */
+const aboutOf = new Map<string, string>();
+
 async function thread(opts: { withDeal?: boolean; flagged?: boolean } = {}) {
   const seeded = await seedListing();
   const conversation = await db.conversation.create({
     data: {
-      listingId: seeded.listing.id,
       buyerId: seeded.buyer.id,
       sellerId: seeded.seller.id,
       flaggedAt: opts.flagged ? new Date() : null,
@@ -32,6 +34,7 @@ async function thread(opts: { withDeal?: boolean; flagged?: boolean } = {}) {
     });
   }
 
+  aboutOf.set(conversation.id, seeded.listing.id);
   return { ...seeded, conversationId: conversation.id };
 }
 
@@ -44,6 +47,7 @@ async function message(
   return db.message.create({
     data: {
       conversationId,
+      listingId: aboutOf.get(conversationId) ?? "",
       senderId,
       body: "a message",
       createdAt,
@@ -214,6 +218,7 @@ test(
     await db.message.create({
       data: {
         conversationId: t.conversationId,
+        listingId: t.listing.id,
         senderId: t.seller.id,
         body: "Channel Adda: do not move this off-platform.",
         fromStaff: true,

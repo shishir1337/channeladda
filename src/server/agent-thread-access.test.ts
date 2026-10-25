@@ -76,6 +76,7 @@ async function dealThread() {
   await db.message.create({
     data: {
       conversationId: opened.id,
+      listingId: seeded.listing.id,
       senderId: seeded.buyer.id,
       body: "Here is the analytics screenshot.",
       attachmentUrl: `/uploads/${KEY}`,
@@ -122,6 +123,7 @@ test(
 
     const sent = await sendMessage({
       conversationId: t.conversationId,
+      listingId: t.listing.id,
       sender: t.agentUser,
       body: "I will send the owner invite this afternoon.",
     });
@@ -150,6 +152,7 @@ test(
     expect(
       await sendMessage({
         conversationId: t.conversationId,
+        listingId: t.listing.id,
         sender: outsider,
         body: "Hello?",
       }),
@@ -254,6 +257,7 @@ test(
 
     const sent = await sendMessage({
       conversationId: t.conversationId,
+      listingId: t.listing.id,
       sender: t.agentUser,
       body: "Reach me on telegram @agentdesk if the invite fails.",
     });

@@ -12,6 +12,8 @@ import { recordAudit } from "@/server/audit";
 import {
   type DbWriter,
   ensureConversation,
+  listingsInThread,
+  pairThreadOf,
   postEvent,
 } from "@/server/chat-events";
 import { notifyClosedOffers, releaseIfFree } from "@/server/listing-hold";
@@ -295,36 +297,33 @@ async function flagForNote(
 }
 
 /**
- * Whether a note may go into this buyer's conversation.
+ * Whether a note may go into this buyer's conversation with this seller.
  *
  * Closing a conversation stops free text reaching it, from anywhere — the
  * listing page included, or the offer box would be the way round a closed
  * chat. The offer itself is not text and still goes through without one.
+ * A conversation is the two people, so a closed one covers every listing
+ * of the seller's.
  */
 async function noteRefused(
-  listingId: string,
-  buyerId: string,
+  pair: { buyerId: string; sellerId: string },
   note: string | null,
 ): Promise<boolean> {
   if (!note) return false;
   const thread = await db.conversation.findUnique({
-    where: { listingId_buyerId: { listingId, buyerId } },
+    where: { buyerId_sellerId: pair },
     select: { closedAt: true },
   });
   return thread?.closedAt != null;
 }
 
-/** The conversation this buyer has about this listing, if any. */
-async function threadOf(
+/** The conversation between this buyer and this seller, if any. */
+function threadOf(
   w: DbWriter,
-  listingId: string,
   buyerId: string,
+  sellerId: string,
 ): Promise<string | null> {
-  const thread = await w.conversation.findUnique({
-    where: { listingId_buyerId: { listingId, buyerId } },
-    select: { id: true },
-  });
-  return thread?.id ?? null;
+  return pairThreadOf(w, { buyerId, sellerId });
 }
 
 /**
@@ -362,7 +361,12 @@ export async function createOffer(input: {
   }
 
   const note = filterNote(input.message, listing.handle);
-  if (await noteRefused(listing.id, input.buyerId, note.text)) {
+  if (
+    await noteRefused(
+      { buyerId: input.buyerId, sellerId: listing.sellerId },
+      note.text,
+    )
+  ) {
     return { ok: false, reason: "closed" };
   }
 
@@ -386,8 +390,8 @@ export async function createOffer(input: {
   const { offerId, conversationId } = await db.$transaction(async (tx) => {
     // The offer is where the conversation starts when the buyer never wrote
     // first, so the seller finds it in their inbox and not only on Offers.
+    // The one they already have with this seller, when there is one.
     const conversationId = await ensureConversation(tx, {
-      listingId: listing.id,
       buyerId: input.buyerId,
       sellerId: listing.sellerId,
     });
@@ -413,6 +417,7 @@ export async function createOffer(input: {
       },
       senderId: input.buyerId,
       offerId: offer.id,
+      listingId: listing.id,
       at: now,
     });
     await flagForNote(tx, conversationId, note, now);
@@ -583,7 +588,6 @@ export async function acceptOffer(
       await claimOpen(tx, offerId, "ACCEPTED", now);
 
       const conversationId = await ensureConversation(tx, {
-        listingId: row.listingId,
         buyerId: row.buyerId,
         sellerId: row.listing.sellerId,
       });
@@ -597,6 +601,7 @@ export async function acceptOffer(
         },
         senderId: responderId,
         offerId,
+        listingId: row.listingId,
         at: now,
       });
 
@@ -635,7 +640,7 @@ export async function acceptOffer(
           data: { status: "REJECTED", respondedAt: now },
         });
         if (moved.count !== 1) continue;
-        const thread = await threadOf(tx, row.listingId, other.buyerId);
+        const thread = await threadOf(tx, other.buyerId, row.listing.sellerId);
         if (thread) {
           await postEvent(tx, {
             conversationId: thread,
@@ -646,6 +651,7 @@ export async function acceptOffer(
             },
             senderId: null,
             offerId: other.id,
+            listingId: row.listingId,
             at: now,
           });
         }
@@ -690,7 +696,6 @@ export async function declineOffer(
     conversationId = await db.$transaction(async (tx) => {
       await claimOpen(tx, offerId, "REJECTED", now);
       const conversationId = await ensureConversation(tx, {
-        listingId: row.listingId,
         buyerId: row.buyerId,
         sellerId: row.listing.sellerId,
       });
@@ -704,6 +709,7 @@ export async function declineOffer(
         },
         senderId: responderId,
         offerId,
+        listingId: row.listingId,
         at: now,
       });
       return conversationId;
@@ -748,7 +754,12 @@ export async function counterOffer(input: {
   }
 
   const note = filterNote(input.message, row.listing.handle);
-  if (await noteRefused(row.listingId, row.buyerId, note.text)) {
+  if (
+    await noteRefused(
+      { buyerId: row.buyerId, sellerId: row.listing.sellerId },
+      note.text,
+    )
+  ) {
     return { ok: false, reason: "closed" };
   }
 
@@ -771,7 +782,6 @@ export async function counterOffer(input: {
         select: { id: true },
       });
       const conversationId = await ensureConversation(tx, {
-        listingId: row.listingId,
         buyerId: row.buyerId,
         sellerId: row.listing.sellerId,
       });
@@ -782,6 +792,7 @@ export async function counterOffer(input: {
         event: { type: "countered", name, amountCents: input.amountCents },
         senderId: input.responderId,
         offerId: offer.id,
+        listingId: row.listingId,
         at: now,
       });
       await flagForNote(tx, conversationId, note, now);
@@ -812,44 +823,53 @@ export async function counterOffer(input: {
  * so one open offer at a time, the expiry, and accepting reserving the
  * listing all hold without a line of new code. Below the asking price only:
  * at or above it the buyer can simply buy.
+ *
+ * About one of the seller's listings already talked about in this
+ * conversation: a conversation is the two people, and a price on a listing
+ * the buyer never asked about would be reaching out to them about it.
  */
 export async function proposePrice(input: {
   sellerId: string;
   conversationId: string;
+  listingId: string;
   amountCents: number;
   message: string | null;
   expiryHours: number;
 }): Promise<Result<{ offerId: string }>> {
-  const thread = await db.conversation.findUnique({
-    where: { id: input.conversationId },
-    select: {
-      id: true,
-      buyerId: true,
-      sellerId: true,
-      closedAt: true,
-      seller: { select: { name: true } },
-      listing: {
-        select: {
-          id: true,
-          status: true,
-          sellerId: true,
-          priceUsd: true,
-          handle: true,
-          title: true,
-        },
+  const [thread, listing] = await Promise.all([
+    db.conversation.findUnique({
+      where: { id: input.conversationId },
+      select: {
+        id: true,
+        buyerId: true,
+        sellerId: true,
+        closedAt: true,
+        seller: { select: { name: true } },
       },
-    },
-  });
+    }),
+    db.listing.findUnique({
+      where: { id: input.listingId },
+      select: {
+        id: true,
+        status: true,
+        sellerId: true,
+        priceUsd: true,
+        handle: true,
+        title: true,
+      },
+    }),
+  ]);
   // The thread's seller and the listing's seller are the same person; both
   // are checked so a transferred listing could not let the old one in.
   if (
     !thread ||
+    !listing ||
     thread.sellerId !== input.sellerId ||
-    thread.listing.sellerId !== input.sellerId
+    listing.sellerId !== input.sellerId ||
+    !(await listingsInThread(db, thread.id)).includes(listing.id)
   ) {
     return { ok: false, reason: "not-found" };
   }
-  const { listing } = thread;
   if (listing.status !== "LIVE") return { ok: false, reason: "not-live" };
   if (input.amountCents >= listing.priceUsd) {
     return { ok: false, reason: "too-high" };
@@ -896,6 +916,7 @@ export async function proposePrice(input: {
       },
       senderId: input.sellerId,
       offerId: offer.id,
+      listingId: listing.id,
       at: now,
     });
     await flagForNote(tx, thread.id, note, now);
@@ -960,7 +981,6 @@ export async function withdrawOffer(
     conversationId = await db.$transaction(async (tx) => {
       await claimOpen(tx, offerId, "WITHDRAWN", now);
       const conversationId = await ensureConversation(tx, {
-        listingId: row.listingId,
         buyerId: row.buyerId,
         sellerId: row.listing.sellerId,
       });
@@ -974,6 +994,7 @@ export async function withdrawOffer(
         },
         senderId: userId,
         offerId,
+        listingId: row.listingId,
         at: now,
       });
       return conversationId;
@@ -1077,7 +1098,7 @@ export async function releaseLapsedOfferReservations(
         data: { status: "EXPIRED" },
       });
       if (moved.count !== 1) return undefined;
-      const thread = await threadOf(tx, offer.listingId, offer.buyerId);
+      const thread = await threadOf(tx, offer.buyerId, offer.listing.sellerId);
       if (thread) {
         await postEvent(tx, {
           conversationId: thread,
@@ -1085,6 +1106,7 @@ export async function releaseLapsedOfferReservations(
           event: { type: "reservation-lapsed", amountCents: offer.amountUsd },
           senderId: null,
           offerId: offer.id,
+          listingId: offer.listingId,
           at: now,
         });
       }
@@ -1150,7 +1172,13 @@ export async function releaseReservation(listingId: string) {
 export async function expireOffers(now = new Date()): Promise<number> {
   const due = await db.offer.findMany({
     where: { status: "OPEN", expiresAt: { lte: now } },
-    select: { id: true, listingId: true, buyerId: true, amountUsd: true },
+    select: {
+      id: true,
+      listingId: true,
+      buyerId: true,
+      amountUsd: true,
+      listing: { select: { sellerId: true } },
+    },
   });
 
   let expired = 0;
@@ -1164,7 +1192,7 @@ export async function expireOffers(now = new Date()): Promise<number> {
         data: { status: "EXPIRED" },
       });
       if (took.count !== 1) return false;
-      const thread = await threadOf(tx, offer.listingId, offer.buyerId);
+      const thread = await threadOf(tx, offer.buyerId, offer.listing.sellerId);
       if (thread) {
         await postEvent(tx, {
           conversationId: thread,
@@ -1172,6 +1200,7 @@ export async function expireOffers(now = new Date()): Promise<number> {
           event: { type: "offer-expired", amountCents: offer.amountUsd },
           senderId: null,
           offerId: offer.id,
+          listingId: offer.listingId,
           at: now,
         });
       }

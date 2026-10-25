@@ -569,8 +569,12 @@ export async function getListingLocks(
   };
 }
 
-/** Everything that points at a listing from someone else's side. */
-const HISTORY = { orders: true, offers: true, conversations: true } as const;
+/**
+ * Everything that points at a listing from someone else's side. Lines in
+ * a conversation rather than conversations: a conversation is two people
+ * now, and what is about this listing is the lines that say so.
+ */
+const HISTORY = { orders: true, offers: true, messages: true } as const;
 
 /**
  * Whether removing this listing deletes it. Only a draft or a returned
@@ -580,12 +584,10 @@ const HISTORY = { orders: true, offers: true, conversations: true } as const;
  */
 function deletesOutright(listing: {
   status: ListingStatus;
-  _count: { orders: number; offers: number; conversations: number };
+  _count: { orders: number; offers: number; messages: number };
 }) {
-  const { orders, offers, conversations } = listing._count;
-  return (
-    DELETABLE.includes(listing.status) && orders + offers + conversations === 0
-  );
+  const { orders, offers, messages } = listing._count;
+  return DELETABLE.includes(listing.status) && orders + offers + messages === 0;
 }
 
 /** One spelling of a handle or link, so "@Name/" and "name" compare equal. */
@@ -886,7 +888,7 @@ export async function removeMyListing(
         if (moved.count !== 1) continue;
         const thread = await tx.conversation.findUnique({
           where: {
-            listingId_buyerId: { listingId: id, buyerId: offer.buyerId },
+            buyerId_sellerId: { buyerId: offer.buyerId, sellerId },
           },
           select: { id: true },
         });
@@ -900,6 +902,7 @@ export async function removeMyListing(
             },
             senderId: null,
             offerId: offer.id,
+            listingId: id,
             at: now,
           });
         }

@@ -15,14 +15,15 @@ import { deleteUpload } from "@/server/storage";
  * say — identity documents. They are useful for about a day and a liability
  * for ever. The message that carried one survives; only the file is deleted.
  *
- * **Messages go after 10 days, unless the thread is part of the record.** The
+ * **Messages go after 10 days, unless they are part of the record.** The
  * owner asked for chat to clear "without the deal part", and the carve-outs
  * are wider than that phrase, because each of them is something somebody will
  * one day need to prove:
  *
- * - a thread tied to an order, which is the only account of what was agreed
- * - a thread tied to an order with a dispute open on it
- * - a thread staff flagged, which is evidence about a person rather than a deal
+ * - the lines about a listing with an order in the conversation, which are
+ *   the only account of what was agreed — a dispute included
+ * - a conversation staff flagged, which is evidence about a person rather
+ *   than a deal
  * - any message staff wrote, which they wrote to be found later
  *
  * Both sweeps are idempotent and safe to run concurrently, because both
@@ -120,36 +121,43 @@ export async function purgeExpiredMedia(now = new Date()): Promise<number> {
 /**
  * Messages past their ten days, except the ones that are part of the record.
  *
- * Expressed as a relational filter rather than by loading every protected
+ * Expressed as one statement rather than by loading every protected
  * conversation id and passing it as `notIn`. That version worked and then
  * stopped: past about thirty-two thousand protected conversations the query
  * exceeds Postgres's bind-parameter limit and the sweep throws, and long
- * before that it is a large transfer on every run.
+ * before that it is a large transfer on every run. Raw SQL because the rule
+ * pairs each line with a deal on its own listing, which Prisma's relation
+ * filters cannot say.
  *
- * The carve-outs, each of which is something somebody will one day need to
- * prove:
+ * A conversation is two people and may be about several listings, so the
+ * record is per listing: the lines about a listing with a deal in this
+ * conversation are kept, the questions about another listing that never
+ * became one clear as usual. The carve-outs, each of which is something
+ * somebody will one day need to prove:
  *
- * - a thread tied to an order — the only account of what was agreed
- * - a thread tied to an order with a dispute open on it
- * - a thread staff flagged, which is evidence about a person, not a deal
+ * - a line about a listing with a deal here — the only account of what was
+ *   agreed, whether the deal is running, disputed or over
+ * - any line in a conversation staff flagged, which is evidence about a
+ *   person, not a deal
  * - any message staff wrote, which they wrote to be found later
  */
 export async function purgeOldMessages(now = new Date()): Promise<number> {
   const cutoff = new Date(now.getTime() - MESSAGE_TTL_MS);
 
-  const { count } = await db.message.deleteMany({
-    where: {
-      createdAt: { lt: cutoff },
-      // Staff notes outlive the thread they are in.
-      fromStaff: false,
-      conversation: {
-        orders: { none: {} },
-        flaggedAt: null,
-      },
-    },
-  });
-
-  return count;
+  return db.$executeRaw`
+    DELETE FROM "Message" AS m
+    WHERE m."createdAt" < ${cutoff}
+      AND m."fromStaff" = false
+      AND EXISTS (
+        SELECT 1 FROM "Conversation" AS c
+        WHERE c."id" = m."conversationId" AND c."flaggedAt" IS NULL
+      )
+      AND NOT EXISTS (
+        SELECT 1 FROM "Order" AS o
+        WHERE o."conversationId" = m."conversationId"
+          AND o."listingId" = m."listingId"
+      )
+  `;
 }
 
 /**

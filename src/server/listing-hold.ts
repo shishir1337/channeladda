@@ -298,7 +298,12 @@ export async function closeOpenOffers(
 ): Promise<ClosedOffer[]> {
   const open = await tx.offer.findMany({
     where: { listingId, status: "OPEN" },
-    select: { id: true, buyerId: true, amountUsd: true },
+    select: {
+      id: true,
+      buyerId: true,
+      amountUsd: true,
+      listing: { select: { sellerId: true } },
+    },
   });
   const closed: ClosedOffer[] = [];
   for (const other of open) {
@@ -309,7 +314,12 @@ export async function closeOpenOffers(
     });
     if (moved.count !== 1 || own) continue;
     const thread = await tx.conversation.findUnique({
-      where: { listingId_buyerId: { listingId, buyerId: other.buyerId } },
+      where: {
+        buyerId_sellerId: {
+          buyerId: other.buyerId,
+          sellerId: other.listing.sellerId,
+        },
+      },
       select: { id: true },
     });
     if (thread) {
@@ -319,6 +329,7 @@ export async function closeOpenOffers(
         event: { type: "offer-auto-declined", amountCents: other.amountUsd },
         senderId: null,
         offerId: other.id,
+        listingId,
         at: now,
       });
     }

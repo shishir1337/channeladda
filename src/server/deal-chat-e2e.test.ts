@@ -42,12 +42,17 @@ function asUser(id: string, name: string): CurrentUser {
 }
 
 async function panelsOf(conversationId: string) {
+  // One listing in these conversations: the one its first line is about.
+  const { listingId } = await db.message.findFirstOrThrow({
+    where: { conversationId },
+    orderBy: { createdAt: "asc" },
+  });
   const out: Record<
     PanelViewer,
     ReturnType<typeof dealPanelState>
   > = {} as never;
   for (const viewer of ["buyer", "seller", "agent"] as const) {
-    const input = await loadPanelInput(conversationId, viewer);
+    const input = await loadPanelInput(conversationId, listingId, viewer);
     if (!input) throw new Error("no panel input");
     out[viewer] = dealPanelState(input);
   }
@@ -84,6 +89,7 @@ test(
     const id = opened.id;
     await sendMessage({
       conversationId: id,
+      listingId: listing.id,
       sender: asUser(seller.id, seller.name),
       body: "Still available. Revenue is steady.",
     });
@@ -247,6 +253,7 @@ test(
     const price = await proposePrice({
       sellerId: seller.id,
       conversationId: id,
+      listingId: listing.id,
       amountCents: 9_500,
       message: "For you.",
       expiryHours: 48,

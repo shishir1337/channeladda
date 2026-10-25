@@ -557,9 +557,10 @@ test(
       (await db.listing.findUniqueOrThrow({ where: { id: listing.id } }))
         .status,
     ).toBe("REMOVED");
+    // The buyer's chat about it is still there.
     expect(
-      await db.conversation.count({ where: { listingId: listing.id } }),
-    ).toBe(1);
+      await db.message.count({ where: { listingId: listing.id } }),
+    ).toBeGreaterThan(0);
   }),
 );
 

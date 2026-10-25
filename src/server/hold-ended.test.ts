@@ -81,7 +81,7 @@ test(
       ),
     ).toHaveLength(1);
     const conversation = await db.conversation.findFirstOrThrow({
-      where: { listingId: listing.id },
+      where: { messages: { some: { listingId: listing.id } } },
       select: { id: true },
     });
     const last = await db.message.findFirstOrThrow({

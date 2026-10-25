@@ -47,6 +47,7 @@ test(
     const before = await threadFingerprint(t.id, t.viewer);
     await sendMessage({
       conversationId: t.id,
+      listingId: t.listing.id,
       sender: asUser(t.seller.id),
       body: "Still available.",
     });

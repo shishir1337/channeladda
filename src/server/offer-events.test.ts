@@ -64,9 +64,10 @@ async function offer(
   return made.value;
 }
 
+/** The conversation between this buyer and the listing's seller. */
 const thread = (listingId: string, buyerId: string) =>
-  db.conversation.findUniqueOrThrow({
-    where: { listingId_buyerId: { listingId, buyerId } },
+  db.conversation.findFirstOrThrow({
+    where: { buyerId, seller: { listings: { some: { id: listingId } } } },
   });
 
 const entries = (conversationId: string) =>

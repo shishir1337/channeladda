@@ -117,8 +117,15 @@ export default async function ThreadPage({
 
   await markThreadRead(id, user);
 
+  // The listing the page is about: the one the newest line is about.
+  const lastListing = thread.messages.at(-1)?.listingId;
+  const focus =
+    thread.listings.find((listing) => listing.id === lastListing) ??
+    thread.listings[0] ??
+    null;
+
   const [panelInput, settings] = await Promise.all([
-    loadPanelInput(id, thread.viewerRole),
+    focus ? loadPanelInput(id, focus.id, thread.viewerRole) : null,
     getSettings(),
   ]);
   const panel = panelInput ? dealPanelState(panelInput) : null;
@@ -192,12 +199,12 @@ export default async function ThreadPage({
   // on the table now, and never in a conversation staff closed — an offer
   // made elsewhere still lands here, but this box is for writing.
   const offerComposer: OfferComposerConfig | null =
-    !closed && (panel?.kind === "buy" || panel?.kind === "propose")
+    focus && !closed && (panel?.kind === "buy" || panel?.kind === "propose")
       ? {
           mode: panel.kind === "buy" ? "offer" : "price",
           conversationId: thread.id,
-          listingId: thread.listingId,
-          askingPrice: fromCents(thread.listingPrice),
+          listingId: focus.id,
+          askingPrice: fromCents(focus.priceCents),
           expiryHours: settings.offerExpiryHours,
         }
       : null;
@@ -229,12 +236,16 @@ export default async function ThreadPage({
             otherSide
           )
         }
-        listing={{
-          href: thread.listingOnSale ? `/listing/${thread.listingSlug}` : null,
-          handle: thread.listingHandle,
-          title: thread.listingTitle,
-        }}
-        channel={channelOf(thread.listingPlatform, thread.listingSourceUrl)}
+        listing={
+          focus
+            ? {
+                href: focus.onSale ? `/listing/${focus.slug}` : null,
+                handle: focus.handle,
+                title: focus.title,
+              }
+            : null
+        }
+        channel={focus ? channelOf(focus.platform, focus.sourceUrl) : null}
         record={
           otherRecord ? (
             <TrackRecordLine
@@ -289,7 +300,7 @@ export default async function ThreadPage({
             "lg:@3xl:grid lg:@3xl:grid-cols-[minmax(0,1fr)_19rem] lg:@3xl:grid-rows-[minmax(0,1fr)] lg:@3xl:gap-6",
         )}
       >
-        {panel ? (
+        {panel && focus ? (
           <div className={cn("min-w-0 shrink-0", PANEL_COLUMN)}>
             {certificate && deal ? (
               // A deal that went through ends on congratulations and the
@@ -314,15 +325,15 @@ export default async function ThreadPage({
                 state={toPanelView(panel)}
                 viewerRole={thread.viewerRole}
                 otherName={otherSide.split(/\s+/)[0] || otherSide}
-                listingSlug={thread.listingSlug}
+                listingSlug={focus.slug}
                 progress={progress}
                 wait={deal?.wait ?? null}
               >
                 {panel.kind === "buy" || panel.kind === "start-deal" ? (
                   <StartDeal
-                    listingId={thread.listingId}
-                    listingSlug={thread.listingSlug}
-                    platform={thread.listingPlatform}
+                    listingId={focus.id}
+                    listingSlug={focus.slug}
+                    platform={focus.platform}
                     // The held price when one was agreed, as createDeal will use.
                     price={fromCents(
                       panel.kind === "start-deal"
@@ -397,6 +408,7 @@ export default async function ThreadPage({
         >
           <ThreadView
             conversationId={thread.id}
+            listingId={focus?.id ?? null}
             otherSide={otherSide}
             closed={composerClosed}
             viewerRole={thread.viewerRole}

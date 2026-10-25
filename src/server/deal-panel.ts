@@ -8,32 +8,38 @@ import { awaitsAgent } from "@/lib/deal-templates";
 import { heldByAcceptedOffer, offerTurn } from "@/server/offers";
 
 /**
- * Everything the deal panel is worked out from, for one conversation.
+ * Everything the deal panel is worked out from, for one listing of one
+ * conversation.
  *
- * The conversation is one buyer and one listing, so its offers are that
- * buyer's offers on that listing, and its deals are the ones linked to it —
- * the newest of each is what the panel is about. Whether the reader may see
- * the conversation at all is decided before this is called, by the same rule
- * as the thread itself; this only reads.
+ * The conversation is one buyer and one seller, and may be about several
+ * of the seller's listings — two deals can run in it at once. So the panel
+ * is per listing: that buyer's offers on that listing, and the deals on it
+ * linked to this conversation, the newest of each. Null for a listing that
+ * is not the seller's. Whether the reader may see the conversation at all —
+ * and, for the agent of a deal, this listing — is decided before this is
+ * called, by the same rule as the thread itself; this only reads.
  */
 export async function loadPanelInput(
   conversationId: string,
+  listingId: string,
   viewer: PanelViewer,
   now = new Date(),
 ): Promise<PanelInput | null> {
-  const thread = await db.conversation.findUnique({
-    where: { id: conversationId },
-    select: {
-      buyerId: true,
-      listingId: true,
-      listing: { select: { status: true, priceUsd: true } },
-    },
-  });
-  if (!thread) return null;
+  const [thread, listing] = await Promise.all([
+    db.conversation.findUnique({
+      where: { id: conversationId },
+      select: { buyerId: true, sellerId: true },
+    }),
+    db.listing.findUnique({
+      where: { id: listingId },
+      select: { sellerId: true, status: true, priceUsd: true },
+    }),
+  ]);
+  if (!thread || !listing || listing.sellerId !== thread.sellerId) return null;
 
   const [latest, held, order] = await Promise.all([
     db.offer.findFirst({
-      where: { listingId: thread.listingId, buyerId: thread.buyerId },
+      where: { listingId, buyerId: thread.buyerId },
       orderBy: { createdAt: "desc" },
       select: {
         id: true,
@@ -43,9 +49,9 @@ export async function loadPanelInput(
         expiresAt: true,
       },
     }),
-    heldByAcceptedOffer(thread.listingId, thread.buyerId),
+    heldByAcceptedOffer(listingId, thread.buyerId),
     db.order.findFirst({
-      where: { conversationId },
+      where: { conversationId, listingId },
       orderBy: { createdAt: "desc" },
       select: {
         id: true,
@@ -67,8 +73,8 @@ export async function loadPanelInput(
   const next = order?.steps[0];
   return {
     viewer,
-    listingStatus: thread.listing.status,
-    askingCents: thread.listing.priceUsd,
+    listingStatus: listing.status,
+    askingCents: listing.priceUsd,
     latestOffer: latest
       ? {
           id: latest.id,

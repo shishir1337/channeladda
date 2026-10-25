@@ -58,6 +58,7 @@ test(
     const { offerId } = await offerOn(listing.id, buyer.id, "Best I can do.");
     await sendMessage({
       conversationId: opened.id,
+      listingId: listing.id,
       sender: asUser(seller.id),
       body: "Let me think about it.",
     });
@@ -66,6 +67,7 @@ test(
       kind: "EVENT",
       event: { type: "payment-received", reference: "CA-11111" },
       senderId: null,
+      listingId: listing.id,
     });
 
     const thread = await getThread(opened.id, asUser(buyer.id));

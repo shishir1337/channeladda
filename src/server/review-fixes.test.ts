@@ -80,6 +80,7 @@ test(
     expect(
       await sendMessage({
         conversationId: opened.id,
+        listingId: listing.id,
         sender: asUser(buyer.id),
         body: "look",
         attachmentKey: "https://attacker.example/pixel.gif",
@@ -104,6 +105,7 @@ test(
     expect(
       await sendMessage({
         conversationId: opened.id,
+        listingId: listing.id,
         sender: asUser(buyer.id),
         body: "look",
         attachmentKey: `proof/${"b".repeat(32)}.png`,
@@ -126,6 +128,7 @@ test(
     await db.message.create({
       data: {
         conversationId: opened.id,
+        listingId: listing.id,
         senderId: buyer.id,
         body: "planted",
         attachmentUrl: `/uploads/proof/${"c".repeat(32)}.png`,
@@ -537,6 +540,7 @@ test(
     await db.message.create({
       data: {
         conversationId: opened.id,
+        listingId: listing.id,
         senderId: buyer.id,
         body: "here",
         attachmentUrl: `/uploads/${key}`,
@@ -665,12 +669,13 @@ test(
     const key = `message/${"e".repeat(32)}.png`;
 
     const conversation = await db.conversation.create({
-      data: { listingId: listing.id, buyerId: buyer.id, sellerId: seller.id },
+      data: { buyerId: buyer.id, sellerId: seller.id },
       select: { id: true },
     });
     await db.message.create({
       data: {
         conversationId: conversation.id,
+        listingId: listing.id,
         senderId: buyer.id,
         body: "here",
         attachmentUrl: `/uploads/${key}`,
@@ -889,6 +894,7 @@ test(
 
     const sent = await sendMessage({
       conversationId: opened.id,
+      listingId: listing.id,
       sender: asUser(buyer.id),
       body: "look",
       attachmentKey: key,

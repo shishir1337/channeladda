@@ -214,6 +214,9 @@ function toThreadMessage(
   return {
     id: row.id,
     kind: "TEXT",
+    // About no listing: this chat is the member and Channel Adda.
+    listingId: null,
+    opensDeal: false,
     body: row.body,
     createdAt: row.createdAt,
     mine: row.senderId === viewerId,

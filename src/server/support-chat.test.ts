@@ -384,7 +384,7 @@ test(
     const inbox = await memberInbox(buyer);
     expect(inbox.map((row) => row.kind)).toEqual(["escrow-agent", "thread"]);
     const thread = inbox[1];
-    expect(thread?.kind === "thread" && thread.deal).toBeTruthy();
+    expect(thread?.kind === "thread" && thread.deals.length > 0).toBeTruthy();
   }),
 );
 

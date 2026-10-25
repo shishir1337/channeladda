@@ -46,15 +46,15 @@ export default async function MessagesLayout({ children }: LayoutProps<"/">) {
         }}
         threads={threads.map((thread) => ({
           id: thread.id,
-          listingTitle: thread.listingTitle,
-          listingHandle: thread.listingHandle,
+          listingTitle: thread.latestListingTitle,
+          listingHandle: thread.listingHandles[0] ?? "",
           withName: thread.withName,
           lastMessageAt: thread.lastMessageAt.toISOString(),
           preview: thread.preview,
           unread: thread.unread > 0,
           flagged: thread.flagged,
           closed: thread.closed,
-          deal: thread.deal,
+          deal: thread.deals[0] ?? null,
         }))}
       />
 

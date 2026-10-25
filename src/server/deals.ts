@@ -429,10 +429,11 @@ export async function createDeal(input: {
         // Every deal has one now: a buyer who never wrote to the seller gets
         // the thread here, so the agent has somewhere to talk to both. The
         // link lives on the deal, not the thread, so a second deal opened in
-        // the same conversation after the first lapsed is linked too. Inside
-        // the transaction: if the order rolls back, the link does too.
+        // the same conversation — after the first lapsed, or on another of
+        // the seller's listings — is linked too. One conversation per buyer
+        // and seller, whatever the listing. Inside the transaction: if the
+        // order rolls back, the link does too.
         const conversationId = await ensureConversation(tx, {
-          listingId: listing.id,
           buyerId: input.buyerId,
           sellerId: listing.sellerId,
         });
@@ -484,6 +485,7 @@ export async function createDeal(input: {
           },
           senderId: input.buyerId,
           orderId: order.id,
+          listingId: listing.id,
           at: now,
         });
 

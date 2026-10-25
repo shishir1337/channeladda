@@ -67,6 +67,7 @@ test(
     const price = await proposePrice({
       sellerId: seller.id,
       conversationId: made.value.conversationId,
+      listingId: listing.id,
       amountCents: 9_000,
       message: null,
       expiryHours: 48,

@@ -451,6 +451,7 @@ function Bubble({
 
 export function ThreadView({
   conversationId,
+  listingId = null,
   messages,
   closed,
   otherSide,
@@ -463,6 +464,8 @@ export function ThreadView({
   footnote = null,
 }: {
   conversationId: string;
+  /** The listing a line written here is about. */
+  listingId?: string | null;
   messages: ThreadMessageView[];
   closed: boolean;
   /** Who the reader is talking to, for the empty state. */
@@ -586,7 +589,9 @@ export function ThreadView({
     startTransition(async () => {
       const result = sendWith
         ? await sendWith(body, attachment?.key)
-        : await postMessage(conversationId, body, attachment?.key);
+        : listingId
+          ? await postMessage(conversationId, listingId, body, attachment?.key)
+          : { ok: false as const, error: "Pick what this message is about." };
       if (!result.ok) {
         setError(result.error);
         return;
