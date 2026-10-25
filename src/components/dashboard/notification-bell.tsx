@@ -16,6 +16,7 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
+import { SoundToggle } from "@/components/app/notification-sound";
 import { iconTile } from "@/components/ui/icon-hue";
 import type { NotificationKind } from "@/generated/prisma/enums";
 import { cn } from "@/lib/utils";
@@ -149,22 +150,26 @@ export function NotificationBell({
         >
           <div className="flex h-11 items-center justify-between gap-3 border-b border-line px-4">
             <p className="text-sm font-semibold text-fg">Notifications</p>
-            {unread > 0 ? (
-              <button
-                type="button"
-                disabled={pending}
-                onClick={() =>
-                  startTransition(async () => {
-                    await readAll();
-                    router.refresh();
-                  })
-                }
-                className="-mr-1.5 inline-flex h-11 cursor-pointer items-center gap-1.5 rounded-md px-1.5 text-xs font-medium text-muted transition-colors hover:bg-surface-2 hover:text-fg disabled:opacity-60 pointer-fine:h-7"
-              >
-                <CheckCheckIcon aria-hidden="true" className="size-3.5" />
-                Mark all read
-              </button>
-            ) : null}
+            <div className="-mr-1.5 flex items-center gap-0.5">
+              {/* Where people look when a chime surprises them. */}
+              <SoundToggle />
+              {unread > 0 ? (
+                <button
+                  type="button"
+                  disabled={pending}
+                  onClick={() =>
+                    startTransition(async () => {
+                      await readAll();
+                      router.refresh();
+                    })
+                  }
+                  className="inline-flex h-11 cursor-pointer items-center gap-1.5 rounded-md px-1.5 text-xs font-medium text-muted transition-colors hover:bg-surface-2 hover:text-fg disabled:opacity-60 pointer-fine:h-7"
+                >
+                  <CheckCheckIcon aria-hidden="true" className="size-3.5" />
+                  Mark all read
+                </button>
+              ) : null}
+            </div>
           </div>
 
           {items.length === 0 ? (

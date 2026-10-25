@@ -28,6 +28,7 @@ import {
 import Link, { useLinkStatus } from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { NotificationSound } from "@/components/app/notification-sound";
 import {
   Avatar,
   type ShellUser,
@@ -960,6 +961,10 @@ export function AppShell({
           {showTabs && tabs ? (
             <TabBar tabs={tabs} pathname={pathname} moreWaiting={moreWaiting} />
           ) : null}
+
+          {/* The chime for anything new, heard from another tab too; it
+              redraws the bell, which the server draws. */}
+          <NotificationSound enabled redrawBell />
 
           {/* ---- the same rail, on a phone ----------------------------------- */}
           <SheetContent

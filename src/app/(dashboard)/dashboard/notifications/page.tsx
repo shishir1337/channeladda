@@ -22,6 +22,7 @@ import {
   PageHeader,
   Section,
 } from "@/components/app/kit";
+import { SoundToggle } from "@/components/app/notification-sound";
 import { MarkAllRead } from "@/components/dashboard/mark-all-read";
 import { Button } from "@/components/ui/button";
 import type { NotificationKind } from "@/generated/prisma/enums";
@@ -81,7 +82,14 @@ export default async function NotificationsPage() {
           unread > 0 ? `${unread} of these have not been read yet.` : undefined
         }
         info="Everything that has happened on your deals, listings and offers."
-        actions={unread > 0 ? <MarkAllRead /> : undefined}
+        actions={
+          <>
+            {/* Per browser: a chime when something new arrives, even in
+                another tab. */}
+            <SoundToggle variant="button" />
+            {unread > 0 ? <MarkAllRead /> : null}
+          </>
+        }
       />
 
       <Section>

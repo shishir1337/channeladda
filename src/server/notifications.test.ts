@@ -1,6 +1,7 @@
 import { expect, test } from "vitest";
 import { db } from "@/lib/db";
 import {
+  latestUnread,
   listNotifications,
   markAllRead,
   markRead,
@@ -162,6 +163,48 @@ test(
     const rows = await listNotifications(user.id, 3);
     expect(rows).toHaveLength(3);
     expect(rows[0].title).toBe("Thing 4");
+  }),
+);
+
+test(
+  "the chime's pulse: only unread, newest first, and a thread's next line moves forward",
+  withCleanDb(async () => {
+    // The browser chimes when the newest unread time moves on. A collapsed
+    // thread row keeps its id, so its time is what has to move.
+    const user = await seedUser();
+    await notify({
+      userId: user.id,
+      kind: "OFFER",
+      title: "Old news",
+      body: "Body",
+    });
+    await markAllRead(user.id);
+    await notify({
+      userId: user.id,
+      kind: "MESSAGE",
+      title: "Hannah sent you a message",
+      body: "First",
+      href: "/dashboard/messages/abc",
+      collapseKey: "thread:abc",
+    });
+    const [first] = await latestUnread(user.id);
+    expect(first.kind).toBe("MESSAGE");
+    expect(await latestUnread(user.id)).toHaveLength(1);
+
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    await notify({
+      userId: user.id,
+      kind: "MESSAGE",
+      title: "Hannah sent you a message",
+      body: "Second",
+      href: "/dashboard/messages/abc",
+      collapseKey: "thread:abc",
+    });
+    const [again] = await latestUnread(user.id);
+    expect(again.id).toBe(first.id);
+    expect(again.createdAt.getTime()).toBeGreaterThan(
+      first.createdAt.getTime(),
+    );
   }),
 );
 

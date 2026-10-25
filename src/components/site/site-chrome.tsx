@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { SiteNotificationSound } from "@/components/app/notification-sound";
 import { AnnouncementBar } from "@/components/site/announcement-bar";
 import { MemberCountsProvider } from "@/components/site/member-counts";
 import { MessagesButton } from "@/components/site/messages-button";
@@ -36,6 +37,8 @@ export function SiteChrome({ children }: { children: ReactNode }) {
         <SiteFooter />
         <SiteDock />
         <MessagesButton />
+        {/* The chime for a signed-in member, heard from another tab too. */}
+        <SiteNotificationSound />
       </SiteMenuProvider>
     </MemberCountsProvider>
   );

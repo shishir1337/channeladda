@@ -164,6 +164,29 @@ export async function unreadCount(userId: string): Promise<number> {
 }
 
 /**
+ * The newest few unread, for the chime (`/api/notifications/pulse`).
+ *
+ * Every open tab asks for this every 15 seconds, so it reads the same index
+ * as `unreadCount` and only the columns the browser needs to tell new from
+ * old. Time, not id, is what tells them apart: a collapsed row (see
+ * `collapseKey`) keeps its id and moves its time forward, and the tenth line
+ * in a thread is news too.
+ */
+export async function latestUnread(
+  userId: string,
+  take = 5,
+): Promise<
+  { id: string; kind: NotificationKind; href: string | null; createdAt: Date }[]
+> {
+  return db.notification.findMany({
+    where: { userId, readAt: null },
+    orderBy: { createdAt: "desc" },
+    take,
+    select: { id: true, kind: true, href: true, createdAt: true },
+  });
+}
+
+/**
  * Scoped to the owner, always.
  *
  * `updateMany` rather than `update` so an id that belongs to somebody else
