@@ -1,7 +1,9 @@
+import { headers } from "next/headers";
 import type { NavGroup } from "@/components/dashboard/app-shell";
 import { AppShell } from "@/components/dashboard/app-shell";
 import { NotificationBell } from "@/components/dashboard/notification-bell";
 import { isKycReviewer } from "@/lib/kyc";
+import { adminNext, PATH_HEADER } from "@/lib/proxy-rules";
 import { countOpenDisputes } from "@/server/admin-disputes";
 import { getQueueCounts } from "@/server/admin-listings";
 import { countPendingKyc } from "@/server/kyc";
@@ -66,7 +68,11 @@ function shellUser(user: CurrentUser) {
 }
 
 export default async function AdminLayout({ children }: LayoutProps<"/">) {
-  const staff = await requireAdminArea();
+  // The page being opened, from the proxy, so a signed-out member of staff
+  // following a link to a dispute is brought back to that dispute.
+  const staff = await requireAdminArea(
+    adminNext((await headers()).get(PATH_HEADER)),
+  );
 
   // Every live agent answers Escrow Agent chats, agents included, so this
   // one count is drawn on both navs. Started here, awaited with the rest;

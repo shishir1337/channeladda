@@ -22,11 +22,11 @@ export default function AdminNotFound() {
     <div className="mx-auto flex w-full max-w-[34rem] flex-col items-center px-4 py-16 text-center sm:py-24">
       <IconTile icon={ShieldAlertIcon} size="lg" />
       <h1 className="mt-4 text-[0.9375rem] leading-6 font-semibold text-fg">
-        Nothing here
+        That page isn’t here
       </h1>
       <p className="mt-1 max-w-[46ch] text-[0.8125rem] leading-relaxed text-muted">
-        That page does not exist, or is not open to your account. Each desk
-        answers to a different role.
+        The link may be wrong, or the page is not open to your account. Each
+        desk answers to a different role.
       </p>
       <div className="mt-6 flex flex-wrap justify-center gap-2">
         <Button asChild size="md">

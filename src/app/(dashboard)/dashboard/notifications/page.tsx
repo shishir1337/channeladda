@@ -26,6 +26,7 @@ import { requireUser } from "@/server/session";
 
 export const metadata: Metadata = {
   title: "Notifications",
+  robots: { index: false, follow: false },
 };
 
 /**

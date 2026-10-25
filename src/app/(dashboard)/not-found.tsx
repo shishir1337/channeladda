@@ -10,8 +10,11 @@ export const metadata: Metadata = {
 };
 
 /**
- * Handles `notFound()` thrown inside the (dashboard) group — most often a
- * listing id that belongs to somebody else.
+ * Handles `notFound()` thrown inside the (dashboard) group: a deal, a
+ * conversation, a listing or an offer that does not exist or is somebody
+ * else's. It used to talk about listings being sold, which was wrong for
+ * every deal and conversation link that ended here, so it says only what is
+ * true of all of them.
  *
  * Without this, the root not-found would render here instead, and because that
  * one draws the chrome itself the page would end up with two `<main id="main">`
@@ -26,8 +29,8 @@ export default function DashboardNotFound() {
       <h1 className="sr-only">Page not found</h1>
       <EmptyState
         icon={CompassIcon}
-        title="This page has been sold, moved or never existed"
-        body="If you followed a link to a listing, it may have been withdrawn by the seller or already sold."
+        title="That page isn’t here"
+        body="The link may be wrong, or what it pointed to has moved or is not open to your account."
         action={
           <>
             <Button asChild size="md">

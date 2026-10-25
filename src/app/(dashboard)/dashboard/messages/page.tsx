@@ -31,6 +31,23 @@ const PANE =
  */
 export default async function MessagesPage() {
   const user = await requireUser("/dashboard/messages");
+  // Every other dashboard page opens with its title as the page's heading;
+  // here the list in the layout and the pane are the page, and the pane's
+  // title is a section heading. The page's own is for screen readers, who
+  // otherwise land on a page with no top-level heading at all.
+  return (
+    <>
+      <h1 className="sr-only">Messages</h1>
+      <MessagesPane user={user} />
+    </>
+  );
+}
+
+async function MessagesPane({
+  user,
+}: {
+  user: Awaited<ReturnType<typeof requireUser>>;
+}) {
   const { escrowAgent, threads } = splitInbox(await memberInbox(user));
   const unread = threads.filter((thread) => thread.unread > 0);
   // By time, not position: running deals are listed first, so the last row

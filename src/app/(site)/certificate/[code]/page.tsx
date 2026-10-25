@@ -1,7 +1,6 @@
-import { BadgeCheckIcon, SearchXIcon } from "lucide-react";
+import { BadgeCheckIcon } from "lucide-react";
 import type { Metadata } from "next";
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
+import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
 import { Container, Section } from "@/components/ui/section";
 import type { Platform } from "@/generated/prisma/enums";
@@ -40,6 +39,10 @@ export default async function CertificateCheckPage({
 }: PageProps<"/certificate/[code]">) {
   const { code } = await params;
   const certificate = await verifyCertificate(decodeURIComponent(code));
+  // A code that is not one of ours is a 404, not a page saying so with a
+  // 200: there is no certificate at this address. The answer the visitor
+  // came for is still given, by the not-found page beside this one.
+  if (!certificate) notFound();
 
   return (
     <>
@@ -53,71 +56,42 @@ export default async function CertificateCheckPage({
       />
       <Section className="pt-6 sm:pt-8">
         <Container narrow>
-          {certificate ? (
-            <div className="max-w-2xl overflow-hidden rounded-panel border border-verified/30 bg-surface">
-              <div className="flex items-center gap-3 border-b border-verified/20 bg-verified-soft px-5 py-4 sm:px-6">
-                <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-verified text-bg">
-                  <BadgeCheckIcon aria-hidden="true" className="size-5" />
-                </span>
-                <div className="min-w-0">
-                  <p className="text-base font-semibold text-fg">
-                    This certificate is genuine
-                  </p>
-                  <p className="text-[0.8125rem] text-muted">
-                    Issued by Channel Adda for deal {certificate.reference}.
-                  </p>
-                </div>
-              </div>
-              <dl className="divide-y divide-line text-sm">
-                <Row
-                  label="Account"
-                  value={`${certificate.handle} on ${PLATFORM_NAME[certificate.platform]}`}
-                />
-                <Row label="From the seller" value={certificate.sellerName} />
-                <Row label="To the buyer" value={certificate.buyerName} />
-                <Row
-                  label="Transfer completed"
-                  value={day(certificate.completedAt)}
-                />
-                <Row
-                  label="Deal type"
-                  value={
-                    certificate.mode === "SAFEST"
-                      ? "Safest, with our agent holding the account"
-                      : "Fastest, with our agent holding the money"
-                  }
-                />
-                <Row label="Certificate no." value={certificate.code} mono />
-              </dl>
-            </div>
-          ) : (
-            <div className="max-w-2xl rounded-panel border border-danger/25 bg-danger-soft/60 p-5 sm:p-6">
-              <div className="flex items-start gap-3">
-                <SearchXIcon
-                  aria-hidden="true"
-                  className="mt-0.5 size-5 shrink-0 text-danger"
-                />
-                <div className="min-w-0">
-                  <p className="text-base font-semibold text-fg">
-                    We could not find this certificate
-                  </p>
-                  <p className="mt-1 text-sm leading-relaxed text-muted">
-                    Check the code letter by letter. If it is right, the
-                    certificate is not one of ours, or the deal it came from was
-                    reopened.
-                  </p>
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    <Button asChild size="sm" variant="secondary">
-                      <Link href="/certificate">Try another code</Link>
-                    </Button>
-                    <Button asChild size="sm" variant="ghost">
-                      <Link href="/support">Contact support</Link>
-                    </Button>
-                  </div>
-                </div>
+          <div className="max-w-2xl overflow-hidden rounded-panel border border-verified/30 bg-surface">
+            <div className="flex items-center gap-3 border-b border-verified/20 bg-verified-soft px-5 py-4 sm:px-6">
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-verified text-bg">
+                <BadgeCheckIcon aria-hidden="true" className="size-5" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-base font-semibold text-fg">
+                  This certificate is genuine
+                </p>
+                <p className="text-[0.8125rem] text-muted">
+                  Issued by Channel Adda for deal {certificate.reference}.
+                </p>
               </div>
             </div>
-          )}
+            <dl className="divide-y divide-line text-sm">
+              <Row
+                label="Account"
+                value={`${certificate.handle} on ${PLATFORM_NAME[certificate.platform]}`}
+              />
+              <Row label="From the seller" value={certificate.sellerName} />
+              <Row label="To the buyer" value={certificate.buyerName} />
+              <Row
+                label="Transfer completed"
+                value={day(certificate.completedAt)}
+              />
+              <Row
+                label="Deal type"
+                value={
+                  certificate.mode === "SAFEST"
+                    ? "Safest, with our agent holding the account"
+                    : "Fastest, with our agent holding the money"
+                }
+              />
+              <Row label="Certificate no." value={certificate.code} mono />
+            </dl>
+          </div>
         </Container>
       </Section>
     </>

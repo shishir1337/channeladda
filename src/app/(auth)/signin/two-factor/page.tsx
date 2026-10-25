@@ -1,7 +1,11 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { TwoFactorChallenge } from "@/components/auth/two-factor-challenge";
+import { hasPendingTwoFactor } from "@/lib/pending-sign-in";
+import { safeNext } from "@/lib/safe-next";
 import { supportHref } from "@/lib/support";
 
 export const metadata: Metadata = {
@@ -21,6 +25,19 @@ export default async function TwoFactorPage({
   searchParams,
 }: PageProps<"/signin/two-factor">) {
   const { next } = await searchParams;
+  const after = safeNext(next);
+
+  // Opened with no sign-in half done — a bookmark, a back button, a link —
+  // this page told the visitor their password was right when nobody had
+  // typed one. Without the half-finished sign-in there is no code to check,
+  // so they start at the beginning, still headed where they meant to go.
+  if (!hasPendingTwoFactor(await cookies())) {
+    redirect(
+      after === "/dashboard"
+        ? "/signin"
+        : `/signin?next=${encodeURIComponent(after)}`,
+    );
+  }
 
   return (
     <AuthShell
@@ -40,9 +57,7 @@ export default async function TwoFactorPage({
         </p>
       }
     >
-      <TwoFactorChallenge
-        next={typeof next === "string" ? next : "/dashboard"}
-      />
+      <TwoFactorChallenge next={after} />
     </AuthShell>
   );
 }

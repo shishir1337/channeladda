@@ -83,9 +83,12 @@ export async function requireStaff(): Promise<CurrentUser> {
  * listing queue, user management, messages or support gets the same 404 a
  * stranger would. The only things this opens are the shell, the deal pages
  * and the Escrow Agent chats (`/admin/support-chats`, `SUPPORT_CHAT_ROLES`).
+ *
+ * `next` is the page a signed-out visitor was opening, so sign-in can bring
+ * them back to it, as it does for the dashboard.
  */
-export async function requireAdminArea(): Promise<CurrentUser> {
-  const user = await requireUser();
+export async function requireAdminArea(next?: string): Promise<CurrentUser> {
+  const user = await requireUser(next);
   if (!STAFF.includes(user.role) && user.role !== "AGENT") notFound();
   return user;
 }
