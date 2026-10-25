@@ -1,6 +1,7 @@
 "use client";
 
 import { CameraIcon, Loader2Icon } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useId, useRef, useState, useTransition } from "react";
 import { Avatar } from "@/components/app/user-menu";
@@ -187,8 +188,19 @@ export function ProfileForm({
         />
       </div>
 
-      <p className="mt-4 text-[0.8125rem] text-muted">
-        Email <span className="font-medium text-fg">{email}</span>
+      {/* Changed on the security page, which asks for the password first;
+          the link opens that form ready to fill. */}
+      <p className="mt-4 flex flex-wrap items-center gap-x-2 text-[0.8125rem] text-muted">
+        <span className="min-w-0">
+          Email <span className="font-medium break-all text-fg">{email}</span>
+        </span>
+        <Link
+          href="/dashboard/security#change-email"
+          aria-label="Change your email"
+          className="-my-3 inline-flex min-h-11 items-center rounded-md font-medium text-fg underline decoration-line-strong underline-offset-4 transition-colors hover:decoration-fg pointer-fine:-my-1 pointer-fine:min-h-6"
+        >
+          Change
+        </Link>
       </p>
 
       <div className="mt-5 flex flex-wrap items-center gap-x-3 gap-y-2">

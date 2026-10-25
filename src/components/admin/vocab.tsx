@@ -473,6 +473,8 @@ export const AUDIT_LABEL: Record<string, string> = {
   "user.kyc": "recorded an identity check",
   "user.two_factor_reset": "reset someone’s two-step verification",
   "user.email_verified": "verified an email address by hand",
+  "user.email_changed": "changed their email",
+  "user.password_changed": "changed their password",
   "user.sessions_ended": "signed someone out everywhere",
   "staff.invite_revoked": "withdrew an invitation",
   "staff.invited": "invited somebody onto the team",

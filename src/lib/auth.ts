@@ -2,13 +2,13 @@ import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { nextCookies } from "better-auth/next-js";
 import { emailOTP, twoFactor } from "better-auth/plugins";
+// Matches the "at least 10 characters" promised on the sign-up screen, and
+// shared with the change-password form so the two can never disagree.
+import { MIN_PASSWORD_LENGTH } from "@/lib/account-security";
 import { CLIENT_IP_HEADERS } from "@/lib/client-ip";
 import { db } from "@/lib/db";
 import { emailVerificationRequired } from "@/lib/email-verification";
 import { sendMail } from "@/server/mailer";
-
-/** Matches the "at least 10 characters" promised on the sign-up screen. */
-export const MIN_PASSWORD_LENGTH = 10;
 
 const baseURL = process.env.BETTER_AUTH_URL ?? "http://localhost:3000";
 
@@ -75,17 +75,46 @@ export const auth = betterAuth({
     // an unverified account may sign in. It flips to true once a real email
     // provider is connected — until then it would lock everyone out.
     requireEmailVerification: false,
+    // The reset screen tells people "every other session has been signed
+    // out", and after a takeover that is the whole point of resetting. It
+    // was not true until this was set.
+    revokeSessionsOnPasswordReset: true,
     async sendResetPassword({ user, url }) {
-      await sendMail({
-        to: user.email,
-        subject: "Reset your Channel Adda password",
-        body:
-          "Someone asked to reset the password on this account. " +
-          "The link below works once and expires in an hour. " +
-          "If this was not you, ignore this email — nothing has changed.",
-        link: url,
-        action: "Reset password",
+      // Someone who signs in with Google has no password to reset; the same
+      // link adds one (Better Auth creates the password account on reset).
+      // The security page offers it, so the email says what it really does.
+      const hasPassword = await db.account.findFirst({
+        where: {
+          userId: user.id,
+          providerId: "credential",
+          password: { not: null },
+        },
+        select: { id: true },
       });
+      await sendMail(
+        hasPassword
+          ? {
+              to: user.email,
+              subject: "Reset your Channel Adda password",
+              body:
+                "Someone asked to reset the password on this account. " +
+                "The link below works once and expires in an hour. " +
+                "If this was not you, ignore this email — nothing has changed.",
+              link: url,
+              action: "Reset password",
+            }
+          : {
+              to: user.email,
+              subject: "Set a password for Channel Adda",
+              body:
+                "Someone asked to add a password to this account, so you can " +
+                "sign in with your email as well as with Google. " +
+                "The link below works once and expires in an hour. " +
+                "If this was not you, ignore this email — nothing has changed.",
+              link: url,
+              action: "Set a password",
+            },
+      );
     },
   },
 
@@ -186,9 +215,17 @@ export const auth = betterAuth({
   },
 
   // The emailOTP plugin brings passwordless sign-in, password reset and email
-  // change by code along with verification. Only verification is wanted:
-  // sign-in by code would walk round the password and two-factor, and reset
-  // and email change already have their own reviewed flows.
+  // change by code along with verification. Only verification is served over
+  // HTTP: sign-in by code would walk round the password and two-factor, and
+  // reset has its own reviewed flow.
+  //
+  // Changing your password or email is done from the security page through
+  // server actions (`@/server/account-security`), which check the current
+  // password, limit tries per member, send the "this was changed" notice and
+  // write the audit row before and after calling Better Auth. The routes
+  // below would let a session skip all four, so they are not served; the
+  // server actions reach the same endpoints through `auth.api`, which these
+  // paths do not affect.
   disabledPaths: [
     "/sign-in/email-otp",
     "/email-otp/request-password-reset",
@@ -196,6 +233,8 @@ export const auth = betterAuth({
     "/forget-password/email-otp",
     "/email-otp/request-email-change",
     "/email-otp/change-email",
+    "/change-password",
+    "/change-email",
   ],
 
   socialProviders: socialProviders(),
@@ -252,7 +291,26 @@ export const auth = betterAuth({
       // An unknown address gets nothing: accounts are made on the sign-up
       // form, which asks for a name, a password and the terms.
       disableSignUp: true,
+      // A new email is confirmed with a code sent to it, when confirmation
+      // is turned on (`@/lib/email-verification`). Only reachable through
+      // the security page's server action — the two routes are in
+      // `disabledPaths` above.
+      changeEmail: { enabled: true },
       async sendVerificationOTP({ email, otp, type }) {
+        if (type === "change-email") {
+          await sendMail({
+            to: email,
+            subject: `${otp} is your Channel Adda code`,
+            heading: "Confirm your new email address",
+            body:
+              "Enter this code on Channel Adda to make this the email for " +
+              "your account. It works once and expires in 10 minutes. " +
+              "If you did not ask for this, ignore this email — nothing " +
+              "will change.",
+            code: otp,
+          });
+          return;
+        }
         if (type !== "email-verification") return;
         await sendMail({
           to: email,

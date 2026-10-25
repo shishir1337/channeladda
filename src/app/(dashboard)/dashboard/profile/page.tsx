@@ -117,8 +117,8 @@ export default async function ProfilePage() {
           <ListItem href="/dashboard/security">
             <ListRow
               leading={<IconTile icon={ShieldCheckIcon} />}
-              title="Password and sign-in"
-              meta="Two-step sign-in"
+              title="Email and password"
+              meta="Change either one, or set up two-step sign-in"
               chevron
             />
           </ListItem>

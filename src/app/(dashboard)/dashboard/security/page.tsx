@@ -24,11 +24,14 @@ import {
   Ring,
 } from "@/components/app/kit";
 import { TwoFactorSetup } from "@/components/auth/two-factor-setup";
+import { SignInDetails } from "@/components/dashboard/account-sign-in";
 import { MyDeskIdentity } from "@/components/deals/my-desk-identity";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { isGoogleEnabled } from "@/lib/auth";
 import { isCustodianRole } from "@/lib/custody-roles";
 import { db } from "@/lib/db";
+import { emailVerificationRequired } from "@/lib/email-verification";
 import { requireUser } from "@/server/session";
 
 export const metadata: Metadata = {
@@ -52,12 +55,21 @@ export default async function SecurityPage() {
 
   const [account, me] = await Promise.all([
     db.account.findFirst({
-      where: { userId: user.id, providerId: "credential" },
+      // With a password in it: the same test the password and email forms
+      // apply on the server (`@/server/account-security`).
+      where: {
+        userId: user.id,
+        providerId: "credential",
+        password: { not: null },
+      },
       select: { id: true },
     }),
     db.user.findUnique({
       where: { id: user.id },
       select: {
+        // From the row, not the session: the session cookie can hold the
+        // old address for a minute after it changes.
+        email: true,
         twoFactorEnabled: true,
         agentEmail: true,
         agentBrand: true,
@@ -119,6 +131,7 @@ export default async function SecurityPage() {
     <>
       <PageHeader
         title="Security"
+        description="Your email, password and two-step sign-in."
         info="Two-step sign-in and a 24-hour payout hold stand between a stolen password and your money."
       />
 
@@ -172,6 +185,14 @@ export default async function SecurityPage() {
             ))}
           </ul>
         </Card>
+
+        {/* ---- email and password ---------------------------------------- */}
+        <SignInDetails
+          email={me?.email ?? user.email}
+          hasPassword={account !== null}
+          confirmByCode={emailVerificationRequired()}
+          googleEnabled={isGoogleEnabled()}
+        />
 
         {/* ---- the control itself ---------------------------------------- */}
         <div id="two-step" className="scroll-mt-24">
