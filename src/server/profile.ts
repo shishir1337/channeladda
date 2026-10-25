@@ -42,6 +42,7 @@ export async function saveProfile(
       name: values.name,
       country: values.country,
       image: values.image,
+      bio: values.bio,
     },
   });
   return { ok: true };

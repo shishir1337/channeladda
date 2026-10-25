@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useId, useRef, useState, useTransition } from "react";
 import { Avatar } from "@/components/app/user-menu";
-import { TextField } from "@/components/auth/fields";
+import { TextArea, TextField } from "@/components/auth/fields";
 import { BusyLabel } from "@/components/messages/chat-parts";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,12 +13,12 @@ import {
   sendUpload,
   uploadRefusal,
 } from "@/components/upload/image-upload";
-import type { ProfileErrors } from "@/lib/profile";
+import { BIO_MAX, type ProfileErrors } from "@/lib/profile";
 import { cn } from "@/lib/utils";
 import { updateProfile } from "@/server/actions/profile";
 
 /**
- * A member's name, country and photo, edited in place.
+ * A member's name, country, photo and bio, edited in place.
  *
  * The photo goes up the moment it is chosen and shows at once; it is only
  * kept when Save is pressed, like the rest of the form.
@@ -27,26 +27,31 @@ export function ProfileForm({
   name: savedName,
   country: savedCountry,
   image: savedImage,
+  bio: savedBio,
   email,
 }: {
   name: string;
   country: string | null;
   image: string | null;
+  bio: string | null;
   email: string;
 }) {
   const router = useRouter();
   const nameId = useId();
   const countryId = useId();
+  const bioId = useId();
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [saved, setSaved] = useState({
     name: savedName,
     country: savedCountry ?? "",
     image: savedImage ?? "",
+    bio: savedBio ?? "",
   });
   const [name, setName] = useState(saved.name);
   const [country, setCountry] = useState(saved.country);
   const [image, setImage] = useState(saved.image);
+  const [bio, setBio] = useState(saved.bio);
   const [uploading, setUploading] = useState(false);
   const [errors, setErrors] = useState<ProfileErrors>({});
   const [note, setNote] = useState<string | null>(null);
@@ -55,6 +60,7 @@ export function ProfileForm({
   const dirty =
     name.trim() !== saved.name ||
     country.trim() !== saved.country ||
+    bio.trim() !== saved.bio ||
     image !== saved.image;
 
   async function choose(file: File) {
@@ -85,10 +91,15 @@ export function ProfileForm({
         event.preventDefault();
         setNote(null);
         startTransition(async () => {
-          const result = await updateProfile({ name, country, image });
+          const result = await updateProfile({ name, country, image, bio });
           if (result.ok) {
             setErrors({});
-            setSaved({ name: name.trim(), country: country.trim(), image });
+            setSaved({
+              name: name.trim(),
+              country: country.trim(),
+              image,
+              bio: bio.trim(),
+            });
             setNote(result.message);
             router.refresh();
           } else {
@@ -187,6 +198,29 @@ export function ProfileForm({
           maxLength={56}
         />
       </div>
+
+      <TextArea
+        id={bioId}
+        name="bio"
+        label="Bio"
+        hint="A few lines about you and what you sell. Buyers read this on your public page before they buy. No links, emails or phone numbers."
+        value={bio}
+        onChange={(event) => setBio(event.target.value)}
+        error={errors.bio}
+        placeholder="I build and sell faceless finance channels. Every handover done within a day."
+        rows={4}
+        maxLength={BIO_MAX}
+        className="mt-4"
+      />
+      <p
+        aria-live="polite"
+        className={cn(
+          "mt-1.5 text-right text-xs tabular-nums",
+          bio.length >= BIO_MAX ? "text-danger" : "text-subtle",
+        )}
+      >
+        {bio.length}/{BIO_MAX}
+      </p>
 
       {/* Changed on the security page, which asks for the password first;
           the link opens that form ready to fill. */}

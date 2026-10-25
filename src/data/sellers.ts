@@ -14,6 +14,8 @@ export type Seller = {
   /** Their profile photo, when they have added one. */
   image?: string | null;
   country: string;
+  /** What they say about themselves, on their public page. */
+  bio?: string | null;
   /** Out of 5, one decimal. */
   /** Null until somebody has actually reviewed them. */
   rating: number | null;

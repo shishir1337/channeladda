@@ -12,7 +12,12 @@ describe("parseProfile", () => {
     });
     expect(result).toEqual({
       ok: true,
-      value: { name: "Nadia Rahman", country: "Bangladesh", image: AVATAR },
+      value: {
+        name: "Nadia Rahman",
+        country: "Bangladesh",
+        image: AVATAR,
+        bio: null,
+      },
     });
   });
 
@@ -20,7 +25,7 @@ describe("parseProfile", () => {
     const result = parseProfile({ name: "Ravi", country: "  ", image: "" });
     expect(result).toEqual({
       ok: true,
-      value: { name: "Ravi", country: null, image: null },
+      value: { name: "Ravi", country: null, image: null, bio: null },
     });
   });
 
@@ -69,5 +74,57 @@ describe("parseProfile", () => {
       const result = parseProfile({ name: "Ravi", country: "", image });
       expect(result.ok, image).toBe(false);
     }
+  });
+});
+
+describe("a bio", () => {
+  const withBio = (bio: string) =>
+    parseProfile({ name: "Ravi", country: "", image: "", bio });
+
+  it("keeps a few lines about the seller, tidied", () => {
+    const result = withBio(
+      "  Faceless finance channels   since 2019.\n\n\n\nI hand over in a day.  ",
+    );
+    expect(result).toEqual({
+      ok: true,
+      value: {
+        name: "Ravi",
+        country: null,
+        image: null,
+        bio: "Faceless finance channels since 2019.\n\nI hand over in a day.",
+      },
+    });
+    expect(withBio("   ")).toMatchObject({ ok: true, value: { bio: null } });
+  });
+
+  it("is kept short", () => {
+    expect(withBio("a".repeat(300)).ok).toBe(true);
+    expect(withBio("a".repeat(301))).toEqual({
+      ok: false,
+      errors: { bio: "Keep it to 300 characters." },
+    });
+  });
+
+  it("has no way to reach the seller off the site", () => {
+    for (const bio of [
+      "Mail me at ravi@gmail.com",
+      "See https://ravi.example",
+      "WhatsApp wa.me/919800000000",
+      "Call +91 98000 00000",
+      "t.me/ravichannels",
+    ]) {
+      expect(withBio(bio), bio).toEqual({
+        ok: false,
+        errors: {
+          bio: "Leave out links, emails and phone numbers: deals stay on Channel Adda.",
+        },
+      });
+    }
+  });
+
+  it("can still say how big and how old a channel is", () => {
+    expect(withBio("Sold 12 channels, 1.2M subscribers, since 2019.").ok).toBe(
+      true,
+    );
   });
 });

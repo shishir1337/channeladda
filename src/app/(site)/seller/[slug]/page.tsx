@@ -158,6 +158,13 @@ export default async function SellerPage({
             ) : null}
           </div>
 
+          {/* In their own words, as they wrote it: line breaks kept. */}
+          {seller.bio ? (
+            <p className="mt-6 max-w-[62ch] text-[0.9375rem] leading-relaxed whitespace-pre-line text-fg sm:text-base">
+              {seller.bio}
+            </p>
+          ) : null}
+
           {/* Every completed deal, bought or sold, so a buyer sees the whole
               of someone's record here before deciding to deal with them. */}
           <dl className="mt-8 grid grid-cols-3 gap-x-6 gap-y-5 border-y border-line py-5">

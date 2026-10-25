@@ -158,6 +158,9 @@ model User {
   // Public seller identity. Present on anyone who has listed.
   slug       String? @unique
   country    String?
+  /// A few lines about them, on their public seller page. No contact
+  /// details: checked by `parseProfile`.
+  bio        String?
   avatarSeed String? // drives the generated avatar
 
   /// Better Auth's two-factor plugin owns this. Name matches its default.

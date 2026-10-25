@@ -2,7 +2,8 @@ import { randomBytes } from "node:crypto";
 import { expect, test } from "vitest";
 import { db } from "@/lib/db";
 import { saveProfile } from "@/server/profile";
-import { seedUser, withCleanDb } from "@/test/db";
+import { getSeller } from "@/server/sellers";
+import { seedListing, seedUser, withCleanDb } from "@/test/db";
 
 // The owner: "its very hard to open profile and edit for anyone". A member
 // changes their own name, country and photo — and only ever to a photo they
@@ -32,6 +33,7 @@ test(
       name: "Nadia Rahman",
       country: "Bangladesh",
       image: photo,
+      bio: null,
     });
 
     expect(result).toEqual({ ok: true });
@@ -55,6 +57,7 @@ test(
       name: "Nadia Rahman",
       country: null,
       image: theirs,
+      bio: null,
     });
 
     expect(result).toEqual({
@@ -83,6 +86,7 @@ test(
         name: "Ravi",
         country: null,
         image: photo,
+        bio: null,
       }),
     ).toEqual({ ok: true });
 
@@ -91,10 +95,40 @@ test(
         name: "Ravi",
         country: null,
         image: null,
+        bio: null,
       }),
     ).toEqual({ ok: true });
     expect(
       (await db.user.findUniqueOrThrow({ where: { id: member.id } })).image,
     ).toBeNull();
+  }),
+);
+
+test(
+  "a seller's bio is saved and shown on their public page",
+  withCleanDb(async () => {
+    const { seller } = await seedListing();
+    const bio =
+      "Faceless finance channels since 2019.\n\nEvery handover in a day.";
+    expect(
+      await saveProfile(seller.id, {
+        name: "Test Seller",
+        country: null,
+        image: null,
+        bio,
+      }),
+    ).toEqual({ ok: true });
+
+    const page = await getSeller(seller.slug ?? "");
+    expect(page?.bio).toBe(bio);
+
+    // Cleared, it is gone from the page.
+    await saveProfile(seller.id, {
+      name: "Test Seller",
+      country: null,
+      image: null,
+      bio: null,
+    });
+    expect((await getSeller(seller.slug ?? ""))?.bio).toBeNull();
   }),
 );

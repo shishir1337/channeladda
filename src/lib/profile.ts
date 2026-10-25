@@ -1,18 +1,28 @@
 import { keyFromUrl } from "@/lib/upload-keys";
 
 /**
- * What a member may say about themselves: a name, a country and a photo.
+ * What a member may say about themselves: a name, a country, a photo and a
+ * short bio.
  *
  * Checked here, once, for the form and the action alike. The name is shown
  * beside every listing and in every chat, so it may not be a phone number,
  * a link or an email address — the usual way to take a deal off the site.
+ * The bio is on the seller's public page, where buyers decide whom to
+ * trust, so the same goes for it.
  */
-export type ProfileFields = { name: string; country: string; image: string };
+export type ProfileFields = {
+  name: string;
+  country: string;
+  image: string;
+  /** Absent from a form that does not show it: kept as none. */
+  bio?: string;
+};
 
 export type ProfileValues = {
   name: string;
   country: string | null;
   image: string | null;
+  bio: string | null;
 };
 
 export type ProfileErrors = Partial<Record<keyof ProfileFields, string>>;
@@ -31,7 +41,26 @@ const CONTACT =
 
 const PLACE = /^[\p{L} .'’()-]+$/u;
 
+/** A few lines on the seller's public page. */
+export const BIO_MAX = 300;
+
+/**
+ * Contact details in a bio. As in a name, but a run of digits is a phone
+ * number only from nine — a bio may say "since 2019" or "120000 views".
+ */
+const BIO_CONTACT =
+  /@|https?:|www\.|\.(com|net|org|me|io|in|bd|pk)\b|\b(wa|t)\.me\b|(?:\d[\s-]?){9,}/i;
+
 const tidy = (text: string) => text.trim().replace(/\s+/g, " ");
+
+/** Each line tidied, and no more than one blank line between paragraphs. */
+const tidyLines = (text: string) =>
+  text
+    .split(/\r?\n/)
+    .map((line) => line.trim().replace(/\s+/g, " "))
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 
 export function parseProfile(input: ProfileFields): ParsedProfile {
   const errors: ProfileErrors = {};
@@ -54,9 +83,22 @@ export function parseProfile(input: ProfileFields): ParsedProfile {
     errors.image = "Choose your photo again.";
   }
 
+  const bio = tidyLines(input.bio ?? "");
+  if (bio.length > BIO_MAX) {
+    errors.bio = `Keep it to ${BIO_MAX} characters.`;
+  } else if (BIO_CONTACT.test(bio)) {
+    errors.bio =
+      "Leave out links, emails and phone numbers: deals stay on Channel Adda.";
+  }
+
   if (Object.keys(errors).length > 0) return { ok: false, errors };
   return {
     ok: true,
-    value: { name, country: country || null, image: image || null },
+    value: {
+      name,
+      country: country || null,
+      image: image || null,
+      bio: bio || null,
+    },
   };
 }

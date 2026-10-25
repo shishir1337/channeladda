@@ -45,7 +45,13 @@ export default async function ProfilePage() {
   const [me, rating] = await Promise.all([
     db.user.findUniqueOrThrow({
       where: { id: user.id },
-      select: { name: true, country: true, image: true, slug: true },
+      select: {
+        name: true,
+        country: true,
+        image: true,
+        bio: true,
+        slug: true,
+      },
     }),
     ratingFor(user.id),
   ]);
@@ -65,6 +71,7 @@ export default async function ProfilePage() {
               name={me.name}
               country={me.country}
               image={me.image}
+              bio={me.bio}
               email={user.email}
             />
           </CardBody>
