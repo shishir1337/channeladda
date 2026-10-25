@@ -19,7 +19,8 @@ import { Button } from "@/components/ui/button";
 import { ImageUpload } from "@/components/upload/image-upload";
 import { type FeeSettings, quote } from "@/lib/fees";
 import type { ListingLiveEditInput } from "@/lib/listing-form";
-import { cn } from "@/lib/utils";
+import { VERIFIED_FACTS_CHECKED } from "@/lib/listing-lock";
+import { supportHref } from "@/lib/support";
 import { saveLiveListing } from "@/server/actions/listings";
 
 /** The form's own copy of the fields, as typed: numbers stay strings. */
@@ -40,6 +41,17 @@ export type LiveListingValues = {
   transferProfile: string;
   whatsapp: string;
 };
+
+/** 48200 as "48,200". */
+function whole(value: string) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n.toLocaleString("en-US") : value;
+}
+
+/** A figure in a locked field: digits that line up. */
+function Figure({ children }: { children: ReactNode }) {
+  return <span className="tabular-nums">{children}</span>;
+}
 
 /** "" and a stray "12abc" both have to become something zod will reject. */
 function num(value: string) {
@@ -63,11 +75,6 @@ const FIELD_LABEL: Record<string, string> = {
   niche: "Niche",
   country: "Main audience country",
   description: "About this account",
-  audience: "Audience",
-  engagement: "Engagement rate",
-  ageYears: "Account age",
-  monthlyRevenue: "Monthly revenue",
-  yearlyRevenue: "Last 12 months",
   price: "Asking price",
   coverUrl: "Cover image",
   avatarUrl: "Profile picture",
@@ -103,12 +110,15 @@ function LockedField({ label, value }: { label: string; value: ReactNode }) {
  * no proof to add and no ownership code to place — the listing is past all
  * of that. It is the parts a buyer reads, and one Save that puts them in
  * front of buyers at once.
+ *
+ * The numbers are shown, not edited: a moderator checked them against the
+ * proof before approving the listing, and they change only through support
+ * (`VERIFIED_FACTS`). The server refuses a change to them either way.
  */
 export function LiveListingForm({
   listingId,
   initial,
   account,
-  audienceLocked,
   fees,
 }: {
   listingId: string;
@@ -121,8 +131,6 @@ export function LiveListingForm({
     metricLabel: string;
     transferNote?: string;
   };
-  /** The audience came from YouTube's own count when we verified it. */
-  audienceLocked: boolean;
   /** Current rates, read on the server. */
   fees: FeeSettings;
 }) {
@@ -132,12 +140,6 @@ export function LiveListingForm({
     niche: useId(),
     country: useId(),
     description: useId(),
-    audience: useId(),
-    engagement: useId(),
-    ageYears: useId(),
-    monetized: useId(),
-    monthlyRevenue: useId(),
-    yearlyRevenue: useId(),
     price: useId(),
     transferProfile: useId(),
     whatsapp: useId(),
@@ -171,19 +173,16 @@ export function LiveListingForm({
     node.scrollIntoView({ block: "center", behavior: "smooth" });
   }, [failures]);
 
+  // The checked figures are not sent: they are not this form's to change.
+  // The handle is, unchanged, so the account's own name may appear in the
+  // words without reading as somebody else's contact details.
   function toInput(): ListingLiveEditInput {
     return {
+      handle: account.handle,
       title: values.title,
       niche: values.niche,
       country: values.country,
       description: values.description,
-      audience: num(values.audience),
-      engagement: num(values.engagement),
-      ageYears: num(values.ageYears),
-      monetized: values.monetized,
-      // Hidden unless monetized, so never sent from a field nobody can see.
-      monthlyRevenue: values.monetized ? num(values.monthlyRevenue) : 0,
-      yearlyRevenue: values.monetized ? num(values.yearlyRevenue) : 0,
       price,
       coverUrl: values.coverUrl ?? "",
       avatarUrl: values.avatarUrl ?? "",
@@ -320,109 +319,58 @@ export function LiveListingForm({
       </Card>
 
       <Card>
-        <CardHeader
-          as="h2"
-          icon={ActivityIcon}
-          title="The numbers"
-          description="Put down what is actually there."
-          info="Buyers check these against the account before they pay, and staff can see every change you make."
-        />
-        <CardBody className="flex flex-col gap-5">
-          <div className="grid gap-x-4 gap-y-5 sm:grid-cols-2">
-            {audienceLocked ? (
-              <div>
+        <CardHeader as="h2" icon={ActivityIcon} title="The numbers" />
+        <CardBody className="flex flex-col gap-4">
+          <div className="grid gap-x-4 gap-y-4 sm:grid-cols-2">
+            <LockedField
+              label={account.metricLabel}
+              value={<Figure>{whole(initial.audience)}</Figure>}
+            />
+            <LockedField
+              label="Engagement rate"
+              value={<Figure>{`${initial.engagement}%`}</Figure>}
+            />
+            <LockedField
+              label="Account age"
+              value={
+                <Figure>
+                  {Number(initial.ageYears) === 1
+                    ? "1 year"
+                    : `${whole(initial.ageYears)} years`}
+                </Figure>
+              }
+            />
+            <LockedField
+              label="Monetized"
+              value={initial.monetized ? "Yes" : "No"}
+            />
+            {initial.monetized ? (
+              <>
                 <LockedField
-                  label={account.metricLabel}
+                  label="Monthly revenue"
                   value={
-                    <span className="tabular-nums">
-                      {Number(values.audience).toLocaleString("en-US")}
-                    </span>
+                    <Figure>{money(Number(initial.monthlyRevenue))}</Figure>
                   }
                 />
-                <p className="mt-1.5 text-xs leading-relaxed text-subtle">
-                  From YouTube, when we verified the channel, so it cannot be
-                  changed here.
-                </p>
-              </div>
-            ) : (
-              <TextField
-                id={ids.audience}
-                name="audience"
-                label={account.metricLabel}
-                inputMode="numeric"
-                value={values.audience}
-                onChange={(e) => set("audience", e.target.value)}
-                error={errors.audience}
-                required
-              />
-            )}
-            <TextField
-              id={ids.engagement}
-              name="engagement"
-              label="Engagement rate (%)"
-              hint="Average, over the last 30 days."
-              inputMode="decimal"
-              value={values.engagement}
-              onChange={(e) => set("engagement", e.target.value)}
-              error={errors.engagement}
-              required
-            />
-            <TextField
-              id={ids.ageYears}
-              name="ageYears"
-              label="Account age (years)"
-              inputMode="numeric"
-              value={values.ageYears}
-              onChange={(e) => set("ageYears", e.target.value)}
-              error={errors.ageYears}
-              required
-            />
-          </div>
-
-          <div
-            className={cn(
-              "rounded-lg border bg-surface shadow-xs transition-colors duration-150 dark:bg-surface-2",
-              values.monetized ? "border-line-strong" : "border-line",
-            )}
-          >
-            <label
-              htmlFor={ids.monetized}
-              className="flex min-h-11 cursor-pointer items-center gap-3 px-3.5 py-3 text-sm font-medium text-fg"
-            >
-              <input
-                id={ids.monetized}
-                type="checkbox"
-                checked={values.monetized}
-                onChange={(e) => set("monetized", e.target.checked)}
-                className="size-4 shrink-0 cursor-pointer accent-fg"
-              />
-              This account is monetized.
-            </label>
-            {values.monetized ? (
-              <div className="grid gap-x-4 gap-y-5 border-t border-line px-3.5 pt-3.5 pb-4 sm:grid-cols-2">
-                <TextField
-                  id={ids.monthlyRevenue}
-                  name="monthlyRevenue"
-                  label="Monthly revenue (USD)"
-                  hint="An average recent month."
-                  inputMode="decimal"
-                  value={values.monthlyRevenue}
-                  onChange={(e) => set("monthlyRevenue", e.target.value)}
-                  error={errors.monthlyRevenue}
+                <LockedField
+                  label="Last 12 months"
+                  value={
+                    <Figure>{money(Number(initial.yearlyRevenue))}</Figure>
+                  }
                 />
-                <TextField
-                  id={ids.yearlyRevenue}
-                  name="yearlyRevenue"
-                  label="Last 12 months (USD)"
-                  hint="The actual total, not twelve months."
-                  inputMode="decimal"
-                  value={values.yearlyRevenue}
-                  onChange={(e) => set("yearlyRevenue", e.target.value)}
-                  error={errors.yearlyRevenue}
-                />
-              </div>
+              </>
             ) : null}
           </div>
+          <p className="text-[0.8125rem] leading-relaxed text-muted">
+            {VERIFIED_FACTS_CHECKED} To change them,{" "}
+            <Link
+              href={supportHref("Changing a live listing")}
+              className="font-medium text-fg underline decoration-line-strong underline-offset-2 transition-colors hover:decoration-fg"
+            >
+              contact support
+            </Link>
+            .
+          </p>
         </CardBody>
       </Card>
 

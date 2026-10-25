@@ -5,6 +5,8 @@
 export const SUPPORT_TOPICS = [
   "A live order",
   "A listing I want to publish",
+  // A live listing's checked figures change only through staff.
+  "Changing a live listing",
   "Ordering a service",
   "Payments or withdrawals",
   "Identity verification",

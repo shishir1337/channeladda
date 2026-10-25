@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { stripBidi } from "@/lib/bidi";
+import { CONTACT_REFUSED, hasContactDetails } from "@/lib/contact-details";
 
 /**
  * What a seller may set on a listing.
@@ -171,6 +172,36 @@ const listingFields = z.object({
 export type ListingDraftInput = z.input<typeof listingDraftSchema>;
 export type ListingDraft = z.output<typeof listingDraftSchema>;
 
+/** Every field a buyer reads that a seller writes in their own words. */
+const BUYER_TEXT = [
+  "title",
+  "niche",
+  "description",
+  "transferProfile",
+] as const;
+
+/**
+ * No way to reach the seller off the site, in anything a buyer reads — the
+ * bio's rule and the bio's words. The account's own handle may be named.
+ *
+ * Run whether or not the rest of the form passed (`when`), so a title with
+ * a phone number in it is pointed out alongside a missing price, not after.
+ */
+function noContactDetails(
+  value: Record<string, unknown>,
+  ctx: z.RefinementCtx,
+) {
+  const allow = typeof value.handle === "string" ? value.handle : null;
+  for (const key of BUYER_TEXT) {
+    const text = value[key];
+    if (typeof text === "string" && hasContactDetails(text, { allow })) {
+      ctx.addIssue({ code: "custom", path: [key], message: CONTACT_REFUSED });
+    }
+  }
+}
+
+const EVEN_IF_INVALID = { when: () => true };
+
 /**
  * Submitting for review asks for more than saving a draft does. A draft is
  * allowed to be half-finished; a listing about to be shown to buyers is not.
@@ -178,7 +209,7 @@ export type ListingDraft = z.output<typeof listingDraftSchema>;
 const LINK_NEEDED =
   "Paste the link to the account — the ownership check reads it, and a moderator opens it.";
 
-export const listingSubmitSchema = listingFields.extend({
+const submitFields = listingFields.extend({
   coverUrl: z.string().min(1, "Add a cover image."),
   avatarUrl: z.string().min(1, "Add a profile picture."),
   proofs: listingFields.shape.proofs.unwrap().min(1, {
@@ -197,6 +228,11 @@ export const listingSubmitSchema = listingFields.extend({
     ),
 });
 
+export const listingSubmitSchema = submitFields.superRefine(
+  noContactDetails,
+  EVEN_IF_INVALID,
+);
+
 /**
  * What may change on a listing buyers can already see.
  *
@@ -207,18 +243,18 @@ export const listingSubmitSchema = listingFields.extend({
  * so the server can refuse a change to them rather than quietly drop it.
  * Not the proof screenshots either: they are what a moderator checked, not
  * something a buyer reads.
+ *
+ * Nor the figures the moderator checked against those screenshots — the
+ * audience, the revenue, the engagement, whether it is monetized and how old
+ * it is (`VERIFIED_FACTS`). Raising 48,200 followers to 980,000 the day after
+ * approval used to go straight in front of buyers. They are optional for the
+ * same reason the account is: sent only so a change can be refused.
  */
-export const listingLiveEditSchema = listingSubmitSchema
+export const listingLiveEditSchema = submitFields
   .pick({
     title: true,
     niche: true,
     country: true,
-    audience: true,
-    monetized: true,
-    monthlyRevenue: true,
-    yearlyRevenue: true,
-    engagement: true,
-    ageYears: true,
     price: true,
     coverUrl: true,
     avatarUrl: true,
@@ -230,7 +266,14 @@ export const listingLiveEditSchema = listingSubmitSchema
     platform: listingFields.shape.platform.optional(),
     handle: z.string().trim().max(300).optional(),
     sourceUrl: z.string().trim().max(300).optional(),
-  });
+    audience: listingFields.shape.audience.optional(),
+    monetized: listingFields.shape.monetized.optional(),
+    monthlyRevenue: listingFields.shape.monthlyRevenue.optional(),
+    yearlyRevenue: listingFields.shape.yearlyRevenue.optional(),
+    engagement: listingFields.shape.engagement.optional(),
+    ageYears: listingFields.shape.ageYears.optional(),
+  })
+  .superRefine(noContactDetails, EVEN_IF_INVALID);
 
 export type ListingLiveEditInput = z.input<typeof listingLiveEditSchema>;
 export type ListingLiveEdit = z.output<typeof listingLiveEditSchema>;
@@ -260,19 +303,21 @@ const blankNumber = z.custom<number>(
   (v) => typeof v === "number" && Number.isNaN(v),
 );
 
-export const listingDraftSchema = listingFields.extend({
-  title: z.union([blankText, listingFields.shape.title]),
-  niche: z.union([blankText, listingFields.shape.niche]),
-  country: z.union([blankText, listingFields.shape.country]),
-  audience: z.union([blankNumber, listingFields.shape.audience]),
-  engagement: z.union([blankNumber, listingFields.shape.engagement]),
-  ageYears: z.union([blankNumber, listingFields.shape.ageYears]),
-  price: z.union([blankNumber, listingFields.shape.price]),
-  monthlyRevenue: z.union([blankNumber, listingFields.shape.monthlyRevenue]),
-  yearlyRevenue: z.union([blankNumber, listingFields.shape.yearlyRevenue]),
-  coverUrl: z.string().default(""),
-  avatarUrl: z.string().default(""),
-});
+export const listingDraftSchema = listingFields
+  .extend({
+    title: z.union([blankText, listingFields.shape.title]),
+    niche: z.union([blankText, listingFields.shape.niche]),
+    country: z.union([blankText, listingFields.shape.country]),
+    audience: z.union([blankNumber, listingFields.shape.audience]),
+    engagement: z.union([blankNumber, listingFields.shape.engagement]),
+    ageYears: z.union([blankNumber, listingFields.shape.ageYears]),
+    price: z.union([blankNumber, listingFields.shape.price]),
+    monthlyRevenue: z.union([blankNumber, listingFields.shape.monthlyRevenue]),
+    yearlyRevenue: z.union([blankNumber, listingFields.shape.yearlyRevenue]),
+    coverUrl: z.string().default(""),
+    avatarUrl: z.string().default(""),
+  })
+  .superRefine(noContactDetails, EVEN_IF_INVALID);
 
 /** Dollars to integer cents, without ever letting a float reach the database. */
 export function toCents(dollarAmount: number) {

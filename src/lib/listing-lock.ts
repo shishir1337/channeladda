@@ -82,20 +82,26 @@ export const LOCK_TEXT: Record<ListingLock, { title: string; body: string }> = {
 };
 
 /**
- * Whether the audience figure came from YouTube itself.
- *
- * A YouTube check that passes writes the channel's own subscriber count over
- * the seller's, along with the channel id it read it from. That figure is
- * Google's, not the seller's, so it is not theirs to change afterwards.
+ * The figures a moderator checked against the proof screenshots before the
+ * listing went on sale. Once it is live they are the listing's word to
+ * buyers, so the seller cannot change them alone: a raised follower count
+ * or revenue figure went in front of buyers at once, with no review. (A
+ * YouTube check also writes the channel's own subscriber count over the
+ * seller's, which made that one figure Google's long before the rest.)
  */
-export function audienceFromYouTube(listing: {
-  platform: string;
-  externalId: string | null;
-  ownershipVerifiedAt: Date | null;
-}): boolean {
-  return (
-    listing.platform.toUpperCase() === "YOUTUBE" &&
-    listing.externalId !== null &&
-    listing.ownershipVerifiedAt !== null
-  );
-}
+export const VERIFIED_FACTS = [
+  "audience",
+  "monetized",
+  "monthlyRevenue",
+  "yearlyRevenue",
+  "engagement",
+  "ageYears",
+] as const;
+
+export type VerifiedFact = (typeof VERIFIED_FACTS)[number];
+
+export const VERIFIED_FACTS_CHECKED =
+  "These were checked when your listing was approved.";
+
+/** Said beside them on the edit form, and when a change to one is refused. */
+export const VERIFIED_FACTS_NOTE = `${VERIFIED_FACTS_CHECKED} To change them, contact support.`;

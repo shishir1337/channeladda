@@ -1,7 +1,9 @@
 import { expect, test } from "vitest";
+import { CONTACT_REFUSED } from "@/lib/contact-details";
 import {
   type ListingDraftInput,
   listingDraftSchema,
+  listingLiveEditSchema,
   listingSubmitSchema,
 } from "@/lib/listing-form";
 
@@ -185,4 +187,92 @@ test("a title of nothing but direction marks is still too short", () => {
       }),
     ),
   ).toContain("title");
+});
+
+// ------------------------------------------------------- contact details
+
+/** Each field's message, from a failed parse. */
+const messages = (result: {
+  success: boolean;
+  error?: { issues: { path: PropertyKey[]; message: string }[] };
+}) =>
+  Object.fromEntries(
+    (result.success ? [] : (result.error?.issues ?? [])).map((issue) => [
+      String(issue.path[0]),
+      issue.message,
+    ]),
+  );
+
+/** A live listing's edit, as the edit form sends it. */
+const LIVE = {
+  title: "Desi Food Diaries - 49K Indian home-cooking Instagram page",
+  niche: "Food",
+  country: "India",
+  price: 1_200,
+  coverUrl: "/uploads/cover/a.png",
+  avatarUrl: "/uploads/avatar/a.png",
+  transferProfile: "",
+  description: "",
+  whatsapp: "",
+  handle: "@desifooddiaries",
+};
+
+test("a phone number, an email or a link in what buyers read is refused, on a draft and on a live listing", () => {
+  // QA, on a live listing: every one of these went in front of buyers.
+  const live = listingLiveEditSchema.safeParse({
+    ...LIVE,
+    title: "Desi Food Diaries - WhatsApp 9876543210 for a better price",
+    description:
+      "Skip the fees: pay me direct. WhatsApp +91 98765 43210, email sana.deals@gmail.com, https://t.me/sanadeals",
+    transferProfile: "Contact me at sana dot deals at gmail dot com",
+  });
+  expect(messages(live)).toEqual({
+    title: CONTACT_REFUSED,
+    description: CONTACT_REFUSED,
+    transferProfile: CONTACT_REFUSED,
+  });
+
+  const draft = listingDraftSchema.safeParse({
+    ...TYPED,
+    niche: "t.me/gamingdeals",
+  });
+  expect(messages(draft)).toEqual({ niche: CONTACT_REFUSED });
+
+  const submit = listingSubmitSchema.safeParse({
+    ...TYPED,
+    description: "Call 98765 43210 before you buy.",
+  });
+  expect(messages(submit).description).toBe(CONTACT_REFUSED);
+});
+
+test("contact details are pointed out alongside every other mistake, not after them", () => {
+  const result = listingDraftSchema.safeParse({
+    ...TYPED,
+    price: -5,
+    title: "Gaming channel, WhatsApp 9876543210",
+  });
+  expect(Object.keys(messages(result)).sort()).toEqual(["price", "title"]);
+});
+
+test("a listing may name its own account", () => {
+  expect(
+    listingLiveEditSchema.safeParse({
+      ...LIVE,
+      description: "Follow @desifooddiaries for a week before you buy.",
+      transferProfile: "Owner email is a Gmail I will hand over, 2FA by SMS",
+    }).success,
+  ).toBe(true);
+  expect(
+    listingDraftSchema.safeParse({
+      ...TYPED,
+      title: "@MrBeast style gaming channel, 6 years old",
+    }).success,
+  ).toBe(true);
+});
+
+test("a live edit no longer needs the checked figures, and still takes them as they were", () => {
+  expect(listingLiveEditSchema.safeParse(LIVE).success).toBe(true);
+  expect(
+    listingLiveEditSchema.safeParse({ ...LIVE, audience: 49_000 }).success,
+  ).toBe(true);
 });

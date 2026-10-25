@@ -3,7 +3,6 @@ import { notFound, redirect } from "next/navigation";
 import { PageHeader } from "@/components/app/kit";
 import { LiveListingForm } from "@/components/dashboard/live-listing-form";
 import { platforms } from "@/data/platforms";
-import { audienceFromYouTube } from "@/lib/listing-lock";
 import { getListingLocks, getMyListing } from "@/server/seller-listings";
 import { requireUser } from "@/server/session";
 import { getFeeSettings } from "@/server/settings";
@@ -53,7 +52,6 @@ export default async function EditListingPage({
       <LiveListingForm
         listingId={listing.id}
         fees={fees}
-        audienceLocked={audienceFromYouTube(listing)}
         account={{
           platform: platform?.name ?? listing.platform,
           handle: listing.handle,

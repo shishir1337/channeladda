@@ -1,4 +1,9 @@
 import { stripBidi } from "@/lib/bidi";
+import {
+  CONTACT_REFUSED,
+  hasContactDetails,
+  hasSpelledEmail,
+} from "@/lib/contact-details";
 import { keyFromUrl } from "@/lib/upload-keys";
 
 /**
@@ -46,13 +51,6 @@ const PLACE = /^[\p{L} .'’()-]+$/u;
 export const BIO_MAX = 300;
 
 /**
- * Contact details in a bio. As in a name, but a run of digits is a phone
- * number only from nine — a bio may say "since 2019" or "120000 views".
- */
-const BIO_CONTACT =
-  /@|https?:|www\.|\.(com|net|org|me|io|in|bd|pk)\b|\b(wa|t)\.me\b|(?:\d[\s-]?){9,}/i;
-
-/**
  * Direction marks go first: a name drawn as "Support" but stored backwards
  * behind an override is how a stranger passes for staff in a chat.
  */
@@ -74,7 +72,11 @@ export function parseProfile(input: ProfileFields): ParsedProfile {
   if (!name) errors.name = "Enter your name.";
   else if (name.length < NAME_MIN || name.length > NAME_MAX) {
     errors.name = `Use ${NAME_MIN} to ${NAME_MAX} characters.`;
-  } else if (CONTACT.test(name) || !/\p{L}/u.test(name)) {
+  } else if (
+    CONTACT.test(name) ||
+    hasSpelledEmail(name) ||
+    !/\p{L}/u.test(name)
+  ) {
     errors.name = "Use your name only, with no links, emails or numbers.";
   }
 
@@ -91,9 +93,11 @@ export function parseProfile(input: ProfileFields): ParsedProfile {
   const bio = tidyLines(input.bio ?? "");
   if (bio.length > BIO_MAX) {
     errors.bio = `Keep it to ${BIO_MAX} characters.`;
-  } else if (BIO_CONTACT.test(bio)) {
-    errors.bio =
-      "Leave out links, emails and phone numbers: deals stay on Channel Adda.";
+  } else if (hasContactDetails(bio)) {
+    // The rule every listing is held to as well: as in a name, but a run of
+    // digits is a phone number only from nine — a bio may say "since 2019"
+    // or "120000 views" — and an email spelled out to dodge the @ counts.
+    errors.bio = CONTACT_REFUSED;
   }
 
   if (Object.keys(errors).length > 0) return { ok: false, errors };

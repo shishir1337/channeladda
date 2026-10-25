@@ -82,6 +82,7 @@ describe("parseProfile", () => {
       "wa.me/8801700000000",
       "www.mychannel.com",
       "https://t.me/nadia",
+      "nadia at gmail dot com",
     ]) {
       const result = parseProfile({ name, country: "", image: "" });
       expect(result.ok, name).toBe(false);
@@ -148,6 +149,9 @@ describe("a bio", () => {
       "WhatsApp wa.me/919800000000",
       "Call +91 98000 00000",
       "t.me/ravichannels",
+      // QA got this one past the @ check.
+      "sana dot deals at gmail dot com",
+      "ravi (at) gmail (dot) com",
     ]) {
       expect(withBio(bio), bio).toEqual({
         ok: false,

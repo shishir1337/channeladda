@@ -15,7 +15,6 @@ import {
   toEngagementBp,
 } from "@/lib/listing-form";
 import {
-  audienceFromYouTube,
   DELETABLE,
   LIVE_EDITABLE,
   type ListingLock,
@@ -601,12 +600,6 @@ function liveColumns(input: ListingLiveEdit) {
     title: input.title,
     niche: input.niche,
     country: input.country,
-    audience: input.audience,
-    monetized: input.monetized,
-    monthlyRevenueUsd: toCents(input.monthlyRevenue),
-    yearlyRevenueUsd: toCents(input.yearlyRevenue),
-    engagementBp: toEngagementBp(input.engagement),
-    ageYears: input.ageYears,
     priceUsd: toCents(input.price),
     coverUrl: input.coverUrl,
     avatarUrl: input.avatarUrl,
@@ -618,11 +611,40 @@ function liveColumns(input: ListingLiveEdit) {
 
 type LiveColumns = ReturnType<typeof liveColumns>;
 
+/**
+ * The checked figures a live edit sent, as their columns. Sent only by a
+ * form that should not have, or by somebody replaying an old one; any that
+ * differ from the row are refused rather than dropped (`VERIFIED_FACTS`).
+ */
+function sentFacts(input: ListingLiveEdit) {
+  const sent: Partial<{
+    audience: number;
+    monetized: boolean;
+    monthlyRevenueUsd: number;
+    yearlyRevenueUsd: number;
+    engagementBp: number;
+    ageYears: number;
+  }> = {};
+  if (input.audience !== undefined) sent.audience = input.audience;
+  if (input.monetized !== undefined) sent.monetized = input.monetized;
+  if (input.monthlyRevenue !== undefined) {
+    sent.monthlyRevenueUsd = toCents(input.monthlyRevenue);
+  }
+  if (input.yearlyRevenue !== undefined) {
+    sent.yearlyRevenueUsd = toCents(input.yearlyRevenue);
+  }
+  if (input.engagement !== undefined) {
+    sent.engagementBp = toEngagementBp(input.engagement);
+  }
+  if (input.ageYears !== undefined) sent.ageYears = input.ageYears;
+  return sent;
+}
+
 export type LiveEditRefusal =
   | "not-found"
   | "wrong-status"
   | "identity"
-  | "verified-audience"
+  | "verified-facts"
   | "changed"
   | ListingLock;
 
@@ -630,9 +652,11 @@ export type LiveEditRefusal =
  * Saves an edit to a listing buyers can already see.
  *
  * It applies at once, with no second review: the owner's call. What keeps
- * that safe is what it cannot touch — which account this is, and the figure
- * YouTube itself supplied — and the audit row, which keeps every changed
- * field as it was and as it is now, under the seller's name, for staff.
+ * that safe is what it cannot touch — which account this is, and the
+ * figures a moderator checked before approving it (`VERIFIED_FACTS`): the
+ * audience, the revenue, the engagement, monetized and the account's age —
+ * and the audit row, which keeps every changed field as it was and as it
+ * is now, under the seller's name, for staff.
  *
  * A new price is for deals opened from now on. A deal already open carries
  * its own price, and an offer its own amount, so neither moves.
@@ -654,8 +678,6 @@ export async function updateLiveListing(
       platform: true,
       handle: true,
       sourceUrl: true,
-      externalId: true,
-      ownershipVerifiedAt: true,
       wasPriceUsd: true,
       title: true,
       niche: true,
@@ -696,10 +718,16 @@ export async function updateLiveListing(
     return { ok: false, reason: "identity" };
   }
 
-  const next = liveColumns(input);
-  if (audienceFromYouTube(existing) && next.audience !== existing.audience) {
-    return { ok: false, reason: "verified-audience" };
+  const facts = sentFacts(input);
+  if (
+    (Object.keys(facts) as (keyof typeof facts)[]).some(
+      (key) => facts[key] !== existing[key],
+    )
+  ) {
+    return { ok: false, reason: "verified-facts" };
   }
+
+  const next = liveColumns(input);
 
   if ((await db.order.count({ where: lockingDeals(id) })) > 0) {
     return { ok: false, reason: "in-deal" };

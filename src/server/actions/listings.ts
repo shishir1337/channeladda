@@ -10,7 +10,7 @@ import {
   listingLiveEditSchema,
   listingSubmitSchema,
 } from "@/lib/listing-form";
-import { LOCK_TEXT } from "@/lib/listing-lock";
+import { LOCK_TEXT, VERIFIED_FACTS_NOTE } from "@/lib/listing-lock";
 import * as repo from "@/server/seller-listings";
 import {
   clearVerificationIfIdentityChanged,
@@ -196,8 +196,7 @@ const LIVE_EDIT_REFUSED: Record<LiveEditRefusal, string> = {
     "Only a live or paused listing is edited here. Open the listing to change a draft.",
   identity:
     "The platform, the handle and the account link cannot change on a live listing. To sell a different account, list it as a new one.",
-  "verified-audience":
-    "The audience figure came from YouTube when we verified the channel, so it cannot be changed.",
+  "verified-facts": VERIFIED_FACTS_NOTE,
   changed:
     "This listing changed while you were editing it, so nothing was saved. Open it again to see where it stands.",
   reserved: LOCK_TEXT.reserved.body,

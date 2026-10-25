@@ -185,24 +185,57 @@ test(
 );
 
 test(
-  "the subscriber count YouTube supplied at verification cannot be edited",
+  "the figures a moderator checked cannot be changed on a live listing",
   withCleanDb(async () => {
+    // QA raised 48,200 followers to 980,000 and the revenue to $9,500 the
+    // day after approval, and buyers saw both at once.
     const { listing, seller } = await seedListing();
-    await db.listing.update({
+    for (const change of [
+      { audience: 980_000 },
+      { monthlyRevenue: 9_500 },
+      { yearlyRevenue: 90_000 },
+      { engagement: 40 },
+      { ageYears: 9 },
+      { monetized: false },
+    ]) {
+      expect(
+        await updateLiveListing(
+          seller.id,
+          listing.id,
+          asSeeded({ ...change, price: 90 }),
+        ),
+        JSON.stringify(change),
+      ).toEqual({ ok: false, reason: "verified-facts" });
+    }
+    const row = await db.listing.findUniqueOrThrow({
       where: { id: listing.id },
-      data: { externalId: "UC-test", ownershipVerifiedAt: new Date() },
     });
-    expect(
-      await updateLiveListing(
-        seller.id,
-        listing.id,
-        asSeeded({ audience: 2_000_000 }),
-      ),
-    ).toEqual({ ok: false, reason: "verified-audience" });
-    // Everything else on it still can be.
+    expect(row).toMatchObject({
+      audience: 120_000,
+      monthlyRevenueUsd: 90_000,
+      priceUsd: 10_000,
+    });
+
+    // Sent back as they stand, or not sent at all as the form does now,
+    // the rest still saves.
     expect(
       await updateLiveListing(seller.id, listing.id, asSeeded({ price: 90 })),
-    ).toMatchObject({ ok: true });
+    ).toMatchObject({ ok: true, changed: ["priceUsd"] });
+    const {
+      audience: _a,
+      monetized: _m,
+      monthlyRevenue: _mr,
+      yearlyRevenue: _yr,
+      engagement: _e,
+      ageYears: _y,
+      ...words
+    } = asSeeded({
+      price: 90,
+      title: "Monetized tech channel, three years old",
+    });
+    expect(await updateLiveListing(seller.id, listing.id, words)).toMatchObject(
+      { ok: true, changed: ["title"] },
+    );
   }),
 );
 
