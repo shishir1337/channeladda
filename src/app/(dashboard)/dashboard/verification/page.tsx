@@ -66,7 +66,7 @@ export default async function VerificationPage() {
         description={
           mine.status === "APPROVED"
             ? "Your ID is checked. The Verified badge shows beside your name."
-            : "Optional. Get the Verified badge beside your name."
+            : `Optional. Adds the Verified badge to your name. A person checks it within ${KYC_REVIEW_HOURS} hours.`
         }
       />
 
@@ -126,33 +126,6 @@ export default async function VerificationPage() {
           </Callout>
         ) : null}
 
-        {mine.status === "NOT_STARTED" ? (
-          <Card>
-            <CardHeader
-              as="h2"
-              icon={BadgeCheckIcon}
-              title="Get the Verified badge"
-              description="It tells buyers and sellers a real person is behind your account."
-            />
-            <CardBody>
-              {/* Labelled as a preview: shown bare, it read as if they were
-                  verified already. */}
-              <p className="text-xs text-subtle">How your name will look</p>
-              <p className="mt-1.5 flex flex-wrap items-center gap-2 rounded-lg border border-dashed border-line-strong px-3 py-2.5 text-sm font-semibold text-fg">
-                {me.name}
-                <VerifiedBadge />
-              </p>
-              <ul className="mt-3 flex flex-col gap-1.5 text-[0.8125rem] leading-relaxed text-muted">
-                <li>You can buy and sell without it.</li>
-                <li>Takes about five minutes on your phone.</li>
-                <li>
-                  A person checks it, usually within {KYC_REVIEW_HOURS} hours.
-                </li>
-              </ul>
-            </CardBody>
-          </Card>
-        ) : null}
-
         {canSend ? (
           <Card>
             <CardHeader
@@ -161,7 +134,6 @@ export default async function VerificationPage() {
               title={
                 mine.status === "REJECTED" ? "Send it again" : "Send your ID"
               }
-              description="Aadhaar card, PAN card, passport or another government ID, and a short selfie video."
             />
             <CardBody>
               <VerificationForm

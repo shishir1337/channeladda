@@ -32,7 +32,6 @@ import {
   documentOption,
   KYC_DOCUMENTS,
   KYC_IMAGE_MAX_MB,
-  KYC_REVIEW_HOURS,
   KYC_VIDEO_MAX_MB,
   KYC_VIDEO_MAX_SECONDS,
   type KycDocumentId,
@@ -262,7 +261,7 @@ function FileField({
             <img
               src={value.preview}
               alt={`Your ${label.toLowerCase()}`}
-              className="max-h-52 w-auto max-w-full self-start rounded-lg border border-line bg-surface-2 object-contain"
+              className="max-h-32 w-auto max-w-full self-start rounded-lg border border-line bg-surface-2 object-contain"
             />
           ) : (
             // biome-ignore lint/a11y/useMediaCaption: the member's own selfie video, previewed before it is checked.
@@ -302,7 +301,7 @@ function FileField({
                 <RotateCcwIcon aria-hidden="true" />
               )}
               {media === "image"
-                ? "Use another photo"
+                ? "Change"
                 : camera
                   ? "Upload one instead"
                   : "Use another video"}
@@ -318,13 +317,10 @@ function FileField({
       ) : camera && !sending ? (
         <div
           className={cn(
-            "mt-2 flex flex-col items-center gap-3 rounded-lg border border-dashed border-line-strong bg-surface px-4 py-5 text-center dark:bg-surface-2/40",
+            "mt-2 flex flex-col items-center gap-2.5 rounded-lg border border-dashed border-line-strong bg-surface px-4 py-4 text-center dark:bg-surface-2/40",
             shown && "border-danger",
           )}
         >
-          <span className="flex size-10 items-center justify-center rounded-lg border border-line bg-surface text-muted shadow-xs dark:bg-surface-2">
-            <VideoIcon aria-hidden="true" className="size-4.5" />
-          </span>
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
             <Button
               type="button"
@@ -350,15 +346,14 @@ function FileField({
             </Button>
           </div>
           <span className="text-xs text-subtle">
-            {RECORD_MAX_SECONDS} seconds at most · or MP4, MOV or WebM up to{" "}
-            {KYC_VIDEO_MAX_MB}MB
+            Up to {RECORD_MAX_SECONDS} seconds
           </span>
         </div>
       ) : (
         <label
           htmlFor={inputId}
           className={cn(
-            "group mt-2 flex min-h-28 flex-col items-center justify-center gap-2 rounded-lg border border-dashed px-4 py-5 text-center transition-colors duration-150",
+            "group mt-2 flex min-h-24 flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed px-3 py-4 text-center transition-colors duration-150",
             sending
               ? "cursor-progress border-line-strong bg-surface-2/50"
               : "cursor-pointer border-line-strong bg-surface hover:border-fg/25 hover:bg-surface-2/50 dark:bg-surface-2/40",
@@ -386,18 +381,9 @@ function FileField({
             </>
           ) : (
             <>
-              <span className="flex size-10 items-center justify-center rounded-lg border border-line bg-surface text-muted shadow-xs dark:bg-surface-2">
-                <Icon aria-hidden="true" className="size-4.5" />
-              </span>
+              <Icon aria-hidden="true" className="size-5 text-muted" />
               <span className="text-sm font-medium text-fg">
-                {media === "image"
-                  ? "Take a photo or choose one"
-                  : "Record a video or choose one"}
-              </span>
-              <span className="text-xs text-subtle">
-                {media === "image"
-                  ? `JPEG, PNG or WebP · up to ${KYC_IMAGE_MAX_MB}MB`
-                  : `MP4, MOV or WebM · up to ${KYC_VIDEO_MAX_MB}MB`}
+                {media === "image" ? "Add a photo" : "Record or choose a video"}
               </span>
             </>
           )}
@@ -534,12 +520,7 @@ export function VerificationForm({
               value={documentType}
               aria-invalid={errors.documentType ? true : undefined}
               aria-describedby={
-                [
-                  doc ? `${groupId}-hint` : null,
-                  errors.documentType ? `${groupId}-error` : null,
-                ]
-                  .filter(Boolean)
-                  .join(" ") || undefined
+                errors.documentType ? `${groupId}-error` : undefined
               }
               onChange={(event) => {
                 const option = documentOption(event.target.value);
@@ -568,14 +549,6 @@ export function VerificationForm({
               className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-muted"
             />
           </div>
-          {doc ? (
-            <p id={`${groupId}-hint`} className={hintClass}>
-              {doc.hint ? `${doc.hint}. ` : ""}
-              {doc.back
-                ? "You send the front, and the back if it has details on it."
-                : `You send the ${doc.front.toLowerCase()} only.`}
-            </p>
-          ) : null}
           {errors.documentType ? (
             <p
               id={`${groupId}-error`}
@@ -591,8 +564,7 @@ export function VerificationForm({
           <TextField
             id={nameId}
             name="fullName"
-            label="Your full name, as on the ID"
-            hint="Exactly as it is printed."
+            label="Full name, as on the ID"
             value={fullName}
             onChange={(event) => setFullName(event.target.value)}
             error={errors.fullName}
@@ -603,8 +575,7 @@ export function VerificationForm({
           <TextField
             id={countryId}
             name="country"
-            label="Country"
-            hint="The country that gave you the ID."
+            label="Country of the ID"
             value={country}
             onChange={(event) => setCountry(event.target.value)}
             error={errors.country}
@@ -618,53 +589,42 @@ export function VerificationForm({
 
       <Step n={2} title="Photos of your ID">
         <p className="text-[0.8125rem] leading-relaxed text-muted">
-          Put the ID on a flat, dark surface in good light. All four corners in
-          the photo, no glare, nothing covered.
+          Flat surface, good light, all four corners, no glare.
         </p>
-        <FileField
-          label={doc?.front ?? "Front of the ID"}
-          media="image"
-          value={front}
-          onChange={(value) => {
-            setFront(value);
-            if (value) setErrors(({ frontUrl: _, ...rest }) => rest);
-          }}
-          error={errors.frontUrl}
-          onBusy={busy}
-        />
-        {doc?.back ? (
+        <div className="grid grid-cols-2 gap-3">
           <FileField
-            label="Back of the ID"
-            hint="Add it if your ID has details on the back."
+            label={doc?.front ?? "Front of the ID"}
             media="image"
-            value={back}
+            value={front}
             onChange={(value) => {
-              setBack(value);
-              setErrors(({ backUrl: _, ...rest }) => rest);
+              setFront(value);
+              if (value) setErrors(({ frontUrl: _, ...rest }) => rest);
             }}
-            error={errors.backUrl}
-            optional
+            error={errors.frontUrl}
             onBusy={busy}
           />
-        ) : null}
+          {doc?.back ? (
+            <FileField
+              label="Back"
+              media="image"
+              value={back}
+              onChange={(value) => {
+                setBack(value);
+                setErrors(({ backUrl: _, ...rest }) => rest);
+              }}
+              error={errors.backUrl}
+              optional
+              onBusy={busy}
+            />
+          ) : null}
+        </div>
       </Step>
 
       <Step n={3} title="Selfie video">
-        <div className="text-[0.8125rem] leading-relaxed text-muted">
-          <p>
-            Record a short video of yourself with your camera, 10 to 30 seconds:
-          </p>
-          <ol className="mt-1.5 list-decimal space-y-1 pl-5 marker:text-subtle">
-            <li>
-              Hold the same ID next to your face, photo side to the camera.
-            </li>
-            <li>
-              Say your full name, then say{" "}
-              <span className="font-medium text-fg">“Channel Adda”</span>.
-            </li>
-            <li>Keep your face and the ID clear, in good light.</li>
-          </ol>
-        </div>
+        <p className="text-[0.8125rem] leading-relaxed text-muted">
+          Hold the same ID by your face, then say your full name and{" "}
+          <span className="font-medium text-fg">“Channel Adda”</span>.
+        </p>
         <FileField
           label="Your video"
           media="video"
@@ -677,17 +637,6 @@ export function VerificationForm({
           onBusy={busy}
         />
       </Step>
-
-      <p className="flex items-start gap-2.5 rounded-lg border border-line bg-surface-2/60 px-3 py-2.5 text-[0.8125rem] leading-relaxed text-fg">
-        <LockIcon
-          aria-hidden="true"
-          className="mt-0.5 size-3.5 shrink-0 text-muted"
-        />
-        <span>
-          Only our verification team sees these. They are never shown on your
-          profile.
-        </span>
-      </p>
 
       {failure ? <FormNotice>{failure}</FormNotice> : null}
 
@@ -704,10 +653,15 @@ export function VerificationForm({
             working="Sending…"
           />
         </Button>
-        <p className="text-xs text-subtle">
-          {uploading > 0
-            ? "Wait for your files to finish uploading."
-            : `A person checks it, usually within ${KYC_REVIEW_HOURS} hours.`}
+        <p className="flex items-center gap-1.5 text-xs text-subtle">
+          {uploading > 0 ? (
+            "Wait for your files to finish uploading."
+          ) : (
+            <>
+              <LockIcon aria-hidden="true" className="size-3 shrink-0" />
+              Only our verification team sees these.
+            </>
+          )}
         </p>
       </div>
     </form>
