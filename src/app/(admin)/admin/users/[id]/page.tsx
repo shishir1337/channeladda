@@ -51,6 +51,7 @@ import type {
   WithdrawalStatus,
 } from "@/generated/prisma/enums";
 import { isCustodianRole, levelLabel } from "@/lib/custody-roles";
+import { emailVerificationRequired } from "@/lib/email-verification";
 import { isKycReviewer } from "@/lib/kyc";
 import { cn } from "@/lib/utils";
 import {
@@ -592,9 +593,15 @@ export default async function AdminUserPage({
             <CardHeader as="h2" title="Account" />
             <Facts className="px-4 sm:px-5">
               <Fact label="Email">
-                <Badge variant={person.emailVerified ? "verified" : "danger"}>
-                  {person.emailVerified ? "Verified" : "Unverified"}
-                </Badge>
+                {/* With confirmation switched off nobody is asked to
+                    confirm, so "Unverified" on every sign-up was noise. */}
+                {person.emailVerified ? (
+                  <Badge variant="verified">Verified</Badge>
+                ) : emailVerificationRequired() ? (
+                  <Badge variant="danger">Unverified</Badge>
+                ) : (
+                  <Badge>Not required</Badge>
+                )}
               </Fact>
               {/* On a staff account this is not a nicety: it is the only thing
                   between a reused password and the payout screen. */}

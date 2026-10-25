@@ -18,6 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Pagination } from "@/components/ui/pagination";
 import type { UserRole } from "@/generated/prisma/enums";
+import { emailVerificationRequired } from "@/lib/email-verification";
 import { cn } from "@/lib/utils";
 import { listUsers, ROLE_LABELS } from "@/server/admin-users";
 import { requireStaff } from "@/server/session";
@@ -71,6 +72,7 @@ export default async function AdminUsersPage({
 }: PageProps<"/admin/users">) {
   const staff = await requireStaff();
   const params = await searchParams;
+  const confirmationOn = emailVerificationRequired();
 
   const query = typeof params.q === "string" ? params.q : "";
   const role = typeof params.role === "string" ? params.role : undefined;
@@ -224,10 +226,13 @@ export default async function AdminUsersPage({
                         {row.banned ? (
                           <Badge variant="danger">Suspended</Badge>
                         ) : null}
-                        {!row.emailVerified ? (
+                        {/* Only while confirmation is asked for: with it
+                            off, every email sign-up read as unverified. */}
+                        {!row.emailVerified && confirmationOn ? (
                           <Badge>Email unverified</Badge>
                         ) : null}
-                        {!row.banned && row.emailVerified ? (
+                        {!row.banned &&
+                        (row.emailVerified || !confirmationOn) ? (
                           <span className="text-[0.8125rem] text-subtle">
                             Active
                           </span>

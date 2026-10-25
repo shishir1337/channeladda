@@ -36,6 +36,7 @@ import { Button } from "@/components/ui/button";
 import { iconText } from "@/components/ui/icon-hue";
 import type { UserRole } from "@/generated/prisma/enums";
 import { isCustodianRole, levelLabel } from "@/lib/custody-roles";
+import { emailVerificationRequired } from "@/lib/email-verification";
 import { cn } from "@/lib/utils";
 import {
   INVITABLE_ROLES,
@@ -431,7 +432,8 @@ export default async function AdminTeamPage() {
                     <Td>
                       {member.banned ? (
                         <Badge variant="danger">Suspended</Badge>
-                      ) : !member.emailVerified ? (
+                      ) : !member.emailVerified &&
+                        emailVerificationRequired() ? (
                         <Badge>Email unverified</Badge>
                       ) : (
                         <span className="text-[0.8125rem] text-subtle">
