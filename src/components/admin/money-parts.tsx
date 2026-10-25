@@ -22,22 +22,15 @@ import { cn } from "@/lib/utils";
  * The pieces the money desk is drawn with.
  *
  * Built on the app kit rather than beside it, so the desk reads like every
- * other staff page. The one addition is the exact figure: `Price` shows
- * whole units in whichever currency the header is set to, which is right
- * for a listing and wrong for a month-end report, so every money figure
- * here also carries its exact US-dollar amount underneath.
+ * other staff page. Every figure here is exact US dollars to the cent,
+ * whatever the header's currency: a converted, rounded amount is right for
+ * a listing and wrong for a month-end report. Each is shown once — the desk
+ * used to print "$3,000.00" over "US$3,000.00", the same amount twice.
  */
 
 type Icon = ComponentType<SVGProps<SVGSVGElement>>;
 
-/** Exact US dollars and cents from integer cents: 123456 → "US$1,234.56". */
-export function exactUsd(cents: number): string {
-  const formatted = (Math.abs(cents) / 100).toLocaleString("en-US", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-  return `${cents < 0 ? "−" : ""}US$${formatted}`;
-}
+export { exactUsd } from "@/lib/exact-usd";
 
 /** "1 deal", "3 deals". */
 export function plural(count: number, one: string, many = `${one}s`): string {
@@ -121,20 +114,21 @@ export function MoneyMetric({
   return (
     <Stat
       label={label}
-      value={<Price usd={cents / 100} />}
+      value={<Price usd={cents / 100} exact />}
       tone={tone}
       icon={icon}
       href={href}
       info={info}
       className={className}
-      // The exact figure sits tight under the rounded one so the two read
-      // as one amount, the few words under that, and any picture last.
+      // What the figure was summed over sits tight under it, the few words
+      // under that, and any picture last.
       chip={
         <>
-          <p className="-mt-1 text-[0.8125rem] text-muted tabular-nums">
-            {exactUsd(cents)}
-            {count ? <span className="text-subtle"> · {count}</span> : null}
-          </p>
+          {count ? (
+            <p className="-mt-1 text-[0.8125rem] text-subtle tabular-nums">
+              {count}
+            </p>
+          ) : null}
           {note ? (
             <p className="mt-1.5 text-xs leading-snug text-subtle">{note}</p>
           ) : null}
@@ -211,7 +205,7 @@ export function MoneyLine({
             </span>
           ) : null}
         </p>
-        <Amount cents={cents} caption={exactUsd(cents)} className="shrink-0" />
+        <Amount cents={cents} exact className="shrink-0" />
         {href ? (
           <ChevronRightIcon
             aria-hidden="true"

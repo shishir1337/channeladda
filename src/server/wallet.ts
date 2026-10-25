@@ -86,8 +86,11 @@ export type WalletEntry = {
 };
 
 /**
+  /** Written for the books and for staff, not for the member: see `walletDetail`. */
  * A Fastest sale whose price the buyer has paid to Channel Adda and we are
  * holding until the transfer completes. Not part of the balance: it is still the
+  /** The deal the money moved for, by the reference the member knows it by. */
+  deal: { reference: string; handle: string } | null;
  * buyer's money until then, and can go back to them if the channel never
  * reaches them.
  */
@@ -145,6 +148,9 @@ export async function getWallet(userId: string): Promise<Wallet> {
     // agent's custody pays it into this balance (`custodyAt`). Never on
     // Safest: the buyer pays the seller directly, and its opening payment
     // is the fee alone — so a Safest buyer's Paid is no promise of ours.
+        order: {
+          select: { reference: true, listing: { select: { handle: true } } },
+        },
     db.order.findMany({
       where: {
         sellerId: userId,
@@ -188,7 +194,12 @@ export async function getWallet(userId: string): Promise<Wallet> {
     balanceUsd,
     pendingWithdrawalUsd,
     availableUsd: balanceUsd - pendingWithdrawalUsd,
-    entries,
+    entries: entries.map(({ order, ...entry }) => ({
+      ...entry,
+      deal: order
+        ? { reference: order.reference, handle: order.listing.handle }
+        : null,
+    })),
     payoutAddress,
     heldForSales,
     heldForSalesUsd: heldForSales.reduce(

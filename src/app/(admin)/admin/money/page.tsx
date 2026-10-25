@@ -380,10 +380,7 @@ export default async function AdminMoneyPage({
                           )}
                         </div>
                       </div>
-                      <Amount
-                        cents={row.amountUsd}
-                        caption={`${exactUsd(row.amountUsd)} invoiced`}
-                      />
+                      <Amount cents={row.amountUsd} exact caption="invoiced" />
                     </div>
 
                     <p className="mt-3 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[0.8125rem] text-muted">
@@ -668,10 +665,7 @@ export default async function AdminMoneyPage({
                         </span>
                       </Td>
                       <Td numeric>
-                        <Amount
-                          cents={row.buyer.cents}
-                          caption={exactUsd(row.buyer.cents)}
-                        />
+                        <Amount cents={row.buyer.cents} exact />
                       </Td>
                       <Td numeric>
                         {row.mode === "SAFEST" && row.seller.count === 0 ? (
@@ -679,16 +673,13 @@ export default async function AdminMoneyPage({
                             never charged
                           </span>
                         ) : (
-                          <Amount
-                            cents={row.seller.cents}
-                            caption={exactUsd(row.seller.cents)}
-                          />
+                          <Amount cents={row.seller.cents} exact />
                         )}
                       </Td>
                       <Td numeric>
                         <Amount
                           cents={row.buyer.cents + row.seller.cents}
-                          caption={exactUsd(row.buyer.cents + row.seller.cents)}
+                          exact
                         />
                       </Td>
                     </Tr>
@@ -705,10 +696,7 @@ export default async function AdminMoneyPage({
                     <Td numeric />
                     <Td numeric />
                     <Td numeric>
-                      <Amount
-                        cents={fees.badges.cents}
-                        caption={exactUsd(fees.badges.cents)}
-                      />
+                      <Amount cents={fees.badges.cents} exact />
                     </Td>
                   </Tr>
                   <tr className="border-t border-line-strong bg-surface-2/50">
@@ -716,7 +704,7 @@ export default async function AdminMoneyPage({
                     <Td numeric />
                     <Td numeric />
                     <Td numeric>
-                      <Amount cents={fees.net} caption={exactUsd(fees.net)} />
+                      <Amount cents={fees.net} exact />
                     </Td>
                   </tr>
                 </tbody>

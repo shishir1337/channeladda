@@ -20,6 +20,7 @@ import {
 } from "@/components/app/kit";
 import { TextArea, TextField } from "@/components/auth/fields";
 import { Button } from "@/components/ui/button";
+import { overMaximum } from "@/lib/exact-usd";
 import { cn } from "@/lib/utils";
 import { adjustMemberBalance } from "@/server/actions/money";
 
@@ -67,6 +68,7 @@ export function MoneyAdjustForm({
   availableCents,
   pendingCents,
   capCents,
+  maxCents,
   capHours,
   minReason,
   maxReason,
@@ -78,6 +80,8 @@ export function MoneyAdjustForm({
   availableCents: number;
   pendingCents: number;
   capCents: number;
+  /** The largest one correction may be, either way, for anybody. */
+  maxCents: number;
   capHours: number;
   minReason: number;
   maxReason: number;
@@ -104,13 +108,24 @@ export function MoneyAdjustForm({
   const credit = direction === "credit";
   const reasonLength = reason.trim().replace(/\s+/g, " ").length;
 
+  // Refused here, before the confirmation: a superadmin was offered
+  // "Yes — add $200,000.00" and only then told the limit is $100,000.
   const amountError =
     amount.trim() !== "" && cents === null
       ? "Enter dollars and cents, like 20 or 20.50."
-      : !credit && cents !== null && cents > availableCents
-        ? `That is more than their available balance of ${exactUsd(availableCents)}. Money promised to a payout they asked for cannot be taken.`
-        : undefined;
-  const overCap = credit && !isSuperadmin && cents !== null && cents > capCents;
+      : cents !== null && cents > maxCents
+        ? overMaximum(credit, maxCents)
+        : !credit && cents !== null && cents > availableCents
+          ? `That is more than their available balance of ${exactUsd(availableCents)}. Money promised to a payout they asked for cannot be taken.`
+          : undefined;
+  // Past the largest correction there is nothing a superadmin could do
+  // either, so the field says so and the finance limit is not raised too.
+  const overCap =
+    credit &&
+    !isSuperadmin &&
+    cents !== null &&
+    cents > capCents &&
+    cents <= maxCents;
 
   const ready =
     cents !== null &&

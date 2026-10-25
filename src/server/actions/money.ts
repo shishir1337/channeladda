@@ -29,7 +29,8 @@ const MESSAGES: Record<repo.AdjustmentFailure, string> = {
   "staff-account":
     "That is a staff account. Only a superadmin can correct a staff member's balance.",
   "bad-amount": "Enter an amount in dollars and cents, like 20 or 20.50.",
-  "too-large": `No single correction can be more than ${dollars(repo.MAX_ADJUSTMENT_USD)}. Split it, or check for an extra zero.`,
+  // Plainly the limit, with no advice on how to get past it.
+  "too-large": `The most one correction can add or take is ${dollars(repo.MAX_ADJUSTMENT_USD)}.`,
   "reason-too-short": `Say why in at least ${repo.MIN_REASON_LENGTH} characters. The member reads this on their wallet.`,
   "reason-too-long": `Keep the reason under ${repo.MAX_REASON_LENGTH} characters.`,
   "needs-superadmin": `Finance can add up to ${dollars(repo.FINANCE_CREDIT_CAP_USD)} to one member in ${repo.CREDIT_WINDOW_HOURS} hours, counting every correction in that time. Ask a superadmin to make this one.`,

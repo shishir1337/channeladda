@@ -36,6 +36,7 @@ import { iconText } from "@/components/ui/icon-hue";
 import { Price } from "@/components/ui/price";
 import type { LedgerKind } from "@/generated/prisma/enums";
 import { cn } from "@/lib/utils";
+import { walletDetail } from "@/lib/wallet-lines";
 import { ratingFor } from "@/server/reseller-status";
 import { requireUser } from "@/server/session";
 import { getSettings } from "@/server/settings";
@@ -72,7 +73,7 @@ const KINDS: Record<string, KindWords> = {
   ESCROW_RELEASE: {
     title: "A sale was paid out to you",
     meaning:
-      "Our agent became the channel's primary owner, so the price Channel Adda was holding became yours.",
+      "Our agent now holds the account, so the price Channel Adda was holding became yours.",
     icon: BanknoteIcon,
   },
   SELLER_FEE: {
@@ -90,7 +91,7 @@ const KINDS: Record<string, KindWords> = {
   REFUND: {
     title: "Money came back to you",
     meaning:
-      "A deal did not go ahead, so what Channel Adda was holding for you came back. A Safest admin fee is kept once our agent has held the channel — it pays for that work.",
+      "A deal did not go ahead, so what Channel Adda was holding for you came back. A Safest admin fee is kept once our agent has held the account — it pays for that work.",
     icon: RotateCcwIcon,
   },
   WITHDRAWAL: {
@@ -401,6 +402,8 @@ export default async function WalletPage({
 
               return (
                 <ListItem key={entry.id}>
+              // Never the note as stored: see `walletDetail`.
+              const detail = walletDetail(entry);
                   <div className="flex items-center gap-3">
                     {/* Money in is green; money out wears its own icon's
                         colour — a deal payment, a fee — not an alarm. */}
@@ -420,9 +423,9 @@ export default async function WalletPage({
                             "Ask support if this entry is not clear."}
                         </InfoTip>
                       </p>
-                      {entry.note ? (
+                      {detail ? (
                         <p className="mt-1 text-xs leading-relaxed break-words text-subtle">
-                          {entry.note}
+                          {detail}
                         </p>
                       ) : null}
                     </div>

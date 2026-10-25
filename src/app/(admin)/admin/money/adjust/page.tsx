@@ -304,6 +304,7 @@ export default async function AdminAdjustPage({
                 availableCents={member.wallet.availableUsd}
                 pendingCents={member.wallet.pendingWithdrawalUsd}
                 capCents={FINANCE_CREDIT_CAP_USD}
+                maxCents={MAX_ADJUSTMENT_USD}
                 capHours={CREDIT_WINDOW_HOURS}
                 minReason={MIN_REASON_LENGTH}
                 maxReason={MAX_REASON_LENGTH}
@@ -367,7 +368,7 @@ export default async function AdminAdjustPage({
                     <Td numeric className="align-top">
                       <Amount
                         cents={row.amountUsd}
-                        caption={exactUsd(row.amountUsd)}
+                        exact
                         tone={row.amountUsd < 0 ? "danger" : "verified"}
                       />
                     </Td>

@@ -1,11 +1,7 @@
 import { CoinsIcon, LockIcon, TriangleAlertIcon } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import {
-  exactUsd,
-  linkClass,
-  MoneyMetric,
-} from "@/components/admin/money-parts";
+import { linkClass, MoneyMetric } from "@/components/admin/money-parts";
 import { PayoutDecision } from "@/components/admin/payout-decision";
 import { Waited } from "@/components/admin/vocab";
 import {
@@ -126,12 +122,10 @@ export default async function AdminPayoutsPage() {
               <ListItem key={payout.id} padded={false}>
                 <div className="px-4 py-4 sm:px-5 sm:py-5">
                   <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
+                      {/* Once, to the cent: the amount that will leave. */}
                     <div className="min-w-0">
                       <p className="text-2xl leading-8 font-semibold tracking-[-0.02em] text-fg tabular-nums">
-                        <Price usd={payout.amountUsd / 100} />
-                      </p>
-                      <p className="mt-0.5 text-[0.8125rem] text-muted tabular-nums">
-                        {exactUsd(payout.amountUsd)}
+                        <Price usd={payout.amountUsd / 100} exact />
                       </p>
                       <p className="mt-2.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[0.8125rem] text-muted">
                         <Link
@@ -164,6 +158,7 @@ export default async function AdminPayoutsPage() {
                     <p className="mt-1.5 text-xs leading-relaxed text-subtle">
                       Read it in full. A single wrong character sends{" "}
                       <Price
+                        exact
                         usd={payout.amountUsd / 100}
                         className="text-muted"
                       />{" "}
