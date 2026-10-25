@@ -16,6 +16,7 @@ import {
   TagIcon,
   XIcon,
 } from "lucide-react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -34,10 +35,7 @@ import {
 } from "@/components/messages/chat-offer-card";
 import { BusyLabel, Initials } from "@/components/messages/chat-parts";
 import { EventLine } from "@/components/messages/event-line";
-import {
-  type OfferComposerConfig,
-  OfferComposerForm,
-} from "@/components/messages/offer-composer";
+import type { OfferComposerConfig } from "@/components/messages/offer-composer";
 import { OfferActions } from "@/components/offers/offer-actions";
 import { Button } from "@/components/ui/button";
 import { iconText } from "@/components/ui/icon-hue";
@@ -52,6 +50,17 @@ import {
 } from "@/server/actions/messages";
 
 /**
+/**
+ * The offer form opens only when somebody presses Offer, so its code is not
+ * part of the chat's first load — the slowest page on a phone — and is
+ * fetched on hover or focus of the button, before the press.
+ */
+const loadOfferComposer = () =>
+  import("@/components/messages/offer-composer").then(
+    (module) => module.OfferComposerForm,
+  );
+const OfferComposerForm = dynamic(loadOfferComposer, { ssr: false });
+
  * One conversation, read by whoever is in it.
  *
  * The rule this interface exists to carry is that buyers and sellers never get
@@ -1119,6 +1128,8 @@ export function ThreadView({
                   pending ||
                   uploading ||
                   over ||
+                  onPointerEnter={() => void loadOfferComposer()}
+                  onFocus={() => void loadOfferComposer()}
                   (draft.trim().length === 0 && attachment === null)
                 }
                 // Keeps the cursor in the box. Tapping Send moved focus off
