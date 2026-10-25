@@ -44,6 +44,7 @@ import { iconText } from "@/components/ui/icon-hue";
 import { Price } from "@/components/ui/price";
 import type { ListingStatus, OfferStatus } from "@/generated/prisma/enums";
 import { needsEmailVerification } from "@/lib/email-verification";
+import { removedBySeller } from "@/lib/listing-lock";
 import { countOf } from "@/lib/plural";
 import { cn } from "@/lib/utils";
 import { getBuyerSummary, getSellerSummary } from "@/server/dashboard";
@@ -299,7 +300,13 @@ export default async function DashboardPage() {
       id: `l-${listing.id}`,
       href: `/dashboard/listings/${listing.id}`,
       icon: StoreIcon,
-      what: <>{LISTING_EVENT[listing.status]}</>,
+      what: (
+        <>
+          {removedBySeller(listing)
+            ? "You removed a listing"
+            : LISTING_EVENT[listing.status]}
+        </>
+      ),
       detail: listing.handle,
       outcome: statusMeta(listing.status),
       at: listing.updatedAt,

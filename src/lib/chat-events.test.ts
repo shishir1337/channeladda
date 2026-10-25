@@ -11,6 +11,7 @@ const EXAMPLES: ChatEvent[] = [
   { type: "offer-withdrawn", name: "Rafi", amountCents: 200_000 },
   { type: "offer-expired", amountCents: 200_000 },
   { type: "offer-auto-declined", amountCents: 200_000 },
+  { type: "offer-listing-removed", amountCents: 200_000 },
   { type: "reservation-lapsed", amountCents: 220_000 },
   {
     type: "deal-opened",

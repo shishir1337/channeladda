@@ -187,6 +187,44 @@ export const listingSubmitSchema = listingFields.extend({
 });
 
 /**
+ * What may change on a listing buyers can already see.
+ *
+ * Everything a buyer reads, held to the same rules as sending it was — a
+ * live listing cannot lose its cover or its price. Not which account it is:
+ * the platform, the handle and the link are what the ownership check proved,
+ * and a different account is a new listing. They may be sent along, but only
+ * so the server can refuse a change to them rather than quietly drop it.
+ * Not the proof screenshots either: they are what a moderator checked, not
+ * something a buyer reads.
+ */
+export const listingLiveEditSchema = listingSubmitSchema
+  .pick({
+    title: true,
+    niche: true,
+    country: true,
+    audience: true,
+    monetized: true,
+    monthlyRevenue: true,
+    yearlyRevenue: true,
+    engagement: true,
+    ageYears: true,
+    price: true,
+    coverUrl: true,
+    avatarUrl: true,
+    transferProfile: true,
+    description: true,
+    whatsapp: true,
+  })
+  .extend({
+    platform: listingFields.shape.platform.optional(),
+    handle: z.string().trim().max(300).optional(),
+    sourceUrl: z.string().trim().max(300).optional(),
+  });
+
+export type ListingLiveEditInput = z.input<typeof listingLiveEditSchema>;
+export type ListingLiveEdit = z.output<typeof listingLiveEditSchema>;
+
+/**
  * What a seller may save and come back to.
  *
  * Only the handle is required, because the public slug is built from it and

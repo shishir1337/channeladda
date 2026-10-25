@@ -23,6 +23,7 @@ import {
   Sep,
   TurnFlag,
 } from "@/components/app/kit";
+import { ListingRowMenu } from "@/components/dashboard/listing-row-menu";
 import {
   ListingStatusBadge,
   statusMeta,
@@ -31,9 +32,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { platforms } from "@/data/platforms";
 import type { ListingStatus } from "@/generated/prisma/enums";
+import { LIVE_EDITABLE, REMOVABLE, removedBySeller } from "@/lib/listing-lock";
 import { pickTab } from "@/lib/tabs";
 import { cn } from "@/lib/utils";
-import { getMyListings, type SellerListing } from "@/server/seller-listings";
+import {
+  getMyListings,
+  lockedListingIds,
+  type SellerListing,
+} from "@/server/seller-listings";
 import { requireUser } from "@/server/session";
 
 export const metadata: Metadata = {
@@ -100,14 +106,26 @@ const FIRST_STEPS = [
   },
 ];
 
-type ListingTab = "yours" | "sale" | "draft" | "sold";
-const LISTING_TABS: readonly ListingTab[] = ["yours", "sale", "draft", "sold"];
+/**
+ * Removed listings have a tab of their own, last, and only once there is one:
+ * off the marketplace for good, they are a record and not something to work
+ * on, and they were mixed in with the sales before.
+ */
+type ListingTab = "yours" | "sale" | "draft" | "sold" | "removed";
+const LISTING_TABS: readonly ListingTab[] = [
+  "yours",
+  "sale",
+  "draft",
+  "sold",
+  "removed",
+];
 
 const TAB_LABEL: Record<ListingTab, string> = {
   yours: "Your turn",
   sale: "On sale",
   draft: "Not live yet",
   sold: "Sold",
+  removed: "Removed",
 };
 
 const TAB_EMPTY: Record<ListingTab, string> = {
@@ -115,6 +133,7 @@ const TAB_EMPTY: Record<ListingTab, string> = {
   sale: "Nothing is on sale right now.",
   draft: "No drafts or listings in review.",
   sold: "Nothing sold yet.",
+  removed: "Nothing removed.",
 };
 
 /**
@@ -125,32 +144,31 @@ export default async function MyListingsPage({
   searchParams,
 }: PageProps<"/dashboard/listings">) {
   const user = await requireUser("/dashboard/listings");
-  const [listings, params] = await Promise.all([
+  const [listings, locked, params] = await Promise.all([
     getMyListings(user.id),
+    lockedListingIds(user.id),
     searchParams,
   ]);
 
   const needsYou = listings.filter((l) => NEEDS_YOU.includes(l.status));
   const onSale = listings.filter((l) => ON_SALE.includes(l.status));
   const inProgress = listings.filter((l) => IN_PROGRESS.includes(l.status));
-  const archive = listings.filter(
-    (l) =>
-      !NEEDS_YOU.includes(l.status) &&
-      !ON_SALE.includes(l.status) &&
-      !IN_PROGRESS.includes(l.status),
-  );
+  const archive = listings.filter((l) => l.status === "SOLD");
+  const removed = listings.filter((l) => l.status === "REMOVED");
 
   const groups: Record<ListingTab, typeof listings> = {
     yours: needsYou,
     sale: onSale,
     draft: inProgress,
     sold: archive.slice(0, ARCHIVE_SHOWN),
+    removed: removed.slice(0, ARCHIVE_SHOWN),
   };
   const counts: Record<ListingTab, number> = {
     yours: needsYou.length,
     sale: onSale.length,
     draft: inProgress.length,
     sold: archive.length,
+    removed: removed.length,
   };
   const tab = pickTab(
     typeof params.tab === "string" ? params.tab : undefined,
@@ -232,7 +250,10 @@ export default async function MyListingsPage({
       ) : (
         <>
           <FilterBar label="Your listings by stage" className="mb-5">
-            {LISTING_TABS.map((name) => (
+            {LISTING_TABS.filter(
+              (name) =>
+                name !== "removed" || counts.removed > 0 || tab === name,
+            ).map((name) => (
               <FilterLink
                 key={name}
                 href={`/dashboard/listings?tab=${name}`}
@@ -253,12 +274,14 @@ export default async function MyListingsPage({
                     key={listing.id}
                     listing={listing}
                     needsYou={tab === "yours"}
+                    locked={locked.has(listing.id)}
                   />
                 ))}
               </List>
-              {tab === "sold" && archive.length > ARCHIVE_SHOWN ? (
+              {(tab === "sold" || tab === "removed") &&
+              counts[tab] > ARCHIVE_SHOWN ? (
                 <p className="mt-3 text-xs text-subtle">
-                  The {ARCHIVE_SHOWN} most recent of {archive.length}.
+                  The {ARCHIVE_SHOWN} most recent of {counts[tab]}.
                 </p>
               ) : null}
             </>
@@ -305,134 +328,195 @@ function OwnershipChip({ listing }: { listing: SellerListing }) {
   );
 }
 
+/**
+ * Where "Edit" goes from a row, or null when there is nowhere yet: a draft
+ * is edited on its own page, a listing on sale on its edit page, and one in
+ * review has to be pulled back first.
+ */
+function editHrefFor(listing: SellerListing, locked: boolean) {
+  if (listing.status === "DRAFT" || listing.status === "REJECTED") {
+    return `/dashboard/listings/${listing.id}#edit`;
+  }
+  if (LIVE_EDITABLE.includes(listing.status) && !locked) {
+    return `/dashboard/listings/${listing.id}/edit`;
+  }
+  return null;
+}
+
+/** What a removed listing's row says about who took it down. */
+function removedNote(listing: SellerListing) {
+  return removedBySeller(listing)
+    ? "You removed this listing."
+    : "Taken down by a moderator. Open it to see why.";
+}
+
 function ListingRow({
   listing,
   needsYou,
+  locked,
 }: {
   listing: SellerListing;
   needsYou?: boolean;
+  /** A running deal holds it, so it cannot be edited or removed. */
+  locked: boolean;
 }) {
   const move = NEXT_MOVE[listing.status];
   // The one status whose meaning no badge or section on this page says.
   const note =
     move ??
-    (listing.status === "RESERVED" ? statusMeta(listing.status).note : null);
+    (listing.status === "RESERVED" || locked
+      ? statusMeta("RESERVED").note
+      : listing.status === "REMOVED"
+        ? removedNote(listing)
+        : null);
   const platform = platforms.find((p) => p.id === listing.platform);
+  const editHref = editHrefFor(listing, locked);
+  const canRemove = REMOVABLE.includes(listing.status) && !locked;
+  const href = `/dashboard/listings/${listing.id}`;
 
-  return (
-    <ListItem href={`/dashboard/listings/${listing.id}`}>
-      <div className="flex items-start gap-3 sm:gap-4">
-        <span className="relative shrink-0">
-          {listing.coverUrl ? (
-            <>
-              {/* biome-ignore lint/performance/noImgElement: the seller's own
+  const body = (
+    <div className="flex items-start gap-3 sm:gap-4">
+      <span className="relative shrink-0">
+        {listing.coverUrl ? (
+          <>
+            {/* biome-ignore lint/performance/noImgElement: the seller's own
                   upload at 96px. Dimensions are set, so nothing shifts. */}
-              <img
-                src={listing.coverUrl}
-                alt=""
-                width={96}
-                height={56}
-                className="h-10 w-16 rounded-md border border-line bg-surface-2 object-cover sm:h-12 sm:w-20"
-              />
-            </>
-          ) : (
-            // A draft is allowed to have no cover yet, and `src=""` makes the
-            // browser re-request the page as an image.
-            <span className="flex h-10 w-16 items-center justify-center rounded-md border border-dashed border-line-strong bg-surface-2 text-subtle sm:h-12 sm:w-20">
-              <ImageIcon aria-hidden="true" className="size-4" />
-            </span>
-          )}
-          {platform ? (
-            <span
-              aria-hidden="true"
-              className="absolute -right-1.5 -bottom-1.5 flex size-5 items-center justify-center rounded-md border border-line bg-surface shadow-xs"
-              style={{ color: platform.tint }}
-            >
-              <platform.icon className="size-3" />
-            </span>
-          ) : null}
-        </span>
+            <img
+              src={listing.coverUrl}
+              alt=""
+              width={96}
+              height={56}
+              className="h-10 w-16 rounded-md border border-line bg-surface-2 object-cover sm:h-12 sm:w-20"
+            />
+          </>
+        ) : (
+          // A draft is allowed to have no cover yet, and `src=""` makes the
+          // browser re-request the page as an image.
+          <span className="flex h-10 w-16 items-center justify-center rounded-md border border-dashed border-line-strong bg-surface-2 text-subtle sm:h-12 sm:w-20">
+            <ImageIcon aria-hidden="true" className="size-4" />
+          </span>
+        )}
+        {platform ? (
+          <span
+            aria-hidden="true"
+            className="absolute -right-1.5 -bottom-1.5 flex size-5 items-center justify-center rounded-md border border-line bg-surface shadow-xs"
+            style={{ color: platform.tint }}
+          >
+            <platform.icon className="size-3" />
+          </span>
+        ) : null}
+      </span>
 
-        <div className="min-w-0 flex-1">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className="flex min-w-0 items-center gap-1.5 text-sm leading-5 font-medium text-fg">
-                <span className="truncate">
-                  {listing.title || listing.handle}
-                </span>
-                {listing.ownershipVerifiedAt ? <VerifiedMark /> : null}
-              </p>
-              <p className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-1.5 text-[0.8125rem] leading-5 text-muted">
-                <span className="capitalize">
-                  {platform?.name ?? listing.platform}
-                </span>
-                <Sep />
-                <span className="min-w-0 max-w-full truncate">
-                  {listing.handle}
-                </span>
-                <Sep />
-                <span className="whitespace-nowrap">
-                  <span className="tabular-nums">
-                    {listing.audience.toLocaleString("en-US")}
-                  </span>{" "}
-                  audience
-                </span>
-              </p>
-            </div>
-            <div className="shrink-0 text-right">
-              <p className="text-sm leading-5 font-medium text-fg tabular-nums">
-                {usd(listing.price)}
-              </p>
-              {listing.status === "LIVE" ? (
-                <p className="mt-0.5 text-xs leading-5 text-subtle tabular-nums">
-                  {listing.watching} watching
-                </p>
-              ) : (
-                <p className="mt-0.5 text-xs leading-5 whitespace-nowrap text-subtle">
-                  Updated {day(listing.updatedAt)}
-                </p>
-              )}
-            </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="flex min-w-0 items-center gap-1.5 text-sm leading-5 font-medium text-fg">
+              <span className="truncate">
+                {listing.title || listing.handle}
+              </span>
+              {listing.ownershipVerifiedAt ? <VerifiedMark /> : null}
+            </p>
+            <p className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-1.5 text-[0.8125rem] leading-5 text-muted">
+              <span className="capitalize">
+                {platform?.name ?? listing.platform}
+              </span>
+              <Sep />
+              <span className="min-w-0 max-w-full truncate">
+                {listing.handle}
+              </span>
+              <Sep />
+              <span className="whitespace-nowrap">
+                <span className="tabular-nums">
+                  {listing.audience.toLocaleString("en-US")}
+                </span>{" "}
+                audience
+              </span>
+            </p>
           </div>
+          <div className="shrink-0 text-right">
+            <p className="text-sm leading-5 font-medium text-fg tabular-nums">
+              {usd(listing.price)}
+            </p>
+            {listing.status === "LIVE" ? (
+              <p className="mt-0.5 text-xs leading-5 text-subtle tabular-nums">
+                {listing.watching} watching
+              </p>
+            ) : (
+              <p className="mt-0.5 text-xs leading-5 whitespace-nowrap text-subtle">
+                Updated {day(listing.updatedAt)}
+              </p>
+            )}
+          </div>
+        </div>
 
-          <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1.5">
-            <ListingStatusBadge status={listing.status} size="sm" />
-            <OwnershipChip listing={listing} />
-            {needsYou ? <TurnFlag mine /> : null}
-            {/* What to do next, in the seller's language — "CODE_CHECK"
+        <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1.5">
+          <ListingStatusBadge status={listing.status} size="sm" />
+          <OwnershipChip listing={listing} />
+          {needsYou ? <TurnFlag mine /> : null}
+          {/* What to do next, in the seller's language — "CODE_CHECK"
                 tells nobody anything. Only where there is a move: what a live,
                 paused or in-review listing means is said once, beside its
                 section's heading, not again on every row. The line is louder
                 when the move is the seller's. */}
-            {note ? (
-              <span
-                className={cn(
-                  "basis-full text-[0.8125rem] leading-5 sm:basis-auto",
-                  needsYou ? "text-fg" : "text-muted",
-                )}
-              >
-                {note}
-              </span>
-            ) : null}
-          </div>
-
-          {listing.status === "REJECTED" && listing.rejectionReason ? (
-            <span className="mt-2.5 flex items-start gap-2 rounded-lg border border-danger/20 bg-danger-soft/60 px-3 py-2">
-              <CircleAlertIcon
-                aria-hidden="true"
-                className="mt-0.5 size-3.5 shrink-0 text-danger"
-              />
-              <span className="min-w-0 text-[0.8125rem] leading-relaxed">
-                <span className="font-medium text-fg">Why it came back:</span>{" "}
-                <span className="text-muted">{listing.rejectionReason}</span>
-              </span>
+          {note ? (
+            <span
+              className={cn(
+                "basis-full text-[0.8125rem] leading-5 sm:basis-auto",
+                needsYou ? "text-fg" : "text-muted",
+              )}
+            >
+              {note}
             </span>
           ) : null}
         </div>
 
+        {listing.status === "REJECTED" && listing.rejectionReason ? (
+          <span className="mt-2.5 flex items-start gap-2 rounded-lg border border-danger/20 bg-danger-soft/60 px-3 py-2">
+            <CircleAlertIcon
+              aria-hidden="true"
+              className="mt-0.5 size-3.5 shrink-0 text-danger"
+            />
+            <span className="min-w-0 text-[0.8125rem] leading-relaxed">
+              <span className="font-medium text-fg">Why it came back:</span>{" "}
+              <span className="text-muted">{listing.rejectionReason}</span>
+            </span>
+          </span>
+        ) : null}
+      </div>
+
+      {editHref || canRemove ? null : (
         <ChevronRightIcon
           aria-hidden="true"
           className="mt-0.5 hidden size-4 shrink-0 text-subtle transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-muted sm:block"
+        />
+      )}
+    </div>
+  );
+
+  if (!editHref && !canRemove) {
+    return <ListItem href={href}>{body}</ListItem>;
+  }
+
+  // The row is still one link, with the menu beside it rather than inside
+  // it: a button inside a link is two controls in one, and a tap on the
+  // menu would open the listing too.
+  return (
+    <ListItem
+      padded={false}
+      className="flex items-start transition-colors duration-150 hover:bg-surface-2/60"
+    >
+      <Link
+        href={href}
+        className="group block min-w-0 flex-1 py-3 pl-3.5 focus-visible:-outline-offset-2 sm:pl-5"
+      >
+        {body}
+      </Link>
+      <div className="shrink-0 py-1.5 pr-1 pl-1 sm:py-2 sm:pr-3 sm:pl-2">
+        <ListingRowMenu
+          listingId={listing.id}
+          name={listing.title || listing.handle}
+          editHref={editHref}
+          canRemove={canRemove}
         />
       </div>
     </ListItem>

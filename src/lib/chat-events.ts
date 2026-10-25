@@ -23,7 +23,11 @@ export type ChatEvent =
       amountCents: number;
     }
   | {
-      type: "offer-expired" | "offer-auto-declined" | "reservation-lapsed";
+      type:
+        | "offer-expired"
+        | "offer-auto-declined"
+        | "offer-listing-removed"
+        | "reservation-lapsed";
       amountCents: number;
     }
   | {
@@ -83,6 +87,8 @@ export function eventText(event: ChatEvent): string {
       return `The offer of ${money(event.amountCents)} lapsed without an answer`;
     case "offer-auto-declined":
       return `The offer of ${money(event.amountCents)} closed: the listing went to another buyer`;
+    case "offer-listing-removed":
+      return `The offer of ${money(event.amountCents)} closed: the seller took the listing off the marketplace`;
     case "reservation-lapsed":
       return `The agreed price of ${money(event.amountCents)} lapsed because the deal was never opened. The listing is back on sale`;
     case "deal-opened":

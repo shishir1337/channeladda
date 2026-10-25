@@ -2,6 +2,8 @@ import {
   BadgeCheckIcon,
   ExternalLinkIcon,
   ImageIcon,
+  LockIcon,
+  PencilIcon,
   ShieldAlertIcon,
 } from "lucide-react";
 import type { Metadata } from "next";
@@ -34,8 +36,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { platforms } from "@/data/platforms";
 import type { ListingStatus } from "@/generated/prisma/enums";
+import { LOCK_TEXT, removedBySeller } from "@/lib/listing-lock";
 import { cn } from "@/lib/utils";
-import { EDITABLE, getMyListing } from "@/server/seller-listings";
+import {
+  EDITABLE,
+  getListingLocks,
+  getMyListing,
+} from "@/server/seller-listings";
 import { requireUser } from "@/server/session";
 import { getFeeSettings } from "@/server/settings";
 
@@ -107,30 +114,46 @@ const CURRENT_BAR: Record<string, string> = {
   danger: "bg-danger",
 };
 
-/** Statuses that give the seller something to press. */
-const HAS_CONTROLS: readonly ListingStatus[] = [
-  "DRAFT",
-  "REJECTED",
-  "ADMIN_REVIEW",
-  "LIVE",
-  "PAUSED",
-];
+/** What "Manage this listing" says about each status's buttons. */
+const MANAGE_INFO: Partial<Record<ListingStatus, string>> = {
+  LIVE: "Pausing hides it from buyers without losing anything. Removing takes it off the marketplace for good.",
+  PAUSED:
+    "Putting it back up shows it to buyers again. Removing takes it off the marketplace for good.",
+  ADMIN_REVIEW: "Pulling it back turns it into a draft you can edit again.",
+};
 
 export default async function SellerListingPage({
   params,
+  searchParams,
 }: PageProps<"/dashboard/listings/[id]">) {
   const { id } = await params;
   const user = await requireUser(`/dashboard/listings/${id}`);
 
   // Scoped to the owner, so somebody else's id is indistinguishable from one
   // that does not exist.
-  const [listing, fees] = await Promise.all([
+  const [listing, locks, fees, query] = await Promise.all([
     getMyListing(user.id, id),
+    getListingLocks(user.id, id),
     getFeeSettings(),
+    searchParams,
   ]);
-  if (!listing) notFound();
+  if (!listing || !locks) notFound();
 
   const meta = statusMeta(listing.status);
+  const sellerRemoved = removedBySeller(listing);
+  // Back from Save on the edit page, or here from Remove on the list.
+  const saved = query.saved === "1" && locks.canEdit;
+  const askToRemove = query.remove === "1" && locks.canRemove;
+  // A lock worth explaining: a deal holds it, or it has sold. A removed
+  // listing says so in its header instead.
+  const lockText =
+    locks.lock && locks.lock !== "removed" ? LOCK_TEXT[locks.lock] : null;
+  const hasControls =
+    locks.canRemove ||
+    (locks.lock === null &&
+      (listing.status === "LIVE" ||
+        listing.status === "PAUSED" ||
+        listing.status === "ADMIN_REVIEW"));
   const platformName =
     platforms.find((p) => p.id === listing.platform)?.name ?? listing.platform;
   const editable = EDITABLE.includes(listing.status);
@@ -149,7 +172,9 @@ export default async function SellerListingPage({
           // just below — the line is not needed twice.
           listing.status === "REJECTED" && listing.rejectionReason
             ? undefined
-            : meta.note
+            : sellerRemoved
+              ? "You removed this listing. Buyers cannot see it."
+              : meta.note
         }
         meta={
           <>
@@ -168,16 +193,40 @@ export default async function SellerListingPage({
           </>
         }
         actions={
-          listing.status === "LIVE" ? (
-            <Button asChild variant="secondary" size="md">
-              <Link href={`/listing/${listing.slug}`}>
-                View as a buyer
-                <ExternalLinkIcon aria-hidden="true" />
-              </Link>
-            </Button>
+          locks.canEdit || listing.status === "LIVE" ? (
+            <>
+              {locks.canEdit ? (
+                <Button asChild variant="secondary" size="md">
+                  <Link href={`/dashboard/listings/${listing.id}/edit`}>
+                    <PencilIcon aria-hidden="true" />
+                    Edit
+                  </Link>
+                </Button>
+              ) : null}
+              {listing.status === "LIVE" ? (
+                <Button asChild variant="secondary" size="md">
+                  <Link href={`/listing/${listing.slug}`}>
+                    View as a buyer
+                    <ExternalLinkIcon aria-hidden="true" />
+                  </Link>
+                </Button>
+              ) : null}
+            </>
           ) : undefined
         }
       />
+
+      {saved ? (
+        <AllClear
+          className="mb-6"
+          title="Changes saved"
+          body={
+            listing.status === "LIVE"
+              ? "Buyers see them now."
+              : "Buyers will see them when you put it back up."
+          }
+        />
+      ) : null}
 
       <Card className="overflow-hidden">
         <div className="h-20 w-full border-b border-line bg-surface-2 sm:h-24">
@@ -288,6 +337,20 @@ export default async function SellerListingPage({
         </ol>
       </Card>
 
+      {listing.status === "REMOVED" &&
+      !sellerRemoved &&
+      listing.rejectionReason ? (
+        <Callout tone="danger" title="Why it was taken down" className="mt-6">
+          <p className="max-w-[68ch] text-sm leading-relaxed text-fg">
+            {listing.rejectionReason}
+          </p>
+          <p className="mt-2 max-w-[68ch]">
+            If you think this is a mistake, contact support and a moderator can
+            look at it again.
+          </p>
+        </Callout>
+      ) : null}
+
       {listing.status === "REJECTED" && listing.rejectionReason ? (
         <Callout tone="danger" title="What needs changing" className="mt-6">
           <p className="max-w-[68ch] text-sm leading-relaxed text-fg">
@@ -362,6 +425,7 @@ export default async function SellerListingPage({
 
       {editable ? (
         <Section
+          id="edit"
           title={
             listing.status === "REJECTED" ? "Fix and resend" : "The listing"
           }
@@ -403,29 +467,50 @@ export default async function SellerListingPage({
           />
         </Section>
       ) : (
-        <ReadOnlySummary listing={listing} platformName={platformName} />
-      )}
-
-      {HAS_CONTROLS.includes(listing.status) ? (
-        <Section
-          title="Manage this listing"
+        <ReadOnlySummary
+          listing={listing}
+          platformName={platformName}
           info={
-            listing.status === "LIVE"
-              ? "Pausing hides it from buyers without losing anything."
-              : listing.status === "ADMIN_REVIEW"
-                ? "Pulling it back turns it into a draft you can edit again."
+            locks.canEdit
+              ? "Press Edit at the top to change what buyers see. Your changes show at once."
+              : listing.status === "CODE_CHECK" ||
+                  listing.status === "ADMIN_REVIEW"
+                ? "Locked while this listing is with us. Pull it back to make changes."
                 : undefined
           }
-        >
-          <Card padded>
-            <ListingControls listingId={listing.id} status={listing.status} />
-          </Card>
-        </Section>
-      ) : (
-        <div className="mt-8">
-          <ListingControls listingId={listing.id} status={listing.status} />
-        </div>
+        />
       )}
+
+      {hasControls || lockText ? (
+        <Section
+          id="manage"
+          title="Manage this listing"
+          info={lockText ? undefined : MANAGE_INFO[listing.status]}
+        >
+          {lockText ? (
+            <Callout icon={LockIcon} title={lockText.title}>
+              {lockText.body}
+            </Callout>
+          ) : (
+            <Card padded>
+              <ListingControls
+                listingId={listing.id}
+                status={listing.status}
+                canRemove={locks.canRemove}
+                deletes={locks.deletes}
+                openOffers={locks.openOffers}
+                unpaidDeals={locks.unpaidDeals}
+                removeBlocked={
+                  locks.paying && !locks.deletes
+                    ? "A buyer is paying for it by crypto right now. You can remove it once that payment lands or runs out, within the hour."
+                    : null
+                }
+                confirmFirst={askToRemove}
+              />
+            </Card>
+          )}
+        </Section>
+      ) : null}
     </>
   );
 }
@@ -433,9 +518,12 @@ export default async function SellerListingPage({
 function ReadOnlySummary({
   listing,
   platformName,
+  info,
 }: {
   listing: Listing;
   platformName: string;
+  /** Whether, and how, these can be changed. */
+  info?: string;
 }) {
   const rows: [string, string][] = [
     ["Platform", platformName],
@@ -451,10 +539,7 @@ function ReadOnlySummary({
   ];
 
   return (
-    <Section
-      title="The details"
-      info="Locked while this listing is with us. Pull it back to make changes."
-    >
+    <Section title="The details" info={info}>
       <Card>
         <CardBody className="py-2 sm:py-2.5">
           <Facts columns={2}>

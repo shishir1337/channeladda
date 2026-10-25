@@ -732,9 +732,12 @@ test(
     const { clearVerificationIfIdentityChanged } = await import(
       "@/server/seller-listings"
     );
+    // Sent back, so the draft form may edit it: a live listing's identity
+    // cannot change at all, so it is never cleared (seller-listings-live).
     await db.listing.update({
       where: { id: listing.id },
       data: {
+        status: "REJECTED",
         ownershipVerifiedAt: new Date(),
         ownershipCode: "CA-ABCD2345",
         sourceUrl: "https://www.youtube.com/@real",

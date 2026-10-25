@@ -5,11 +5,18 @@ import { needsEmailVerification } from "@/lib/email-verification";
 import {
   fieldErrors,
   type ListingDraftInput,
+  type ListingLiveEditInput,
   listingDraftSchema,
+  listingLiveEditSchema,
   listingSubmitSchema,
 } from "@/lib/listing-form";
+import { LOCK_TEXT } from "@/lib/listing-lock";
 import * as repo from "@/server/seller-listings";
-import { clearVerificationIfIdentityChanged } from "@/server/seller-listings";
+import {
+  clearVerificationIfIdentityChanged,
+  type LiveEditRefusal,
+  type RemoveRefusal,
+} from "@/server/seller-listings";
 import { requireUser } from "@/server/session";
 
 /**
@@ -50,6 +57,19 @@ const LOCKED = {
 function refreshFor(id?: string) {
   revalidatePath("/dashboard/listings");
   if (id) revalidatePath(`/dashboard/listings/${id}`);
+}
+
+/**
+ * Every page a buyer could read this listing on: its own page, browse, the
+ * homepage showcase, and the seller's public page — the last two are cached
+ * for a minute, which is a minute of the old price.
+ */
+function refreshPublic(slug: string, sellerSlug: string | null) {
+  revalidatePath(`/listing/${slug}`);
+  revalidatePath("/browse");
+  revalidatePath("/browse/[platform]", "page");
+  revalidatePath("/");
+  if (sellerSlug) revalidatePath(`/seller/${sellerSlug}`);
 }
 
 export async function saveListing(
@@ -170,19 +190,68 @@ export async function setPaused(
   return { ok: true, id };
 }
 
-export async function deleteListing(id: string): Promise<ActionResult> {
+const LIVE_EDIT_REFUSED: Record<LiveEditRefusal, string> = {
+  "not-found": NOT_YOURS.errors.form,
+  "wrong-status":
+    "Only a live or paused listing is edited here. Open the listing to change a draft.",
+  identity:
+    "The platform, the handle and the account link cannot change on a live listing. To sell a different account, list it as a new one.",
+  "verified-audience":
+    "The audience figure came from YouTube when we verified the channel, so it cannot be changed.",
+  changed:
+    "This listing changed while you were editing it, so nothing was saved. Open it again to see where it stands.",
+  reserved: LOCK_TEXT.reserved.body,
+  "in-deal": LOCK_TEXT["in-deal"].body,
+  sold: LOCK_TEXT.sold.body,
+  removed: "This listing is off the marketplace, so it cannot be edited.",
+};
+
+/**
+ * An edit to a listing buyers can already see. It shows at once: there is
+ * no second review, and staff see what changed in the listing's history.
+ */
+export async function saveLiveListing(
+  id: string,
+  input: ListingLiveEditInput,
+): Promise<ActionResult> {
   const user = await requireUser();
-  const result = await repo.deleteDraft(user.id, id);
-  if (!result.ok) {
-    return result.reason === "locked"
-      ? {
-          ok: false,
-          errors: {
-            form: "Only a draft can be deleted. Pause it instead if it is live.",
-          },
-        }
-      : NOT_YOURS;
+  const parsed = listingLiveEditSchema.safeParse(input);
+  if (!parsed.success) {
+    return { ok: false, errors: fieldErrors(parsed.error) };
   }
-  revalidatePath("/dashboard/listings");
+
+  const result = await repo.updateLiveListing(user.id, id, parsed.data);
+  if (!result.ok) {
+    return { ok: false, errors: { form: LIVE_EDIT_REFUSED[result.reason] } };
+  }
+
+  refreshFor(id);
+  if (result.changed.length > 0) refreshPublic(result.slug, user.slug);
+  return { ok: true, id };
+}
+
+const REMOVE_REFUSED: Record<RemoveRefusal, string> = {
+  "not-found": NOT_YOURS.errors.form,
+  reserved: LOCK_TEXT.reserved.body,
+  "in-deal": LOCK_TEXT["in-deal"].body,
+  sold: LOCK_TEXT.sold.body,
+  paying:
+    "A buyer is paying for this listing by crypto right now. You can remove it once that payment lands or runs out, within the hour.",
+  changed:
+    "This listing changed while you were removing it, so nothing was done. Open it again to see where it stands.",
+};
+
+/**
+ * "Remove listing", whatever stage it is at: a draft is deleted, anything
+ * that has been sent leaves the marketplace for good. See `removeMyListing`.
+ */
+export async function removeListing(id: string): Promise<ActionResult> {
+  const user = await requireUser();
+  const result = await repo.removeMyListing(user.id, id);
+  if (!result.ok) {
+    return { ok: false, errors: { form: REMOVE_REFUSED[result.reason] } };
+  }
+  refreshFor(id);
+  if (result.outcome === "removed") refreshPublic(result.slug, user.slug);
   return { ok: true };
 }

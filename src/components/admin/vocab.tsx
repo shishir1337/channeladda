@@ -450,10 +450,12 @@ export const AUDIT_LABEL: Record<string, string> = {
   "deal.returned": "returned a channel to its seller",
   "deal.step_completed": "completed a step",
   "listing.approve": "approved a listing",
+  "listing.edit": "edited their live listing",
   "listing.ownership_verified": "confirmed an ownership code",
   "listing.reject": "sent a listing back",
   "listing.remove": "took a listing down",
   "listing.reopen": "sent a taken-down listing back to review",
+  "listing.seller_remove": "removed their own listing",
   "listing.feature": "featured a listing",
   "listing.unfeature": "stopped featuring a listing",
   "payment.arrived_too_late": "took a payment that arrived too late",
@@ -491,6 +493,68 @@ export const AUDIT_LABEL: Record<string, string> = {
 /** Falls back to a readable form of the key rather than printing the key. */
 export function auditLabel(action: string): string {
   return AUDIT_LABEL[action] ?? action.replace(/[._]/g, " ");
+}
+
+/** A seller's live edit, field by field, in the columns it wrote. */
+const LISTING_FIELD: Record<
+  string,
+  { label: string; show: (value: unknown) => string }
+> = (() => {
+  const text = (value: unknown) =>
+    typeof value === "string" && value.trim() !== "" ? value : "nothing";
+  const usd = (value: unknown) =>
+    typeof value === "number"
+      ? (value / 100).toLocaleString("en-US", {
+          style: "currency",
+          currency: "USD",
+        })
+      : "nothing";
+  const count = (value: unknown) =>
+    typeof value === "number" ? value.toLocaleString("en-US") : "nothing";
+  // Pictures and long text are said to have changed, not printed.
+  const changed = () => "";
+  return {
+    title: { label: "Title", show: text },
+    niche: { label: "Niche", show: text },
+    country: { label: "Audience country", show: text },
+    audience: { label: "Audience", show: count },
+    monetized: {
+      label: "Monetized",
+      show: (value) => (value ? "yes" : "no"),
+    },
+    monthlyRevenueUsd: { label: "Monthly revenue", show: usd },
+    yearlyRevenueUsd: { label: "Last 12 months", show: usd },
+    engagementBp: {
+      label: "Engagement",
+      show: (value) =>
+        typeof value === "number" ? `${value / 10}%` : "nothing",
+    },
+    ageYears: { label: "Account age", show: count },
+    priceUsd: { label: "Asking price", show: usd },
+    coverUrl: { label: "Cover image", show: changed },
+    avatarUrl: { label: "Profile picture", show: changed },
+    description: { label: "About this account", show: changed },
+    transferProfile: { label: "Account setup", show: text },
+    whatsapp: { label: "WhatsApp", show: text },
+  };
+})();
+
+/**
+ * What a `listing.edit` row changed, one line per field: "Asking price:
+ * $100.00 → $90.00", or just "Cover image" for a picture or the long text.
+ */
+export function listingEditLines(before: unknown, after: unknown): string[] {
+  const from = (before ?? {}) as Record<string, unknown>;
+  const to = (after ?? {}) as Record<string, unknown>;
+  return Object.keys(to).map((key) => {
+    const field = LISTING_FIELD[key];
+    if (!field) return key;
+    const was = field.show(from[key]);
+    const now = field.show(to[key]);
+    return was === "" && now === ""
+      ? field.label
+      : `${field.label}: ${was} → ${now}`;
+  });
 }
 
 // ------------------------------------------------------------ empty states

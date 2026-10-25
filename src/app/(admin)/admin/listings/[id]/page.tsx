@@ -22,6 +22,7 @@ import {
   auditLabel,
   LISTING_STATUS,
   ListingStatusTag,
+  listingEditLines,
   Waited,
 } from "@/components/admin/vocab";
 import {
@@ -39,6 +40,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Price } from "@/components/ui/price";
 import { platforms } from "@/data/platforms";
+import { removedBySeller } from "@/lib/listing-lock";
 import { getListingForReview } from "@/server/admin-listings";
 import { getAuditTrail } from "@/server/audit";
 import { requireStaff } from "@/server/session";
@@ -332,7 +334,11 @@ export default async function ReviewListingPage({
               <Card tone="danger">
                 <CardHeader
                   as="h2"
-                  title="Taken down"
+                  title={
+                    removedBySeller(listing)
+                      ? "Removed by the seller"
+                      : "Taken down"
+                  }
                   info="Hidden from buyers and locked for the seller, who cannot edit or resubmit it. Only staff can bring it back."
                   className="border-danger/15"
                 />
@@ -460,7 +466,7 @@ export default async function ReviewListingPage({
             <CardBody>
               {trail.length === 0 ? (
                 <p className="text-[0.8125rem] text-muted">
-                  No staff action on this listing yet.
+                  Nothing recorded on this listing yet.
                 </p>
               ) : (
                 <ol>
@@ -484,6 +490,15 @@ export default async function ReviewListingPage({
                           {auditLabel(row.action)}
                         </span>
                       </p>
+                      {row.action === "listing.edit" ? (
+                        <ul className="mt-1 flex flex-col gap-0.5 text-xs leading-relaxed break-words text-muted">
+                          {listingEditLines(row.before, row.after).map(
+                            (line) => (
+                              <li key={line}>{line}</li>
+                            ),
+                          )}
+                        </ul>
+                      ) : null}
                       <p className="mt-0.5 text-xs text-subtle">
                         <time
                           dateTime={row.createdAt.toISOString()}
