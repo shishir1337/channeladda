@@ -1,12 +1,21 @@
 "use client";
 
 import {
+  CheckIcon,
+  CopyIcon,
   KeyRoundIcon,
   Loader2Icon,
   ShieldCheckIcon,
   SmartphoneIcon,
 } from "lucide-react";
-import { type ReactNode, useId, useState, useTransition } from "react";
+import QRCode from "qrcode";
+import {
+  type ReactNode,
+  useEffect,
+  useId,
+  useState,
+  useTransition,
+} from "react";
 import { Card, CardBody, CardHeader } from "@/components/app/kit";
 import { TextField } from "@/components/auth/fields";
 import { Button } from "@/components/ui/button";
@@ -59,6 +68,129 @@ function StepNumber({ n }: { n: number }) {
     >
       {n}
     </span>
+  );
+}
+
+/**
+ * Better Auth's answer in plain words. Its own messages ("Invalid password",
+ * "Invalid code") were shown as they came, and read like a crash.
+ */
+function plainError(
+  error: { code?: string; status?: number } | null | undefined,
+  fallback: string,
+): string {
+  switch (error?.code) {
+    case "INVALID_PASSWORD":
+      return "That password isn't right. Check it and try again.";
+    case "INVALID_CODE":
+      return "That code isn't right. The code changes every 30 seconds — type the one your app shows now.";
+    case "OTP_HAS_EXPIRED":
+      return "That code has run out. Type the one your app shows now.";
+    case "TOO_MANY_ATTEMPTS_REQUEST_NEW_CODE":
+      return "Too many wrong codes. Wait a minute, then try again.";
+  }
+  if (error?.status === 429) {
+    return "Too many tries just now. Wait a minute, then try again.";
+  }
+  return fallback;
+}
+
+/** The secret key out of the app link, for typing in by hand. */
+function secretOf(uri: string): string | null {
+  try {
+    return new URL(uri).searchParams.get("secret");
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The app link as a QR code, drawn in the browser: the secret never goes to
+ * a QR service, or anywhere else.
+ */
+function QrCode({ uri }: { uri: string }) {
+  const [src, setSrc] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    QRCode.toString(uri, {
+      type: "svg",
+      margin: 1,
+      errorCorrectionLevel: "M",
+      color: { dark: "#000000", light: "#ffffff" },
+    })
+      .then((svg) => {
+        if (live) {
+          setSrc(`data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`);
+        }
+      })
+      .catch(() => {
+        // The key below still works; a missing picture is not a dead end.
+      });
+    return () => {
+      live = false;
+    };
+  }, [uri]);
+
+  return (
+    // Always black on white, in dark mode too: that is what a camera reads.
+    <div className="flex size-44 shrink-0 items-center justify-center rounded-lg border border-line bg-white p-2">
+      {src ? (
+        // biome-ignore lint/performance/noImgElement: a QR code drawn in the browser as a data URL; there is nothing for the image optimiser to do.
+        <img
+          src={src}
+          alt="QR code for your authenticator app"
+          width={160}
+          height={160}
+          className="size-40"
+        />
+      ) : (
+        <Loader2Icon
+          aria-hidden="true"
+          className="size-5 animate-spin text-neutral-400"
+        />
+      )}
+    </div>
+  );
+}
+
+/** The secret in groups of four, with a button that copies it whole. */
+function SecretKey({ secret }: { secret: string }) {
+  const [copied, setCopied] = useState(false);
+  const grouped = secret.match(/.{1,4}/g)?.join(" ") ?? secret;
+  return (
+    <div className="min-w-0">
+      <p className="text-xs leading-relaxed text-muted">
+        Can't scan it? Type this key into the app instead.
+      </p>
+      <p className="mt-1.5 rounded-lg border border-line bg-surface-2 px-3 py-2 font-mono text-[0.8125rem] leading-relaxed tracking-wide break-words text-fg select-all">
+        {grouped}
+      </p>
+      <Button
+        type="button"
+        size="sm"
+        variant="secondary"
+        className="mt-2"
+        onClick={() => {
+          navigator.clipboard
+            ?.writeText(secret)
+            .then(() => {
+              setCopied(true);
+              setTimeout(() => setCopied(false), 2000);
+            })
+            .catch(() => {});
+        }}
+      >
+        {copied ? (
+          <CheckIcon aria-hidden="true" />
+        ) : (
+          <CopyIcon aria-hidden="true" />
+        )}
+        {copied ? "Copied" : "Copy key"}
+      </Button>
+      <span role="status" className="sr-only">
+        {copied ? "Key copied" : ""}
+      </span>
+    </div>
   );
 }
 
@@ -134,7 +266,12 @@ export function TwoFactorSetup({
               startTransition(async () => {
                 const result = await authClient.twoFactor.disable({ password });
                 if (result?.error) {
-                  setError(result.error.message ?? "That did not work.");
+                  setError(
+                    plainError(
+                      result.error,
+                      "That didn't work. Try again in a minute.",
+                    ),
+                  );
                   return;
                 }
                 window.location.reload();
@@ -230,8 +367,10 @@ export function TwoFactorSetup({
                   });
                   if (result?.error || !result?.data) {
                     setError(
-                      result?.error?.message ??
-                        "Could not start setup. Check your password.",
+                      plainError(
+                        result?.error,
+                        "Setup didn't start. Try again in a minute.",
+                      ),
                     );
                     return;
                   }
@@ -265,15 +404,18 @@ export function TwoFactorSetup({
               <StepNumber n={1} />
               <div className="min-w-0 flex-1">
                 <p className="text-sm leading-6 font-medium text-fg">
-                  Add this to your authenticator app
+                  Scan this with your authenticator app
                 </p>
-                <p className="mt-2 rounded-lg border border-line bg-surface-2 px-3 py-2.5 font-mono text-xs leading-relaxed break-all text-muted select-all">
-                  {uri}
+                <p className="mt-0.5 text-xs leading-relaxed text-subtle">
+                  Google Authenticator, Microsoft Authenticator, 1Password or
+                  any app that shows six-digit codes.
                 </p>
-                <p className="mt-1.5 text-xs leading-relaxed text-subtle">
-                  Most apps scan a QR code; most also take this line pasted in.
-                  Either way the secret never leaves your device after this.
-                </p>
+                <div className="mt-3 flex flex-col gap-4 sm:flex-row sm:items-start">
+                  <QrCode uri={uri} />
+                  {secretOf(uri) ? (
+                    <SecretKey secret={secretOf(uri) ?? ""} />
+                  ) : null}
+                </div>
               </div>
             </li>
 
@@ -281,7 +423,7 @@ export function TwoFactorSetup({
               <StepNumber n={2} />
               <div className="min-w-0 flex-1">
                 <p className="text-sm leading-6 font-medium text-fg">
-                  Type the code it shows
+                  Type the six-digit code it shows
                 </p>
                 <div className="mt-2 flex flex-wrap items-end gap-3">
                   <TextField
@@ -306,8 +448,10 @@ export function TwoFactorSetup({
                         });
                         if (result?.error) {
                           setError(
-                            result.error.message ??
-                              "That code is not right. They change every 30 seconds.",
+                            plainError(
+                              result.error,
+                              "That code isn't right. The code changes every 30 seconds — type the one your app shows now.",
+                            ),
                           );
                           return;
                         }

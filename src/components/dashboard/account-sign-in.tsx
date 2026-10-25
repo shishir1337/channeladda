@@ -7,6 +7,7 @@ import {
   type ReactNode,
   useEffect,
   useId,
+  useRef,
   useState,
   useTransition,
 } from "react";
@@ -166,8 +167,25 @@ function DetailRow({
   done: string | null;
   children: ReactNode;
 }) {
+  const rowRef = useRef<HTMLLIElement>(null);
+  const formRef = useRef<HTMLDivElement>(null);
+
+  // On a phone the form opened below the fold, so a tap on Change seemed to
+  // do nothing. Bring it into view when it is not, and put the cursor in
+  // its first field — the next thing anybody does is type.
+  useEffect(() => {
+    if (!open) return;
+    const form = formRef.current;
+    if (!form) return;
+    form.querySelector("input")?.focus({ preventScroll: true });
+    const { top, bottom } = form.getBoundingClientRect();
+    if (top < 0 || bottom > window.innerHeight) {
+      rowRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
+    }
+  }, [open]);
+
   return (
-    <li id={id} className="scroll-mt-24 px-3.5 py-3 sm:px-5">
+    <li ref={rowRef} id={id} className="scroll-mt-24 px-3.5 py-3 sm:px-5">
       <div className="flex items-center gap-3">
         <IconTile icon={icon} />
         <div className="min-w-0 flex-1">
@@ -197,7 +215,9 @@ function DetailRow({
         </p>
       ) : null}
       {open ? (
-        <div className="mt-4 animate-app-in sm:pl-11">{children}</div>
+        <div ref={formRef} className="mt-4 animate-app-in sm:pl-11">
+          {children}
+        </div>
       ) : null}
     </li>
   );
