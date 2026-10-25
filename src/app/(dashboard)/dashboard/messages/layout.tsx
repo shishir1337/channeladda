@@ -1,5 +1,5 @@
 import { ThreadRail } from "@/components/messages/thread-rail";
-import { listThreads } from "@/server/messages";
+import { memberInbox, splitInbox } from "@/server/inbox";
 import { getCurrentUser } from "@/server/session";
 
 /**
@@ -23,6 +23,9 @@ import { getCurrentUser } from "@/server/session";
  * a column of its own only when the pane — not the window — is wide enough,
  * which depends on whether the sidebar is collapsed.
  *
+ * The Escrow Agent — Channel Adda's live agents — is pinned at the top of the
+ * list, above running deals, for everyone (`memberInbox`).
+ *
  * Deliberately not `requireUser()`: a layout does not know which page is
  * rendering inside it, so redirecting from here would send people to /signin
  * with no way back. Each page does its own redirect and that one wins.
@@ -31,11 +34,16 @@ export default async function MessagesLayout({ children }: LayoutProps<"/">) {
   const user = await getCurrentUser();
   if (!user) return <>{children}</>;
 
-  const threads = await listThreads(user);
+  const { escrowAgent, threads } = splitInbox(await memberInbox(user));
 
   return (
     <div className="lg:-mb-16 lg:grid lg:grid-cols-[17rem_minmax(0,1fr)] lg:items-start lg:gap-6 xl:grid-cols-[20rem_minmax(0,1fr)]">
       <ThreadRail
+        escrowAgent={{
+          preview: escrowAgent.preview,
+          lastMessageAt: escrowAgent.lastMessageAt?.toISOString() ?? null,
+          unread: escrowAgent.unread > 0,
+        }}
         threads={threads.map((thread) => ({
           id: thread.id,
           listingTitle: thread.listingTitle,

@@ -10,6 +10,11 @@ export type Seller = {
   points?: number;
   /** Holds the Reseller badge right now. */
   reseller?: boolean;
+  /**
+   * Their ID check was approved: the Verified badge. Absent or false shows
+   * no badge. Not a listing's ownership check, which is the listing's own.
+   */
+  verified?: boolean;
   initials: string;
   /** Their profile photo, when they have added one. */
   image?: string | null;

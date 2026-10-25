@@ -26,7 +26,7 @@ export const metadata: Metadata = {
     template: "%s | Channel Adda",
   },
   description:
-    "The supervised marketplace for YouTube channels, Instagram, Facebook and Telegram accounts and content websites. KYC-verified sellers, crypto payments via Cryptomus, and a Channel Adda agent holding either the account or the money until the handover is confirmed.",
+    "The supervised marketplace for YouTube channels, Instagram, Facebook and Telegram accounts and content websites. Ownership-checked listings, crypto payments via Cryptomus, and a Channel Adda agent holding either the account or the money until the handover is confirmed.",
   keywords: [
     "buy youtube channel",
     "sell instagram account",
@@ -38,7 +38,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Channel Adda — Buy & sell social media accounts, safely",
     description:
-      "KYC-verified sellers, crypto payments, and an agent holding one side of every deal until the handover is confirmed.",
+      "Ownership-checked listings, crypto payments, and an agent holding one side of every deal until the handover is confirmed.",
     siteName: "Channel Adda",
     type: "website",
   },

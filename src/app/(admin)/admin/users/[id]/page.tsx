@@ -51,6 +51,7 @@ import type {
   WithdrawalStatus,
 } from "@/generated/prisma/enums";
 import { isCustodianRole, levelLabel } from "@/lib/custody-roles";
+import { isKycReviewer } from "@/lib/kyc";
 import { cn } from "@/lib/utils";
 import {
   getUserDetail,
@@ -705,6 +706,15 @@ export default async function AdminUserPage({
             canSet={canSetKyc}
             blockedBecause={canSetKyc ? undefined : kycBlockedBecause}
           />
+          {/* Their documents, for the roles that may open them. */}
+          {person.kycSubmissionId && isKycReviewer(staff.role) ? (
+            <Link
+              href={`/admin/verification/${person.kycSubmissionId}`}
+              className="-mt-2 inline-flex min-h-11 items-center gap-1.5 px-1 text-[0.8125rem] font-medium text-muted underline decoration-line-strong underline-offset-4 transition-colors hover:text-fg hover:decoration-fg pointer-fine:min-h-6"
+            >
+              Open the ID and video they sent
+            </Link>
+          ) : null}
 
           <AccountRecovery
             userId={person.id}

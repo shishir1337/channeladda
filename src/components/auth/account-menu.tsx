@@ -3,6 +3,7 @@
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import {
   ArrowLeftRightIcon,
+  BadgeCheckIcon,
   BellIcon,
   CoinsIcon,
   ExternalLinkIcon,
@@ -101,6 +102,11 @@ const PLACES: { label: string | null; items: Place[] }[] = [
     items: [
       { label: "Wallet", href: "/dashboard/wallet", icon: CoinsIcon },
       { label: "Profile", href: "/dashboard/profile", icon: UserRoundIcon },
+      {
+        label: "Verification",
+        href: "/dashboard/verification",
+        icon: BadgeCheckIcon,
+      },
       {
         label: "Notifications",
         href: "/dashboard/notifications",

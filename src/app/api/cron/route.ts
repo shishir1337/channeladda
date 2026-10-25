@@ -6,6 +6,7 @@ import { reconcileInvoices } from "@/server/invoices";
 import { expireOffers, releaseLapsedOfferReservations } from "@/server/offers";
 import { remindEndingPasses } from "@/server/reseller";
 import { recordSweep } from "@/server/settings";
+import { purgeExpiredSupportMedia } from "@/server/support-chat";
 import { collectOrphanUploads } from "@/server/upload-access";
 
 /**
@@ -72,6 +73,8 @@ export async function POST(request: Request) {
     // Media before messages: deleting a message first would take its
     // attachment row with it and orphan the file on disk for ever.
     ["media", purgeExpiredMedia],
+    // The same 48 hours for photos and clips in Escrow Agent chats.
+    ["supportMedia", () => purgeExpiredSupportMedia()],
     ["messages", purgeOldMessages],
     // Last: a file nobody ever attached to anything. The upload endpoint is
     // open to any signed-in account, so without this it is free storage.

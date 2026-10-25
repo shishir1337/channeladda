@@ -7,6 +7,7 @@ import {
   BellIcon,
   ChevronRightIcon,
   CoinsIcon,
+  FingerprintIcon,
   GavelIcon,
   GlobeIcon,
   HandshakeIcon,
@@ -14,6 +15,7 @@ import {
   LifeBuoyIcon,
   MenuIcon,
   MessageSquareIcon,
+  MessagesSquareIcon,
   PanelLeftIcon,
   PlusIcon,
   SearchIcon,
@@ -62,11 +64,17 @@ const ICONS = {
   money: CoinsIcon,
   transfer: ArrowLeftRightIcon,
   messages: MessageSquareIcon,
+  /** Members' Escrow Agent chats, on the staff side. */
+  "support-chat": MessagesSquareIcon,
   people: UsersIcon,
   support: LifeBuoyIcon,
   dispute: GavelIcon,
   browse: SearchIcon,
   profile: UserRoundIcon,
+  /** A member's own ID check: the badge it earns. */
+  verified: BadgeCheckIcon,
+  /** The staff queue of ID checks. Not BadgeCheck: that is the listing queue. */
+  identity: FingerprintIcon,
 } as const;
 
 export type NavIcon = keyof typeof ICONS;
@@ -83,6 +91,8 @@ const NAV_HUE: Partial<Record<NavIcon, Hue>> = {
   browse: "cyan",
   review: "cyan",
   staff: "indigo",
+  // Blue, like chat everywhere, would match Conversations right above it.
+  "support-chat": "indigo",
 };
 
 function tintOf(icon: NavIcon): string {

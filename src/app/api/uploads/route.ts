@@ -2,7 +2,7 @@ import { db } from "@/lib/db";
 import { getCurrentUser } from "@/server/session";
 import {
   limitFor,
-  MAX_VIDEO_BYTES,
+  MAX_ANY_UPLOAD_BYTES,
   putUpload,
   UploadError,
   type UploadKind,
@@ -17,7 +17,13 @@ import {
  * dispatch one at a time per client, so a gallery of screenshots would upload
  * in single file.
  */
-const KINDS = new Set<UploadKind>(["cover", "avatar", "proof", "message"]);
+const KINDS = new Set<UploadKind>([
+  "cover",
+  "avatar",
+  "proof",
+  "message",
+  "kyc",
+]);
 
 export async function POST(request: Request) {
   const user = await getCurrentUser();
@@ -41,10 +47,10 @@ export async function POST(request: Request) {
   // room for multipart framing; the per-kind limit is applied once the kind
   // is known.
   const declared = Number(request.headers.get("content-length") ?? 0);
-  if (declared > MAX_VIDEO_BYTES + 1024 * 1024) {
+  if (declared > MAX_ANY_UPLOAD_BYTES + 1024 * 1024) {
     return Response.json(
       {
-        error: `That file is ${(declared / 1024 / 1024).toFixed(1)}MB. The limit is ${MAX_VIDEO_BYTES / 1024 / 1024}MB.`,
+        error: `That file is ${(declared / 1024 / 1024).toFixed(1)}MB, which is too big to upload.`,
       },
       { status: 413 },
     );
@@ -63,6 +69,26 @@ export async function POST(request: Request) {
   const kind = String(form.get("kind") ?? "") as UploadKind;
   if (!KINDS.has(kind)) {
     return Response.json({ error: "Unknown upload type." }, { status: 400 });
+  }
+
+  // An ID check's files are only any use to somebody who can send one: not
+  // while one is being checked, and not once they are verified.
+  if (kind === "kyc") {
+    const me = await db.user.findUnique({
+      where: { id: user.id },
+      select: { kycStatus: true },
+    });
+    if (me?.kycStatus === "PENDING" || me?.kycStatus === "APPROVED") {
+      return Response.json(
+        {
+          error:
+            me.kycStatus === "PENDING"
+              ? "We are already checking your documents."
+              : "You are already verified.",
+        },
+        { status: 409 },
+      );
+    }
   }
 
   const file = form.get("file");
@@ -88,6 +114,7 @@ export async function POST(request: Request) {
 
     // Recorded so the uploader can read their own file before anything else
     // references it, and so an upload nobody ever attaches can be collected.
+    // The hash is ours, from the bytes: an ID check reads it from here.
     await db.upload.create({
       data: {
         key: stored.key,
@@ -95,6 +122,7 @@ export async function POST(request: Request) {
         kind,
         bytes: stored.bytes,
         contentType: stored.contentType,
+        sha256: stored.sha256,
       },
     });
 

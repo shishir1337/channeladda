@@ -1,12 +1,15 @@
 import type { NavGroup } from "@/components/dashboard/app-shell";
 import { AppShell } from "@/components/dashboard/app-shell";
 import { NotificationBell } from "@/components/dashboard/notification-bell";
+import { isKycReviewer } from "@/lib/kyc";
 import { countOpenDisputes } from "@/server/admin-disputes";
 import { getQueueCounts } from "@/server/admin-listings";
+import { countPendingKyc } from "@/server/kyc";
 import { countFlaggedThreads } from "@/server/messages";
 import { listNotifications, unreadCount } from "@/server/notifications";
 import { type CurrentUser, requireAdminArea } from "@/server/session";
 import { countOpenTickets } from "@/server/support";
+import { countSupportChatsWaiting } from "@/server/support-chat";
 
 /**
  * The staff area.
@@ -18,9 +21,10 @@ import { countOpenTickets } from "@/server/support";
  * The guard here decides what is drawn. It is not the security boundary: every
  * action re-checks the role itself.
  *
- * An AGENT gets in, and sees Deals and nothing else. They are not in the STAFF
- * list, so every other page here still guards with `requireStaff()` and hands
- * them the same 404 a stranger would get. The moderation counts are skipped
+ * An AGENT gets in, and sees Deals and Support chats — members' Escrow Agent
+ * chats, which every live agent answers — and nothing else. They are not in
+ * the STAFF list, so every other page here still guards with `requireStaff()`
+ * and hands them the same 404 a stranger would get. The moderation counts are skipped
  * for them too — they feed badges on pages an agent cannot open.
  */
 /**
@@ -64,14 +68,29 @@ function shellUser(user: CurrentUser) {
 export default async function AdminLayout({ children }: LayoutProps<"/">) {
   const staff = await requireAdminArea();
 
+  // Every live agent answers Escrow Agent chats, agents included, so this
+  // one count is drawn on both navs. Started here, awaited with the rest;
+  // it never rejects, so a failure elsewhere cannot leave it unhandled.
+  const supportChatsWaiting = countSupportChatsWaiting().catch((error) => {
+    console.error("[admin] support chats count", error);
+    return 0;
+  });
+
   // Returned before the moderation counts are fetched, not after: they feed
   // badges on pages an agent cannot open, so running those queries for them
   // would be three round trips to render nothing.
   if (staff.role === "AGENT") {
+    // The bell too: a member writing to the Escrow Agent is told to every
+    // live agent, and an agent's whole day is spent in this shell.
+    const [supportChats, bell] = await Promise.all([
+      supportChatsWaiting,
+      bellFor(staff.id),
+    ]);
     return (
       <AppShell
         staff
         user={shellUser(staff)}
+        bell={bell}
         groups={[
           {
             label: null,
@@ -87,6 +106,13 @@ export default async function AdminLayout({ children }: LayoutProps<"/">) {
                 icon: "transfer",
                 section: true,
               },
+              {
+                label: "Support chats",
+                href: "/admin/support-chats",
+                icon: "support-chat",
+                section: true,
+                waiting: supportChats,
+              },
             ],
           },
         ]}
@@ -96,11 +122,16 @@ export default async function AdminLayout({ children }: LayoutProps<"/">) {
     );
   }
 
-  const [counts, flagged, openTickets, disputes] = await Promise.all([
+  // ID checks are MODERATOR and SUPERADMIN only, like the files in them:
+  // finance would be led to a 404 that throws them out of the staff shell.
+  const reviewsKyc = isKycReviewer(staff.role);
+
+  const [counts, flagged, openTickets, disputes, idChecks] = await Promise.all([
     getQueueCounts(),
     countFlaggedThreads(),
     countOpenTickets(),
     countOpenDisputes(),
+    reviewsKyc ? countPendingKyc() : Promise.resolve(0),
   ]);
 
   const groups: NavGroup[] = [
@@ -169,12 +200,31 @@ export default async function AdminLayout({ children }: LayoutProps<"/">) {
           waiting: flagged,
         },
         {
+          // Members' Escrow Agent chats: the live line to the team.
+          label: "Support chats",
+          href: "/admin/support-chats",
+          icon: "support-chat",
+          section: true,
+          waiting: await supportChatsWaiting,
+        },
+        {
           label: "Support",
           href: "/admin/support",
           icon: "support",
           section: true,
           waiting: openTickets,
         },
+        ...(reviewsKyc
+          ? [
+              {
+                label: "ID checks",
+                href: "/admin/verification",
+                icon: "identity" as const,
+                section: true,
+                waiting: idChecks,
+              },
+            ]
+          : []),
       ],
     },
     {

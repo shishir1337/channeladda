@@ -1,6 +1,11 @@
-import { ArrowUpRightIcon, ChevronLeftIcon } from "lucide-react";
+import {
+  ArrowUpRightIcon,
+  ChevronLeftIcon,
+  ShieldCheckIcon,
+} from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { iconTile } from "@/components/ui/icon-hue";
 import { platformMap } from "@/data/platforms";
 import type { Platform } from "@/generated/prisma/enums";
 import { channelLink } from "@/lib/channel-link";
@@ -60,6 +65,31 @@ export function Initials({
 }
 
 /**
+ * The Escrow Agent: Channel Adda's shield in its own colour, never a
+ * person's face — every agent answering is the same Escrow Agent to a member.
+ */
+export function EscrowAgentAvatar({
+  className,
+  iconClassName = "size-4",
+}: {
+  className?: string;
+  iconClassName?: string;
+}) {
+  return (
+    <span
+      aria-hidden="true"
+      className={cn(
+        "inline-flex size-8 shrink-0 items-center justify-center rounded-full border",
+        iconTile(ShieldCheckIcon),
+        className,
+      )}
+    >
+      <ShieldCheckIcon className={iconClassName} />
+    </span>
+  );
+}
+
+/**
  * A button label that keeps its width when it swaps to its busy wording.
  * Both wordings are laid out in the same cell and only one is visible, so
  * "Send" turning into "Sending…" does not nudge the buttons beside it.
@@ -94,8 +124,10 @@ export function BusyLabel({
 export function ThreadHeader({
   back,
   people,
+  avatar,
   title,
   listing,
+  subtitle,
   channel,
   record,
   meta,
@@ -105,9 +137,16 @@ export function ThreadHeader({
   back?: { href: string; label: string; phoneOnly?: boolean };
   /** One name for the other side; two when the reader is neither side. */
   people: string[];
+  /** Drawn in place of the people's initials: the Escrow Agent's shield. */
+  avatar?: ReactNode;
   title: ReactNode;
-  /** `href` is null once the listing's page is gone — sold, or removed. */
-  listing: { href: string | null; handle: string; title: string };
+  /**
+   * `href` is null once the listing's page is gone — sold, or removed. Left
+   * out for a chat that is about no listing, the Escrow Agent's.
+   */
+  listing?: { href: string | null; handle: string; title: string } | null;
+  /** The line under the title when there is no listing. */
+  subtitle?: ReactNode;
   /**
    * The account itself, on its own platform: a link checked by
    * `channelLink`, never the raw URL the seller typed.
@@ -157,7 +196,9 @@ export function ThreadHeader({
               <ChevronLeftIcon aria-hidden="true" className="size-5" />
             </Link>
           ) : null}
-          {people.length > 1 ? (
+          {avatar ? (
+            avatar
+          ) : people.length > 1 ? (
             <span className="flex shrink-0 -space-x-2">
               <span className="rounded-full ring-2 ring-bg">
                 <Initials name={people[0] ?? ""} className="size-8" />
@@ -176,7 +217,13 @@ export function ThreadHeader({
             <h1 className="truncate text-[0.9375rem] leading-6 font-semibold text-fg sm:text-base sm:break-words sm:whitespace-normal">
               {title}
             </h1>
-            {listing.href ? (
+            {!listing ? (
+              subtitle ? (
+                <p className="truncate text-[0.8125rem] leading-5 text-muted">
+                  {subtitle}
+                </p>
+              ) : null
+            ) : listing.href ? (
               <Link
                 href={listing.href}
                 className="group inline-flex max-w-full items-center gap-1 text-[0.8125rem] leading-5 text-muted transition-colors duration-150 hover:text-fg"

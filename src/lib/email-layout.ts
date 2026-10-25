@@ -82,6 +82,7 @@ export function emailAction(href: string): string {
   if (/^\/dashboard\/wallet/.test(path)) return "Open your wallet";
   if (/^\/dashboard\/listings\/./.test(path)) return "Open your listing";
   if (/^\/dashboard\/listings/.test(path)) return "Open your listings";
+  if (/^\/dashboard\/verification/.test(path)) return "Open verification";
   if (/^\/listing\//.test(path)) return "View the listing";
   if (/^\/admin(\/|$)/.test(path)) return "Open in admin";
   return DEFAULT_ACTION;

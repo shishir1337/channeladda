@@ -10,7 +10,7 @@ import { Container, Section, SectionHeading } from "@/components/ui/section";
 export const metadata: Metadata = {
   title: "Trust & safety",
   description:
-    "Verified sellers, live ownership checks, a record of every deal and disputes decided by people: the checks that make a Channel Adda deal safe.",
+    "Live ownership checks, a Verified badge for checked IDs, a record of every deal and disputes decided by people: the checks that make a Channel Adda deal safe.",
   alternates: { canonical: "/trust-safety" },
 };
 

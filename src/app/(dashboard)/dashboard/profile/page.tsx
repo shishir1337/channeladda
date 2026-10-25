@@ -1,5 +1,6 @@
 import {
   ArrowUpRightIcon,
+  BadgeCheckIcon,
   BellIcon,
   GemIcon,
   ShieldCheckIcon,
@@ -20,9 +21,12 @@ import {
   PageHeader,
 } from "@/components/app/kit";
 import { pointsLabel, ResellerBadge } from "@/components/app/reseller-badge";
+import { VerifiedBadge } from "@/components/app/verified-badge";
 import { ProfileForm } from "@/components/dashboard/profile-form";
 import { Button } from "@/components/ui/button";
+import type { KycStatus } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
+import { KYC_REVIEW_HOURS } from "@/lib/kyc";
 import { ratingFor } from "@/server/reseller-status";
 import { requireUser } from "@/server/session";
 
@@ -33,6 +37,26 @@ export const metadata: Metadata = {
 
 const until = (date: Date) =>
   date.toLocaleDateString("en-GB", { day: "numeric", month: "long" });
+
+/** The Verification row, by where their ID check stands. */
+const VERIFY_ROW: Record<KycStatus, { title: string; meta: string }> = {
+  NOT_STARTED: {
+    title: "Get the Verified badge",
+    meta: "Optional. Send your ID to show it beside your name",
+  },
+  PENDING: {
+    title: "Checking your ID",
+    meta: `Usually within ${KYC_REVIEW_HOURS} hours`,
+  },
+  APPROVED: {
+    title: "Verified",
+    meta: "The badge shows beside your name",
+  },
+  REJECTED: {
+    title: "Your ID check was not approved",
+    meta: "See why, and send it again",
+  },
+};
 
 /**
  * Who you are on Channel Adda, and the one place to change it.
@@ -51,10 +75,12 @@ export default async function ProfilePage() {
         image: true,
         bio: true,
         slug: true,
+        kycStatus: true,
       },
     }),
     ratingFor(user.id),
   ]);
+  const verified = me.kycStatus === "APPROVED";
 
   return (
     <>
@@ -98,6 +124,7 @@ export default async function ProfilePage() {
               <span className="font-semibold tabular-nums">
                 {pointsLabel(rating.points)}
               </span>
+              {verified ? <VerifiedBadge /> : null}
               {rating.reseller ? <ResellerBadge /> : null}
             </p>
             <p className="mt-1 text-[0.8125rem] text-muted">
@@ -109,6 +136,14 @@ export default async function ProfilePage() {
         </Card>
 
         <List>
+          <ListItem href="/dashboard/verification">
+            <ListRow
+              leading={<IconTile icon={BadgeCheckIcon} />}
+              title={VERIFY_ROW[me.kycStatus].title}
+              meta={VERIFY_ROW[me.kycStatus].meta}
+              chevron
+            />
+          </ListItem>
           <ListItem href="/dashboard/wallet#reseller">
             <ListRow
               leading={<IconTile icon={GemIcon} />}

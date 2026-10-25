@@ -22,7 +22,7 @@ export const legalDocs: Record<string, LegalDoc> = {
     title: "Terms of service",
     summary:
       "The agreement between you and Channel Adda when you use the marketplace.",
-    updated: "20 October 2026",
+    updated: "26 October 2026",
     sections: [
       {
         heading: "What Channel Adda is",
@@ -37,7 +37,8 @@ export const legalDocs: Record<string, LegalDoc> = {
         heading: "Your account",
         paragraphs: [
           "You must be at least 18 and legally able to enter contracts. One person, one account. You are responsible for everything done through your account and for keeping your password and two-factor codes to yourself.",
-          "Sellers must complete identity verification before a first listing goes live. We may refuse or remove any listing at our discretion, and we will always give a reason.",
+          "Verifying your identity is optional. You can buy, sell and withdraw without it. If you want the Verified badge beside your name, you can send us a government ID and a short selfie video, and our team checks them by hand.",
+          "We may refuse or remove any listing at our discretion, and we will always give a reason.",
         ],
       },
       {
@@ -67,7 +68,7 @@ export const legalDocs: Record<string, LegalDoc> = {
       {
         heading: "Suspension and termination",
         paragraphs: [
-          "We may suspend or close an account that breaks these terms. Where a suspension involves fraud, we ban by identity document rather than by email address, so the same person cannot simply sign up again.",
+          "We may suspend or close an account that breaks these terms. Where a suspension involves fraud and the account was verified, we keep a fingerprint of the ID, and our team is told if the same document turns up on another account.",
           "Funds held for a suspended user are frozen while any open orders or disputes are resolved, and released to whoever is entitled to them once that is settled.",
         ],
       },
@@ -84,13 +85,13 @@ export const legalDocs: Record<string, LegalDoc> = {
     slug: "privacy",
     title: "Privacy policy",
     summary: "What we collect, why we collect it, and who else can see it.",
-    updated: "22 August 2026",
+    updated: "26 October 2026",
     sections: [
       {
         heading: "What we collect",
         bullets: [
           "Account details: email address and password hash",
-          "Identity documents and liveness checks, for sellers and high-value buyers",
+          "Identity documents and a short selfie video, only if you choose to get the Verified badge",
           "Listing content: handles, metrics, screenshots and descriptions you upload",
           "Order records: messages, offers, proof uploads and transfer checklists",
           "Payment records from Cryptomus, including wallet addresses used for payouts",
@@ -108,6 +109,7 @@ export const legalDocs: Record<string, LegalDoc> = {
         heading: "What other users can see",
         paragraphs: [
           "Buyers and sellers in an order can see each other's display name, rating, history and everything either of them writes or uploads to that order. They cannot see your email address, your identity documents or your wallet addresses.",
+          "If you send an ID and a selfie video for the Verified badge, only our verification team sees them. They are never shown on your profile. Other people see only the badge.",
           "Until an order exists, contact details in chat are masked. This protects both sides and keeps deals inside the supervision that protects them.",
         ],
       },
@@ -197,28 +199,27 @@ export const legalDocs: Record<string, LegalDoc> = {
     slug: "aml-kyc",
     title: "AML & KYC policy",
     summary:
-      "Identity checks, transaction monitoring, and why a marketplace handling crypto needs both.",
-    updated: "22 August 2026",
+      "Optional ID checks for the Verified badge, and how we watch for misuse.",
+    updated: "26 October 2026",
     sections: [
       {
         heading: "Why this exists",
         paragraphs: [
-          "Channel Adda holds and moves money on behalf of other people. That makes us attractive to anyone wanting to move funds they should not have, so we verify who our sellers are and monitor what moves through the platform.",
+          "Channel Adda holds and moves money on behalf of other people. That makes us attractive to anyone wanting to move funds they should not have, so we watch what moves through the platform, and members can verify who they are.",
         ],
       },
       {
-        heading: "Who has to verify",
-        bullets: [
-          "Every seller, before a first listing goes live",
-          "Any buyer whose single order exceeds $2,000",
-          "Any user we flag through monitoring, at any transaction size",
+        heading: "Who verifies",
+        paragraphs: [
+          "Verifying is optional. Nobody has to verify to buy, sell or withdraw. Members who want the Verified badge beside their name can choose to.",
         ],
       },
       {
         heading: "What verification involves",
         paragraphs: [
-          "A government-issued photo ID and a liveness check confirming the document belongs to the person presenting it. For business sellers we also verify the entity and its beneficial owners.",
-          "We ban by document hash rather than email address. Someone removed for fraud cannot return with a new email.",
+          'A photo of a government ID: an Aadhaar card, a PAN card, a passport, or another government ID such as a driving licence or voter ID. Then a short selfie video, holding the same ID and saying your name and "Channel Adda".',
+          "Our team checks them by hand, usually within 24 hours. Only our verification team sees them, and they are never shown on your profile. If we cannot verify you, we say why, and you can try again.",
+          "We keep a fingerprint of each approved document. If the same document turns up on another account, our team is told.",
         ],
       },
       {

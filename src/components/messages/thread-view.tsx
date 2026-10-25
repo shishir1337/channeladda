@@ -39,7 +39,10 @@ import { iconText } from "@/components/ui/icon-hue";
 import { chatTime } from "@/lib/chat-time";
 import { MAX_MESSAGE } from "@/lib/messages";
 import { cn } from "@/lib/utils";
-import { postMessage } from "@/server/actions/messages";
+import {
+  type MessageActionResult,
+  postMessage,
+} from "@/server/actions/messages";
 
 /**
  * One conversation, read by whoever is in it.
@@ -384,6 +387,9 @@ export function ThreadView({
   viewerRole,
   offerComposer = null,
   after = null,
+  sendWith = null,
+  notice = null,
+  empty = null,
 }: {
   conversationId: string;
   messages: ThreadMessageView[];
@@ -403,6 +409,18 @@ export function ThreadView({
    * the reader once the deal is over, as the next thing in it.
    */
   after?: ReactNode;
+  /**
+   * The server action a line is sent with, for a chat that is not a deal
+   * conversation — the Escrow Agent. Left out, it is `postMessage` into
+   * `conversationId`.
+   */
+  sendWith?:
+    | ((body: string, attachmentKey?: string) => Promise<MessageActionResult>)
+    | null;
+  /** The line above the first message, in place of the deal-chat one. */
+  notice?: ReactNode;
+  /** What an empty chat says, in place of the deal-chat one. */
+  empty?: { title: string; body: string } | null;
 }) {
   const [offering, setOffering] = useState(false);
   const [draft, setDraft] = useState("");
@@ -471,7 +489,9 @@ export function ThreadView({
     setError(null);
     setNote(null);
     startTransition(async () => {
-      const result = await postMessage(conversationId, body, attachment?.key);
+      const result = sendWith
+        ? await sendWith(body, attachment?.key)
+        : await postMessage(conversationId, body, attachment?.key);
       if (!result.ok) {
         setError(result.error);
         return;
@@ -519,27 +539,32 @@ export function ThreadView({
         {/* A quiet line rather than a box: it is read once, before the first
           message, and should not compete with the conversation after that.
           One line on screen; the rule itself, word for word, behind the (i). */}
-        <p className="mx-auto flex max-w-[66ch] items-center gap-2 px-1 text-xs leading-relaxed text-muted">
-          <EyeIcon
-            aria-hidden="true"
-            className="size-3.5 shrink-0 text-subtle"
-          />
-          <span>Channel Adda can see this chat, to keep you safe.</span>
-          <InfoTip label="About this chat">
-            Channel Adda can read this conversation and will step in if
-            something goes wrong. Phone numbers, emails and links are removed
-            automatically. Photos and clips are deleted after 48 hours, and a
-            thread with no deal on it clears after 10 days.
-          </InfoTip>
-        </p>
+        {notice ?? (
+          <p className="mx-auto flex max-w-[66ch] items-center gap-2 px-1 text-xs leading-relaxed text-muted">
+            <EyeIcon
+              aria-hidden="true"
+              className="size-3.5 shrink-0 text-subtle"
+            />
+            <span>Channel Adda can see this chat, to keep you safe.</span>
+            <InfoTip label="About this chat">
+              Channel Adda can read this conversation and will step in if
+              something goes wrong. Phone numbers, emails and links are removed
+              automatically. Photos and clips are deleted after 48 hours, and a
+              thread with no deal on it clears after 10 days.
+            </InfoTip>
+          </p>
+        )}
 
         {messages.length === 0 ? (
           <EmptyState
             bare
             className="py-14"
             icon={MessageSquareIcon}
-            title="No messages yet"
-            body={`Ask ${otherSide} whatever you need to know before you commit — revenue, where the traffic comes from, strikes, why they are selling.`}
+            title={empty?.title ?? "No messages yet"}
+            body={
+              empty?.body ??
+              `Ask ${otherSide} whatever you need to know before you commit — revenue, where the traffic comes from, strikes, why they are selling.`
+            }
           />
         ) : (
           <ul className="mt-6 flex flex-col gap-5">

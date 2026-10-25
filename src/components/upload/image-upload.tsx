@@ -11,7 +11,8 @@ import {
 import { useId, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
-export type UploadKind = "cover" | "avatar" | "proof";
+/** `kyc` is an ID check's photos and video, sent by its own form. */
+export type UploadKind = "cover" | "avatar" | "proof" | "kyc";
 
 const MAX_MB = 8;
 const TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"];
@@ -54,7 +55,13 @@ export function sendUpload(
         resolve({ url: data.url, sha256: data.sha256 });
       } else {
         reject(
-          new Error(data.error ?? "That upload did not go through. Try again."),
+          new Error(
+            data.error ??
+              // The proxy's own 413 carries no message of ours.
+              (xhr.status === 413
+                ? "That file is too big to upload. Try a smaller one."
+                : "That upload did not go through. Try again."),
+          ),
         );
       }
     };

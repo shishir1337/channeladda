@@ -277,8 +277,8 @@ export function SignUpForm({ next }: { next?: string }) {
         {pending ? "Creating account…" : "Create account"}
       </Button>
       <p className="mt-3 text-center text-xs leading-relaxed text-subtle">
-        No documents needed. Identity checks only apply before a seller&apos;s
-        first listing goes live.
+        No documents needed. An ID check is optional, only for the Verified
+        badge.
       </p>
     </form>
   );

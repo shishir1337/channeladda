@@ -149,11 +149,12 @@ export const helpArticles: HelpArticle[] = [
     slug: "verification-and-kyc",
     title: "Verification and KYC",
     category: "account",
-    summary: "Who has to verify their identity, and at what point.",
+    summary: "The Verified badge: it is optional, and this is how to get it.",
     body: [
-      "Browsing, searching and saving listings need nothing more than an email address. You can create an account in about fifteen seconds.",
-      "Sellers complete an identity check before their first listing goes live: a government ID and a liveness check. We ban by document, not by email address, so someone removed for fraud cannot simply sign up again.",
-      "Buyers are only asked to verify on a single purchase above $2,000.",
+      "Browsing, buying and selling need nothing more than an email address. You can create an account in about fifteen seconds.",
+      "Getting verified is optional. It only adds the Verified badge beside your name, so buyers and sellers know a real person is behind your account.",
+      'To get it, open Verification in your dashboard. Send a photo of your Aadhaar card, PAN card, passport or other government ID, and a short selfie video holding the same ID, saying your name and "Channel Adda".',
+      "A person on our team checks it, usually within 24 hours. Only our verification team sees your documents, and they are never shown on your profile. If we cannot verify you, we tell you why and you can try again.",
     ],
   },
   {
@@ -164,6 +165,7 @@ export const helpArticles: HelpArticle[] = [
     body: [
       "Turn on two-factor authentication, especially if you sell. It is the single thing that stops a leaked password becoming a withdrawal to somebody else's wallet.",
       "Channel Adda staff will never ask for your password, your two-factor codes, or your recovery email. We will never ask you to move a conversation to Telegram or WhatsApp to complete a deal — anyone who does is not from Channel Adda, and no deal arranged that way is protected.",
+      "Need help? Signed in, open Messages and write to the Escrow Agent, pinned at the top: that chat goes to Channel Adda's own agents, and it only ever happens inside Messages. Somebody calling themselves an Escrow Agent anywhere else is not us. Signed out, use the support form.",
     ],
   },
 ];

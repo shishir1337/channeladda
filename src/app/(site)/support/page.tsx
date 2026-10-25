@@ -4,6 +4,7 @@ import {
   GavelIcon,
   MailIcon,
   MessagesSquareIcon,
+  ShieldCheckIcon,
 } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -12,6 +13,11 @@ import { iconTile } from "@/components/ui/icon-hue";
 import { PageHeader } from "@/components/ui/page-header";
 import { Container, Section } from "@/components/ui/section";
 import { helpArticles } from "@/data/help";
+import {
+  ESCROW_AGENT_HREF,
+  ESCROW_AGENT_NAME,
+  REPLY_PROMISE,
+} from "@/lib/support-chat";
 
 export const metadata: Metadata = {
   title: "Contact support",
@@ -20,11 +26,26 @@ export const metadata: Metadata = {
   alternates: { canonical: "/support" },
 };
 
-const channels = [
+const channels: {
+  icon: typeof MailIcon;
+  title: string;
+  body: string;
+  meta: string;
+  link?: { href: string; label: string };
+}[] = [
+  {
+    // Signed-in members chat with the team from Messages. The form below
+    // stays for everyone else — above all, people who cannot sign in.
+    icon: ShieldCheckIcon,
+    title: `Chat with an ${ESCROW_AGENT_NAME}`,
+    body: `Signed in? Open Messages and write to the ${ESCROW_AGENT_NAME}, pinned at the top. A Channel Adda agent will help.`,
+    meta: REPLY_PROMISE,
+    link: { href: ESCROW_AGENT_HREF, label: "Open the chat" },
+  },
   {
     icon: MessagesSquareIcon,
     title: "The form below",
-    body: "The quickest route for anything about a live order. Add the order reference and we start from it.",
+    body: "For anyone, signed in or not. About a live order? Add the order reference and we start from it.",
     meta: "Read by a person, never a bot",
   },
   {
@@ -69,7 +90,7 @@ export default async function SupportPage({
 
       <Section>
         <Container>
-          <ul className="grid gap-3 sm:grid-cols-3">
+          <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {channels.map((channel) => (
               <li key={channel.title}>
                 <div className="flex h-full flex-col rounded-card border border-line bg-surface p-5 sm:p-6">
@@ -84,6 +105,15 @@ export default async function SupportPage({
                   <p className="mt-2 text-sm leading-relaxed text-muted">
                     {channel.body}
                   </p>
+                  {channel.link ? (
+                    <Link
+                      href={channel.link.href}
+                      className="mt-3 inline-flex min-h-11 w-fit items-center gap-1.5 text-sm font-medium text-fg transition-colors duration-150 hover:text-muted"
+                    >
+                      {channel.link.label}
+                      <ArrowRightIcon aria-hidden="true" className="size-4" />
+                    </Link>
+                  ) : null}
                   <p className="mt-auto flex items-center gap-1.5 pt-4 text-[0.8125rem] text-subtle">
                     <ClockIcon aria-hidden="true" className="size-3.5" />
                     {channel.meta}

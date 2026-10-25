@@ -26,6 +26,8 @@ const TABLES = [
   "Notification",
   "Report",
   "SupportTicket",
+  "SupportMessage",
+  "SupportThread",
   "Review",
   "Dispute",
   "Withdrawal",

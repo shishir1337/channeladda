@@ -12,8 +12,8 @@ import { Container, Section, SectionHeading } from "@/components/ui/section";
 const safeguards = [
   {
     icon: FingerprintIcon,
-    title: "Sellers are verified",
-    body: "ID check before a seller can sell or withdraw.",
+    title: "A badge for checked IDs",
+    body: "Verified means our team checked their ID.",
   },
   {
     icon: FileCheck2Icon,

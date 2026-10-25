@@ -141,7 +141,7 @@ export const faqs = [
   },
   {
     q: "How do you verify that a seller really owns the account?",
-    a: "Sellers place a one-time Channel Adda verification code in the account description or bio, and we check it on the live account: automatically on YouTube, by a moderator on every other platform. On top of that we require KYC, proof screenshots of the analytics and monetization dashboards, and manual admin approval before a listing goes public.",
+    a: "Sellers place a one-time Channel Adda verification code in the account description or bio, and we check it on the live account: automatically on YouTube, by a moderator on every other platform. On top of that we require proof screenshots of the analytics and monetization dashboards, and manual admin approval before a listing goes public. Sellers can also send us their ID for the Verified badge; that part is optional.",
   },
   {
     q: "What fees does Channel Adda charge?",

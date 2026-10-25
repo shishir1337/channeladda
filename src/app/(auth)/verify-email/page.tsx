@@ -40,8 +40,8 @@ export default async function VerifyEmailPage({
           </h2>
           <p className="mt-1 text-sm leading-relaxed text-muted">
             You can save listings, send offers and message sellers straight
-            away. Identity checks only come in before a seller&apos;s first
-            listing goes live.
+            away. An ID check is optional: do it any time for the Verified
+            badge.
           </p>
           <div className="mt-5 flex flex-wrap gap-2">
             {user ? (

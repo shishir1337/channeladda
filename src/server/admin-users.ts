@@ -216,6 +216,8 @@ export type UserDetail = UserRow & {
   /** Safest channels this person is holding right now, and the cap. */
   holds: number;
   maxHolds: number;
+  /** Their ID check on file, for a link to it in ID checks. */
+  kycSubmissionId: string | null;
 };
 
 export async function getUserDetail(id: string): Promise<UserDetail | null> {
@@ -237,6 +239,7 @@ export async function getUserDetail(id: string): Promise<UserDetail | null> {
       dealLevel: true,
       kycStatus: true,
       createdAt: true,
+      kycSubmission: { select: { id: true } },
       _count: {
         select: {
           listings: true,
@@ -292,6 +295,7 @@ export async function getUserDetail(id: string): Promise<UserDetail | null> {
     dealLevel: row.dealLevel,
     holds,
     maxHolds: settings.maxHoldsPerAgent,
+    kycSubmissionId: row.kycSubmission?.id ?? null,
   };
 }
 
@@ -706,23 +710,43 @@ export const KYC_SETTABLE: readonly KycStatus[] = [
   "NOT_STARTED",
 ];
 
+/** Thrown inside a transaction to roll it back when somebody got there first. */
+class KycRaceLost extends Error {}
+
 /**
- * Record the outcome of an identity check done off-platform.
+ * Record the outcome of an identity check: from the review queue
+ * (`@/server/kyc`), or by hand on the account page for a check done
+ * off-platform.
  *
- * Nothing in the app ever wrote `kycStatus`, so it sat at NOT_STARTED on
- * every real account — and `server/sellers.ts` filters the public sellers
- * directory and the homepage's top sellers on APPROVED, which means both were
- * empty on any database that had not been seeded. This is the missing write.
+ * One write for both, so the account and the member's submission can never
+ * disagree — a PENDING row under an APPROVED person, or a queue entry for
+ * somebody a moderator already approved by hand. Only APPROVED shows the
+ * Verified badge; nothing else depends on the status.
  *
  * Rank-checked like a suspension: a moderator may record a member's check,
  * only a superadmin a colleague's, and nobody their own.
+ *
+ * Compare-and-set on the status, so two moderators deciding the same check
+ * at once get one decision and one "no-change", not two notifications.
  */
 export async function setKycStatus(input: {
   actorId: string;
   actorRole: UserRole;
   userId: string;
   status: KycStatus;
+  /** What was checked. Kept in the audit trail by the caller. */
   reason: string;
+  /**
+   * What the member reads, on a check that is not approved: the review
+   * queue's reason. The manual control's note is staff-only and is never
+   * shown to them, so it does not pass one.
+   */
+  memberNote?: string | null;
+  /**
+   * Decide this submission, and only while it is still waiting. The queue
+   * passes it; the manual control decides whatever the member has on file.
+   */
+  submissionId?: string;
 }): Promise<RemedyResult<{ before: KycStatus; after: KycStatus }>> {
   if (input.actorId === input.userId) return { ok: false, reason: "self" };
 
@@ -738,26 +762,52 @@ export async function setKycStatus(input: {
     return { ok: false, reason: "no-change" };
   }
 
-  await db.$transaction(async (tx) => {
-    await tx.user.update({
-      where: { id: target.id },
-      data: { kycStatus: input.status },
-    });
-    // A submission, if there ever is one, must not disagree with the account.
-    // Nothing creates these today; when something does, this keeps the two in
-    // step rather than leaving a PENDING row under an APPROVED person.
-    if (input.status !== "NOT_STARTED") {
-      await tx.kycSubmission.updateMany({
-        where: { userId: target.id },
+  try {
+    await db.$transaction(async (tx) => {
+      // The document's hash goes on the account when it is approved, so the
+      // same document turning up on another account can be pointed out to
+      // the reviewer. A later change of status keeps it: a person removed
+      // for fraud is exactly who it is for.
+      const submission =
+        input.status === "APPROVED"
+          ? await tx.kycSubmission.findUnique({
+              where: { userId: target.id },
+              select: { documentHash: true },
+            })
+          : null;
+
+      const moved = await tx.user.updateMany({
+        where: { id: target.id, kycStatus: target.kycStatus },
+        data: {
+          kycStatus: input.status,
+          ...(submission?.documentHash
+            ? { kycDocHash: submission.documentHash }
+            : {}),
+        },
+      });
+      if (moved.count !== 1) throw new KycRaceLost();
+
+      // NOT_STARTED included: it takes a waiting submission out of the
+      // queue, and the member can send one again.
+      const decided = await tx.kycSubmission.updateMany({
+        where: input.submissionId
+          ? { id: input.submissionId, userId: target.id, status: "PENDING" }
+          : { userId: target.id },
         data: {
           status: input.status,
           reviewerId: input.actorId,
-          reviewNote: input.reason,
+          reviewNote: input.memberNote?.trim() || null,
           reviewedAt: new Date(),
         },
       });
+      if (input.submissionId && decided.count !== 1) throw new KycRaceLost();
+    });
+  } catch (error) {
+    if (error instanceof KycRaceLost) {
+      return { ok: false, reason: "no-change" };
     }
-  });
+    throw error;
+  }
 
   return { ok: true, before: target.kycStatus, after: input.status };
 }

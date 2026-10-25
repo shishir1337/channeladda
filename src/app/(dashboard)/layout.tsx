@@ -142,6 +142,11 @@ export default async function DashboardLayout({ children }: LayoutProps<"/">) {
           icon: "profile",
         },
         {
+          label: "Verification",
+          href: "/dashboard/verification",
+          icon: "verified",
+        },
+        {
           label: "Notifications",
           href: "/dashboard/notifications",
           icon: "bell",

@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  BadgeCheckIcon,
   BellIcon,
   CheckCheckIcon,
   CircleDollarSignIcon,
@@ -50,6 +51,7 @@ const ICONS: Record<NotificationKind, typeof BellIcon> = {
   DISPUTE: GavelIcon,
   REVIEW: StarIcon,
   BADGE: GemIcon,
+  IDENTITY: BadgeCheckIcon,
 };
 
 /** "3 days" beats a date: half these readers are not reading in English. */

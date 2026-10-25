@@ -210,10 +210,13 @@ export function SellerPanel({ seller }: { seller: Seller }) {
         <div className="min-w-0">
           <h3 className="flex items-center gap-1.5 text-[0.9375rem] font-semibold">
             <span className="truncate">{seller.name}</span>
-            <BadgeCheckIcon
-              aria-label="Verified seller"
-              className="size-4 shrink-0 text-verified"
-            />
+            {seller.verified ? (
+              <BadgeCheckIcon
+                role="img"
+                aria-label="Verified seller: ID checked by Channel Adda"
+                className="size-4 shrink-0 text-verified"
+              />
+            ) : null}
             {seller.reseller ? <ResellerBadge /> : null}
           </h3>
           <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[0.8125rem] text-subtle">
@@ -254,10 +257,13 @@ export function SellerPanel({ seller }: { seller: Seller }) {
         <Button asChild variant="secondary" size="sm">
           <Link href={`/seller/${seller.slug}`}>View seller profile</Link>
         </Button>
-        <Badge variant="verified" size="md">
-          <BadgeCheckIcon aria-hidden="true" />
-          KYC verified
-        </Badge>
+        {/* The person's ID check, not the listing's ownership check. */}
+        {seller.verified ? (
+          <Badge variant="verified" size="md">
+            <BadgeCheckIcon aria-hidden="true" />
+            ID verified
+          </Badge>
+        ) : null}
       </div>
     </Panel>
   );

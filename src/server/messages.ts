@@ -19,6 +19,7 @@ import { notify } from "@/server/notifications";
 import { offerTurn } from "@/server/offers";
 import type { CurrentUser } from "@/server/session";
 import { sizeOfUpload } from "@/server/storage";
+import { escrowAgentUnread } from "@/server/support-chat";
 import {
   agentOnThread,
   runningDealsOf,
@@ -570,24 +571,33 @@ export async function listThreads(
   });
 }
 
-/** How many threads are waiting on this person. Drives the sidebar badge. */
+/**
+ * How many threads are waiting on this person. Drives the sidebar badge, the
+ * phone's tab bar and the website's (`/api/waiting`), so all three agree.
+ * The Escrow Agent chat counts as one more when a reply is unread.
+ */
 export async function countUnreadThreads(userId: string): Promise<number> {
   const asAgent = await stillAnAgent(userId);
-  const threads = await db.conversation.findMany({
-    where: {
-      OR: [
-        { buyerId: userId },
-        { sellerId: userId },
-        ...(asAgent ? [{ orders: runningDealsOf(userId) }] : []),
-      ],
-    },
-    select: { id: true },
-  });
+  const [threads, escrowAgent] = await Promise.all([
+    db.conversation.findMany({
+      where: {
+        OR: [
+          { buyerId: userId },
+          { sellerId: userId },
+          ...(asAgent ? [{ orders: runningDealsOf(userId) }] : []),
+        ],
+      },
+      select: { id: true },
+    }),
+    escrowAgentUnread(userId),
+  ]);
   const unread = await unreadByThread(
     userId,
     threads.map((row) => row.id),
   );
-  return [...unread.values()].filter((n) => n > 0).length;
+  return (
+    [...unread.values()].filter((n) => n > 0).length + (escrowAgent > 0 ? 1 : 0)
+  );
 }
 
 // The staff queue has its own order (flagged first) and no deal tag.

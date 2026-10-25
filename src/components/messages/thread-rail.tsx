@@ -2,11 +2,12 @@
 
 import { SearchIcon, ShieldCheckIcon, ZapIcon } from "lucide-react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, usePathname } from "next/navigation";
 import { useId, useMemo, useState } from "react";
 import { inputClass, SeeAll } from "@/components/app/kit";
-import { Initials } from "@/components/messages/chat-parts";
+import { EscrowAgentAvatar, Initials } from "@/components/messages/chat-parts";
 import { Badge } from "@/components/ui/badge";
+import { ESCROW_AGENT_HREF, ESCROW_AGENT_NAME } from "@/lib/support-chat";
 import { cn } from "@/lib/utils";
 
 /**
@@ -19,6 +20,10 @@ import { cn } from "@/lib/utils";
  *
  * The active thread is read from the route rather than passed in, so the rail
  * does not need re-rendering from the server when the selection changes.
+ *
+ * The Escrow Agent sits above all of it, outside the filter: a member who
+ * needs help should find it in the same place every time, however many
+ * conversations they have and whatever they last typed into the box.
  */
 export type RailThread = {
   id: string;
@@ -32,6 +37,14 @@ export type RailThread = {
   closed: boolean;
   /** The deal still running here: these rows are listed first. */
   deal: { reference: string; mode: "SAFEST" | "FASTEST" } | null;
+};
+
+/** The pinned Escrow Agent row. */
+export type RailEscrowAgent = {
+  preview: string;
+  /** Null until the member first writes. */
+  lastMessageAt: string | null;
+  unread: boolean;
 };
 
 function when(iso: string) {
@@ -49,8 +62,16 @@ function when(iso: string) {
   return date.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 }
 
-export function ThreadRail({ threads }: { threads: RailThread[] }) {
+export function ThreadRail({
+  threads,
+  escrowAgent,
+}: {
+  threads: RailThread[];
+  escrowAgent: RailEscrowAgent;
+}) {
   const params = useParams<{ id?: string }>();
+  const pathname = usePathname();
+  const agentOpen = pathname === ESCROW_AGENT_HREF;
   const filterId = useId();
   const headingId = useId();
   const [query, setQuery] = useState("");
@@ -76,9 +97,9 @@ export function ThreadRail({ threads }: { threads: RailThread[] }) {
       className={cn(
         "flex flex-col max-lg:mb-6 lg:sticky lg:top-[5.5rem] lg:h-[calc(100dvh-6.5rem)] lg:border-r lg:border-line lg:pr-4",
         // On a phone there is no room for both panes: an open thread takes
-        // the screen, and the list is one tap back. With nothing in it, the
-        // page's own empty state says it better than an empty rail.
-        (params?.id || threads.length === 0) && "max-lg:hidden",
+        // the screen, and the list is one tap back. Never empty: the Escrow
+        // Agent is always in it.
+        (params?.id || agentOpen) && "max-lg:hidden",
       )}
     >
       <div className="flex min-h-8 items-center justify-between gap-3">
@@ -91,13 +112,18 @@ export function ThreadRail({ threads }: { threads: RailThread[] }) {
         <SeeAll href="/browse">Find more</SeeAll>
       </div>
 
+      <div className="-mx-1 mt-3 p-1">
+        <EscrowAgentRow agent={escrowAgent} active={agentOpen} />
+      </div>
+
       {threads.length === 0 ? (
-        <p className="mt-3 text-[0.8125rem] leading-relaxed text-muted">
-          No conversations yet.
+        // The page under it says so on a phone, with the way to start one.
+        <p className="mt-2 px-1 text-[0.8125rem] leading-relaxed text-muted max-lg:hidden">
+          No other conversations yet.
         </p>
       ) : (
         <>
-          <div className="relative mt-3">
+          <div className="relative mt-2">
             <label htmlFor={filterId} className="sr-only">
               Filter conversations
             </label>
@@ -185,6 +211,71 @@ function Group({
         ))}
       </ul>
     </section>
+  );
+}
+
+/**
+ * The Escrow Agent. Quiet like every row, told apart by its shield and the
+ * line under the name rather than by colour across the whole row.
+ */
+function EscrowAgentRow({
+  agent,
+  active,
+}: {
+  agent: RailEscrowAgent;
+  active: boolean;
+}) {
+  return (
+    <Link
+      href={ESCROW_AGENT_HREF}
+      aria-current={active ? "page" : undefined}
+      className={cn(
+        "group flex items-start gap-3 rounded-lg px-2.5 py-2.5 transition-[background-color,box-shadow] duration-150 focus-visible:-outline-offset-2",
+        active
+          ? "bg-surface shadow-xs ring-1 ring-line dark:bg-surface-2"
+          : "hover:bg-black/[0.04] dark:hover:bg-white/[0.05]",
+      )}
+    >
+      <EscrowAgentAvatar className="mt-0.5 size-9" iconClassName="size-4.5" />
+      <span className="min-w-0 flex-1">
+        <span className="flex items-baseline gap-2">
+          <span className="min-w-0 flex-1 truncate text-sm font-medium text-fg">
+            {ESCROW_AGENT_NAME}
+          </span>
+          {agent.lastMessageAt ? (
+            <time
+              dateTime={agent.lastMessageAt}
+              className={cn(
+                "shrink-0 text-xs tabular-nums",
+                agent.unread ? "text-fg" : "text-subtle",
+              )}
+            >
+              {when(agent.lastMessageAt)}
+            </time>
+          ) : null}
+        </span>
+        <span className="block truncate text-xs leading-5 text-subtle">
+          Channel Adda live agents
+        </span>
+        <span className="mt-0.5 flex items-center gap-2">
+          <span
+            className={cn(
+              "min-w-0 flex-1 truncate text-[0.8125rem] leading-5",
+              agent.unread ? "text-fg" : "text-muted",
+            )}
+          >
+            {agent.preview}
+          </span>
+          {agent.unread ? (
+            <span
+              aria-hidden="true"
+              className="size-2 shrink-0 rounded-full bg-primary"
+            />
+          ) : null}
+        </span>
+      </span>
+      {agent.unread ? <span className="sr-only">Unread</span> : null}
+    </Link>
   );
 }
 

@@ -22,6 +22,17 @@ const VIDEO_EXT = ["mp4", "mov", "webm"] as const;
 
 const IMAGE_KINDS = ["cover", "avatar", "proof", "message"] as const;
 
+/**
+ * An ID check's photos. No GIF: an ID is a photo, and `putUpload` refuses
+ * one under `kyc`. The selfie clip uses the chat's video types.
+ */
+const KYC_IMAGE_EXT = ["png", "jpg", "webp"] as const;
+
+const KYC_IMAGE = new RegExp(
+  `^kyc/[0-9a-f]{32}\\.(?:${KYC_IMAGE_EXT.join("|")})$`,
+);
+const KYC_VIDEO = new RegExp(`^kyc/[0-9a-f]{32}\\.(?:${VIDEO_EXT.join("|")})$`);
+
 const SERVABLE = new RegExp(
   `^(?:(?:${IMAGE_KINDS.join("|")})/[0-9a-f]{32}\\.(?:${IMAGE_EXT.join("|")})` +
     `|message/[0-9a-f]{32}\\.(?:${VIDEO_EXT.join("|")}))$`,
@@ -29,7 +40,27 @@ const SERVABLE = new RegExp(
 
 /** Whether this key may be read off disk and served. */
 export function isServableKey(key: string): boolean {
-  return SERVABLE.test(key);
+  return SERVABLE.test(key) || isKycKey(key);
+}
+
+/**
+ * An ID check's file: a photo of the ID or the selfie video.
+ *
+ * Private, like nothing else here: only the member who sent it and the staff
+ * who review ID checks may read one (`canReadUpload`).
+ */
+export function isKycKey(key: string): boolean {
+  return KYC_IMAGE.test(key) || KYC_VIDEO.test(key);
+}
+
+/** A photo of an ID, as `putUpload` stores it under `kyc`. */
+export function isKycImageKey(key: string): boolean {
+  return KYC_IMAGE.test(key);
+}
+
+/** The selfie video of an ID check. */
+export function isKycVideoKey(key: string): boolean {
+  return KYC_VIDEO.test(key);
 }
 
 /**

@@ -41,9 +41,12 @@ export async function generateMetadata({
   const seller = await getSeller(slug);
   if (!seller) return { title: "Seller not found" };
 
-  const description = `${seller.name} has completed ${seller.sales} supervised sales on Channel Adda and holds ${pointsLabel(seller.points ?? 0)}. Verified since ${seller.memberSince}.`;
+  // "Verified" only for an approved ID check, as on the page itself.
+  const description = `${seller.name} has completed ${seller.sales} supervised sales on Channel Adda and holds ${pointsLabel(seller.points ?? 0)}. ${seller.verified ? "ID verified, member" : "Member"} since ${seller.memberSince}.`;
   return {
-    title: `${seller.name} — verified seller`,
+    title: seller.verified
+      ? `${seller.name} — verified seller`
+      : `${seller.name} — seller on Channel Adda`,
     description,
     openGraph: { title: `${seller.name} on Channel Adda`, description },
     alternates: { canonical: `/seller/${seller.slug}` },
@@ -92,10 +95,13 @@ export default async function SellerPage({
               <div className="min-w-0">
                 <h1 className="flex flex-wrap items-center gap-2 text-[1.875rem] leading-[1.1] font-semibold tracking-[-0.03em] sm:text-[2.5rem]">
                   {seller.name}
-                  <BadgeCheckIcon
-                    aria-label="Verified seller"
-                    className="size-6 shrink-0 text-verified"
-                  />
+                  {seller.verified ? (
+                    <BadgeCheckIcon
+                      role="img"
+                      aria-label="Verified seller: ID checked by Channel Adda"
+                      className="size-6 shrink-0 text-verified"
+                    />
+                  ) : null}
                   {seller.reseller ? <ResellerBadge /> : null}
                 </h1>
                 <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted">

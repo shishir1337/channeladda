@@ -36,11 +36,42 @@ export const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
  */
 export const MAX_VIDEO_BYTES = 25 * 1024 * 1024;
 
-export type UploadKind = "cover" | "avatar" | "proof" | "message";
+/**
+ * 50 MB for the selfie video of an ID check.
+ *
+ * Twice a chat clip, because this one is recorded on a phone's front camera
+ * at whatever the phone defaults to — often 1080p — and 30 seconds of that is
+ * 30 to 60 MB on a mid-range Android. Telling somebody to change their camera
+ * settings is how an optional check stops being taken. The photos of the ID
+ * itself stay at MAX_UPLOAD_BYTES.
+ *
+ * As with chat, the proxy's client_max_body_size has to be at least this
+ * plus a megabyte, or the request is refused before it reaches this code.
+ */
+export const MAX_KYC_VIDEO_BYTES = 50 * 1024 * 1024;
 
-/** The ceiling for a given kind, in bytes. */
+/** The largest any kind allows. The upload route refuses more than this unread. */
+export const MAX_ANY_UPLOAD_BYTES = MAX_KYC_VIDEO_BYTES;
+
+/**
+ * `kyc` is an ID check: photos of the document and a selfie video. Private —
+ * see `canReadUpload`.
+ */
+export type UploadKind = "cover" | "avatar" | "proof" | "message" | "kyc";
+
+/**
+ * The ceiling for a given kind, in bytes. For `kyc` this is the video's;
+ * a photo under `kyc` is held to MAX_UPLOAD_BYTES once it is identified.
+ */
 export function limitFor(kind: UploadKind): number {
-  return kind === "message" ? MAX_VIDEO_BYTES : MAX_UPLOAD_BYTES;
+  if (kind === "message") return MAX_VIDEO_BYTES;
+  if (kind === "kyc") return MAX_KYC_VIDEO_BYTES;
+  return MAX_UPLOAD_BYTES;
+}
+
+/** Kinds that may be a clip: chat attachments and the ID check's video. */
+function takesVideo(kind: UploadKind): boolean {
+  return kind === "message" || kind === "kyc";
 }
 
 export type StoredFile = {
@@ -154,18 +185,21 @@ export class UploadError extends Error {}
 
 function identify(bytes: Buffer, kind: UploadKind) {
   const found = SIGNATURES.find((s) => s.matches(bytes));
-  if (!found) {
+  // An ID is a photo: a GIF under `kyc` is refused like any unknown file.
+  if (!found || (kind === "kyc" && found.contentType === "image/gif")) {
     throw new UploadError(
-      kind === "message"
-        ? "That file is not an image or a clip we can show. Images: PNG, JPEG, WebP, GIF. Clips: MP4, MOV, WebM."
-        : "That file is not a PNG, JPEG, WebP or GIF image. Export it as one and try again.",
+      kind === "kyc"
+        ? "That is not a photo or a video we can take. Photos: JPEG, PNG or WebP. Videos: MP4, MOV or WebM."
+        : kind === "message"
+          ? "That file is not an image or a clip we can show. Images: PNG, JPEG, WebP, GIF. Clips: MP4, MOV, WebM."
+          : "That file is not a PNG, JPEG, WebP or GIF image. Export it as one and try again.",
     );
   }
 
-  // Clips belong in chat and nowhere else. A listing cover that is secretly a
-  // video breaks every card it appears on, and a proof screenshot is meant to
-  // be a screenshot.
-  if (isVideo(found.contentType) && kind !== "message") {
+  // Clips belong in chat and in an ID check, and nowhere else. A listing
+  // cover that is secretly a video breaks every card it appears on, and a
+  // proof screenshot is meant to be a screenshot.
+  if (isVideo(found.contentType) && !takesVideo(kind)) {
     throw new UploadError("That needs to be an image, not a video.");
   }
 
@@ -213,6 +247,17 @@ export async function putUpload(
   }
 
   const { contentType, ext } = identify(bytes, kind);
+  // A photo of an ID is held to the image limit: the larger `kyc` ceiling
+  // is for the selfie video only.
+  if (
+    kind === "kyc" &&
+    !isVideo(contentType) &&
+    bytes.byteLength > MAX_UPLOAD_BYTES
+  ) {
+    throw new UploadError(
+      `That photo is ${(bytes.byteLength / 1024 / 1024).toFixed(1)}MB. The limit is ${MAX_UPLOAD_BYTES / 1024 / 1024}MB.`,
+    );
+  }
   const key = newKey(kind, ext);
   const target = pathFor(key);
 
@@ -232,8 +277,8 @@ export async function readUpload(key: string) {
   const bytes = await readFile(pathFor(key));
   // Keys are written as `kind/hash.ext`, so the kind this file was stored
   // under is in the key itself. It matters because a clip is only a legal
-  // upload under `message`, and re-identifying it as anything else here would
-  // refuse to serve a file this code wrote.
+  // upload under `message` and `kyc`, and re-identifying it as anything else
+  // here would refuse to serve a file this code wrote.
   const kind = key.split("/")[0] as UploadKind;
   return { bytes, contentType: identify(bytes, kind).contentType };
 }

@@ -2,6 +2,7 @@
 
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import {
+  BadgeCheckIcon,
   ChevronsUpDownIcon,
   ExternalLinkIcon,
   LayoutDashboardIcon,
@@ -202,6 +203,14 @@ export function UserMenu({
               <Link href="/dashboard/profile" className={item}>
                 <UserRoundIcon aria-hidden="true" />
                 Your profile
+              </Link>
+            </DropdownMenu.Item>
+          ) : null}
+          {area === "member" ? (
+            <DropdownMenu.Item asChild>
+              <Link href="/dashboard/verification" className={item}>
+                <BadgeCheckIcon aria-hidden="true" />
+                Verification
               </Link>
             </DropdownMenu.Item>
           ) : null}

@@ -780,19 +780,19 @@ const KYC_CHOICES: {
     status: "APPROVED",
     label: "Approved",
     meaning: "You checked their identity and it holds up.",
-    more: "Their seller page can appear in the public sellers directory and among the top sellers on the homepage.",
+    more: "The Verified badge shows beside their name, and their seller page can appear in the public sellers directory and among the top sellers on the homepage.",
   },
   {
     status: "REJECTED",
     label: "Rejected",
     meaning: "The check failed.",
-    more: "They stay out of the directory. Their listings are not touched — suspend the account if that is what this calls for.",
+    more: "No Verified badge, and they stay out of the directory. They can send their ID again. Their listings are not touched — suspend the account if that is what this calls for.",
   },
   {
     status: "NOT_STARTED",
     label: "Not started",
     meaning: "Clears an earlier decision, as if no check had been done.",
-    more: "Use it to undo a mistake.",
+    more: "Use it to undo a mistake. A check waiting in ID checks leaves the queue, and they can send one again.",
   },
 ];
 
@@ -807,12 +807,12 @@ const KYC_VARIANT: Record<
 };
 
 /**
- * Recording an identity check that was done off-platform.
+ * Recording an identity check by hand, for one done off-platform.
  *
- * Nothing here looks at a document — there is no upload flow yet — so the
- * card says that plainly and asks what was checked. Without this control the
- * status could never leave NOT_STARTED, and the public sellers directory,
- * which only lists approved sellers, was empty on every real database.
+ * Documents members send are reviewed in ID checks (`/admin/verification`);
+ * this writes through the same `setKycStatus`, so the two always agree. Only
+ * an approved check shows the Verified badge, and the reason typed here stays
+ * in the audit trail — it is never shown to the member.
  */
 export function KycControl({
   userId,
@@ -854,7 +854,7 @@ export function KycControl({
       <CardHeader
         as="h2"
         title="Identity check"
-        info="Records the outcome of a check you did yourself — a video call, a document sent to support. Nothing here inspects a document."
+        info="Only an approved check shows the Verified badge. For a check you did yourself, such as a video call. Documents members send are reviewed under ID checks."
         actions={
           <Badge variant={KYC_VARIANT[current]}>
             <span className="sr-only">Currently </span>

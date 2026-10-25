@@ -81,7 +81,8 @@ export async function requireStaff(): Promise<CurrentUser> {
  * and nothing else. `AGENT` deliberately stays out of `STAFF` above: every
  * other admin page guards with `requireStaff()`, so an agent reaching the
  * listing queue, user management, messages or support gets the same 404 a
- * stranger would. The only thing this opens is the shell and the deal pages.
+ * stranger would. The only things this opens are the shell, the deal pages
+ * and the Escrow Agent chats (`/admin/support-chats`, `SUPPORT_CHAT_ROLES`).
  */
 export async function requireAdminArea(): Promise<CurrentUser> {
   const user = await requireUser();

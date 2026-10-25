@@ -144,7 +144,9 @@ const KYC_WORDS: Record<KycStatus, string> = {
  * MODERATOR and SUPERADMIN, the same desk that reviews listings — it is the
  * same judgement, about the same people. The reason is required and kept,
  * because "who approved this seller, on what evidence" is the question asked
- * after one of them turns out not to be who they said.
+ * after one of them turns out not to be who they said. It stays in the audit
+ * trail: unlike the review queue's reason (`rejectVerification`), it is never
+ * shown to the member.
  */
 export async function setUserKyc(
   userId: string,
@@ -183,14 +185,17 @@ export async function setUserKyc(
   });
 
   refreshUser(userId);
-  // The public directory and the homepage's top sellers both filter on this.
+  // The public directory and the homepage's top sellers both filter on this,
+  // and the Verified badge follows it everywhere.
   revalidatePath("/sellers");
   revalidatePath("/");
+  // A waiting check this decided leaves the review queue.
+  revalidatePath("/admin/verification");
   return {
     ok: true,
     message:
       status === "APPROVED"
-        ? "Identity approved. If they have a seller page, it can now appear in the public directory."
+        ? "Identity approved. The Verified badge shows beside their name, and their seller page can appear in the public directory."
         : `Identity check now ${KYC_WORDS[status]}.`,
   };
 }

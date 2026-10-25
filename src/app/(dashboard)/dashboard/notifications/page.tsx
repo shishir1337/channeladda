@@ -1,4 +1,5 @@
 import {
+  BadgeCheckIcon,
   BellIcon,
   CircleDollarSignIcon,
   FileTextIcon,
@@ -41,6 +42,7 @@ const ICONS: Record<NotificationKind, typeof BellIcon> = {
   DISPUTE: GavelIcon,
   REVIEW: StarIcon,
   BADGE: GemIcon,
+  IDENTITY: BadgeCheckIcon,
 };
 
 /** What each kind is, in the reader's terms rather than the schema's. */
@@ -53,6 +55,7 @@ const KINDS: Record<NotificationKind, string> = {
   DISPUTE: "Dispute",
   REVIEW: "Review",
   BADGE: "Reseller badge",
+  IDENTITY: "Verification",
 };
 
 /**

@@ -3,7 +3,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { EmptyState } from "@/components/app/kit";
 import { Button } from "@/components/ui/button";
-import { listThreads } from "@/server/messages";
+import { ESCROW_AGENT_HREF, ESCROW_AGENT_NAME } from "@/lib/support-chat";
+import { memberInbox, splitInbox } from "@/server/inbox";
 import { requireUser } from "@/server/session";
 
 export const metadata: Metadata = {
@@ -29,7 +30,7 @@ const PANE =
  */
 export default async function MessagesPage() {
   const user = await requireUser("/dashboard/messages");
-  const threads = await listThreads(user);
+  const { escrowAgent, threads } = splitInbox(await memberInbox(user));
   const unread = threads.filter((thread) => thread.unread > 0);
   // By time, not position: running deals are listed first, so the last row
   // is no longer the oldest.
@@ -46,10 +47,38 @@ export default async function MessagesPage() {
         className={PANE}
         icon={MessagesSquareIcon}
         title="No conversations yet"
-        body="Ask a question on any listing and the thread starts here."
+        body={`Ask a question on any listing and the thread starts here. Need help? Write to the ${ESCROW_AGENT_NAME}.`}
+        action={
+          <>
+            <Button asChild size="md">
+              <Link href="/browse">Browse accounts</Link>
+            </Button>
+            <Button asChild size="md" variant="secondary">
+              <Link href={ESCROW_AGENT_HREF}>Chat with an agent</Link>
+            </Button>
+          </>
+        }
+      />
+    );
+  }
+
+  // A reply from the Escrow Agent is read before anything else: somebody
+  // asked us for help and the answer is here.
+  if (escrowAgent.unread > 0) {
+    return (
+      <EmptyState
+        as="h2"
+        className={PANE}
+        icon={MailOpenIcon}
+        title={`The ${ESCROW_AGENT_NAME} replied`}
+        body={
+          unread.length > 0
+            ? `And ${unread.length} ${unread.length === 1 ? "conversation needs" : "conversations need"} a reply.`
+            : "A Channel Adda agent answered your message."
+        }
         action={
           <Button asChild size="md">
-            <Link href="/browse">Browse accounts</Link>
+            <Link href={ESCROW_AGENT_HREF}>Read the reply</Link>
           </Button>
         }
       />

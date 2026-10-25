@@ -46,6 +46,15 @@ enum KycStatus {
   REJECTED
 }
 
+/// The ID a member sent to be verified. Verification is optional: it only
+/// earns the Verified badge (the owner, 2026-10-26).
+enum KycDocument {
+  AADHAAR
+  PAN
+  PASSPORT
+  OTHER // driving licence, voter ID, national ID
+}
+
 enum ListingStatus {
   DRAFT
   CODE_CHECK // ownership code placed, awaiting verification
@@ -135,6 +144,7 @@ enum NotificationKind {
   DISPUTE
   REVIEW
   BADGE // the Reseller badge: about to end
+  IDENTITY // an ID check: approved, or not
 }
 
 // ---------------------------------------------------------------- accounts
@@ -180,8 +190,12 @@ model User {
   /// size, which is how agents worked before levels existed.
   dealLevel  DealLevel?
 
+  /// Only APPROVED shows the Verified badge. Nothing else depends on it:
+  /// verification is optional.
   kycStatus  KycStatus @default(NOT_STARTED)
   // Hash of the identity document, so a banned seller cannot re-register.
+  // Copied from KycSubmission.documentHash when a check is approved; the
+  // review screen warns when the same hash is on another account.
   kycDocHash String?
 
   /// Median first-reply time in minutes, recomputed from messages.
@@ -222,9 +236,13 @@ model User {
   invoices        Invoice[]
   uploads         Upload[]
   resellerPasses  ResellerPass[]
+  /// Their Escrow Agent chat, once they have written in it.
+  supportThread   SupportThread?     @relation("SupportThreadMember")
+  supportMessages SupportMessage[]   @relation("SupportMessageSender")
 
   @@index([slug])
   @@index([role])
+  @@index([kycDocHash])
 }
 
 /// A signed-in device. Better Auth writes these; nothing else should.
@@ -338,19 +356,43 @@ model StaffInvite {
   @@index([acceptedAt, revokedAt])
 }
 
+/// A member's ID check, for the Verified badge. One per member: sending
+/// again after a rejection overwrites it.
+///
+/// Every file here is a private `kyc/` upload, served only to the member who
+/// sent it and to MODERATOR and SUPERADMIN (`@/server/upload-access`). None
+/// of these URLs may go into a notification, an email, a chat event, an
+/// audit row or a log.
 model KycSubmission {
-  id          String    @id @default(cuid())
-  userId      String    @unique
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  status      KycStatus @default(PENDING)
-  documentUrl String
-  selfieUrl   String
-  fullName    String
-  country     String
-  reviewerId  String?
-  reviewNote  String?
-  submittedAt DateTime  @default(now())
-  reviewedAt  DateTime?
+  id              String       @id @default(cuid())
+  userId          String       @unique
+  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status          KycStatus    @default(PENDING)
+  documentType    KycDocument?
+  /// The front of the ID, or a passport's photo page.
+  documentUrl     String
+  /// The back, for an ID that has details on it. Optional.
+  documentBackUrl String?
+  /// SHA-256 of the front's bytes, from the upload. Copied to
+  /// User.kycDocHash on approval.
+  documentHash    String?
+  /// A short selfie video holding the same ID.
+  videoUrl        String?
+  /// Unused since the video replaced a still selfie.
+  selfieUrl       String?
+  fullName        String
+  country         String
+  /// Times sent, counting this one.
+  attempts        Int          @default(1)
+  reviewerId      String?
+  /// Shown to the member when it is not approved. A note from the manual
+  /// control on the account page stays in the audit trail instead.
+  reviewNote      String?
+  submittedAt     DateTime     @default(now())
+  reviewedAt      DateTime?
+
+  @@index([status, submittedAt])
+  @@index([documentHash])
 }
 
 model PayoutAddress {
@@ -952,6 +994,10 @@ model Upload {
   kind        String
   bytes       Int
   contentType String
+  /// SHA-256 of the bytes, worked out on the server as the file is stored.
+  /// An ID check reads its document hash from here rather than from the
+  /// browser.
+  sha256      String?
 
   /// Set once something points at this file. Null means it is an orphan and
   /// the sweep may collect it.
@@ -1095,4 +1141,60 @@ model ResellerPass {
   createdAt  DateTime    @default(now())
 
   @@index([userId, endsAt])
+}
+
+// ---------------------------------------------------------------- escrow agent
+
+/// A member's own chat with Channel Adda's live agents: the "Escrow Agent"
+/// pinned at the top of their Messages (the owner, 2026-10-26).
+///
+/// Not a Conversation. Those belong to a listing, a buyer and a seller, and
+/// every chat query reads them that way; this has none of the three. One per
+/// member, ever, made by their first message.
+model SupportThread {
+  id            String    @id @default(cuid())
+  memberId      String    @unique
+  member        User      @relation("SupportThreadMember", fields: [memberId], references: [id], onDelete: Cascade)
+  /// When the member started waiting for a reply. Set by their message when
+  /// it is empty and cleared by an agent's reply, so staff are told once per
+  /// wait rather than once per line, and the staff inbox sorts on it.
+  awaitingSince DateTime?
+  lastMessageAt DateTime  @default(now())
+  /// The member has read everything written up to here.
+  memberReadAt  DateTime?
+  createdAt     DateTime  @default(now())
+
+  messages SupportMessage[]
+
+  @@index([awaitingSince])
+  @@index([lastMessageAt])
+}
+
+/// One line in an Escrow Agent chat.
+model SupportMessage {
+  id        String        @id @default(cuid())
+  threadId  String
+  thread    SupportThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  /// Restrict, as on Message: an agent's reply must never turn into
+  /// something nobody wrote.
+  senderId  String
+  sender    User          @relation("SupportMessageSender", fields: [senderId], references: [id], onDelete: Restrict)
+  /// Written from the staff side. The member sees it as the Escrow Agent,
+  /// never by the agent's name.
+  fromAgent Boolean       @default(false)
+  body      String
+
+  /// A photo or clip, kept 48 hours as in every other chat
+  /// (`@/server/chat-retention`).
+  attachmentUrl       String?
+  attachmentKind      MediaKind?
+  attachmentBytes     Int?
+  attachmentExpiresAt DateTime?
+  attachmentRemovedAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([threadId, createdAt])
+  @@index([attachmentExpiresAt])
+  @@index([attachmentUrl])
 }

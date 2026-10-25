@@ -21,11 +21,20 @@ const POLL_MS = 5_000;
 export function LiveRefresh({
   conversationId,
   fingerprint,
+  url,
 }: {
   conversationId: string;
   /** What the server rendered this page from. */
   fingerprint: string;
+  /**
+   * Where to ask, for a chat that is not a deal conversation — the Escrow
+   * Agent. Left out, the conversation's own fingerprint route.
+   */
+  url?: string;
 }) {
+  const source =
+    url ??
+    `/api/conversations/${encodeURIComponent(conversationId)}/fingerprint`;
   const router = useRouter();
   // The latest one the page was drawn from. A ref, so a refresh that brings
   // a new value does not tear the timer down and start it again.
@@ -45,10 +54,7 @@ export function LiveRefresh({
       }
       inFlight = true;
       try {
-        const response = await fetch(
-          `/api/conversations/${encodeURIComponent(conversationId)}/fingerprint`,
-          { cache: "no-store" },
-        );
+        const response = await fetch(source, { cache: "no-store" });
         if (response.status === 404) {
           stopped = true;
           return;
@@ -85,7 +91,7 @@ export function LiveRefresh({
       if (timer) clearTimeout(timer);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [conversationId, router]);
+  }, [source, router]);
 
   return null;
 }

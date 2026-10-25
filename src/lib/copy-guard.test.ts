@@ -44,6 +44,14 @@ const BANNED: readonly RegExp[] = [
   /you confirm twice/i,
   /the channel is mine/i,
   /the way you agreed? in the (deal )?chat/i,
+  // An ID check is optional (the owner, 2026-10-26): it only earns the
+  // Verified badge. Nothing may say it is needed to list, sell or withdraw.
+  /(identity|id|kyc) (verification|checks?) (only )?(apply |applies |come in )?before a (seller.s )?first listing/i,
+  /(must|have to|need to) complete (identity|id|kyc)/i,
+  /kyc-verified sellers/i,
+  /id check before a seller can/i,
+  /we require kyc/i,
+  /liveness check/i,
 ];
 
 const ROOT = join(__dirname, "..");

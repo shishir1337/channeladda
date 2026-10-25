@@ -3,9 +3,10 @@ import type { PlatformId } from "@/data/platforms";
 import type { Seller } from "@/data/sellers";
 import { db } from "@/lib/db";
 import { ratingPoints } from "@/lib/reseller";
+import { rankSellers } from "@/lib/seller-rank";
 import { activeResellers } from "@/server/reseller-status";
 import { getSettings } from "@/server/settings";
-import { trackRecord } from "@/server/track-record";
+import { ratingPointsFor, trackRecord } from "@/server/track-record";
 
 const PLATFORM_TO_ID = {
   YOUTUBE: "youtube",
@@ -41,6 +42,8 @@ async function buildSeller(userId: string): Promise<Seller | null> {
         where: { status: "LIVE" },
         select: { platform: true },
         distinct: ["platform"],
+        // A fixed order, the same one /sellers lists them in.
+        orderBy: { platform: "asc" },
       },
     },
   });
@@ -74,6 +77,8 @@ async function buildSeller(userId: string): Promise<Seller | null> {
       multiplier: reseller ? settings.resellerPointsMultiplier : 1,
     }),
     reseller,
+    // The Verified badge: an approved ID check, and nothing else.
+    verified: user.kycStatus === "APPROVED",
     initials: initialsOf(user.name),
     image: user.image,
     country: user.country ?? "Global",
@@ -98,15 +103,110 @@ export async function getSeller(slug: string): Promise<Seller | null> {
   return user ? buildSeller(user.id) : null;
 }
 
-export async function getSellers(): Promise<Seller[]> {
+/** A seller in their place on /sellers, with what they have on sale now. */
+export type RankedSeller = Seller & {
+  /** 1 for the most rating points (`@/lib/seller-rank`). */
+  rank: number;
+  /** Live listings. */
+  live: number;
+  joinedAt: Date;
+};
+
+/**
+ * Every verified seller, ranked by rating points, the most first: all of
+ * /sellers, and the homepage's top four.
+ *
+ * The same figures `getSeller` builds for each seller's own page, read for
+ * everyone at once — a handful of queries however many sellers there are,
+ * where building them one by one took several queries per seller. A test
+ * holds the two to the same numbers. Their track record is left out: no
+ * list shows it.
+ */
+export async function getSellers(): Promise<RankedSeller[]> {
   const users = await db.user.findMany({
     where: { slug: { not: null }, kycStatus: "APPROVED" },
-    select: { id: true },
+    select: {
+      id: true,
+      slug: true,
+      name: true,
+      image: true,
+      country: true,
+      bio: true,
+      responseMins: true,
+      createdAt: true,
+      kycStatus: true,
+    },
   });
-  const built = await Promise.all(users.map((u) => buildSeller(u.id)));
-  return built
-    .filter((s): s is Seller => s !== null)
-    .sort((a, b) => b.volume - a.volume);
+  if (users.length === 0) return [];
+  const ids = users.map((u) => u.id);
+
+  const [sold, reviews, listings, points, holders] = await Promise.all([
+    db.order.groupBy({
+      by: ["sellerId"],
+      where: { status: "COMPLETED", sellerId: { in: ids } },
+      _count: { _all: true },
+      _sum: { priceUsd: true },
+    }),
+    db.review.groupBy({
+      by: ["subjectId"],
+      where: { subjectId: { in: ids } },
+      _count: { _all: true },
+      _sum: { rating: true },
+    }),
+    db.listing.groupBy({
+      by: ["sellerId", "platform"],
+      where: { status: "LIVE", sellerId: { in: ids } },
+      _count: { _all: true },
+      orderBy: { platform: "asc" },
+    }),
+    ratingPointsFor(ids),
+    activeResellers(ids),
+  ]);
+
+  const soldBy = new Map(sold.map((row) => [row.sellerId, row]));
+  const reviewsOf = new Map(reviews.map((row) => [row.subjectId, row]));
+  const liveOf = new Map<string, { live: number; platforms: PlatformId[] }>();
+  for (const row of listings) {
+    const entry = liveOf.get(row.sellerId) ?? { live: 0, platforms: [] };
+    entry.live += row._count._all;
+    entry.platforms.push(PLATFORM_TO_ID[row.platform]);
+    liveOf.set(row.sellerId, entry);
+  }
+
+  const sellers = users.flatMap((user) => {
+    if (!user.slug) return [];
+    const sales = soldBy.get(user.id);
+    const review = reviewsOf.get(user.id);
+    const reviewCount = review?._count._all ?? 0;
+    // As buildSeller: null until somebody has reviewed them, never five.
+    const rating =
+      reviewCount > 0 ? (review?._sum.rating ?? 0) / reviewCount : null;
+    const live = liveOf.get(user.id);
+    return [
+      {
+        slug: user.slug,
+        name: user.name,
+        points: points.get(user.id) ?? 0,
+        reseller: holders.has(user.id),
+        verified: user.kycStatus === "APPROVED",
+        initials: initialsOf(user.name),
+        image: user.image,
+        country: user.country ?? "Global",
+        bio: user.bio,
+        rating: rating === null ? null : Math.round(rating * 10) / 10,
+        reviews: reviewCount,
+        sales: sales?._count._all ?? 0,
+        responseMins: user.responseMins ?? 15,
+        memberSince: String(user.createdAt.getFullYear()),
+        volume: (sales?._sum.priceUsd ?? 0) / 100,
+        specialties: live?.platforms ?? [],
+        live: live?.live ?? 0,
+        joinedAt: user.createdAt,
+      },
+    ];
+  });
+
+  return rankSellers(sellers);
 }
 
 export async function getSellerSlugs(): Promise<string[]> {

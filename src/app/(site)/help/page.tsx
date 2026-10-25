@@ -75,7 +75,8 @@ export default function HelpPage() {
                   Cannot find it?
                 </h2>
                 <p className="mt-1 text-sm leading-relaxed text-muted">
-                  Write to us and a person on our support team replies.
+                  Signed in? Chat with an Escrow Agent from Messages. Or write
+                  to us and a person on our support team replies.
                 </p>
               </div>
             </div>

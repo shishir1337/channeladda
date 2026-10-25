@@ -108,7 +108,8 @@ export function SiteFooter() {
                 Support
               </h2>
               <p className="mt-1 text-sm text-muted">
-                Write to us from the support page and a person replies.
+                Chat with an Escrow Agent from Messages, or write to us from the
+                support page. A person replies.
               </p>
             </div>
           </Link>

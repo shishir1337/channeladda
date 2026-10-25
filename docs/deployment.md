@@ -161,11 +161,12 @@ server {
   listen 443 ssl http2;
   server_name channeladda.com;
 
-  # 30M, not 10M. Chat accepts 25MB clips (MAX_VIDEO_BYTES in
-  # src/server/storage.ts) and multipart framing adds to that. At 10M a
-  # seller's screen recording is rejected by nginx before the app ever sees
-  # it, with a 413 that explains nothing.
-  client_max_body_size 30M;
+  # 55M, not 10M. Chat accepts 25MB clips (MAX_VIDEO_BYTES in
+  # src/server/storage.ts), the ID check's selfie video up to 50MB
+  # (MAX_KYC_VIDEO_BYTES), and multipart framing adds to that. Below it, a
+  # phone video is rejected by nginx before the app ever sees it, with a 413
+  # that explains nothing.
+  client_max_body_size 55M;
 
   location / {
     proxy_pass http://127.0.0.1:3000;

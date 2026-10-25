@@ -50,10 +50,13 @@ export function TopSellers({ sellers }: { sellers: Seller[] }) {
                           className="absolute inset-0 rounded-card"
                         />
                       </Link>
-                      <BadgeCheckIcon
-                        aria-label="Verified seller"
-                        className="size-4 shrink-0 text-verified"
-                      />
+                      {seller.verified ? (
+                        <BadgeCheckIcon
+                          role="img"
+                          aria-label="Verified seller: ID checked by Channel Adda"
+                          className="size-4 shrink-0 text-verified"
+                        />
+                      ) : null}
                       {seller.reseller ? <ResellerBadge /> : null}
                     </h3>
                     <p className="truncate text-[0.8125rem] text-subtle">
