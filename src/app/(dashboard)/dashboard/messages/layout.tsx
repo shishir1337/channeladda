@@ -55,7 +55,11 @@ export default async function MessagesLayout({ children }: LayoutProps<"/">) {
           lastMessageAt: thread.lastMessageAt.toISOString(),
           preview: thread.preview,
           unread: thread.unread > 0,
-          flagged: thread.flagged,
+          // Moderation is the staff's business: a buyer whose link was taken
+          // out of a message saw their own chat marked "Flagged".
+          flagged:
+            thread.flagged &&
+            (thread.role === "agent" || thread.role === "staff"),
           closed: thread.closed,
           deals: thread.deals.map(({ reference, mode }) => ({
             reference,

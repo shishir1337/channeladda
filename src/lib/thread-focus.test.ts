@@ -35,6 +35,36 @@ test("otherwise the one listing where it is the reader's move", () => {
   ).toBe("b");
 });
 
+test("otherwise the one listing with a deal running", () => {
+  // The newest line is a question about c; the deal on a is still the chat.
+  const messages = [{ listingId: "a" }, { listingId: "c" }];
+  for (const state of [waiting, theirStep]) {
+    expect(
+      pickFocus({
+        about: undefined,
+        listings,
+        panels: [
+          { listingId: "a", state },
+          { listingId: "c", state: buy },
+        ],
+        messages,
+      }),
+    ).toBe("a");
+  }
+  // Two deals running is not "the one": the newest line decides.
+  expect(
+    pickFocus({
+      about: undefined,
+      listings,
+      panels: [
+        { listingId: "a", state: waiting },
+        { listingId: "b", state: theirStep },
+      ],
+      messages,
+    }),
+  ).toBe("c");
+});
+
 test("otherwise the listing of the newest line", () => {
   const messages = [
     { listingId: "a" },

@@ -34,6 +34,21 @@ export type Redaction = {
 
 const MARKER = "[contact details removed]";
 
+/**
+ * The one sentence a message carries when something was taken out of it,
+ * word for word the same under the message and in the note its sender gets:
+ * "We removed an email address and a phone number. Deals stay on Channel
+ * Adda so we can protect them." Two versions of it, one of them starting
+ * "an email address, a phone number removed", read as two different rules.
+ */
+export function removedNote(kinds: readonly string[]): string {
+  const named =
+    kinds.length > 1
+      ? `${kinds.slice(0, -1).join(", ")} and ${kinds[kinds.length - 1]}`
+      : (kinds[0] ?? "contact details");
+  return `We removed ${named}. Deals stay on Channel Adda so we can protect them.`;
+}
+
 /** Platforms people move a deal to. Also the hint that an @handle is a contact. */
 const OFF_PLATFORM =
   /\b(telegram|whats?app|signal|discord|skype|wechat|viber|insta\s?dm|dm\s+me|email\s+me|mail\s+me|call\s+me|text\s+me|phone\s+me|contact\s+me\s+(on|at)|reach\s+me\s+(on|at))\b/i;

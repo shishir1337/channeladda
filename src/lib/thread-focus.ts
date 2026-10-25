@@ -44,11 +44,23 @@ export function isUnderWay(state: PanelState): boolean {
   }
 }
 
+/** Whether a deal is running on a listing: waiting to be paid, or under way. */
+function isDealRunning(state: PanelState): boolean {
+  return (
+    state.kind === "pay" ||
+    state.kind === "waiting-for-payment" ||
+    state.kind === "step"
+  );
+}
+
 /**
  * The first that applies: the listing asked for in the address (`?about=`),
  * if it is one of this conversation's; the one listing where it is the
- * reader's move; the listing of the newest line; the first listing. Null
- * for a conversation about nothing yet.
+ * reader's move; the one listing with a deal running; the listing of the
+ * newest line; the first listing. Null for a conversation about nothing yet.
+ *
+ * The running deal comes before the newest line: a question about another
+ * listing was turning a deal's chat, and the line typed in it, to that one.
  */
 export function pickFocus(input: {
   about: string | string[] | undefined;
@@ -65,6 +77,11 @@ export function pickFocus(input: {
     (panel) => ids.has(panel.listingId) && isYourMove(panel.state),
   );
   if (moves.length === 1) return moves[0].listingId;
+
+  const running = input.panels.filter(
+    (panel) => ids.has(panel.listingId) && isDealRunning(panel.state),
+  );
+  if (running.length === 1) return running[0].listingId;
 
   for (let i = input.messages.length - 1; i >= 0; i--) {
     const listingId = input.messages[i].listingId;

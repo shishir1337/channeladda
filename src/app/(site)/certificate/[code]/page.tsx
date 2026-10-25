@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
 import { Container, Section } from "@/components/ui/section";
 import type { Platform } from "@/generated/prisma/enums";
+import { SITE_TIME_LABEL, siteDate } from "@/lib/site-time";
 import { verifyCertificate } from "@/server/certificate";
 
 export const metadata: Metadata = {
@@ -20,13 +21,8 @@ const PLATFORM_NAME: Record<Platform, string> = {
   WEBSITE: "Website",
 };
 
-const day = (date: Date) =>
-  date.toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-    timeZone: "UTC",
-  });
+/** India time, as the certificate itself says: a UTC day was a day early. */
+const day = (date: Date) => `${siteDate(date)} (${SITE_TIME_LABEL})`;
 
 /**
  * Whether a certificate is genuine, for whoever was shown it: a platform's

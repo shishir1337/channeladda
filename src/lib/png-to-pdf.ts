@@ -14,6 +14,12 @@ export function pngToPdf(
   png: Uint8Array,
   page: { widthPt: number; heightPt: number },
   title?: string,
+  /**
+   * What the picture says, laid over it as invisible text in a standard
+   * font (nothing embedded), so the PDF can be searched and copied from.
+   * An image-only certificate could not be: QA, 2026-10-26.
+   */
+  text: readonly string[] = [],
 ): Uint8Array<ArrayBuffer> {
   const image = decodePng(png);
   const pixels = deflateSync(image.rgb);
@@ -25,11 +31,20 @@ export function pngToPdf(
   };
 
   const { widthPt: w, heightPt: h } = page;
-  const draw = `q ${w} 0 0 ${h} 0 0 cm /Im0 Do Q`;
+  // Render mode 3 draws nothing: the text is there to select and search,
+  // and the picture is what shows.
+  const words =
+    text.length > 0
+      ? `\nBT /F1 9 Tf 3 Tr 11 TL 36 ${h - 36} Td ${text
+          .map((line) => `(${escapePdfText(line)}) Tj T*`)
+          .join(" ")} ET`
+      : "";
+  const draw = `q ${w} 0 0 ${h} 0 0 cm /Im0 Do Q${words}`;
+  const font = text.length > 0 ? " /Font << /F1 6 0 R >>" : "";
   add("<< /Type /Catalog /Pages 2 0 R >>");
   add("<< /Type /Pages /Kids [3 0 R] /Count 1 >>");
   add(
-    `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${w} ${h}] /Resources << /XObject << /Im0 5 0 R >> >> /Contents 4 0 R >>`,
+    `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${w} ${h}] /Resources << /XObject << /Im0 5 0 R >>${font} >> /Contents 4 0 R >>`,
   );
   add(`<< /Length ${draw.length} >>\nstream\n${draw}\nendstream`);
   add(
@@ -37,6 +52,11 @@ export function pngToPdf(
     pixels,
     "\nendstream",
   );
+  if (text.length > 0) {
+    add(
+      "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>",
+    );
+  }
   add(`<< /Title (${escapePdfText(title ?? "")}) /Producer (Channel Adda) >>`);
 
   const chunks: Uint8Array[] = [];

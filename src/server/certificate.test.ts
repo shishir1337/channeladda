@@ -136,3 +136,35 @@ test(
     );
   }),
 );
+
+test(
+  "the certificate dates a deal by India time, not the server's UTC day",
+  withCleanDb(async () => {
+    // QA, 2026-10-26: CA-30107 finished on 26 October in Kolkata, and the
+    // certificate and its public check, rendered on a UTC server, said 25.
+    const { order } = await seedDeal();
+    await db.order.update({
+      where: { id: order.id },
+      data: { completedAt: new Date("2026-10-25T20:15:00Z") },
+    });
+    const certificate = await certificateFor(order.id);
+    if (!certificate) throw new Error("no certificate");
+    const { certificateText } = await import(
+      "@/components/deals/certificate-art"
+    );
+    const text = certificateText(certificate, "channeladda.com/certificate/x");
+    expect(text).toContain("Completed on 26 October 2026 (India time)");
+  }),
+);
+
+test("one-line certificate text keeps its spaces from being stretched", async () => {
+  // The renderer widened the space after "Certificate" and "certifies":
+  // no-break spaces are measured right, and the paragraph still wraps.
+  const { tight, ligatureSafe } = await import(
+    "@/components/deals/certificate-art"
+  );
+  expect(tight("Certificate of Transfer")).toBe("Certificate of Transfer");
+  expect(ligatureSafe("This certifies that the account")).toBe(
+    "This certifies that the account",
+  );
+});

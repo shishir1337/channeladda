@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { removedNote } from "@/lib/redact";
 import { recordAudit } from "@/server/audit";
 import * as repo from "@/server/messages";
 import { requireStaff, requireUser } from "@/server/session";
@@ -111,7 +112,7 @@ export async function postMessage(
   return {
     ok: true,
     note: result.redactedKinds.length
-      ? `Sent, with ${result.redactedKinds.join(" and ")} removed. Deals stay on Channel Adda so we can protect them.`
+      ? removedNote(result.redactedKinds)
       : null,
   };
 }

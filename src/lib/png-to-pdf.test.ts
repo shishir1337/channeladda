@@ -125,3 +125,29 @@ describe("pngToPdf", () => {
     ).toThrow(/PNG/);
   });
 });
+
+describe("the text a certificate carries", () => {
+  it("lays it over the picture as selectable text in a standard font", () => {
+    // An image-only certificate could not be searched or copied from.
+    const pdf = Buffer.from(
+      pngToPdf(
+        png(1, 1, 2, [[0, 255, 255, 255]]),
+        { widthPt: 842, heightPt: 595 },
+        "t",
+        ["Certificate no. CA-12345-ABCDEFGH", "Price: $1,150.00"],
+      ),
+    ).toString("latin1");
+    expect(pdf).toContain("/BaseFont /Helvetica");
+    expect(pdf).toContain("(Certificate no. CA-12345-ABCDEFGH) Tj");
+    // Drawn invisibly: the picture is what shows.
+    expect(pdf).toContain("3 Tr");
+    // Every object is where the cross-reference table says it is.
+    const xref = pdf.slice(pdf.lastIndexOf("xref"));
+    const offsets = [...xref.matchAll(/^(\d{10}) 00000 n $/gm)].map((m) =>
+      Number(m[1]),
+    );
+    offsets.forEach((offset, index) => {
+      expect(pdf.slice(offset).startsWith(`${index + 1} 0 obj`)).toBe(true);
+    });
+  });
+});

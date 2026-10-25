@@ -43,6 +43,7 @@ import { money } from "@/lib/chat-events";
 import { chatTime } from "@/lib/chat-time";
 import { fileSize } from "@/lib/file-size";
 import { MAX_MESSAGE } from "@/lib/messages";
+import { removedNote } from "@/lib/redact";
 import { cn } from "@/lib/utils";
 import {
   type MessageActionResult,
@@ -583,10 +584,7 @@ function Bubble({
                     aria-hidden="true"
                     className="mt-0.5 size-3.5 shrink-0"
                   />
-                  <span>
-                    {message.redactedKinds} removed. Deals stay on Channel Adda
-                    so we can stand behind them.
-                  </span>
+                  <span>{removedNote(message.redactedKinds.split(", "))}</span>
                 </p>
               ) : null}
             </div>
@@ -673,6 +671,26 @@ export function ThreadView({
     setAboutFrom(focusListingId);
     setAbout(focusListingId);
   }
+
+  // The listing the page opened on goes into the address, without a trip
+  // to the server. Left out, each refresh — the reader's own line landing,
+  // or the other side's arriving with the live refresh — chose the focus
+  // again, and could turn the page, and the line being typed, to another
+  // listing.
+  const ownSend = sendWith !== null;
+  useEffect(() => {
+    if (!focusListingId || ownSend) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("about") === focusListingId) return;
+    params.set("about", focusListingId);
+    // A tick later: on a fresh load this effect runs before the router's
+    // own, which is what teaches it about replaceState — and a message sent
+    // then went to the address without the listing in it.
+    const timer = window.setTimeout(() => {
+      window.history.replaceState(null, "", `${pathname}?${params}`);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [focusListingId, ownSend, pathname]);
   const [offering, setOffering] = useState(false);
   const [draft, setDraft] = useState("");
   const [note, setNote] = useState<string | null>(null);
@@ -1002,10 +1020,21 @@ export function ThreadView({
                 fitToText(event.currentTarget);
               }}
               onKeyDown={(event) => {
-                if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
-                  event.preventDefault();
-                  send();
+                // On a computer Enter sends and Shift+Enter starts a new
+                // line, as in every chat; on a phone Enter is the new line
+                // and Send is the button. Not mid-word in an input method,
+                // where Enter picks the word.
+                if (event.key !== "Enter" || event.nativeEvent.isComposing) {
+                  return;
                 }
+                const sends =
+                  event.metaKey ||
+                  event.ctrlKey ||
+                  (!event.shiftKey &&
+                    window.matchMedia("(pointer: fine)").matches);
+                if (!sends) return;
+                event.preventDefault();
+                if (!pending && !uploading) send();
               }}
               placeholder="Write a message…"
               aria-invalid={over}
@@ -1126,7 +1155,7 @@ export function ThreadView({
               <Button
                 type="button"
                 variant={hasSomething || pending ? "primary" : "secondary"}
-                title="Send (Ctrl+Enter)"
+                title="Send (Enter)"
                 className="order-3 max-lg:size-11 max-lg:rounded-full! max-lg:px-0"
                 disabled={
                   pending ||
@@ -1173,6 +1202,14 @@ export function ThreadView({
               />
               <span>{note}</span>
             </output>
+          ) : null}
+          {/* What Enter does, with a mouse and keyboard only: on a phone
+              Enter is a new line, and the hint would be wrong. Out of the
+              way while a note or an error says something more useful. */}
+          {!error && !note ? (
+            <p className="mt-1.5 hidden px-1 text-xs text-subtle pointer-fine:block">
+              Enter to send, Shift+Enter for a new line
+            </p>
           ) : null}
           {footnote ? (
             <p className="mt-2 px-1 text-xs leading-relaxed text-subtle">

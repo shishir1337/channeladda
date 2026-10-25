@@ -2,6 +2,7 @@ import { ImageResponse } from "next/og";
 import {
   CERTIFICATE_SIZE,
   CertificateArt,
+  certificateText,
 } from "@/components/deals/certificate-art";
 import { pngToPdf } from "@/lib/png-to-pdf";
 import { siteUrl } from "@/lib/site-url";
@@ -53,6 +54,7 @@ export async function GET(
     new Uint8Array(await image.arrayBuffer()),
     A4,
     `Channel Adda certificate ${certificate.reference}`,
+    certificateText(certificate, checkAt),
   );
   return new Response(pdf, {
     headers: {

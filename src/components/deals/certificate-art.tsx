@@ -1,4 +1,5 @@
 import type { Platform } from "@/generated/prisma/enums";
+import { SITE_TIME_LABEL, siteDate } from "@/lib/site-time";
 import type { Certificate } from "@/server/certificate";
 
 /**
@@ -28,13 +29,21 @@ const PLATFORM_NAME: Record<Platform, string> = {
   WEBSITE: "Website",
 };
 
-const day = (date: Date) =>
-  date.toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-    timeZone: "UTC",
-  });
+/**
+ * In the site's time zone, not the server's: rendered on a UTC server, a
+ * deal finished on the evening of 26 October in Kolkata said 25 October.
+ */
+const day = (date: Date) => siteDate(date);
+
+/**
+ * The renderer widens the space after a word with an "fi" in it, and after
+ * letter-spaced capitals — "Certificate  of", "INSTAGRAM  ACCOUNT". A
+ * no-break space is measured correctly, so one-line text uses those, and
+ * the paragraph uses one only after an "fi" or "fl" word, so it still wraps.
+ */
+export const tight = (text: string) => text.replace(/ /g, "\u00a0");
+export const ligatureSafe = (text: string) =>
+  text.replace(/(\S*f[il]\S*) /gi, "$1\u00a0");
 
 const usd = (cents: number) =>
   (cents / 100).toLocaleString("en-US", {
@@ -125,7 +134,7 @@ export function CertificateArt({
             }}
           >
             <span style={{ fontSize: 18, color: SUBTLE, letterSpacing: 2 }}>
-              CERTIFICATE NO.
+              {tight("CERTIFICATE NO.")}
             </span>
             <span style={{ fontSize: 26, marginTop: 4, letterSpacing: 1 }}>
               {c.code}
@@ -143,10 +152,10 @@ export function CertificateArt({
           }}
         >
           <span style={{ fontSize: 20, color: GREEN, letterSpacing: 6 }}>
-            VERIFIED TRANSFER
+            {tight("VERIFIED TRANSFER")}
           </span>
           <span style={{ fontSize: 68, marginTop: 14, letterSpacing: -1.5 }}>
-            Certificate of Transfer
+            {tight("Certificate of Transfer")}
           </span>
           <span
             style={{
@@ -157,8 +166,9 @@ export function CertificateArt({
               maxWidth: 1080,
             }}
           >
-            This certifies that the account below changed hands through Channel
-            Adda, with a Channel Adda agent supervising the handover.
+            {ligatureSafe(
+              "This certifies that the account below changed hands through Channel Adda, with a Channel Adda agent supervising the handover.",
+            )}
           </span>
         </div>
 
@@ -176,13 +186,13 @@ export function CertificateArt({
           }}
         >
           <span style={{ fontSize: 20, color: SUBTLE, letterSpacing: 2 }}>
-            {PLATFORM_NAME[c.platform].toUpperCase()} ACCOUNT
+            {tight(`${PLATFORM_NAME[c.platform].toUpperCase()} ACCOUNT`)}
           </span>
           <span style={{ fontSize: 50, marginTop: 8, letterSpacing: -1 }}>
             {clip(c.handle, 40)}
           </span>
           <span style={{ fontSize: 22, color: MUTED, marginTop: 6 }}>
-            {clip(c.title, 80)}
+            {tight(clip(c.title, 80))}
           </span>
         </div>
 
@@ -239,12 +249,13 @@ export function CertificateArt({
         >
           <div style={{ display: "flex", flexDirection: "column" }}>
             <span style={{ fontSize: 20, color: SUBTLE }}>
-              Check this certificate at
+              {tight("Check this certificate at")}
             </span>
             <span style={{ fontSize: 24, marginTop: 6 }}>{checkAt}</span>
             <span style={{ fontSize: 18, color: SUBTLE, marginTop: 10 }}>
-              Deal opened {day(c.openedAt)}
-              {c.paidAt ? ` · Payment received ${day(c.paidAt)}` : ""}
+              {tight(
+                `Deal opened ${day(c.openedAt)}${c.paidAt ? ` · Payment received ${day(c.paidAt)}` : ""} · Dates in ${SITE_TIME_LABEL}`,
+              )}
             </span>
           </div>
           {/* The seal. */}
@@ -310,9 +321,11 @@ function Party({ label, name }: { label: string; name: string }) {
       }}
     >
       <span style={{ fontSize: 18, color: SUBTLE, letterSpacing: 2 }}>
-        {label}
+        {tight(label)}
       </span>
-      <span style={{ fontSize: 36, marginTop: 6 }}>{clip(name, 28)}</span>
+      <span style={{ fontSize: 36, marginTop: 6 }}>
+        {tight(clip(name, 28))}
+      </span>
     </div>
   );
 }
@@ -321,9 +334,27 @@ function Fact({ label, value }: { label: string; value: string }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
       <span style={{ fontSize: 18, color: SUBTLE, letterSpacing: 1 }}>
-        {label.toUpperCase()}
+        {tight(label.toUpperCase())}
       </span>
-      <span style={{ fontSize: 28, marginTop: 6 }}>{value}</span>
+      <span style={{ fontSize: 28, marginTop: 6 }}>{tight(value)}</span>
     </div>
   );
+}
+
+/** What the certificate says, line by line, for the PDF's text layer. */
+export function certificateText(c: Certificate, checkAt: string): string[] {
+  return [
+    "Channel Adda - Certificate of Transfer",
+    `Certificate no. ${c.code}`,
+    "This certifies that the account below changed hands through Channel Adda, with a Channel Adda agent supervising the handover.",
+    `${PLATFORM_NAME[c.platform]} account: ${c.handle}`,
+    c.title,
+    `From the seller: ${c.sellerName}`,
+    `To the buyer: ${c.buyerName}`,
+    `Completed on ${day(c.completedAt)} (${SITE_TIME_LABEL})`,
+    `Price: ${usd(c.priceUsd)}`,
+    `Deal type: ${c.mode === "SAFEST" ? "Safest" : "Fastest"}`,
+    `Deal reference: ${c.reference}`,
+    `Check this certificate at ${checkAt}`,
+  ];
 }

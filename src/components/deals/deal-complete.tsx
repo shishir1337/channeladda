@@ -3,14 +3,11 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import type { DealMode } from "@/generated/prisma/enums";
 import type { DealActor } from "@/lib/deal-machine";
+import { siteDate } from "@/lib/site-time";
 import { cn } from "@/lib/utils";
 
-const day = (date: Date) =>
-  date.toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
+/** The same day the certificate gives: India time, not the server's. */
+const day = (date: Date) => siteDate(date);
 
 /**
  * The end of a deal that went through: congratulations, in green, and the
