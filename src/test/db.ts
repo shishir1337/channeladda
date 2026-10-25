@@ -34,6 +34,7 @@ const TABLES = [
   "LedgerEntry",
   "ConversationRead",
   "Message",
+  "ConversationAlias",
   "Conversation",
   "TransferStep",
   "Order",

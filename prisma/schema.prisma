@@ -479,7 +479,10 @@ model Listing {
   updatedAt DateTime @updatedAt
 
   proofs        ListingProof[]
+  /// Legacy: the threads first opened about this listing. Not read.
   conversations Conversation[]
+  /// Every line written about it, in whichever conversation.
+  messages      Message[]
   offers        Offer[]
   orders        Order[]
   favourites    Favourite[]
@@ -664,21 +667,31 @@ model TransferStep {
   @@unique([orderId, position])
 }
 
-/// One negotiation, between one buyer and one seller, about one listing.
+/// One buyer and one seller, about everything they have discussed.
+///
+/// A buyer who comes back to the same seller finds the same conversation —
+/// "we dealt before, and this is new" (the owner, 2026-10-26) — with each
+/// listing and each deal shown inside it. Every message says which listing
+/// it is about (`Message.listingId`). The direction counts: when the seller
+/// later buys from the buyer, that is a second conversation, so whose turn
+/// it is and who pays are read from `buyerId` and `sellerId` here.
 ///
 /// There is no direct buyer-to-seller channel anywhere in this product. Every
-/// message belongs to a conversation, every conversation is tied to a listing,
+/// message belongs to a conversation, every message is tied to a listing,
 /// and staff can read and join any of them. That is deliberate: a private
 /// channel is where a deal walks off the platform and the protection walks
 /// with it.
 model Conversation {
-  id        String  @id @default(cuid())
-  listingId String
-  listing   Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  id        String   @id @default(cuid())
+  /// Legacy: not read. The listing a thread was about when there was one
+  /// thread per listing; dropped in a later release. SetNull, not Cascade:
+  /// deleting one listing must not delete a whole conversation.
+  listingId String?
+  listing   Listing? @relation(fields: [listingId], references: [id], onDelete: SetNull)
   buyerId   String
-  buyer     User    @relation("ConversationBuyer", fields: [buyerId], references: [id], onDelete: Cascade)
+  buyer     User     @relation("ConversationBuyer", fields: [buyerId], references: [id], onDelete: Cascade)
   sellerId  String
-  seller    User    @relation("ConversationSeller", fields: [sellerId], references: [id], onDelete: Cascade)
+  seller    User     @relation("ConversationSeller", fields: [sellerId], references: [id], onDelete: Cascade)
 
   /// Every deal opened in this conversation, oldest first by createdAt. A
   /// deal that lapses leaves the buyer free to open another here, so this is
@@ -700,12 +713,31 @@ model Conversation {
   messages Message[]
   /// Where each reader has read up to.
   reads    ConversationRead[]
+  /// The ids of the threads merged into this one, so old links still open.
+  aliases  ConversationAlias[]
 
-  /// One thread per buyer per listing — not one per question.
-  @@unique([listingId, buyerId])
+  /// One thread per buyer and seller — not one per listing, nor per question.
+  @@unique([buyerId, sellerId])
   @@index([sellerId, lastMessageAt])
   @@index([buyerId, lastMessageAt])
   @@index([flaggedAt])
+}
+
+/// A thread from before one conversation per buyer and seller.
+///
+/// Its own id is kept, so a link to it — in a notification, an email, a
+/// bookmark — opens the conversation it was merged into, on the listing it
+/// was about. Only for someone who may read that conversation.
+model ConversationAlias {
+  /// The old conversation's id.
+  id             String       @id
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  /// What the old thread was about, so the link lands on it.
+  listingId      String
+  createdAt      DateTime     @default(now())
+
+  @@index([conversationId])
 }
 
 /// What an entry in a conversation is.
@@ -730,6 +762,13 @@ model Message {
   /// read as Channel Adda's own.
   senderId       String?
   sender         User?        @relation(fields: [senderId], references: [id], onDelete: Restrict)
+
+  /// The listing this line is about. A conversation is two people and may
+  /// cover several listings; each line is about exactly one, which is what
+  /// the 10-day clear-out, an agent's view of the thread and the contact
+  /// filter go by. Restrict: a listing with lines about it is history.
+  listingId String
+  listing   Listing @relation(fields: [listingId], references: [id], onDelete: Restrict)
 
   kind    MessageKind @default(TEXT)
   /// The offer an OFFER card shows, or an EVENT is about.
@@ -766,6 +805,7 @@ model Message {
   createdAt DateTime @default(now())
 
   @@index([conversationId, createdAt])
+  @@index([conversationId, listingId, createdAt])
   @@index([attachmentExpiresAt])
   @@index([createdAt])
   @@index([offerId])
