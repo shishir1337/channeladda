@@ -20,20 +20,13 @@ import { VerificationForm } from "@/components/dashboard/verification-form";
 import { Button } from "@/components/ui/button";
 import { db } from "@/lib/db";
 import { documentLabel, KYC_REVIEW_HOURS } from "@/lib/kyc";
+import { dayAndTime } from "@/lib/when";
 import { getMyVerification } from "@/server/kyc";
 import { requireUser } from "@/server/session";
 
 export const metadata: Metadata = {
   title: "Verification",
   robots: { index: false, follow: false },
-};
-
-const DATE: Intl.DateTimeFormatOptions = {
-  day: "numeric",
-  month: "short",
-  year: "numeric",
-  hour: "numeric",
-  minute: "2-digit",
 };
 
 /**
@@ -108,9 +101,7 @@ export default async function VerificationPage() {
               <Facts>
                 <Fact label="ID sent">{documentLabel(mine.documentType)}</Fact>
                 {mine.submittedAt ? (
-                  <Fact label="Sent">
-                    {mine.submittedAt.toLocaleString("en-GB", DATE)}
-                  </Fact>
+                  <Fact label="Sent">{dayAndTime(mine.submittedAt)}</Fact>
                 ) : null}
               </Facts>
             </CardBody>

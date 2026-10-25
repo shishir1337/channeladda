@@ -154,7 +154,8 @@ export function ProfileForm({
               errors.image ? "text-danger" : "text-subtle",
             )}
           >
-            {errors.image ?? "A clear photo of you. PNG or JPEG, up to 8MB."}
+            {errors.image ??
+              "A clear photo of you. PNG, JPEG, WebP or GIF, up to 8MB."}
           </p>
         </div>
         <input

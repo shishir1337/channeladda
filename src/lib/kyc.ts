@@ -96,8 +96,37 @@ export const KYC_REVIEW_HOURS = 24;
 export const KYC_IMAGE_MAX_MB = 8;
 /** The selfie video, in MB (`MAX_KYC_VIDEO_BYTES` in `@/server/storage`). */
 export const KYC_VIDEO_MAX_MB = 50;
-/** The video is asked for at 10 to 30 seconds; the form refuses past this. */
+/**
+ * How long the selfie video may be. One rule, said the same way everywhere:
+ * recorded on the page, 5 to 30 seconds (the camera stops itself at 30);
+ * uploaded, 5 to 60 seconds, since a phone's own camera is harder to stop
+ * on the dot. The form used to refuse a 70-second upload with "Keep it to
+ * 10 to 30 seconds" while taking 8 seconds, recording 6, and saying "Up to
+ * 30 seconds" beside it.
+ */
+export const KYC_VIDEO_MIN_SECONDS = 5;
+export const KYC_RECORD_MAX_SECONDS = 30;
 export const KYC_VIDEO_MAX_SECONDS = 60;
+
+/** The rule in one line, for beside the video field. */
+export const KYC_VIDEO_RULE = `Record ${KYC_VIDEO_MIN_SECONDS} to ${KYC_RECORD_MAX_SECONDS} seconds here, or upload a video of ${KYC_VIDEO_MIN_SECONDS} to ${KYC_VIDEO_MAX_SECONDS} seconds.`;
+
+/**
+ * Why a video of this length is refused, or null. `seconds` is null when the
+ * browser cannot tell, and such a video is taken: the moderator watches it.
+ */
+export function videoLengthProblem(seconds: number | null): string | null {
+  if (seconds === null || !Number.isFinite(seconds)) return null;
+  // A clip read as 4.6 seconds was stopped at 5 by anybody's watch.
+  const whole = Math.round(seconds);
+  if (whole < KYC_VIDEO_MIN_SECONDS) {
+    return `That video is ${whole === 1 ? "1 second" : `${whole} seconds`} long. It needs at least ${KYC_VIDEO_MIN_SECONDS} seconds.`;
+  }
+  if (whole > KYC_VIDEO_MAX_SECONDS) {
+    return `That video is ${whole} seconds long. Upload one of ${KYC_VIDEO_MIN_SECONDS} to ${KYC_VIDEO_MAX_SECONDS} seconds, or record one here.`;
+  }
+  return null;
+}
 
 /** A reason for not approving is read by the member, so it says something. */
 export const KYC_REASON_MIN = 10;

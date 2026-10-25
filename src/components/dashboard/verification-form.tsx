@@ -34,10 +34,14 @@ import {
   documentOption,
   KYC_DOCUMENTS,
   KYC_IMAGE_MAX_MB,
+  KYC_RECORD_MAX_SECONDS,
   KYC_VIDEO_MAX_MB,
   KYC_VIDEO_MAX_SECONDS,
+  KYC_VIDEO_MIN_SECONDS,
+  KYC_VIDEO_RULE,
   type KycDocumentId,
   type KycErrors,
+  videoLengthProblem,
 } from "@/lib/kyc";
 import { cn } from "@/lib/utils";
 import { submitVerification } from "@/server/actions/kyc";
@@ -67,10 +71,6 @@ const IMAGE_ACCEPT = IMAGE_TYPES.join(",");
 // checks the bytes either way (MP4, MOV or WebM).
 const VIDEO_ACCEPT = "video/*";
 
-/** What the on-page camera records: the 10 to 30 seconds the steps ask for. */
-const RECORD_MIN_SECONDS = 5;
-const RECORD_MAX_SECONDS = 30;
-
 /** How long a clip is, or null when the browser cannot tell. Never throws. */
 function readDuration(file: File): Promise<number | null> {
   return new Promise((resolve) => {
@@ -80,6 +80,12 @@ function readDuration(file: File): Promise<number | null> {
     const done = (seconds: number | null) => {
       if (settled) return;
       settled = true;
+      // Let go of the file before the address is revoked. A recorded clip
+      // has no length in its header, so the browser goes on reading it to
+      // find one, and a read of a revoked address is the console's
+      // "blob: ERR_FILE_NOT_FOUND" after sending.
+      video.removeAttribute("src");
+      video.load();
       URL.revokeObjectURL(url);
       resolve(seconds);
     };
@@ -110,16 +116,9 @@ async function refusal(file: File, media: Media): Promise<string | null> {
     return "That is not a video. Record one with your camera.";
   }
   if (file.size > KYC_VIDEO_MAX_MB * 1024 * 1024) {
-    return `That video is ${(file.size / 1024 / 1024).toFixed(0)}MB. The limit is ${KYC_VIDEO_MAX_MB}MB. Record a shorter one, 10 to 30 seconds.`;
+    return `That video is ${(file.size / 1024 / 1024).toFixed(0)}MB. The limit is ${KYC_VIDEO_MAX_MB}MB. Use a shorter one, up to ${KYC_VIDEO_MAX_SECONDS} seconds.`;
   }
-  const seconds = await readDuration(file);
-  if (seconds !== null && seconds > KYC_VIDEO_MAX_SECONDS) {
-    return `That video is ${Math.round(seconds)} seconds long. Keep it to 10 to 30 seconds.`;
-  }
-  if (seconds !== null && seconds < 3) {
-    return "That video is too short. Record 10 to 30 seconds.";
-  }
-  return null;
+  return videoLengthProblem(await readDuration(file));
 }
 
 /** Sends one file under `kyc`; never throws. */
@@ -167,7 +166,6 @@ function FileField({
   const hintId = useId();
   const errorId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
-  const previewRef = useRef<string | null>(null);
   const [sending, setSending] = useState(false);
   const [progress, setProgress] = useState(0);
   const [problem, setProblem] = useState<string | null>(null);
@@ -177,13 +175,15 @@ function FileField({
   const [camera, setCamera] = useState(false);
   useEffect(() => setCamera(media === "video" && canRecord()), [media]);
 
-  // The object URL lives as long as the field does.
-  useEffect(
-    () => () => {
-      if (previewRef.current) URL.revokeObjectURL(previewRef.current);
-    },
-    [],
-  );
+  // Each preview's address is let go once nothing draws it: after the next
+  // one is on the page, or the field has gone. Revoked any earlier — as the
+  // old one was, the moment a new file was chosen — and the <video> still
+  // showing it reads a dead address.
+  const preview = value?.preview;
+  useEffect(() => {
+    if (!preview) return;
+    return () => URL.revokeObjectURL(preview);
+  }, [preview]);
 
   async function choose(file: File) {
     setProblem(null);
@@ -204,15 +204,14 @@ function FileField({
       return;
     }
 
-    if (previewRef.current) URL.revokeObjectURL(previewRef.current);
-    const preview = URL.createObjectURL(file);
-    previewRef.current = preview;
-    onChange({ url: sent.url, preview, name: file.name });
+    onChange({
+      url: sent.url,
+      preview: URL.createObjectURL(file),
+      name: file.name,
+    });
   }
 
   function clear() {
-    if (previewRef.current) URL.revokeObjectURL(previewRef.current);
-    previewRef.current = null;
     setProblem(null);
     onChange(null);
   }
@@ -228,8 +227,8 @@ function FileField({
           <span className="ml-0.5 text-danger">*</span>
         </p>
         <CameraRecorder
-          minSeconds={RECORD_MIN_SECONDS}
-          maxSeconds={RECORD_MAX_SECONDS}
+          minSeconds={KYC_VIDEO_MIN_SECONDS}
+          maxSeconds={KYC_RECORD_MAX_SECONDS}
           onRecorded={(file) => {
             setRecording(false);
             void choose(file);
@@ -347,9 +346,6 @@ function FileField({
               Upload a video
             </Button>
           </div>
-          <span className="text-xs text-subtle">
-            Up to {RECORD_MAX_SECONDS} seconds
-          </span>
         </div>
       ) : (
         <label
@@ -631,6 +627,7 @@ export function VerificationForm({
         </p>
         <FileField
           label="Your video"
+          hint={KYC_VIDEO_RULE}
           media="video"
           value={video}
           onChange={(value) => {
