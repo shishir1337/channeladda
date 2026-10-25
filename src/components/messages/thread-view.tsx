@@ -51,7 +51,6 @@ import {
 } from "@/server/actions/messages";
 
 /**
-/**
  * The offer form opens only when somebody presses Offer, so its code is not
  * part of the chat's first load — the slowest page on a phone — and is
  * fetched on hover or focus of the button, before the press.
@@ -62,6 +61,7 @@ const loadOfferComposer = () =>
   );
 const OfferComposerForm = dynamic(loadOfferComposer, { ssr: false });
 
+/**
  * One conversation, read by whoever is in it.
  *
  * The rule this interface exists to carry is that buyers and sellers never get
@@ -1069,8 +1069,7 @@ export function ThreadView({
                     {attachment.name}
                   </span>
                   <span className="block text-xs text-subtle tabular-nums">
-                    {fileSize(attachment.bytes)} · deleted
-                    after 48 hours
+                    {fileSize(attachment.bytes)} · deleted after 48 hours
                   </span>
                 </span>
                 <button
@@ -1129,6 +1128,8 @@ export function ThreadView({
                   type="button"
                   variant="ghost"
                   aria-expanded={offering}
+                  onPointerEnter={() => void loadOfferComposer()}
+                  onFocus={() => void loadOfferComposer()}
                   onClick={() => setOffering((was) => !was)}
                   title={
                     offerComposer.mode === "price"
@@ -1170,8 +1171,6 @@ export function ThreadView({
                   pending ||
                   uploading ||
                   over ||
-                  onPointerEnter={() => void loadOfferComposer()}
-                  onFocus={() => void loadOfferComposer()}
                   (draft.trim().length === 0 && attachment === null)
                 }
                 // Keeps the cursor in the box. Tapping Send moved focus off
