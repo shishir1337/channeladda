@@ -14,6 +14,7 @@ import {
   TagIcon,
   XIcon,
 } from "lucide-react";
+import Link from "next/link";
 import {
   type ReactNode,
   useEffect,
@@ -62,6 +63,8 @@ export type ThreadMessageView = {
   fromStaff: boolean;
   senderName: string;
   senderRole: "buyer" | "seller" | "staff" | "agent" | "system";
+  /** The buyer's or the seller's public page, when they have one. */
+  senderHref: string | null;
   /** Set on an offer card only. */
   offer: ThreadOfferView | null;
   redactedKinds: string | null;
@@ -212,6 +215,66 @@ async function sendAttachment(
   }
 }
 
+/**
+ * Which box the conversation scrolls in: the message list itself in the
+ * window-height view, the page everywhere else (a phone, a narrow pane),
+ * where the list simply grows with the conversation.
+ */
+function listScrolls(list: HTMLElement) {
+  return (
+    getComputedStyle(list).overflowY !== "visible" &&
+    list.scrollHeight > list.clientHeight + 1
+  );
+}
+
+/** The box the conversation scrolls in, as `listScrolls` decides. */
+function scrollingBox(list: HTMLElement) {
+  return listScrolls(list)
+    ? list
+    : (document.scrollingElement ?? document.documentElement);
+}
+
+/**
+ * How far the end of the conversation — the message box — is below the
+ * bottom of the screen, in pixels; negative once the page is scrolled past
+ * it. On the page that is the chat's own end, not the page's: on the staff
+ * desk the controls follow it on a phone.
+ */
+function distanceFromEnd(list: HTMLElement) {
+  if (listScrolls(list)) {
+    return list.scrollHeight - list.scrollTop - list.clientHeight;
+  }
+  const end = (list.parentElement ?? list).getBoundingClientRect().bottom;
+  return end - document.documentElement.clientHeight;
+}
+
+/**
+ * Shows the newest message, just above the message box. Instant, not the
+ * page's smooth scrolling: a smooth scroll started before a message is drawn
+ * stops where the end used to be, leaving the new one under the box.
+ */
+function scrollToEnd(list: HTMLElement) {
+  if (listScrolls(list)) {
+    list.scrollTop = list.scrollHeight;
+    return;
+  }
+  const by = distanceFromEnd(list);
+  if (Math.abs(by) >= 1) {
+    window.scrollTo({ top: window.scrollY + by, behavior: "instant" });
+  }
+}
+
+/**
+ * Grows the message box with what is typed in a browser without
+ * `field-sizing: content`, which does it in CSS everywhere else. The cap,
+ * and scrolling inside the box past it, are the textarea's own CSS.
+ */
+function fitToText(box: HTMLTextAreaElement | null) {
+  if (!box || CSS.supports("field-sizing", "content")) return;
+  box.style.height = "auto";
+  box.style.height = `${box.scrollHeight}px`;
+}
+
 function sameTurn(a: ThreadMessageView, b: ThreadMessageView) {
   return (
     a.kind === "TEXT" &&
@@ -312,6 +375,13 @@ function Bubble({
                     Channel Adda agent
                   </span>
                 </>
+              ) : !message.mine && message.senderHref ? (
+                <Link
+                  href={message.senderHref}
+                  className="rounded-sm font-medium text-muted underline-offset-4 transition-colors duration-150 hover:text-fg hover:underline"
+                >
+                  {displayName(message)}
+                </Link>
               ) : (
                 <span className="font-medium text-muted">
                   {message.mine ? "You" : displayName(message)}
@@ -390,6 +460,7 @@ export function ThreadView({
   sendWith = null,
   notice = null,
   empty = null,
+  footnote = null,
 }: {
   conversationId: string;
   messages: ThreadMessageView[];
@@ -421,6 +492,11 @@ export function ThreadView({
   notice?: ReactNode;
   /** What an empty chat says, in place of the deal-chat one. */
   empty?: { title: string; body: string } | null;
+  /**
+   * A line under the message box, inside it, so it stays with the box at
+   * the bottom of the screen — the staff desk's "sent as Channel Adda".
+   */
+  footnote?: ReactNode;
 }) {
   const [offering, setOffering] = useState(false);
   const [draft, setDraft] = useState("");
@@ -438,42 +514,57 @@ export function ThreadView({
   } | null>(null);
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
-  const endRef = useRef<HTMLDivElement>(null);
+  const textRef = useRef<HTMLTextAreaElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
   const scrollerRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
   /** Whether the reader is following the newest message. */
   const following = useRef(true);
 
   // Land on the newest message, the way every other chat does — and stay
-  // there while the box changes size. In the window-height view the messages
-  // scroll inside their own box, which is only its final size once styles,
-  // fonts and images have settled; a single scroll on mount often ran before
-  // that and left the conversation open at the top. Someone who has scrolled
-  // up to read is left exactly where they are.
+  // there whenever anything changes size while the reader is at the end: a
+  // message sent or arriving with the live refresh, a photo loading, the
+  // message box growing or emptying. Whichever box scrolls — the list in the
+  // window-height view, the page elsewhere — follows. The content is watched
+  // as one wrapper, so a list that did not exist when the chat opened (the
+  // first message) is still seen. Someone who has scrolled up to read is
+  // left exactly where they are.
+  //
+  // Only scrolling up lets go of the end. The browser fires scroll events
+  // of its own when a layout change moves the end — a sent message landing
+  // in the same frame as the box emptying — and judging "still at the end?"
+  // from those let go before the observer could follow, leaving the new
+  // message under the box.
   useEffect(() => {
-    const scroller = scrollerRef.current;
-    if (!scroller) return;
-    const ownScroll = () => getComputedStyle(scroller).overflowY === "auto";
+    const root = rootRef.current;
+    const list = scrollerRef.current;
+    const content = contentRef.current;
+    if (!root || !list || !content) return;
 
-    endRef.current?.scrollIntoView({ block: "end" });
+    scrollToEnd(list);
 
+    let lastTop = scrollingBox(list).scrollTop;
     const onScroll = () => {
-      following.current =
-        scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 80;
+      const top = scrollingBox(list).scrollTop;
+      const distance = distanceFromEnd(list);
+      if (Math.abs(distance) < 80) following.current = true;
+      // Scrolled up to read, or on down past the chat to what follows it.
+      else if (top < lastTop || distance < 0) following.current = false;
+      lastTop = top;
     };
-    // Only the box's own scroll, never the page's: on a phone the page is
-    // what scrolls, and dragging it back to the bottom would be hostile.
     const keepAtEnd = () => {
-      if (following.current && ownScroll()) {
-        scroller.scrollTop = scroller.scrollHeight;
-      }
+      if (following.current) scrollToEnd(list);
     };
     const observer = new ResizeObserver(keepAtEnd);
-    observer.observe(scroller);
-    for (const child of scroller.children) observer.observe(child);
-    scroller.addEventListener("scroll", onScroll, { passive: true });
+    observer.observe(root);
+    observer.observe(list);
+    observer.observe(content);
+    list.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("scroll", onScroll, { passive: true });
     return () => {
       observer.disconnect();
-      scroller.removeEventListener("scroll", onScroll);
+      list.removeEventListener("scroll", onScroll);
+      window.removeEventListener("scroll", onScroll);
     };
   }, []);
 
@@ -488,6 +579,10 @@ export function ThreadView({
     if ((!body && !attachment) || over) return;
     setError(null);
     setNote(null);
+    // Whoever sends wants to see what they sent. No scroll here: the new
+    // message is not drawn until the action's refresh lands, and the
+    // observer above takes the conversation to it once it is.
+    following.current = true;
     startTransition(async () => {
       const result = sendWith
         ? await sendWith(body, attachment?.key)
@@ -497,10 +592,11 @@ export function ThreadView({
         return;
       }
       setDraft("");
+      // Back to one line where the browser does not size the box itself.
+      if (textRef.current) textRef.current.style.height = "";
       if (attachment) URL.revokeObjectURL(attachment.url);
       setAttachment(null);
       setNote(result.note);
-      endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
     });
   }
 
@@ -527,100 +623,109 @@ export function ThreadView({
   }
 
   return (
-    // On a phone the message box is pinned to the bottom of the screen, so
-    // the conversation keeps room under its last message for it.
-    <div className="flex min-h-0 flex-1 flex-col max-lg:pb-24">
-      {/* The scrolling part. In the window-height view (see the thread page)
-          only this moves; everywhere else it is simply the page. */}
+    <div ref={rootRef} className="flex min-h-0 flex-1 flex-col">
+      {/* The conversation, taking all the room above the message box, so
+          the box is always last. In the window-height view (chat-layout)
+          only this scrolls; on a phone and in a narrow pane it grows with
+          the conversation and the page scrolls instead. */}
+      {/* `relative` makes it the box its absolutely placed pieces — the
+          bubbles' screen-reader names — are laid out in. Without it they
+          escaped the list's scroll: each one under the fold stretched the
+          page below the window, so the page itself could scroll, carrying
+          the message box up and leaving empty space under it. */}
       <div
         ref={scrollerRef}
-        className="lg:@3xl:min-h-0 lg:@3xl:flex-1 lg:@3xl:overflow-y-auto lg:@3xl:overscroll-contain lg:@3xl:pr-2 lg:@3xl:[scrollbar-width:thin]"
+        className="relative flex flex-1 flex-col lg:min-h-0 lg:overflow-y-auto lg:overscroll-contain lg:pr-2 lg:[scrollbar-width:thin]"
       >
-        {/* A quiet line rather than a box: it is read once, before the first
+        {/* Pushed to the bottom when the chat is shorter than the room, as
+            in every messaging app: the newest message sits just above the
+            box you answer it in, not at the top with a gap under it. The
+            bottom padding is the strip the box's fade covers. */}
+        <div ref={contentRef} className="mt-auto pb-4">
+          {/* A quiet line rather than a box: it is read once, before the first
           message, and should not compete with the conversation after that.
           One line on screen; the rule itself, word for word, behind the (i). */}
-        {notice ?? (
-          <p className="mx-auto flex max-w-[66ch] items-center gap-2 px-1 text-xs leading-relaxed text-muted">
-            <EyeIcon
-              aria-hidden="true"
-              className="size-3.5 shrink-0 text-subtle"
-            />
-            <span>Channel Adda can see this chat, to keep you safe.</span>
-            <InfoTip label="About this chat">
-              Channel Adda can read this conversation and will step in if
-              something goes wrong. Phone numbers, emails and links are removed
-              automatically. Photos and clips are deleted after 48 hours, and a
-              thread with no deal on it clears after 10 days.
-            </InfoTip>
-          </p>
-        )}
+          {notice ?? (
+            <p className="mx-auto flex max-w-[66ch] items-center gap-2 px-1 text-xs leading-relaxed text-muted">
+              <EyeIcon
+                aria-hidden="true"
+                className="size-3.5 shrink-0 text-subtle"
+              />
+              <span>Channel Adda can see this chat, to keep you safe.</span>
+              <InfoTip label="About this chat">
+                Channel Adda can read this conversation and will step in if
+                something goes wrong. Phone numbers, emails and links are
+                removed automatically. Photos and clips are deleted after 48
+                hours, and a thread with no deal on it clears after 10 days.
+              </InfoTip>
+            </p>
+          )}
 
-        {messages.length === 0 ? (
-          <EmptyState
-            bare
-            className="py-14"
-            icon={MessageSquareIcon}
-            title={empty?.title ?? "No messages yet"}
-            body={
-              empty?.body ??
-              `Ask ${otherSide} whatever you need to know before you commit — revenue, where the traffic comes from, strikes, why they are selling.`
-            }
-          />
-        ) : (
-          <ul className="mt-6 flex flex-col gap-5">
-            {messages.map((message, index) => {
-              const prev = messages[index - 1];
-              const next = messages[index + 1];
-              return message.kind === "EVENT" ? (
-                <EventLine
-                  key={message.id}
-                  message={message}
-                  // A run of history lines reads as one block of record.
-                  className={prev?.kind === "EVENT" ? "-mt-3" : undefined}
-                />
-              ) : message.kind === "OFFER" && message.offer ? (
-                <ChatOfferCard
-                  key={message.id}
-                  offer={message.offer}
-                  viewerRole={viewerRole}
-                  senderName={message.mine ? "You" : displayName(message)}
-                  mine={message.mine}
-                  createdAt={message.createdAt}
-                  actions={
-                    (viewerRole === "buyer" || viewerRole === "seller") &&
-                    message.offer.effectiveStatus === "OPEN" ? (
-                      <OfferActions
-                        offer={{
-                          id: message.offer.id,
-                          amount: message.offer.amountCents / 100,
-                          awaiting: message.offer.awaiting,
-                          bySeller: message.offer.bySeller,
-                          effectiveStatus: message.offer.effectiveStatus,
-                        }}
-                        viewingAs={viewerRole}
-                      />
-                    ) : undefined
-                  }
-                />
-              ) : (
-                <Bubble
-                  key={message.id}
-                  message={message}
-                  first={!prev || !sameTurn(prev, message)}
-                  last={!next || !sameTurn(message, next)}
-                />
-              );
-            })}
-          </ul>
-        )}
-        {after ? <div className="mt-6">{after}</div> : null}
-        {/* The margin lands the message box on screen with the newest
-          message, rather than leaving it just under the fold. */}
-        <div ref={endRef} className="scroll-mb-48" />
+          {messages.length === 0 ? (
+            <EmptyState
+              bare
+              className="py-14"
+              icon={MessageSquareIcon}
+              title={empty?.title ?? "No messages yet"}
+              body={
+                empty?.body ??
+                `Ask ${otherSide} whatever you need to know before you commit — revenue, where the traffic comes from, strikes, why they are selling.`
+              }
+            />
+          ) : (
+            <ul className="mt-6 flex flex-col gap-5">
+              {messages.map((message, index) => {
+                const prev = messages[index - 1];
+                const next = messages[index + 1];
+                return message.kind === "EVENT" ? (
+                  <EventLine
+                    key={message.id}
+                    message={message}
+                    // A run of history lines reads as one block of record.
+                    className={prev?.kind === "EVENT" ? "-mt-3" : undefined}
+                  />
+                ) : message.kind === "OFFER" && message.offer ? (
+                  <ChatOfferCard
+                    key={message.id}
+                    offer={message.offer}
+                    viewerRole={viewerRole}
+                    senderName={message.mine ? "You" : displayName(message)}
+                    senderHref={message.mine ? null : message.senderHref}
+                    mine={message.mine}
+                    createdAt={message.createdAt}
+                    actions={
+                      (viewerRole === "buyer" || viewerRole === "seller") &&
+                      message.offer.effectiveStatus === "OPEN" ? (
+                        <OfferActions
+                          offer={{
+                            id: message.offer.id,
+                            amount: message.offer.amountCents / 100,
+                            awaiting: message.offer.awaiting,
+                            bySeller: message.offer.bySeller,
+                            effectiveStatus: message.offer.effectiveStatus,
+                          }}
+                          viewingAs={viewerRole}
+                        />
+                      ) : undefined
+                    }
+                  />
+                ) : (
+                  <Bubble
+                    key={message.id}
+                    message={message}
+                    first={!prev || !sameTurn(prev, message)}
+                    last={!next || !sameTurn(message, next)}
+                  />
+                );
+              })}
+            </ul>
+          )}
+          {after ? <div className="mt-6">{after}</div> : null}
+        </div>
       </div>
 
       {closed ? (
-        <p className="mt-6 flex items-start justify-center gap-2 rounded-card border border-line bg-surface-2/60 px-4 py-3 text-[0.8125rem] leading-relaxed text-muted">
+        <p className="mt-2 mb-[max(0.75rem,env(safe-area-inset-bottom))] flex items-start justify-center gap-2 rounded-card border border-line bg-surface-2/60 px-4 py-3 text-[0.8125rem] leading-relaxed text-muted lg:mb-6">
           <LockIcon
             aria-hidden="true"
             className={`mt-0.5 size-3.5 shrink-0 ${iconText(LockIcon)}`}
@@ -630,11 +735,17 @@ export function ThreadView({
           </span>
         </p>
       ) : (
-        // On a computer the box stays at the bottom of the window while the
-        // conversation scrolls under it. On a phone it is fixed to the bottom
-        // of the screen, as every messaging app does, and capped so an open
-        // offer form scrolls inside it rather than pushing its top off screen.
-        <div className="relative mt-6 max-lg:fixed max-lg:inset-x-0 max-lg:bottom-0 max-lg:z-30 max-lg:mt-0 max-lg:max-h-[70dvh] max-lg:overflow-y-auto max-lg:overscroll-contain max-lg:border-t max-lg:border-line max-lg:bg-bg/95 max-lg:px-3 max-lg:pt-2 max-lg:pb-[max(0.5rem,env(safe-area-inset-bottom))] max-lg:backdrop-blur-xl lg:sticky lg:bottom-0 lg:z-10 lg:bg-bg lg:pb-5 lg:before:pointer-events-none lg:before:absolute lg:before:inset-x-0 lg:before:bottom-full lg:before:h-6 lg:before:bg-linear-to-t lg:before:from-bg lg:before:to-transparent">
+        // The last thing on the screen at every size. In the window-height
+        // view it is simply the column's last row. Where the page scrolls
+        // instead, `sticky` holds it at the bottom while the conversation
+        // passes under it, and the page is never shorter than the screen
+        // (chat-layout), so it cannot ride up a short chat over empty page.
+        // Not `fixed`: that is measured from the nearest ancestor with a
+        // transform, filter or container query rather than the screen, and
+        // has been moved by each of those before. On a phone it runs edge to
+        // edge, and is capped so an open offer form scrolls inside it rather
+        // than pushing its top off screen.
+        <div className="sticky bottom-0 z-10 -mx-3 border-t border-line bg-bg/95 px-3 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] backdrop-blur-xl max-lg:max-h-[70dvh] max-lg:overflow-y-auto max-lg:overscroll-contain sm:-mx-6 sm:px-6 lg:mx-0 lg:border-t-0 lg:bg-bg lg:px-0 lg:pt-2 lg:pb-6 lg:backdrop-blur-none lg:before:pointer-events-none lg:before:absolute lg:before:inset-x-0 lg:before:bottom-full lg:before:h-4 lg:before:bg-linear-to-t lg:before:from-bg lg:before:to-transparent">
           {offering && offerComposer ? (
             <OfferComposerForm
               config={offerComposer}
@@ -642,17 +753,24 @@ export function ThreadView({
             />
           ) : null}
 
-          {/* One row on a phone — attach, offer, the text, send — so the box
-              takes a line of the screen rather than three. */}
-          <div className="rounded-card border border-line bg-surface shadow-xs transition-[border-color,box-shadow] duration-150 not-focus-within:hover:border-line-strong focus-within:border-primary focus-within:ring-[3px] focus-within:ring-primary/20 has-[[aria-invalid=true]]:border-danger has-[[aria-invalid=true]]:ring-danger/15 max-lg:flex max-lg:flex-wrap max-lg:items-end max-lg:gap-0.5 max-lg:rounded-[1.375rem] max-lg:p-1 dark:bg-surface-2">
+          {/* One row — attach, offer, the text, send — and one line of text
+              until more is typed, so the box takes a line of the screen
+              rather than a block of it. It grows to about six lines, then
+              scrolls inside. Touch keeps 44px targets and 16px text (iOS
+              zooms into anything smaller); a mouse gets the kit's 36px. */}
+          <div className="@container/composer flex flex-wrap items-end gap-0.5 rounded-[1.375rem] border border-line bg-surface p-1 shadow-xs transition-[border-color,box-shadow] duration-150 not-focus-within:hover:border-line-strong focus-within:border-primary focus-within:ring-[3px] focus-within:ring-primary/20 has-[[aria-invalid=true]]:border-danger has-[[aria-invalid=true]]:ring-danger/15 lg:rounded-card dark:bg-surface-2">
             <label htmlFor="composer" className="sr-only">
               Write a message
             </label>
             <textarea
+              ref={textRef}
               id="composer"
-              rows={3}
+              rows={1}
               value={draft}
-              onChange={(event) => setDraft(event.target.value)}
+              onChange={(event) => {
+                setDraft(event.target.value);
+                fitToText(event.currentTarget);
+              }}
               onKeyDown={(event) => {
                 if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
                   event.preventDefault();
@@ -661,11 +779,11 @@ export function ThreadView({
               }}
               placeholder="Write a message…"
               aria-invalid={over}
-              className="block max-h-72 min-h-20 w-full resize-none bg-transparent px-3.5 pt-3 pb-1 text-base leading-6 field-sizing-content text-fg placeholder:text-subtle focus:outline-none max-lg:order-2 max-lg:max-h-32 max-lg:min-h-11 max-lg:w-auto max-lg:min-w-0 max-lg:flex-1 max-lg:px-2 max-lg:py-2.5 sm:text-sm"
+              className="order-2 block max-h-39 min-h-11 min-w-0 flex-1 resize-none bg-transparent px-2 py-2.5 text-base leading-6 field-sizing-content text-fg placeholder:text-subtle focus:outline-none pointer-fine:min-h-9 pointer-fine:py-1.5 pointer-fine:text-sm"
             />
 
             {attachment ? (
-              <div className="mx-2 mb-1 flex items-center gap-3 rounded-lg border border-line bg-surface-2 p-2 max-lg:order-0 max-lg:mx-0 max-lg:basis-full">
+              <div className="order-0 mb-0.5 flex basis-full items-center gap-3 rounded-lg border border-line bg-surface-2 p-2">
                 {attachment.kind === "IMAGE" ? (
                   // biome-ignore lint/performance/noImgElement: a local preview of the file being sent, not a served image
                   <img
@@ -701,7 +819,7 @@ export function ThreadView({
               </div>
             ) : null}
 
-            <div className="flex flex-wrap items-center gap-1 px-2 pt-1 pb-2 max-lg:contents">
+            <div className="contents">
               <input
                 ref={fileRef}
                 type="file"
@@ -717,8 +835,8 @@ export function ThreadView({
                 type="button"
                 size="icon"
                 variant="ghost"
-                title="Photo or clip"
-                className="max-lg:order-1"
+                title="Photo or clip, up to 25MB"
+                className="order-1"
                 disabled={uploading || pending || attachment !== null}
                 onClick={() => fileRef.current?.click()}
               >
@@ -745,44 +863,47 @@ export function ThreadView({
                       ? "Offer a price"
                       : "Make an offer"
                   }
-                  className="aria-expanded:bg-surface-2 aria-expanded:text-fg max-lg:order-1 max-lg:size-11 max-lg:px-0"
+                  // Words only where they leave the text a real width: in
+                  // the deal chat's narrow column beside the panel, the tag
+                  // alone, as on a phone.
+                  className="order-1 aria-expanded:bg-surface-2 aria-expanded:text-fg max-lg:size-11 max-lg:px-0 lg:@max-xl/composer:aspect-square lg:@max-xl/composer:px-0!"
                 >
                   <TagIcon aria-hidden="true" className="size-4" />
-                  <span className="max-lg:sr-only">
+                  <span className="max-lg:sr-only lg:@max-xl/composer:sr-only">
                     {offerComposer.mode === "price"
                       ? "Offer a price"
                       : "Make an offer"}
                   </span>
                 </Button>
               ) : null}
-              <p
-                className={cn(
-                  "min-w-0 px-1.5 text-xs tabular-nums",
-                  over ? "font-medium text-danger" : "text-subtle",
-                  // On a phone only a warning earns the room, on a line of
-                  // its own above the row.
-                  !over && left >= 400 && "max-sm:hidden",
-                  "max-lg:order-0 max-lg:basis-full max-lg:pt-1",
-                  !over && left >= 400 && "max-lg:hidden",
-                )}
-              >
-                {over
-                  ? `${(draft.length - MAX_MESSAGE).toLocaleString("en-US")} characters too many`
-                  : left < 400
-                    ? `${left.toLocaleString("en-US")} characters left`
-                    : "Up to 25MB"}
-              </p>
+              {/* Only near the limit, on a line of its own above the row. */}
+              {over || left < 400 ? (
+                <p
+                  className={cn(
+                    "order-0 basis-full px-2 pt-1 text-xs tabular-nums",
+                    over ? "font-medium text-danger" : "text-subtle",
+                  )}
+                >
+                  {over
+                    ? `${(draft.length - MAX_MESSAGE).toLocaleString("en-US")} characters too many`
+                    : `${left.toLocaleString("en-US")} characters left`}
+                </p>
+              ) : null}
               <Button
                 type="button"
                 variant={hasSomething || pending ? "primary" : "secondary"}
                 title="Send (Ctrl+Enter)"
-                className="ml-auto max-lg:order-3 max-lg:ml-0 max-lg:size-11 max-lg:rounded-full! max-lg:px-0"
+                className="order-3 max-lg:size-11 max-lg:rounded-full! max-lg:px-0"
                 disabled={
                   pending ||
                   uploading ||
                   over ||
                   (draft.trim().length === 0 && attachment === null)
                 }
+                // Keeps the cursor in the box. Tapping Send moved focus off
+                // it, which on a phone drops the keyboard — and the screen
+                // jumped with it after every message.
+                onMouseDown={(event) => event.preventDefault()}
                 onClick={send}
               >
                 {pending ? (
@@ -816,6 +937,11 @@ export function ThreadView({
               />
               <span>{note}</span>
             </output>
+          ) : null}
+          {footnote ? (
+            <p className="mt-2 px-1 text-xs leading-relaxed text-subtle">
+              {footnote}
+            </p>
           ) : null}
         </div>
       )}

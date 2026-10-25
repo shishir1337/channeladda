@@ -134,6 +134,8 @@ test(
       senderRole: "agent",
       senderName: t.agent.name,
       fromStaff: false,
+      // The agent's name is never a link to anyone's page.
+      senderHref: null,
     });
   }),
 );

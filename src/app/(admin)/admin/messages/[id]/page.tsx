@@ -2,6 +2,7 @@ import { FlagIcon } from "lucide-react";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Callout } from "@/components/app/kit";
+import { CHAT_WINDOW_WIDE } from "@/components/messages/chat-layout";
 import { channelOf, ThreadHeader } from "@/components/messages/chat-parts";
 import { LiveRefresh } from "@/components/messages/live-refresh";
 import { toMessageViews } from "@/components/messages/serialize";
@@ -34,9 +35,12 @@ export default async function AdminThreadPage({
     // The same window-height view as the member thread: header on top,
     // message box at the bottom, only the messages scrolling between, and
     // the staff controls scrolling on their own. The container decides, so a
-    // narrow layout keeps the page's own scroll.
+    // narrow layout keeps the page's own scroll — at least the window's
+    // height, with the message box at its bottom (see chat-layout). On a
+    // phone the staff controls follow the conversation, so the page keeps
+    // the shell's bottom padding.
     <div className="@container lg:-mb-16">
-      <div className="lg:@3xl:flex lg:@3xl:h-[calc(100dvh-6.5rem)] lg:@3xl:flex-col">
+      <div className={CHAT_WINDOW_WIDE}>
         <LiveRefresh conversationId={thread.id} fingerprint={fingerprint} />
 
         <ThreadHeader
@@ -88,22 +92,27 @@ export default async function AdminThreadPage({
           </Callout>
         ) : null}
 
-        <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start lg:gap-6 lg:@3xl:min-h-0 lg:@3xl:flex-1 lg:@3xl:grid-rows-[minmax(0,1fr)] lg:@3xl:items-stretch">
-          <div className="min-w-0 lg:@3xl:flex lg:@3xl:min-h-0 lg:@3xl:flex-col">
+        <div className="mt-5 grid gap-5 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,1fr)_18rem] lg:grid-rows-[minmax(0,1fr)] lg:gap-6">
+          <div className="flex min-h-0 min-w-0 flex-col">
             <ThreadView
               conversationId={thread.id}
               otherSide={`${thread.buyerName} and ${thread.sellerName}`}
               closed={false}
               viewerRole="staff"
               messages={toMessageViews(thread.messages)}
+              footnote={
+                <>
+                  Anything you write here is sent as Channel Adda, not as{" "}
+                  {staff.name}. Both sides see it.
+                </>
+              }
             />
-            <p className="mt-2 px-1 text-xs leading-relaxed text-subtle">
-              Anything you write here is sent as Channel Adda, not as{" "}
-              {staff.name}. Both sides see it.
-            </p>
           </div>
 
-          <div className="min-w-0 lg:@3xl:-m-1 lg:@3xl:min-h-0 lg:@3xl:overflow-y-auto lg:@3xl:overscroll-contain lg:@3xl:p-1 lg:@3xl:[scrollbar-width:thin]">
+          {/* No negative margin at the bottom, the window's edge: 4px past
+              it scrolled the whole page. `relative` keeps screen-reader
+              labels inside its scroll, for the same reason. */}
+          <div className="min-w-0 lg:@3xl:relative lg:@3xl:-mx-1 lg:@3xl:-mt-1 lg:@3xl:min-h-0 lg:@3xl:overflow-y-auto lg:@3xl:overscroll-contain lg:@3xl:px-1 lg:@3xl:pt-1 lg:@3xl:pb-6 lg:@3xl:[scrollbar-width:thin]">
             <StaffControls
               conversationId={thread.id}
               claimedBy={thread.staffName}

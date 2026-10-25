@@ -91,6 +91,14 @@ test(
     expect(thread?.messages[0].offer).toBeNull();
     expect(thread?.messages[3].offer).toBeNull();
     expect(thread?.messages[3].senderName).toBe("Channel Adda");
+    // A name links to a public page only when there is one: the seller has
+    // a slug, this buyer has none, and the platform is nobody's page.
+    expect(thread?.messages.map((m) => m.senderHref)).toEqual([
+      null,
+      null,
+      `/seller/${seller.slug}`,
+      null,
+    ]);
   }),
 );
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { TagIcon } from "lucide-react";
+import Link from "next/link";
 import type { ReactNode } from "react";
 import { TurnFlag } from "@/components/app/kit";
 import { OFFER_STATUS } from "@/components/deals/offer-status";
@@ -37,6 +38,7 @@ export function ChatOfferCard({
   offer,
   viewerRole,
   senderName,
+  senderHref = null,
   mine,
   createdAt,
   actions,
@@ -44,6 +46,8 @@ export function ChatOfferCard({
   offer: ThreadOfferView;
   viewerRole: "buyer" | "seller" | "agent" | "staff";
   senderName: string;
+  /** Their public profile, as on a chat bubble: set only when they have one. */
+  senderHref?: string | null;
   mine: boolean;
   createdAt: string;
   /** Accept, counter, decline or withdraw — supplied when they apply. */
@@ -87,7 +91,16 @@ export function ChatOfferCard({
             <Price usd={offer.amountCents / 100} exact />
           </p>
           <p className="mt-0.5 text-xs text-subtle">
-            {senderName}
+            {senderHref && !mine ? (
+              <Link
+                href={senderHref}
+                className="rounded-sm underline-offset-4 transition-colors duration-150 hover:text-fg hover:underline"
+              >
+                {senderName}
+              </Link>
+            ) : (
+              senderName
+            )}
             <span aria-hidden="true" className="mx-1.5 text-line-strong">
               ·
             </span>

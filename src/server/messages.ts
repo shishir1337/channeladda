@@ -78,6 +78,12 @@ export type ThreadMessage = {
   fromStaff: boolean;
   senderName: string;
   senderRole: SenderRole;
+  /**
+   * The sender's public page, for the buyer's or the seller's lines when
+   * they have one. Null for staff, the deal's agent and the platform, and
+   * for a member with no page yet.
+   */
+  senderHref: string | null;
   /** Set on an offer card only. */
   offer: ThreadOffer | null;
   /** What was taken out, shown to everyone so the gap is never a mystery. */
@@ -321,7 +327,7 @@ export async function getThread(
           fromStaff: true,
           redactedKinds: true,
           kind: true,
-          sender: { select: { name: true } },
+          sender: { select: { name: true, slug: true } },
           offer: {
             select: {
               id: true,
@@ -398,20 +404,31 @@ export async function getThread(
  * learn which moderator is reading their dispute. The platform's own events
  * have no sender and read as Channel Adda too. Anyone else who is neither
  * side is the deal's agent, the only other person who can write here.
+ *
+ * Only the two sides link to a public page, and only once they have one: a
+ * slug is what `/seller/[slug]` looks people up by.
  */
 function senderOf(
   message: {
     senderId: string | null;
     fromStaff: boolean;
-    sender: { name: string } | null;
+    sender: { name: string; slug: string | null } | null;
   },
   row: { buyerId: string; sellerId: string },
-): { senderName: string; senderRole: SenderRole } {
+): { senderName: string; senderRole: SenderRole; senderHref: string | null } {
   if (message.fromStaff) {
-    return { senderName: "Channel Adda", senderRole: "staff" };
+    return {
+      senderName: "Channel Adda",
+      senderRole: "staff",
+      senderHref: null,
+    };
   }
   if (message.senderId === null || message.sender === null) {
-    return { senderName: "Channel Adda", senderRole: "system" };
+    return {
+      senderName: "Channel Adda",
+      senderRole: "system",
+      senderHref: null,
+    };
   }
   const senderRole: SenderRole =
     message.senderId === row.buyerId
@@ -419,7 +436,12 @@ function senderOf(
       : message.senderId === row.sellerId
         ? "seller"
         : "agent";
-  return { senderName: message.sender.name, senderRole };
+  const slug = senderRole === "agent" ? null : message.sender.slug;
+  return {
+    senderName: message.sender.name,
+    senderRole,
+    senderHref: slug ? `/seller/${slug}` : null,
+  };
 }
 
 /**

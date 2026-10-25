@@ -220,6 +220,9 @@ function toThreadMessage(
     fromStaff: false,
     senderName: row.fromAgent ? agentName(row) : memberName,
     senderRole: row.fromAgent ? "agent" : "buyer",
+    // Nobody's page is linked from here: the replies are the Escrow Agent's,
+    // and the member is talking to Channel Adda, not to another member.
+    senderHref: null,
     offer: null,
     redactedKinds: null,
     attachmentUrl: row.attachmentUrl,

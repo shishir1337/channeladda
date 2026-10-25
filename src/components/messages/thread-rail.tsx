@@ -155,8 +155,11 @@ export function ThreadRail({
             </p>
           ) : (
             // The inset keeps the active row's ring and shadow clear of the
-            // scroll edge, which would otherwise clip them.
-            <div className="-mx-1 mt-1 flex min-h-0 flex-col gap-3 p-1 lg:flex-1 lg:overflow-y-auto lg:overscroll-contain">
+            // scroll edge, which would otherwise clip them. `relative` keeps
+            // the rows' screen-reader "Unread" inside the scroll: placed
+            // against the rail instead, those below the fold stretched the
+            // page past the window and let it scroll.
+            <div className="relative -mx-1 mt-1 flex min-h-0 flex-col gap-3 p-1 lg:flex-1 lg:overflow-y-auto lg:overscroll-contain">
               {/* Running deals first, under their own heading: they are what
                   somebody has to act on. The server already lists them first;
                   the split here is only the headings. */}

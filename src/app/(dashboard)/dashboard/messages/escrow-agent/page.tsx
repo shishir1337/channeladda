@@ -1,6 +1,7 @@
 import { ClockIcon, LockIcon } from "lucide-react";
 import type { Metadata } from "next";
 import { InfoTip } from "@/components/app/info-tip";
+import { CHAT_FILL, CHAT_WINDOW } from "@/components/messages/chat-layout";
 import {
   EscrowAgentAvatar,
   ThreadHeader,
@@ -14,6 +15,7 @@ import {
   ESCROW_AGENT_NAME,
   REPLY_PROMISE,
 } from "@/lib/support-chat";
+import { cn } from "@/lib/utils";
 import { postToEscrowAgent } from "@/server/actions/support-chat";
 import { requireUser } from "@/server/session";
 import {
@@ -27,9 +29,13 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-/** The window-height view the deal chat uses on a computer. */
-const FIXED_VIEW =
-  "lg:@3xl:flex lg:@3xl:h-[calc(100dvh-6.5rem)] lg:@3xl:flex-col";
+/**
+ * The deal chat's view (see chat-layout). With no deal panel to sit beside
+ * the conversation, the window-height view holds at every computer width;
+ * on a phone the negative margin hands back the shell's bottom padding, so
+ * the message box ends the page at the bottom of the screen.
+ */
+const VIEW = cn(CHAT_FILL, "max-lg:-mb-28", CHAT_WINDOW);
 
 /**
  * A member's own chat with Channel Adda's live agents.
@@ -48,7 +54,7 @@ export default async function EscrowAgentPage() {
   if (thread.id) await markEscrowAgentRead(user.id);
 
   return (
-    <div className={FIXED_VIEW}>
+    <div className={VIEW}>
       <LiveRefresh
         conversationId={ESCROW_AGENT_HREF}
         fingerprint={fingerprint}
@@ -72,7 +78,7 @@ export default async function EscrowAgentPage() {
         subtitle="Channel Adda live agents"
       />
 
-      <div className="mt-5 min-w-0 lg:@3xl:flex lg:@3xl:min-h-0 lg:@3xl:flex-1 lg:@3xl:flex-col">
+      <div className="mt-5 flex min-h-0 min-w-0 flex-1 flex-col">
         <ThreadView
           conversationId={ESCROW_AGENT_HREF}
           sendWith={postToEscrowAgent}

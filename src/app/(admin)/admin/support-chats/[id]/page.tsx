@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Waited } from "@/components/admin/vocab";
+import { CHAT_FILL, CHAT_WINDOW } from "@/components/messages/chat-layout";
 import { ThreadHeader } from "@/components/messages/chat-parts";
 import { LiveRefresh } from "@/components/messages/live-refresh";
 import { toMessageViews } from "@/components/messages/serialize";
@@ -10,6 +11,7 @@ import { ThreadView } from "@/components/messages/thread-view";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ESCROW_AGENT_NAME, SUPPORT_CHATS_HREF } from "@/lib/support-chat";
+import { cn } from "@/lib/utils";
 import { replyToSupport } from "@/server/actions/support-chat";
 import { requireRole } from "@/server/session";
 import {
@@ -44,9 +46,12 @@ export default async function SupportChatPage({
 
   return (
     // The same window-height view as the conversation desk: header on top,
-    // reply box at the bottom, only the messages scrolling between.
-    <div className="@container lg:-mb-16">
-      <div className="lg:@3xl:flex lg:@3xl:h-[calc(100dvh-6.5rem)] lg:@3xl:flex-col">
+    // reply box at the bottom, only the messages scrolling between — at
+    // every computer width, with no second column to make room for. On a
+    // phone the page fills the screen and hands back the shell's bottom
+    // padding, so the reply box ends it (see chat-layout).
+    <div className="@container -mb-16">
+      <div className={cn(CHAT_FILL, CHAT_WINDOW)}>
         <LiveRefresh
           conversationId={chat.id}
           fingerprint={fingerprint}
@@ -79,7 +84,7 @@ export default async function SupportChatPage({
           }
         />
 
-        <div className="mt-5 min-w-0 lg:@3xl:flex lg:@3xl:min-h-0 lg:@3xl:flex-1 lg:@3xl:flex-col">
+        <div className="mt-5 flex min-h-0 min-w-0 flex-1 flex-col">
           <ThreadView
             conversationId={chat.id}
             sendWith={replyToSupport.bind(null, chat.id)}

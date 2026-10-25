@@ -18,6 +18,11 @@ import { PayToCard } from "@/components/deals/pay-to";
 import { ReviewPrompts } from "@/components/deals/review-prompts";
 import { TrackRecordLine } from "@/components/deals/track-record";
 import { StartDeal } from "@/components/listing/start-deal";
+import {
+  CHAT_FILL,
+  CHAT_WINDOW,
+  CHAT_WINDOW_WIDE,
+} from "@/components/messages/chat-layout";
 import { channelOf, ThreadHeader } from "@/components/messages/chat-parts";
 import { DealPanel } from "@/components/messages/deal-panel";
 import { LiveRefresh } from "@/components/messages/live-refresh";
@@ -55,9 +60,14 @@ export const metadata: Metadata = {
  * on the right, pinned under the top bar while the conversation scrolls, and
  * scrolling on its own when it is taller than the window. The pane is the
  * size container (see the messages layout), so this follows the sidebar.
+ * The 4px of padding keeps focus rings and shadows clear of the scroll
+ * edge; no negative margin at the bottom, which is the window's edge — 4px
+ * past it scrolled the whole page. `relative` keeps anything absolutely
+ * placed inside it (screen-reader labels) inside its scroll, for the same
+ * reason. The bottom padding ends the panel level with the message box.
  */
 const PANEL_COLUMN =
-  "lg:@3xl:col-start-2 lg:@3xl:row-start-1 lg:@3xl:-m-1 lg:@3xl:min-h-0 lg:@3xl:overflow-y-auto lg:@3xl:overscroll-contain lg:@3xl:p-1 lg:@3xl:[scrollbar-width:thin]";
+  "lg:@3xl:relative lg:@3xl:col-start-2 lg:@3xl:row-start-1 lg:@3xl:-mx-1 lg:@3xl:-mt-1 lg:@3xl:min-h-0 lg:@3xl:overflow-y-auto lg:@3xl:overscroll-contain lg:@3xl:px-1 lg:@3xl:pt-1 lg:@3xl:pb-6 lg:@3xl:[scrollbar-width:thin]";
 
 /**
  * On a computer, with room for the deal beside it, the conversation is an
@@ -65,11 +75,24 @@ const PANEL_COLUMN =
  * box holds the bottom, and only the messages scroll between them — the deal
  * panel scrolling on its own beside them. Pinning each of those to a page
  * that scrolled as a whole left the box jumping a few pixels at the end of
- * the page and the panel sliding under the header. Narrower layouts keep the
- * page's own scroll, where stacking makes that the only sensible choice.
+ * the page and the panel sliding under the header. Narrower, with the panel
+ * stacked above the conversation, the page keeps its own scroll — but is
+ * never shorter than the window, so the message box is at its bottom (see
+ * chat-layout). With no panel there is nothing to stack, and the window
+ * view holds at every computer width.
+ *
+ * On a phone the page fills the screen, and the negative margin hands back
+ * the shell's bottom padding: the message box ends the page, flush with the
+ * bottom of the screen, instead of 112px of empty page under it.
  */
-const FIXED_VIEW =
-  "lg:@3xl:flex lg:@3xl:h-[calc(100dvh-6.5rem)] lg:@3xl:flex-col";
+function viewFor(withPanel: boolean) {
+  return cn(
+    CHAT_FILL,
+    "max-lg:-mb-28",
+    withPanel ? CHAT_WINDOW_WIDE : CHAT_WINDOW,
+  );
+}
+
 /**
  * One conversation: the people, the negotiation and the deal, in one place.
  *
@@ -180,7 +203,7 @@ export default async function ThreadPage({
       : null;
 
   return (
-    <div className={FIXED_VIEW}>
+    <div className={viewFor(panel !== null)}>
       <LiveRefresh conversationId={thread.id} fingerprint={fingerprint} />
 
       <ThreadHeader
@@ -257,14 +280,17 @@ export default async function ThreadPage({
         }
       />
 
+      {/* A column — the panel, then the conversation taking the rest of the
+          height — until there is room for the panel beside it. */}
       <div
         className={cn(
-          "mt-5 grid gap-5 lg:@3xl:min-h-0 lg:@3xl:flex-1 lg:@3xl:grid-rows-[minmax(0,1fr)]",
-          panel && "lg:@3xl:grid-cols-[minmax(0,1fr)_19rem] lg:@3xl:gap-6",
+          "mt-5 flex min-h-0 flex-1 flex-col gap-5",
+          panel &&
+            "lg:@3xl:grid lg:@3xl:grid-cols-[minmax(0,1fr)_19rem] lg:@3xl:grid-rows-[minmax(0,1fr)] lg:@3xl:gap-6",
         )}
       >
         {panel ? (
-          <div className={cn("min-w-0", PANEL_COLUMN)}>
+          <div className={cn("min-w-0 shrink-0", PANEL_COLUMN)}>
             {certificate && deal ? (
               // A deal that went through ends on congratulations and the
               // certificate, not on "This deal has ended".
@@ -365,7 +391,7 @@ export default async function ThreadPage({
 
         <div
           className={cn(
-            "min-w-0 lg:@3xl:flex lg:@3xl:min-h-0 lg:@3xl:flex-col",
+            "flex min-h-0 min-w-0 flex-1 flex-col",
             panel && "lg:@3xl:col-start-1 lg:@3xl:row-start-1",
           )}
         >
