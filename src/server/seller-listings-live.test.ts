@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import type { ListingLiveEdit } from "@/lib/listing-form";
 import { SELLER_REMOVED_REASON } from "@/lib/listing-lock";
 import { emptyFilters } from "@/lib/listing-query";
+import { threadHref } from "@/lib/thread-href";
 import { createDeal } from "@/server/deals";
 import { getListing, queryListings } from "@/server/listings";
 import { createOffer } from "@/server/offers";
@@ -374,7 +375,7 @@ test(
       where: { userId: other.id, kind: "OFFER", title: { contains: "closed" } },
     });
     expect(offerNote.href).toBe(
-      `/dashboard/messages/${offer.value.conversationId}`,
+      threadHref(offer.value.conversationId, listing.id),
     );
 
     // Gone from every public query.

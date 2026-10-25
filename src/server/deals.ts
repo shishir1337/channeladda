@@ -30,6 +30,7 @@ import { keptFee, requiredHold } from "@/lib/holds";
 import { movesHeldMoney } from "@/lib/outcomes";
 import { BUYER_PAYS_AFTER_STEP, payToVisibleTo } from "@/lib/pay-to";
 import { isSerializationFailure } from "@/lib/serialization-failure";
+import { threadHref } from "@/lib/thread-href";
 import { keyFromUrl } from "@/lib/upload-keys";
 import { recordAudit } from "@/server/audit";
 import { ensureConversation, postEvent } from "@/server/chat-events";
@@ -1500,7 +1501,7 @@ export async function advanceStep(input: {
       title,
       body,
       href: order.conversationId
-        ? `/dashboard/messages/${order.conversationId}`
+        ? threadHref(order.conversationId, order.listingId)
         : `/dashboard/deals/${order.id}`,
       email: { subject: title, body },
     });
@@ -1517,7 +1518,7 @@ export async function advanceStep(input: {
       title,
       body,
       href: order.conversationId
-        ? `/dashboard/messages/${order.conversationId}`
+        ? threadHref(order.conversationId, order.listingId)
         : `/dashboard/deals/${order.id}`,
       email: { subject: title, body },
     });
@@ -1539,7 +1540,7 @@ export async function advanceStep(input: {
       title,
       body,
       href: order.conversationId
-        ? `/dashboard/messages/${order.conversationId}`
+        ? threadHref(order.conversationId, order.listingId)
         : `/dashboard/deals/${order.id}`,
       email: { subject: title, body },
     });
@@ -2401,6 +2402,8 @@ export type DealListRow = {
   awaitingAgent: boolean;
   /** The deal's chat, where it is paid for and run. */
   conversationId: string | null;
+  /** The deal's listing: its chat opens on it. */
+  listingId: string;
   /** The open step's stored label, for its name on screen. */
   openLabel: string | null;
 };
@@ -2430,6 +2433,7 @@ export async function listDealsFor(userId: string): Promise<DealListRow[]> {
       holdUntil: true,
       createdAt: true,
       conversationId: true,
+      listingId: true,
       listing: { select: { title: true, platform: true } },
       buyer: { select: { name: true } },
       seller: { select: { name: true } },
@@ -2479,6 +2483,7 @@ export async function listDealsFor(userId: string): Promise<DealListRow[]> {
         ? null
         : (order.steps[0]?.label ?? null),
       conversationId: order.conversationId,
+      listingId: order.listingId,
       waitingUntil:
         !isTerminal(order.status) && order.holdUntil && order.holdUntil > now
           ? order.holdUntil
@@ -2548,6 +2553,8 @@ export type DealView = {
   viewerRole: DealActor;
   /** The conversation this deal runs in. Every deal has one now. */
   conversationId: string | null;
+  /** The deal's listing: its conversation opens on it. */
+  listingId: string;
   steps: DealStepView[];
   /** The lowest incomplete step, or null once the deal has stopped. */
   nextStep: DealStepView | null;
@@ -2611,6 +2618,7 @@ export async function getDealFor(
       agentEmail: true,
       agentBrand: true,
       conversationId: true,
+      listingId: true,
       createdAt: true,
       handoverTo: true,
       sellerPayTo: true,
@@ -2702,6 +2710,7 @@ export async function getDealFor(
       viewerRole === "agent" && isTerminal(order.status)
         ? null
         : order.conversationId,
+    listingId: order.listingId,
     steps,
     nextStep: isTerminal(order.status)
       ? null
@@ -2775,6 +2784,7 @@ export async function updateHandoverTo(input: {
       sellerId: true,
       agentId: true,
       conversationId: true,
+      listingId: true,
       handoverTo: true,
       listing: { select: { platform: true, title: true } },
       steps: { select: { position: true, completedAt: true } },
@@ -2814,6 +2824,7 @@ export async function updateHandoverTo(input: {
       userId: recipientId,
       orderId: order.id,
       conversationId: order.conversationId,
+      listingId: order.listingId,
       reference: order.reference,
       listingTitle: order.listing.title,
       handoverTo: parsed.value,

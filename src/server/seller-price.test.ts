@@ -1,5 +1,6 @@
 import { expect, test } from "vitest";
 import { db } from "@/lib/db";
+import { threadHref } from "@/lib/thread-href";
 import { openConversation } from "@/server/messages";
 import {
   createOffer,
@@ -82,7 +83,7 @@ test(
     const told = await db.notification.findFirstOrThrow({
       where: { userId: t.buyer.id, kind: "OFFER" },
     });
-    expect(told.href).toBe(`/dashboard/messages/${t.conversationId}`);
+    expect(told.href).toBe(threadHref(t.conversationId, t.listing.id));
   }),
 );
 

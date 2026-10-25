@@ -23,6 +23,7 @@ import { InfoTip } from "@/components/app/info-tip";
 import { Amount, Callout, Facts, Reference, Ring } from "@/components/app/kit";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { threadHref } from "@/lib/thread-href";
 import { cn } from "@/lib/utils";
 import type {
   DisputeCase as Case,
@@ -346,7 +347,13 @@ export function DisputeCase({
               // link still says both, for anyone hearing it.
               <>
                 <Button asChild size="sm" variant="secondary">
-                  <Link href={`/admin/messages/${dispute.conversation.id}`}>
+                  <Link
+                    href={threadHref(
+                      dispute.conversation.id,
+                      dispute.listing.id,
+                      "/admin/messages",
+                    )}
+                  >
                     <MessagesSquareIcon aria-hidden="true" />
                     Read their conversation
                     <span className="sr-only">

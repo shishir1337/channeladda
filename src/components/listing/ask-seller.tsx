@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { useSession } from "@/lib/auth-client";
 import { OPENING_MESSAGE } from "@/lib/chat-opening";
 import { MAX_MESSAGE } from "@/lib/messages";
+import { threadHref } from "@/lib/thread-href";
 import { cn } from "@/lib/utils";
 import { askSellerQuestion } from "@/server/actions/messages";
 
@@ -70,7 +71,7 @@ export function AskSeller({
             setError(result.error);
             return;
           }
-          router.push(`/dashboard/messages/${result.conversationId}`);
+          router.push(threadHref(result.conversationId, listingId));
         });
       }}
     >

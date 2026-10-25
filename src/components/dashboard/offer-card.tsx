@@ -9,10 +9,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { OfferStatus } from "@/generated/prisma/enums";
 import { timeLeft } from "@/lib/chat-time";
+import { threadHref } from "@/lib/thread-href";
 import { cn } from "@/lib/utils";
 
 export type OfferCardData = {
   id: string;
+  /** The listing it is on: its conversation opens there. */
+  listingId: string;
   listingSlug: string;
   listingTitle: string;
   listingHandle: string;
@@ -211,7 +214,7 @@ export function OfferCard({
             </div>
             {offer.conversationId ? (
               <Button asChild variant="ghost" size="sm">
-                <Link href={`/dashboard/messages/${offer.conversationId}`}>
+                <Link href={threadHref(offer.conversationId, offer.listingId)}>
                   <MessagesSquareIcon aria-hidden="true" />
                   Open the chat
                 </Link>

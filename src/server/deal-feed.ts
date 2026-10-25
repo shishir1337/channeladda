@@ -142,6 +142,7 @@ export async function listDealsForAgent(agentId: string, limit = 50) {
       createdAt: true,
       // Where the agent talks to both sides and can work the steps.
       conversationId: true,
+      listingId: true,
       listing: { select: { title: true, slug: true } },
       // Whose move it is comes from the first open step, not the status:
       // one status can cover the seller's step and then the agent's.

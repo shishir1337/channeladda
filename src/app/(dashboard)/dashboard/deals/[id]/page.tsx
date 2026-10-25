@@ -43,6 +43,7 @@ import { mayEndHolds } from "@/lib/custody-roles";
 import { db } from "@/lib/db";
 import { isTerminal } from "@/lib/deal-machine";
 import { templateFor } from "@/lib/deal-templates";
+import { threadHref } from "@/lib/thread-href";
 import { cn } from "@/lib/utils";
 import { certificateFor } from "@/server/certificate";
 import { getDealFor } from "@/server/deals";
@@ -169,7 +170,7 @@ export default async function DealPage({
           <>
             {deal.conversationId ? (
               <Button asChild variant="secondary" size="md">
-                <Link href={`/dashboard/messages/${deal.conversationId}`}>
+                <Link href={threadHref(deal.conversationId, deal.listingId)}>
                   <MessagesSquareIcon aria-hidden="true" />
                   Open the deal chat
                 </Link>

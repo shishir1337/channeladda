@@ -69,6 +69,7 @@ import {
   withinLevel,
 } from "@/lib/custody-roles";
 import { db } from "@/lib/db";
+import { threadHref } from "@/lib/thread-href";
 import { cn } from "@/lib/utils";
 import {
   type DealLookupRow,
@@ -613,7 +614,10 @@ export default async function AdminDealsPage({
                       <div className="px-4 pb-3 sm:px-5">
                         <Button asChild size="sm" variant="secondary">
                           <Link
-                            href={`/dashboard/messages/${order.conversationId}`}
+                            href={threadHref(
+                              order.conversationId,
+                              order.listingId,
+                            )}
                           >
                             <MessagesSquareIcon aria-hidden="true" />
                             Open the deal chat

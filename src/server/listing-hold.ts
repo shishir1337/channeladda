@@ -4,6 +4,7 @@ import type { Prisma } from "@/generated/prisma/client";
 import { money } from "@/lib/chat-events";
 import { db } from "@/lib/db";
 import { TERMINAL_STATUSES } from "@/lib/deal-machine";
+import { threadHref } from "@/lib/thread-href";
 import { postEvent } from "@/server/chat-events";
 import { notify } from "@/server/notifications";
 import { getSettings } from "@/server/settings";
@@ -281,6 +282,8 @@ export type ClosedOffer = {
   buyerId: string;
   amountUsd: number;
   thread: string | null;
+  /** The listing it was on, for the link into the conversation. */
+  listingId: string;
 };
 
 /**
@@ -337,6 +340,7 @@ export async function closeOpenOffers(
       buyerId: other.buyerId,
       amountUsd: other.amountUsd,
       thread: thread?.id ?? null,
+      listingId,
     });
   }
   return closed;
@@ -371,7 +375,7 @@ export async function notifyClosedOffers(closed: ClosedOffer[]) {
       title: `Your offer of ${money(offer.amountUsd)} closed`,
       body: "The listing went to another buyer, so it is no longer available.",
       href: offer.thread
-        ? `/dashboard/messages/${offer.thread}`
+        ? threadHref(offer.thread, offer.listingId)
         : "/dashboard/offers",
     });
   }

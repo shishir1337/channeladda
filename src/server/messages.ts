@@ -17,6 +17,7 @@ import {
   type RedactionKind,
   redactContactDetails,
 } from "@/lib/redact";
+import { threadHref } from "@/lib/thread-href";
 import { writesInClosedThread } from "@/lib/thread-rules";
 import { isChatAttachmentKey, keyIsVideo, urlForKey } from "@/lib/upload-keys";
 import { ensureConversation, listingsInThread } from "@/server/chat-events";
@@ -1140,7 +1141,7 @@ export async function sendMessage(input: {
       // Staff speak as Channel Adda here too, never by name.
       title: `${role === "staff" ? "Channel Adda" : (input.sender.name ?? "Someone")} sent you a message`,
       body: body.slice(0, 140) || "Sent an attachment.",
-      href: `/dashboard/messages/${row.id}`,
+      href: threadHref(row.id, input.listingId),
       collapseKey: `thread:${row.id}`,
     });
   }

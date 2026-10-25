@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { expect, test } from "vitest";
 import { db } from "@/lib/db";
+import { threadHref } from "@/lib/thread-href";
 import { purgeOldMessages } from "@/server/chat-retention";
 import { loadPanelInput } from "@/server/deal-panel";
 import { assignAgent, createDeal } from "@/server/deals";
@@ -520,8 +521,10 @@ test(
     expect(await threadFingerprint(t.id, t.x)).toBe(fingerprint);
     expect(await db.notification.count({ where: { userId: t.x.id } })).toBe(0);
 
-    // Y, whose listing it is, is told.
-    expect(await db.notification.count({ where: { userId: t.y.id } })).toBe(1);
+    // Y, whose listing it is, is told — and the bell opens the
+    // conversation on that listing.
+    const bell = await db.notification.findMany({ where: { userId: t.y.id } });
+    expect(bell.map((n) => n.href)).toEqual([threadHref(t.id, t.second.id)]);
     const [theirs] = await listThreads(t.y);
     expect(theirs.preview).toContain("Agent Y");
     expect(theirs.unread).toBeGreaterThan(0);

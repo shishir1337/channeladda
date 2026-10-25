@@ -1,5 +1,6 @@
 import { beforeEach, expect, test, vi } from "vitest";
 import { db } from "@/lib/db";
+import { threadHref } from "@/lib/thread-href";
 import { listThreads, openConversation } from "@/server/messages";
 import {
   acceptOffer,
@@ -143,7 +144,7 @@ test(
       where: { userId: buyer.id, kind: "OFFER" },
     });
     expect(told).toHaveLength(1);
-    expect(told[0].href).toBe(`/dashboard/messages/${first.conversationId}`);
+    expect(told[0].href).toBe(threadHref(first.conversationId, listing.id));
     expect(mail.sent.map((m) => m.to)).toContain(buyer.email);
   }),
 );
@@ -180,16 +181,14 @@ test(
       where: { userId: other.id },
     });
     expect(told).toHaveLength(1);
-    expect(told[0].href).toBe(`/dashboard/messages/${theirs.conversationId}`);
+    expect(told[0].href).toBe(threadHref(theirs.conversationId, listing.id));
     expect(mail.sent.map((m) => m.to)).not.toContain(other.email);
     // The buyer whose offer was accepted is emailed, as before.
     expect(mail.sent.map((m) => m.to)).toContain(buyer.email);
     const acceptedNote = await db.notification.findFirstOrThrow({
       where: { userId: buyer.id, kind: "OFFER" },
     });
-    expect(acceptedNote.href).toBe(
-      `/dashboard/messages/${mine.conversationId}`,
-    );
+    expect(acceptedNote.href).toBe(threadHref(mine.conversationId, listing.id));
   }),
 );
 
@@ -216,14 +215,14 @@ test(
     const declined = await db.notification.findFirstOrThrow({
       where: { userId: buyer.id, kind: "OFFER" },
     });
-    expect(declined.href).toBe(`/dashboard/messages/${first.conversationId}`);
+    expect(declined.href).toBe(threadHref(first.conversationId, listing.id));
     // The seller hears about the withdrawal, without an email.
     const withdrawn = await db.notification.findMany({
       where: { userId: seller.id, kind: "OFFER" },
       orderBy: { createdAt: "asc" },
     });
     expect(withdrawn.at(-1)?.href).toBe(
-      `/dashboard/messages/${first.conversationId}`,
+      threadHref(first.conversationId, listing.id),
     );
   }),
 );
@@ -274,7 +273,7 @@ test(
     const told = await db.notification.findFirstOrThrow({
       where: { userId: buyer.id, title: { contains: "lapsed" } },
     });
-    expect(told.href).toBe(`/dashboard/messages/${made.conversationId}`);
+    expect(told.href).toBe(threadHref(made.conversationId, listing.id));
   }),
 );
 
@@ -391,7 +390,7 @@ test(
     const told = await db.notification.findFirstOrThrow({
       where: { userId: seller.id, kind: "OFFER" },
     });
-    expect(told.href).toBe(`/dashboard/messages/${made.conversationId}`);
+    expect(told.href).toBe(threadHref(made.conversationId, listing.id));
     expect(mail.sent.map((m) => m.to)).toContain(seller.email);
   }),
 );

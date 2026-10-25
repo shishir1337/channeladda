@@ -9,6 +9,7 @@ import type { DealMode, Platform } from "@/generated/prisma/enums";
 import { useSession } from "@/lib/auth-client";
 import { buyerTotal, type FeeSettings } from "@/lib/fees";
 import { handoverTarget, parseHandoverTo } from "@/lib/handover-target";
+import { threadHref } from "@/lib/thread-href";
 import { cn } from "@/lib/utils";
 import { startDeal } from "@/server/actions/deals";
 
@@ -317,7 +318,7 @@ export function StartDeal({
             // the deal page only pointed on to it.
             router.push(
               result.conversationId
-                ? `/dashboard/messages/${result.conversationId}`
+                ? threadHref(result.conversationId, listingId)
                 : `/dashboard/deals/${result.orderId}`,
             );
           });

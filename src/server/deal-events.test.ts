@@ -2,6 +2,7 @@ import { expect, test } from "vitest";
 import { eventText } from "@/lib/chat-events";
 import { db } from "@/lib/db";
 import { templateFor } from "@/lib/deal-templates";
+import { threadHref } from "@/lib/thread-href";
 import {
   advanceStep,
   assignAgent,
@@ -133,7 +134,7 @@ test(
       where: { userId: other.id },
     });
     expect(told.map((n) => n.href)).toEqual([
-      `/dashboard/messages/${theirs.conversationId}`,
+      threadHref(theirs.conversationId, seeded.listing.id),
     ]);
 
     // Their own offer is not "declined" by somebody else: they superseded it.

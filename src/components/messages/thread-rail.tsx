@@ -8,6 +8,7 @@ import { inputClass, SeeAll } from "@/components/app/kit";
 import { EscrowAgentAvatar, Initials } from "@/components/messages/chat-parts";
 import { Badge } from "@/components/ui/badge";
 import { ESCROW_AGENT_HREF, ESCROW_AGENT_NAME } from "@/lib/support-chat";
+import { threadHref } from "@/lib/thread-href";
 import { cn } from "@/lib/utils";
 
 /**
@@ -337,7 +338,9 @@ function ThreadRow({
     : "";
   return (
     <Link
-      href={`/dashboard/messages/${thread.id}`}
+      // No listing named: the page opens on wherever the reader's move
+      // is, or the one talked about last.
+      href={threadHref(thread.id)}
       aria-current={active ? "page" : undefined}
       className={cn(
         "group flex items-start gap-3 rounded-lg px-2.5 py-2.5 transition-[background-color,box-shadow] duration-150 focus-visible:-outline-offset-2",

@@ -46,6 +46,7 @@ import type { ListingStatus, OfferStatus } from "@/generated/prisma/enums";
 import { needsEmailVerification } from "@/lib/email-verification";
 import { removedBySeller } from "@/lib/listing-lock";
 import { countOf } from "@/lib/plural";
+import { threadHref } from "@/lib/thread-href";
 import { cn } from "@/lib/utils";
 import { getBuyerSummary, getSellerSummary } from "@/server/dashboard";
 import { listDealsFor } from "@/server/deals";
@@ -171,7 +172,7 @@ export default async function DashboardPage() {
         // Into the chat, where the step is done, rather than the deal page
         // that only points on to it.
         href: deal.conversationId
-          ? `/dashboard/messages/${deal.conversationId}`
+          ? threadHref(deal.conversationId, deal.listingId)
           : `/dashboard/deals/${deal.id}`,
         icon: ArrowLeftRightIcon,
         // The thing to do, in words — not "Your move on" and the whole

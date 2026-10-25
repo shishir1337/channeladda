@@ -72,6 +72,7 @@ test("a missing name does not produce 'Hi ,'", () => {
 
 import { db } from "@/lib/db";
 import { templateFor } from "@/lib/deal-templates";
+import { threadHref } from "@/lib/thread-href";
 import {
   advanceStep,
   createDeal,
@@ -114,7 +115,9 @@ test(
     const turn = await db.notification.findFirstOrThrow({
       where: { userId: seller.id, kind: "ORDER" },
     });
-    expect(turn.href).toBe(`/dashboard/messages/${order.conversationId}`);
+    expect(turn.href).toBe(
+      threadHref(order.conversationId ?? "", order.listingId),
+    );
   }),
 );
 
@@ -157,8 +160,12 @@ test(
     const href = (userId: string) =>
       told.find((n) => n.userId === userId)?.href;
     // Both sides to the conversation, where the record is.
-    expect(href(buyer.id)).toBe(`/dashboard/messages/${order.conversationId}`);
-    expect(href(seller.id)).toBe(`/dashboard/messages/${order.conversationId}`);
+    expect(href(buyer.id)).toBe(
+      threadHref(order.conversationId ?? "", order.listingId),
+    );
+    expect(href(seller.id)).toBe(
+      threadHref(order.conversationId ?? "", order.listingId),
+    );
     // The agent's access to the conversation ends with the deal, so a link
     // there would be a 404. The deal page is theirs to open.
     expect(href(agent.id)).toBe(`/dashboard/deals/${order.id}`);

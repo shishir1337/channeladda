@@ -3,6 +3,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { isTerminal } from "@/lib/deal-machine";
 import { BUYER_PAYS_AFTER_STEP, hasPayToLink, MAX_PAY_TO } from "@/lib/pay-to";
+import { threadHref } from "@/lib/thread-href";
 import { recordAudit } from "@/server/audit";
 import { postEvent } from "@/server/chat-events";
 import { notify } from "@/server/notifications";
@@ -49,6 +50,7 @@ export async function saveSellerPayTo(input: {
       buyerPaidAt: true,
       sellerPayTo: true,
       conversationId: true,
+      listingId: true,
       reference: true,
       seller: { select: { name: true } },
       steps: {
@@ -132,7 +134,7 @@ export async function saveSellerPayTo(input: {
       title,
       body,
       href: order.conversationId
-        ? `/dashboard/messages/${order.conversationId}`
+        ? threadHref(order.conversationId, order.listingId)
         : `/dashboard/deals/${order.id}`,
       // By email too: the buyer is waiting on this, and a change is the one
       // thing here that can cost them money.

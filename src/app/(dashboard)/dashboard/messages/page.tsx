@@ -4,6 +4,7 @@ import Link from "next/link";
 import { EmptyState } from "@/components/app/kit";
 import { Button } from "@/components/ui/button";
 import { ESCROW_AGENT_HREF, ESCROW_AGENT_NAME } from "@/lib/support-chat";
+import { threadHref } from "@/lib/thread-href";
 import { memberInbox, splitInbox } from "@/server/inbox";
 import { requireUser } from "@/server/session";
 
@@ -95,7 +96,7 @@ export default async function MessagesPage() {
         body="Start with the one that has been waiting longest."
         action={
           <Button asChild size="md">
-            <Link href={`/dashboard/messages/${oldestUnread.id}`}>
+            <Link href={threadHref(oldestUnread.id)}>
               Reply to {oldestUnread.withName.split(/\s+/)[0]}
             </Link>
           </Button>

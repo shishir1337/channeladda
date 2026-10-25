@@ -1,5 +1,6 @@
 import { expect, test, vi } from "vitest";
 import { db } from "@/lib/db";
+import { threadHref } from "@/lib/thread-href";
 import { createDeal } from "@/server/deals";
 import { seedListing, withCleanDb } from "@/test/db";
 
@@ -69,7 +70,7 @@ test(
     expect(paid.ok).toBe(true);
 
     const [request] = fake.requests;
-    const back = `/dashboard/messages/${order.conversationId}`;
+    const back = threadHref(order.conversationId ?? "", order.listingId);
     expect(request.successUrl.endsWith(back)).toBe(true);
     expect(request.returnUrl.endsWith(back)).toBe(true);
   }),

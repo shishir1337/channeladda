@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
+import { threadHref } from "@/lib/thread-href";
 import {
   classifyStatus,
   createInvoice,
@@ -121,7 +122,7 @@ export async function startPayment(orderId: string): Promise<PayResult> {
   // invoice still open, and Cryptomus keeps the first request's return
   // address. (The deal page's old ?paid=1 was read by nothing.)
   const back = deal.conversationId
-    ? `${base}/dashboard/messages/${deal.conversationId}`
+    ? `${base}${threadHref(deal.conversationId, deal.listingId)}`
     : `${base}/dashboard/deals/${deal.id}`;
   const raise = (reference: string) =>
     createInvoice({

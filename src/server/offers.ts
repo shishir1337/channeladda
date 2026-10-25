@@ -8,6 +8,7 @@ import {
   type RedactionKind,
   redactContactDetails,
 } from "@/lib/redact";
+import { threadHref } from "@/lib/thread-href";
 import { recordAudit } from "@/server/audit";
 import {
   type DbWriter,
@@ -16,7 +17,11 @@ import {
   pairThreadOf,
   postEvent,
 } from "@/server/chat-events";
-import { notifyClosedOffers, releaseIfFree } from "@/server/listing-hold";
+import {
+  type ClosedOffer,
+  notifyClosedOffers,
+  releaseIfFree,
+} from "@/server/listing-hold";
 import { notify } from "@/server/notifications";
 import { getSettings } from "@/server/settings";
 
@@ -251,11 +256,6 @@ function asMoney(cents: number): string {
   });
 }
 
-/** Where a notification about an offer takes somebody: the conversation. */
-function threadHref(conversationId: string): string {
-  return `/dashboard/messages/${conversationId}`;
-}
-
 type Note = { text: string | null; kinds: RedactionKind[]; flagged: boolean };
 
 /**
@@ -432,7 +432,7 @@ export async function createOffer(input: {
     kind: "OFFER",
     title: `${buyer?.name ?? "Someone"} offered ${amount}`,
     body: `On ${listing.title || "your listing"}. You can accept it, turn it down, or come back with a number of your own.`,
-    href: threadHref(conversationId),
+    href: threadHref(conversationId, listing.id),
     email: {
       subject: `${amount} offered on ${listing.title || "your listing"}`,
       body: [
@@ -535,7 +535,7 @@ async function claimOpen(
  * so this is worked out from the row rather than assumed.
  */
 async function tellTheOtherSide(
-  row: { buyerId: string; listing: { sellerId: string } },
+  row: { buyerId: string; listingId: string; listing: { sellerId: string } },
   responderId: string,
   conversationId: string,
   outcome: { title: string; body: string; email: boolean },
@@ -547,7 +547,8 @@ async function tellTheOtherSide(
     kind: "OFFER",
     title: outcome.title,
     body: outcome.body,
-    href: threadHref(conversationId),
+    // Where the offer is: the conversation, on its listing.
+    href: threadHref(conversationId, row.listingId),
     ...(outcome.email
       ? { email: { subject: outcome.title, body: outcome.body } }
       : {}),
@@ -576,7 +577,7 @@ export async function acceptOffer(
 
   const now = new Date();
   let conversationId: string;
-  let closed: { buyerId: string; amountUsd: number; thread: string | null }[];
+  let closed: ClosedOffer[];
   try {
     ({ conversationId, closed } = await db.$transaction(async (tx) => {
       const reserved = await tx.listing.updateMany({
@@ -615,11 +616,7 @@ export async function acceptOffer(
         },
         select: { id: true, buyerId: true, amountUsd: true, expiresAt: true },
       });
-      const closed: {
-        buyerId: string;
-        amountUsd: number;
-        thread: string | null;
-      }[] = [];
+      const closed: ClosedOffer[] = [];
       for (const other of others) {
         // The winning buyer's own other offers — one past its expiry that no
         // sweep has marked yet, or one raced in beside this — are not "lost
@@ -655,7 +652,12 @@ export async function acceptOffer(
             at: now,
           });
         }
-        closed.push({ ...other, thread });
+        closed.push({
+          buyerId: other.buyerId,
+          amountUsd: other.amountUsd,
+          thread,
+          listingId: row.listingId,
+        });
       }
       return { conversationId, closed };
     }));
@@ -931,7 +933,7 @@ export async function proposePrice(input: {
     kind: "OFFER",
     title,
     body,
-    href: threadHref(thread.id),
+    href: threadHref(thread.id, listing.id),
     email: { subject: title, body },
   });
 
@@ -1010,7 +1012,7 @@ export async function withdrawOffer(
     kind: "OFFER",
     title: `${name || "Someone"} withdrew their offer of ${asMoney(row.amountUsd)}`,
     body: "There is nothing to answer now.",
-    href: threadHref(conversationId),
+    href: threadHref(conversationId, row.listingId),
   });
 
   return { ok: true };
@@ -1125,7 +1127,7 @@ export async function releaseLapsedOfferReservations(
       kind: "OFFER",
       title: `Your accepted offer of ${amount} lapsed`,
       body: `The deal was never opened, so ${offer.listing.title} is back on sale. You can make another offer.`,
-      href: thread ? threadHref(thread) : "/dashboard/offers",
+      href: thread ? threadHref(thread, offer.listingId) : "/dashboard/offers",
     });
     await notify({
       userId: offer.listing.sellerId,

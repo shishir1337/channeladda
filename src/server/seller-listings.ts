@@ -23,6 +23,7 @@ import {
   REMOVABLE,
   SELLER_REMOVED_REASON,
 } from "@/lib/listing-lock";
+import { threadHref } from "@/lib/thread-href";
 import { recordAudit } from "@/server/audit";
 import { postEvent } from "@/server/chat-events";
 import { paymentInProgress } from "@/server/listing-hold";
@@ -756,6 +757,7 @@ type ClosedOffer = {
   buyerId: string;
   amountUsd: number;
   thread: string | null;
+  listingId: string;
 };
 
 class RemoveAbort extends Error {
@@ -910,6 +912,7 @@ export async function removeMyListing(
           buyerId: offer.buyerId,
           amountUsd: offer.amountUsd,
           thread: thread?.id ?? null,
+          listingId: id,
         });
       }
 
@@ -955,7 +958,7 @@ export async function removeMyListing(
       title: `Your offer of ${money(offer.amountUsd)} closed`,
       body: "The seller took the listing off the marketplace, so it is no longer for sale.",
       href: offer.thread
-        ? `/dashboard/messages/${offer.thread}`
+        ? threadHref(offer.thread, offer.listingId)
         : "/dashboard/offers",
     });
   }

@@ -33,6 +33,7 @@ export const metadata: Metadata = {
 function toCard(offer: OfferView): OfferCardData {
   return {
     id: offer.id,
+    listingId: offer.listingId,
     listingSlug: offer.listingSlug,
     listingTitle: offer.listingTitle,
     listingHandle: offer.listingHandle,

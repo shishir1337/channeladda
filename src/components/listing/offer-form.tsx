@@ -7,6 +7,7 @@ import { FormNotice } from "@/components/auth/fields";
 import { Button } from "@/components/ui/button";
 import { siteInput, siteTextarea } from "@/components/ui/field";
 import { useSession } from "@/lib/auth-client";
+import { threadHref } from "@/lib/thread-href";
 import { useHydrated } from "@/lib/use-hydrated";
 import { cn } from "@/lib/utils";
 import { makeOffer } from "@/server/actions/offers";
@@ -98,7 +99,7 @@ export function OfferForm({
         <div className="mt-4 flex flex-wrap gap-3">
           {thread ? (
             <Button asChild size="md">
-              <Link href={`/dashboard/messages/${thread}`}>Open the chat</Link>
+              <Link href={threadHref(thread, listingId)}>Open the chat</Link>
             </Button>
           ) : null}
           <Button asChild variant="secondary" size="md">

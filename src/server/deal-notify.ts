@@ -5,18 +5,24 @@ import { CUSTODIAN_ROLES, withinLevel } from "@/lib/custody-roles";
 import { db } from "@/lib/db";
 import type { DealActor } from "@/lib/deal-machine";
 import { awaitsAgent, templateFor } from "@/lib/deal-templates";
+import { threadHref } from "@/lib/thread-href";
 import { canSendMail, sendMail } from "@/server/mailer";
 import { notify } from "@/server/notifications";
 
 /**
  * Where a notification about a deal takes somebody: its conversation, where
  * the next step can be taken and the other side asked about it. The deal
- * page is one click from there. A deal from before conversations were
+ * page is one click from there. Opened on the deal's listing, since a
+ * conversation can be about several. A deal from before conversations were
  * guaranteed falls back to its page.
  */
-function dealHref(order: { id: string; conversationId: string | null }) {
+function dealHref(order: {
+  id: string;
+  conversationId: string | null;
+  listingId: string;
+}) {
   return order.conversationId
-    ? `/dashboard/messages/${order.conversationId}`
+    ? threadHref(order.conversationId, order.listingId)
     : `/dashboard/deals/${order.id}`;
 }
 
@@ -126,6 +132,7 @@ export async function notifyNextActor(orderId: string): Promise<void> {
         sellerId: true,
         agentId: true,
         conversationId: true,
+        listingId: true,
         handoverTo: true,
         holdUntil: true,
         priceUsd: true,
@@ -253,6 +260,7 @@ export async function notifyHandoverChanged(input: {
   userId: string;
   orderId: string;
   conversationId: string | null;
+  listingId: string;
   reference: string;
   listingTitle: string;
   handoverTo: string;
@@ -261,6 +269,7 @@ export async function notifyHandoverChanged(input: {
     const href = dealHref({
       id: input.orderId,
       conversationId: input.conversationId,
+      listingId: input.listingId,
     });
     // The address itself stays out of the notification row: those are
     // listed and previewed, and it belongs only on the deal and in email.
@@ -315,6 +324,7 @@ export async function notifyBuyerWaitOver(orderId: string): Promise<void> {
         mode: true,
         buyerId: true,
         conversationId: true,
+        listingId: true,
         steps: {
           where: { completedAt: null },
           orderBy: { position: "asc" },
@@ -361,6 +371,7 @@ export async function notifyDealEnded(
         sellerId: true,
         agentId: true,
         conversationId: true,
+        listingId: true,
         listing: { select: { title: true } },
       },
     });
