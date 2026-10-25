@@ -21,6 +21,7 @@ import { Price } from "@/components/ui/price";
 import type { Listing } from "@/data/listings";
 import type { Platform } from "@/data/platforms";
 import type { Seller } from "@/data/sellers";
+import { engagementShown } from "@/lib/engagement";
 import { countOf } from "@/lib/plural";
 import { revenueLine } from "@/lib/revenue-line";
 import { formatCompact } from "@/lib/utils";
@@ -67,7 +68,7 @@ export function MetricsPanel({
     {
       icon: TrendingUpIcon,
       label: "Engagement rate",
-      value: `${listing.engagement}%`,
+      value: engagementShown(listing) ?? "Not measured",
     },
     {
       icon: CalendarIcon,

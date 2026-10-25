@@ -210,6 +210,10 @@ const LINK_NEEDED =
   "Paste the link to the account — the ownership check reads it, and a moderator opens it.";
 
 const submitFields = listingFields.extend({
+  // Blank (NaN from the form) is allowed here and refused below for every
+  // platform but a website, which has visits rather than a feed to engage
+  // with: Website sellers could not send a listing without inventing one.
+  engagement: z.union([z.nan(), listingFields.shape.engagement]),
   coverUrl: z.string().min(1, "Add a cover image."),
   avatarUrl: z.string().min(1, "Add a profile picture."),
   proofs: listingFields.shape.proofs.unwrap().min(1, {
@@ -228,10 +232,24 @@ const submitFields = listingFields.extend({
     ),
 });
 
-export const listingSubmitSchema = submitFields.superRefine(
-  noContactDetails,
-  EVEN_IF_INVALID,
-);
+/** An engagement rate, for everything but a website. */
+function engagementUnlessWebsite(
+  value: { platform?: unknown; engagement?: unknown },
+  ctx: z.RefinementCtx,
+) {
+  if (value.platform === "website") return;
+  if (typeof value.engagement === "number" && Number.isNaN(value.engagement)) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["engagement"],
+      message: "Enter an engagement rate.",
+    });
+  }
+}
+
+export const listingSubmitSchema = submitFields
+  .superRefine(noContactDetails, EVEN_IF_INVALID)
+  .superRefine(engagementUnlessWebsite, EVEN_IF_INVALID);
 
 /**
  * What may change on a listing buyers can already see.

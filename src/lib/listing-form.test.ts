@@ -276,3 +276,30 @@ test("a live edit no longer needs the checked figures, and still takes them as t
     listingLiveEditSchema.safeParse({ ...LIVE, audience: 49_000 }).success,
   ).toBe(true);
 });
+
+test("a website may be sent without an engagement rate", () => {
+  // Seller QA: engagement rate was required for a Website, which has none
+  // in the sense a feed does.
+  const site: ListingDraftInput = {
+    ...TYPED,
+    platform: "website",
+    handle: "gadgetreview.example.com",
+    sourceUrl: "https://gadgetreview.example.com",
+    engagement: Number.NaN,
+    coverUrl: "/uploads/cover/a.png",
+    avatarUrl: "/uploads/avatar/a.png",
+    proofs: [
+      {
+        url: "/uploads/proof/a.png",
+        label: "Analytics, last 30 days",
+        sha256: "a".repeat(64),
+      },
+    ],
+  };
+  expect(fields(listingSubmitSchema.safeParse(site))).toEqual([]);
+
+  // Everywhere else it is still asked for.
+  expect(
+    fields(listingSubmitSchema.safeParse({ ...site, platform: "instagram" })),
+  ).toEqual(["engagement"]);
+});

@@ -3,6 +3,7 @@
 import {
   CheckIcon,
   CircleAlertIcon,
+  InfoIcon,
   LinkIcon,
   Loader2Icon,
   SearchIcon,
@@ -143,7 +144,8 @@ type Lookup =
   | { kind: "idle" }
   /** Fetched and already in the form; `filled` is what it changed. */
   | { kind: "filled"; channel: ImportedChannel; filled: ImportKey[] }
-  | { kind: "error"; message: string; for: PlatformId };
+  /** `edits`: the handle edits when it failed; another edit retires it. */
+  | { kind: "error"; message: string; for: PlatformId; edits?: number };
 
 type PlatformInfo = {
   id: PlatformId;
@@ -178,6 +180,7 @@ export function ChannelLinkField({
   onUndo,
   error,
   savedUrl,
+  handleEdits,
 }: {
   /** The input's id, which the error summary scrolls to. */
   id: string;
@@ -195,6 +198,11 @@ export function ChannelLinkField({
   error?: string;
   /** The link already saved on this listing, when one is being edited. */
   savedUrl?: string;
+  /**
+   * How many times the seller has typed in the handle field. A lookup that
+   * failed is retired by the next edit: they are filling it in by hand.
+   */
+  handleEdits?: number;
 }) {
   const hintId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -212,7 +220,11 @@ export function ChannelLinkField({
       : found.kind === "idle"
         ? platform.id
         : ID_OF[found.channel.platform];
-  const lookup: Lookup = about === platform.id ? found : { kind: "idle" };
+  const lookup: Lookup =
+    about === platform.id &&
+    !(found.kind === "error" && found.edits !== handleEdits)
+      ? found
+      : { kind: "idle" };
   const note = notice?.for === platform.id ? notice.text : null;
   // A link replaced while the last one was still being looked up must not
   // have the old answer land on it.
@@ -241,7 +253,12 @@ export function ChannelLinkField({
       }
       if (mine !== ticket.current) return;
       if (!result.ok) {
-        setLookup({ kind: "error", message: result.error, for: target });
+        setLookup({
+          kind: "error",
+          message: result.error,
+          for: target,
+          edits: handleEdits,
+        });
         return;
       }
       const { ok: _ok, ...channel } = result;
@@ -458,16 +475,24 @@ export function ChannelLinkField({
 
       {pending ? <PreviewSkeleton /> : null}
 
+      {/* Not an error: the listing can be sent without a lookup, so a red
+          alert that stayed put read as a problem nobody could fix. */}
       {lookup.kind === "error" && !pending ? (
         <p
-          role="alert"
-          className="mt-3 flex items-start gap-2 rounded-lg border border-danger/20 bg-danger-soft/60 px-3 py-2.5 text-[0.8125rem] leading-relaxed text-fg"
+          role="status"
+          className="mt-3 flex items-start gap-2 rounded-lg border border-line bg-surface-2 px-3 py-2.5 text-[0.8125rem] leading-relaxed text-muted"
         >
-          <CircleAlertIcon
+          <InfoIcon
             aria-hidden="true"
-            className="mt-0.5 size-3.5 shrink-0 text-danger"
+            className="mt-0.5 size-3.5 shrink-0 text-subtle"
           />
-          <span>{lookup.message}</span>
+          <span>
+            <span className="text-fg">
+              We couldn&rsquo;t fetch details for that channel — fill them in
+              yourself.
+            </span>{" "}
+            {lookup.message}
+          </span>
         </p>
       ) : null}
 

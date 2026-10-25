@@ -7,6 +7,7 @@ import { Price } from "@/components/ui/price";
 import type { Listing } from "@/data/listings";
 import { platformMap } from "@/data/platforms";
 import { artworkProps } from "@/lib/artwork";
+import { engagementShown } from "@/lib/engagement";
 import { countOf } from "@/lib/plural";
 import { revenueLine } from "@/lib/revenue-line";
 import { cn, formatCompact } from "@/lib/utils";
@@ -172,7 +173,7 @@ export function ListingCard({
             label={platform.metricLabel}
             value={formatCompact(listing.audience)}
           />
-          <Fact label="Engagement" value={`${listing.engagement}%`} />
+          <Fact label="Engagement" value={engagementShown(listing) ?? "—"} />
           <Fact label="Age" value={`${listing.ageYears} yr`} />
         </dl>
 
@@ -294,7 +295,8 @@ function PhoneRow({
           <span className="font-medium text-fg">
             {formatCompact(listing.audience)}
           </span>{" "}
-          {platform.metricLabel.toLowerCase()} · {listing.engagement}% ·{" "}
+          {platform.metricLabel.toLowerCase()} ·{" "}
+          {engagementShown(listing) ? `${engagementShown(listing)} · ` : null}
           {listing.ageYears} yr
         </p>
         <div className="mt-1.5 flex min-w-0 items-center gap-2">

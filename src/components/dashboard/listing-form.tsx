@@ -98,6 +98,50 @@ const EMPTY: Draft = {
   proofs: [],
 };
 
+/**
+ * Examples in each platform's own terms. Every platform was shown YouTube's
+ * — "Monetized tech review channel…", "Brand Account…" — so an Instagram
+ * seller was told to describe a channel and its Brand Account.
+ */
+const EXAMPLES: Record<
+  PlatformId,
+  { handle: string; title: string; transfer: string; transferHint: string }
+> = {
+  youtube: {
+    handle: "@dailytechbrief",
+    title: "Monetized tech review channel with 4 years of watch time",
+    transfer: "Brand Account, 2FA on the owner email",
+    transferHint: "For example: it sits on a Brand Account.",
+  },
+  instagram: {
+    handle: "@dailytravelreels",
+    title: "Travel reels page with 48K engaged followers",
+    transfer: "Creator account, 2FA by authenticator app",
+    transferHint:
+      "For example: a creator or business account, and how 2FA is set up.",
+  },
+  facebook: {
+    handle: "dailyrecipes",
+    title: "Recipe page with 90K followers and steady weekly reach",
+    transfer: "Page in Meta Business Suite, two admins",
+    transferHint:
+      "For example: who the admins are, or whether it is in Business Suite.",
+  },
+  telegram: {
+    handle: "@cryptodailynews",
+    title: "Crypto news channel with 22K active members",
+    transfer: "Public channel, I am the only owner",
+    transferHint: "For example: public or private, and who else is an admin.",
+  },
+  website: {
+    handle: "gadgetreview.com",
+    title: "Gadget review site with 30K monthly visits and affiliate income",
+    transfer: "Domain at Namecheap, hosting on Cloudflare",
+    transferHint:
+      "For example: where the domain is registered and where it is hosted.",
+  },
+};
+
 /** "" and a stray "12abc" both have to become something zod will reject. */
 function num(value: string) {
   if (value.trim() === "") return Number.NaN;
@@ -391,6 +435,8 @@ export function ListingForm({
   };
 
   const [draft, setDraft] = useState<Draft>({ ...EMPTY, ...initial });
+  // Typing a handle by hand retires a lookup that could not find the channel.
+  const [handleEdits, setHandleEdits] = useState(0);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saved, setSaved] = useState(false);
   const [sending, setSending] = useState<"draft" | "review" | null>(null);
@@ -489,6 +535,7 @@ export function ListingForm({
 
   const platform =
     platforms.find((p) => p.id === draft.platform) ?? platforms[0];
+  const examples = EXAMPLES[platform.id];
 
   // Shown as a quiet line rather than a field while it is simply what the
   // link says; a field again the moment there is something to decide.
@@ -550,9 +597,10 @@ export function ListingForm({
       id: STEP.numbers,
       label: "The numbers",
       icon: ActivityIcon,
+      // A website has visits, not a feed: its engagement rate is optional.
       done: [
         filled(draft.audience),
-        filled(draft.engagement),
+        ...(draft.platform === "website" ? [] : [filled(draft.engagement)]),
         filled(draft.ageYears),
       ],
       error: hasErrorIn([
@@ -950,6 +998,7 @@ export function ListingForm({
             onUndo={undoLastFill}
             error={errors.sourceUrl}
             savedUrl={initial?.sourceUrl || undefined}
+            handleEdits={handleEdits}
           />
 
           {handleFollowsLink ? (
@@ -987,11 +1036,14 @@ export function ListingForm({
               id={ids.handle}
               name="handle"
               label="Handle"
-              hint="The account's name as buyers would search for it, for example @dailytechbrief."
+              hint={`The account's name as buyers would search for it, for example ${examples.handle}.`}
               value={draft.handle}
-              onChange={(e) => set("handle", e.target.value)}
+              onChange={(e) => {
+                setHandleEdits((n) => n + 1);
+                set("handle", e.target.value);
+              }}
               error={errors.handle}
-              placeholder="@dailytechbrief"
+              placeholder={examples.handle}
               required
             />
           ) : null}
@@ -1006,7 +1058,7 @@ export function ListingForm({
               value={draft.title}
               onChange={(e) => set("title", e.target.value)}
               error={errors.title}
-              placeholder="Monetized tech review channel with 4 years of watch time"
+              placeholder={examples.title}
               required
             />
             <p className="mt-1.5 text-xs text-subtle">
@@ -1077,14 +1129,22 @@ export function ListingForm({
             <TextField
               id={ids.engagement}
               name="engagement"
-              label="Engagement rate (%)"
-              hint="Average, over the last 30 days."
+              label={
+                platform.id === "website"
+                  ? "Engagement rate (%, optional)"
+                  : "Engagement rate (%)"
+              }
+              hint={
+                platform.id === "website"
+                  ? "Leave it empty if the site does not measure one."
+                  : "Average, over the last 30 days."
+              }
               inputMode="decimal"
               value={draft.engagement}
               onChange={(e) => set("engagement", e.target.value)}
               error={errors.engagement}
               placeholder="7.4"
-              required
+              required={platform.id !== "website"}
             />
             <TextField
               id={ids.age}
@@ -1553,11 +1613,11 @@ export function ListingForm({
             id={ids.transfer}
             name="transferProfile"
             label="Anything specific about this account (optional)"
-            hint="For example: sits on a Brand Account, or the domain is at Cloudflare."
+            hint={examples.transferHint}
             value={draft.transferProfile}
             onChange={(e) => set("transferProfile", e.target.value)}
             error={errors.transferProfile}
-            placeholder="Brand Account, 2FA on the owner email"
+            placeholder={examples.transfer}
           />
 
           <FieldInfo
