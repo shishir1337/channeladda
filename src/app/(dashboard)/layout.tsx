@@ -78,7 +78,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/">) {
   const groups: NavGroup[] = [
     {
       label: null,
-      items: [{ label: "Home", href: "/dashboard", icon: "overview" }],
+      items: [{ label: "Overview", href: "/dashboard", icon: "overview" }],
     },
     {
       label: "Trading",
@@ -174,7 +174,7 @@ export default async function DashboardLayout({ children }: LayoutProps<"/">) {
   // Browse, not Wallet: the balance is in the top bar on every screen, and
   // the marketplace was the one place a phone could not get back to.
   const tabs: NavItem[] = [
-    { label: "Home", href: "/dashboard", icon: "overview" },
+    { label: "Overview", href: "/dashboard", icon: "overview" },
     { label: "Browse", href: "/browse", icon: "browse" },
     {
       label: "Deals",

@@ -33,7 +33,7 @@ export function siteTabs(
 ): SiteTab[] {
   if (member) {
     return [
-      { label: "Home", href: "/dashboard", icon: "overview" },
+      { label: "Overview", href: "/dashboard", icon: "overview" },
       { label: "Browse", href: "/browse", icon: "browse" },
       {
         label: "Deals",

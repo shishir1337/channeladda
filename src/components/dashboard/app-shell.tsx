@@ -9,8 +9,8 @@ import {
   CoinsIcon,
   FingerprintIcon,
   GavelIcon,
-  GlobeIcon,
   HandshakeIcon,
+  HouseIcon,
   LayoutDashboardIcon,
   LifeBuoyIcon,
   MenuIcon,
@@ -39,7 +39,7 @@ import { ChannelAddaLogo } from "@/components/icons/brand-icons";
 import { ThemeRow, ThemeToggle } from "@/components/site/theme-toggle";
 import { WalletChip } from "@/components/site/wallet-balance";
 import { Button } from "@/components/ui/button";
-import { HUE_TEXT, type Hue, hueOf, iconText } from "@/components/ui/icon-hue";
+import { HUE_TEXT, type Hue, hueOf } from "@/components/ui/icon-hue";
 import {
   Sheet,
   SheetContent,
@@ -392,12 +392,14 @@ const iconButton =
   "inline-flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted transition-colors duration-150 hover:bg-black/[0.05] hover:text-fg dark:hover:bg-white/[0.06] pointer-fine:size-8";
 
 /**
- * The way out to the website, beside the balance in the top bar.
+ * The way out to the website, beside the balance in the top bar: "Home",
+ * the site's homepage (the owner, 2026-10-26), while the dashboard's own
+ * first page is its Overview.
  *
  * The owner could not find one: the logo does it, and the rail has a
  * "Website" group, but neither says so where the eye goes. It is the
  * wallet's shape — height, corners, hover — so the two read as one row;
- * a globe and the word on a wider screen, the globe alone on a phone,
+ * a house and the word on a wider screen, the house alone on a phone,
  * where the word is still the link's name for a screen reader. 40px wide
  * there, not 44: at 360px every pixel it takes comes out of the page's
  * name beside the logo.
@@ -409,14 +411,14 @@ function WebsiteLink() {
   return (
     <Link
       href="/"
-      title="Go to the Channel Adda website"
+      title="Go to the Channel Adda homepage"
       className="inline-flex h-11 min-w-10 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-md text-[0.8125rem] font-medium text-muted transition-colors duration-150 hover:bg-black/[0.05] hover:text-fg sm:px-2.5 dark:hover:bg-white/[0.06] pointer-fine:h-8 pointer-fine:min-w-8"
     >
-      <GlobeIcon
+      <HouseIcon
         aria-hidden="true"
-        className={cn("size-4 shrink-0", iconText(GlobeIcon))}
+        className={cn("size-4 shrink-0", HUE_TEXT.sky)}
       />
-      <span className="max-sm:sr-only">Website</span>
+      <span className="max-sm:sr-only">Home</span>
     </Link>
   );
 }

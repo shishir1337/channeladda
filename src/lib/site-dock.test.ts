@@ -20,7 +20,7 @@ test("signing in from a page comes back to it", () => {
 test("a member gets the dashboard's own bar, with its counts", () => {
   const tabs = siteTabs("/", { counts: { deals: 2, messages: 5 } });
   expect(tabs.map((tab) => [tab.label, tab.href, tab.waiting])).toEqual([
-    ["Home", "/dashboard", undefined],
+    ["Overview", "/dashboard", undefined],
     ["Browse", "/browse", undefined],
     ["Deals", "/dashboard/deals", 2],
     ["Messages", "/dashboard/messages", 5],
