@@ -14,14 +14,15 @@ import { Price } from "@/components/ui/price";
 import { Container, Section, SectionHeading } from "@/components/ui/section";
 import { platforms } from "@/data/platforms";
 import { formatRate, sellerPayout } from "@/lib/fees";
+import { pageMetadata } from "@/lib/seo";
 import { getFeeSettings } from "@/server/settings";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Sell your account",
   description:
-    "List a YouTube channel, Instagram or Facebook page, Telegram channel or website for free. A supervised handover proves the buyer is real, and you are paid in crypto once it is confirmed.",
-  alternates: { canonical: "/sell" },
-};
+    "List a YouTube channel, Instagram or Facebook page, Telegram channel or website for free. Our agent supervises the handover, and you are paid once it is done.",
+  path: "/sell",
+});
 
 const steps = [
   {
@@ -38,7 +39,7 @@ const steps = [
   },
   {
     title: "Get paid, either way",
-    body: "Fastest: we pay your wallet once our agent has the channel. Safest: the buyer pays you directly.",
+    body: "Fastest: we pay your wallet once our agent has the account. Safest: the buyer pays you directly.",
   },
 ];
 
@@ -53,7 +54,7 @@ export default async function SellPage() {
     <>
       <PageHeader
         crumbs={[{ label: "Home", href: "/" }, { label: "Sell" }]}
-        title="Sell your channel safely"
+        title="Sell your account safely"
         description="Free to list. We only take a fee when a deal completes."
         actions={
           <Button asChild size="lg">
@@ -208,7 +209,7 @@ export default async function SellPage() {
               {
                 icon: LockIcon,
                 title: "You are protected too",
-                body: "Our agent holds the money or the channel, so a buyer cannot run off.",
+                body: "Our agent holds the money or the account, so a buyer cannot run off.",
               },
               {
                 icon: BadgeCheckIcon,

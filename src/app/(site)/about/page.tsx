@@ -5,18 +5,19 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Container, Section } from "@/components/ui/section";
 import { platforms } from "@/data/platforms";
 import { databaseGate } from "@/lib/db-gate";
+import { pageMetadata } from "@/lib/seo";
 import { getPlatformCounts } from "@/server/listings";
 import { getSellerSlugs } from "@/server/sellers";
 
 /** Counts from the marketplace itself, refreshed like the pages they echo. */
 export const revalidate = 60;
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "About Channel Adda",
   description:
     "Why we built a supervised marketplace for social media accounts, and how the business actually makes money.",
-  alternates: { canonical: "/about" },
-};
+  path: "/about",
+});
 
 export default async function AboutPage() {
   const gate = await databaseGate();

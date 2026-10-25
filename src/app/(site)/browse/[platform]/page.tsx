@@ -9,6 +9,7 @@ import { Price } from "@/components/ui/price";
 import { type PlatformId, platformMap, platforms } from "@/data/platforms";
 import { databaseGate } from "@/lib/db-gate";
 import { parseFilters } from "@/lib/listing-query";
+import { pagedPath, pagedTitle, pageMetadata } from "@/lib/seo";
 import {
   getPlatformCounts,
   getPlatformFloors,
@@ -25,19 +26,25 @@ export const dynamicParams = false;
 
 export async function generateMetadata({
   params,
+  searchParams,
 }: PageProps<"/browse/[platform]">): Promise<Metadata> {
   const { platform } = await params;
   const p = platformMap[platform as PlatformId];
   if (!p) return { title: "Platform not found" };
 
-  const counts = await getPlatformCounts();
-  const title = `Buy ${p.name} ${p.assetNoun} — ${counts[p.id].toLocaleString("en-US")} for sale`;
-  return {
-    title,
-    description: p.blurb,
-    openGraph: { title, description: p.blurb },
-    alternates: { canonical: `/browse/${p.id}` },
-  };
+  const [counts, { page }] = await Promise.all([
+    getPlatformCounts(),
+    searchParams.then(parseFilters),
+  ]);
+  // "Websites for sale · 5 listed", not "Buy Website sites — 5 for sale".
+  const title = `${p.label} for sale · ${counts[p.id].toLocaleString("en-US")} listed`;
+  return pageMetadata({
+    title: pagedTitle(title, page),
+    description: page > 1 ? `Page ${page}. ${p.summary}` : p.summary,
+    // Each page of the list is its own page to a search engine; the
+    // filters are not, so they are left out of the address.
+    path: pagedPath(`/browse/${p.id}`, page),
+  });
 }
 
 export default async function PlatformBrowsePage({
@@ -76,7 +83,7 @@ export default async function PlatformBrowsePage({
             >
               <p.icon className="size-6 sm:size-7" />
             </span>
-            {p.name} {p.assetNoun} for sale
+            {p.label} for sale
           </span>
         }
         description={p.blurb}
@@ -121,13 +128,11 @@ export default async function PlatformBrowsePage({
               <p className="mt-4 text-[0.9375rem] leading-relaxed text-muted sm:text-base">
                 {p.transferNote}
               </p>
+              {/* In this platform's own terms: "invited as owner, then made
+                  primary owner" is YouTube's handover, not Instagram's. */}
               <p className="mt-4 text-[0.9375rem] leading-relaxed text-muted sm:text-base">
-                On a Fastest deal we hold your payment while our agent takes the
-                account from the seller: you are invited as owner for{" "}
-                <span className="font-semibold text-fg">{p.holdDays} days</span>
-                , then the seller is paid and our agent makes you primary owner.
-                On a Safest deal our agent holds the account itself, and you pay
-                the seller only once it is in our hands.
+                {p.fastestHold} On Safest our agent holds the {p.noun} itself,
+                and you pay the seller only once it is in our hands.
               </p>
               <Link
                 href="/how-it-works"
@@ -151,7 +156,7 @@ export default async function PlatformBrowsePage({
                         className="size-4 shrink-0"
                         style={{ color: other.tint }}
                       />
-                      {other.name} {other.assetNoun}
+                      {other.label}
                       <span className="tnum ml-auto text-xs text-subtle">
                         {counts[other.id].toLocaleString("en-US")}
                       </span>

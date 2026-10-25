@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { Categories } from "@/components/home/categories";
 import { Faq } from "@/components/home/faq";
 import { Hero } from "@/components/home/hero";
@@ -6,7 +7,10 @@ import { SellerCta } from "@/components/home/seller-cta";
 import { SoldTicker } from "@/components/home/sold-ticker";
 import { Testimonials } from "@/components/home/testimonials";
 import { TopSellers } from "@/components/home/top-sellers";
+import { JsonLd } from "@/components/site/json-ld";
 import { databaseGate } from "@/lib/db-gate";
+import { pageMetadata, SITE_DESCRIPTION, siteLd } from "@/lib/seo";
+import { siteUrl } from "@/lib/site-url";
 import {
   getFeaturedListings,
   getPlatformCounts,
@@ -18,6 +22,14 @@ import { getSellers, getSiteStats } from "@/server/sellers";
 /** Marketplace data changes constantly; Prisma queries are invisible to Next's
  *  cache detection, so revalidation is declared explicitly. */
 export const revalidate = 60;
+
+export const metadata: Metadata = pageMetadata({
+  title: {
+    absolute: "Channel Adda — Buy & sell social media accounts, safely",
+  },
+  description: SITE_DESCRIPTION,
+  path: "/",
+});
 
 export default async function HomePage() {
   const gate = await databaseGate();
@@ -35,6 +47,7 @@ export default async function HomePage() {
 
   return (
     <>
+      <JsonLd data={siteLd(siteUrl(), SITE_DESCRIPTION)} />
       <Hero stats={stats} />
       <SoldTicker items={sold} />
       <Categories counts={counts} floors={floors} />

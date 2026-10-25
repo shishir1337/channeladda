@@ -115,8 +115,30 @@ export function MetricsPanel({
   );
 }
 
+/**
+ * The seller's own account of what this is and how it earns — the listing
+ * form's "About this account", which buyers were never shown. Their line
+ * breaks are kept; it is text, never HTML.
+ */
+export function AboutPanel({ text }: { text: string | null }) {
+  if (!text) return null;
+  return (
+    <Panel title="About this account" id="about">
+      <p className="text-sm leading-relaxed break-words whitespace-pre-line text-fg">
+        {text}
+      </p>
+    </Panel>
+  );
+}
+
 /** The single most common source of post-sale disputes, stated up front. */
-export function MonetizationNotice({ listing }: { listing: Listing }) {
+export function MonetizationNotice({
+  listing,
+  platform,
+}: {
+  listing: Listing;
+  platform: Platform;
+}) {
   if (listing.monthlyRevenue <= 0) return null;
 
   return (
@@ -127,7 +149,7 @@ export function MonetizationNotice({ listing }: { listing: Listing }) {
       />
       <div className="min-w-0">
         <h2 className="text-base font-semibold text-fg">
-          Revenue does not move with the channel
+          Revenue does not move with the {platform.noun}
         </h2>
         {/* Two sentences where there were two paragraphs: it is a warning,
             read on a phone, and has one thing to say. */}
@@ -160,10 +182,11 @@ export function TransferPanel({ platform }: { platform: Platform }) {
           </li>
         ))}
       </ol>
+      {/* The hold in this platform's own terms. "You are an owner, then made
+          primary owner" is YouTube's handover, and contradicted the steps
+          above on every other platform. */}
       <p className="mt-5 rounded-xl border border-line bg-bg-subtle p-4 text-[0.8125rem] leading-relaxed text-muted">
-        On Fastest you are an owner for{" "}
-        <span className="font-semibold text-fg">{platform.holdDays} days</span>,
-        then made primary owner.{" "}
+        {platform.fastestHold}{" "}
         <Link
           href="/how-it-works"
           className="font-medium text-fg underline underline-offset-4 decoration-line-strong hover:decoration-fg"

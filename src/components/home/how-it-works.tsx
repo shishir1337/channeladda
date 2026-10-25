@@ -26,7 +26,7 @@ const steps = [
   {
     icon: LockIcon,
     title: "Choose Safest or Fastest",
-    body: "We hold the channel or your money.",
+    body: "We hold the account or your money.",
   },
   {
     icon: HandshakeIcon,
@@ -36,7 +36,7 @@ const steps = [
   {
     icon: BanknoteIcon,
     title: "It is yours",
-    body: "The deal closes when the channel is yours.",
+    body: "The deal closes when the account is yours.",
   },
 ];
 
@@ -46,10 +46,10 @@ const modes = [
     icon: ZapIcon,
     name: "Fastest",
     tagline: "You pay us, we pay the seller",
-    release: "When our agent has the channel",
+    release: "When our agent has the account",
     accent: false,
     points: [
-      "We hold your money until our agent has the channel",
+      "We hold your money until our agent has the account",
       "Then our agent makes you primary owner",
       "The seller never hands it straight to a stranger",
     ],
@@ -58,13 +58,13 @@ const modes = [
     id: "safest",
     icon: LockIcon,
     name: "Safest",
-    tagline: "We hold the channel first",
+    tagline: "We hold the account first",
     release: "By you, after our agent has it",
     accent: true,
     points: [
-      "Our agent takes the channel before you pay the seller",
+      "Our agent takes the account before you pay the seller",
       "You pay us only our fee",
-      "The seller confirms your payment, then the channel is yours",
+      "The seller confirms your payment, then the account is yours",
     ],
   },
 ];

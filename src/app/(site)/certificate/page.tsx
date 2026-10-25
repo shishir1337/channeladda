@@ -3,13 +3,14 @@ import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { Container, Section } from "@/components/ui/section";
+import { pageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Check a certificate",
   description:
     "Check that a Channel Adda certificate of transfer is genuine, by the code printed on it.",
-  alternates: { canonical: "/certificate" },
-};
+  path: "/certificate",
+});
 
 /**
  * Where a code read off a printed certificate is typed. The form is a

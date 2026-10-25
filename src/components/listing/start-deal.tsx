@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useId, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Price } from "@/components/ui/price";
+import { platformNoun } from "@/data/platforms";
 import type { DealMode, Platform } from "@/generated/prisma/enums";
 import { useSession } from "@/lib/auth-client";
 import { buyerTotal, type FeeSettings } from "@/lib/fees";
@@ -23,32 +24,39 @@ import { startDeal } from "@/server/actions/deals";
  * from the seller and hands it on to them. Either way the figure they will be asked for now is on
  * screen before they commit.
  */
-const MODES = [
-  {
-    id: "SAFEST" as const,
-    label: "Safest",
-    icon: ShieldCheckIcon,
-    holds: "We hold the channel",
-    // Three short lines, not a paragraph: the owner's clients read this on a
-    // phone and went looking for the choice under the wall of text.
-    steps: [
-      "You pay our fee",
-      "Our agent takes the channel",
-      "You pay the seller, then get the channel",
-    ],
-  },
-  {
-    id: "FASTEST" as const,
-    label: "Fastest",
-    icon: ZapIcon,
-    holds: "We hold the money",
-    steps: [
-      "You pay us the price and our fee",
-      "Our agent takes the channel",
-      "You get the channel, the seller gets paid",
-    ],
-  },
-];
+/**
+ * The two modes in this platform's word for what is sold: a channel, a
+ * page, a site. "We hold the channel" was on every listing, an Instagram
+ * page and a website included.
+ */
+function modesFor(thing: string) {
+  return [
+    {
+      id: "SAFEST" as const,
+      label: "Safest",
+      icon: ShieldCheckIcon,
+      holds: `We hold the ${thing}`,
+      // Three short lines, not a paragraph: the owner's clients read this on a
+      // phone and went looking for the choice under the wall of text.
+      steps: [
+        "You pay our fee",
+        `Our agent takes the ${thing}`,
+        `You pay the seller, then get the ${thing}`,
+      ],
+    },
+    {
+      id: "FASTEST" as const,
+      label: "Fastest",
+      icon: ZapIcon,
+      holds: "We hold the money",
+      steps: [
+        "You pay us the price and our fee",
+        `Our agent takes the ${thing}`,
+        `You get the ${thing}, the seller gets paid`,
+      ],
+    },
+  ];
+}
 
 export function StartDeal({
   listingId,
@@ -90,6 +98,7 @@ export function StartDeal({
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
+  const MODES = modesFor(platformNoun(platform));
   const chosen = MODES.find((m) => m.id === mode) ?? MODES[0];
   const { fee, total } = buyerTotal(price, fees, mode);
 

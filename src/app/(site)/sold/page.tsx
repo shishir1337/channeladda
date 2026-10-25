@@ -9,6 +9,7 @@ import { soldAgoLabel } from "@/data/listings";
 import { platformMap } from "@/data/platforms";
 import { databaseGate } from "@/lib/db-gate";
 import { countOf } from "@/lib/plural";
+import { pageMetadata } from "@/lib/seo";
 import { formatCompact } from "@/lib/utils";
 import { getRecentlySold } from "@/server/listings";
 
@@ -16,12 +17,12 @@ import { getRecentlySold } from "@/server/listings";
  *  cache detection, so revalidation is declared explicitly. */
 export const revalidate = 60;
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Recently sold accounts",
   description:
     "Every completed Channel Adda sale, with the settled price and how long the deal took. Real transaction history rather than asking prices.",
-  alternates: { canonical: "/sold" },
-};
+  path: "/sold",
+});
 
 /** Groups keep the page scannable and make recency obvious at a glance. */
 const groups = [

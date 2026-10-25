@@ -14,6 +14,7 @@ import { platformMap } from "@/data/platforms";
 import { databaseGate } from "@/lib/db-gate";
 import { countOf } from "@/lib/plural";
 import { type Medal, medalFor, ordinal } from "@/lib/seller-rank";
+import { pageMetadata } from "@/lib/seo";
 import { cn } from "@/lib/utils";
 import { getSellers, type RankedSeller } from "@/server/sellers";
 
@@ -21,12 +22,12 @@ import { getSellers, type RankedSeller } from "@/server/sellers";
  *  cache detection, so revalidation is declared explicitly. */
 export const revalidate = 60;
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Top sellers",
   description:
     "Every verified Channel Adda seller, ranked by rating points earned only from deals that completed. See who has sold the most, and what they sell.",
-  alternates: { canonical: "/sellers" },
-};
+  path: "/sellers",
+});
 
 /**
  * Gold, silver and bronze in the site's own colours: gold is the yellow that

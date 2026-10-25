@@ -7,13 +7,14 @@ import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/ui/page-header";
 import { Container, Section, SectionHeading } from "@/components/ui/section";
 import { platforms } from "@/data/platforms";
+import { pageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "How it works",
   description:
-    "Both deal types, the handover checklist and the holding period explained. How Channel Adda moves money and account ownership without either side taking a leap of faith.",
-  alternates: { canonical: "/how-it-works" },
-};
+    "Both deal types, the handover checklist and the holding period, explained: how Channel Adda moves money and ownership with neither side taking a leap of faith.",
+  path: "/how-it-works",
+});
 
 export default function HowItWorksPage() {
   return (

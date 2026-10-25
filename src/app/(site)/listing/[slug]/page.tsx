@@ -12,6 +12,7 @@ import { ListingCard } from "@/components/home/listing-card";
 import { BuyPanel } from "@/components/listing/buy-panel";
 import { ListingBuyBar } from "@/components/listing/listing-buy-bar";
 import {
+  AboutPanel,
   MetricsPanel,
   MonetizationNotice,
   Panel,
@@ -20,18 +21,25 @@ import {
   TransferPanel,
 } from "@/components/listing/listing-sections";
 import { OfferForm } from "@/components/listing/offer-form";
+import { SoldListing } from "@/components/listing/sold-listing";
+import { JsonLd } from "@/components/site/json-ld";
 import { Badge } from "@/components/ui/badge";
 import { Breadcrumbs } from "@/components/ui/page-header";
 import { Container } from "@/components/ui/section";
 import { platformMap } from "@/data/platforms";
 import { artworkProps } from "@/lib/artwork";
 import { databaseGate } from "@/lib/db-gate";
+import { listingDescription, listingLd, previewImage } from "@/lib/listing-seo";
 import { withResellerDiscount } from "@/lib/reseller";
+import { pageMetadata } from "@/lib/seo";
+import { siteUrl } from "@/lib/site-url";
 import { formatCompact } from "@/lib/utils";
 import {
   getListing,
+  getListingDescription,
   getProofCount,
   getSimilarListings,
+  getSoldListing,
 } from "@/server/listings";
 import { heldByAcceptedOffer, openOfferOn } from "@/server/offers";
 import { activeResellers } from "@/server/reseller-status";
@@ -48,21 +56,35 @@ export async function generateMetadata({
 }: PageProps<"/listing/[slug]">): Promise<Metadata> {
   const { slug } = await params;
   const listing = await getListing(slug);
-  if (!listing) return { title: "Listing not found" };
+  if (!listing) {
+    const sold = await getSoldListing(slug);
+    if (!sold) return { title: "Listing not found" };
+    const platform = platformMap[sold.listing.platform];
+    // Kept out of search: nothing here can be bought, and a result that
+    // lands on a sold account is a dead end. Its links — the seller, the
+    // similar accounts — are still followed.
+    return {
+      ...pageMetadata({
+        title: `${sold.listing.handle} — ${platform.labelOne}, sold`,
+        description: listingDescription(sold.listing, platform, true),
+        path: `/listing/${sold.listing.slug}`,
+      }),
+      robots: { index: false, follow: true },
+    };
+  }
 
   const platform = platformMap[listing.platform];
-  const title = `${listing.handle} — ${formatCompact(listing.audience)} ${platform.metricLabel.toLowerCase()} ${platform.name} for sale`;
+  const title = `${listing.handle} — ${formatCompact(listing.audience)} ${platform.metricLabel.toLowerCase()} ${platform.labelOne} for sale`;
+  // The seller's cover when it is a picture a preview can show; the sample
+  // SVG artwork is not, so those fall back to the site's own.
+  const cover = previewImage(listing.coverUrl);
 
-  return {
+  return pageMetadata({
     title,
-    description: listing.title,
-    openGraph: {
-      title,
-      description: listing.title,
-      images: [{ url: listing.coverUrl }],
-    },
-    alternates: { canonical: `/listing/${listing.slug}` },
-  };
+    description: listingDescription(listing, platform),
+    path: `/listing/${listing.slug}`,
+    images: cover ? [{ url: cover, alt: listing.handle }] : undefined,
+  });
 }
 
 export default async function ListingPage({
@@ -77,13 +99,35 @@ export default async function ListingPage({
     getSettings(),
     getCurrentUser(),
   ]);
-  if (!listing) notFound();
+  if (!listing) {
+    // A listing that sold keeps its page; anything else that is not live —
+    // paused, removed, never published — is still not found.
+    const sold = await getSoldListing(slug);
+    if (!sold) notFound();
+    const soldPlatform = platformMap[sold.listing.platform];
+    const [soldSeller, soldSimilar, soldAbout] = await Promise.all([
+      getSeller(sold.listing.sellerSlug),
+      getSimilarListings(sold.listing),
+      getListingDescription(sold.listing.id),
+    ]);
+    return (
+      <SoldListing
+        listing={sold.listing}
+        platform={soldPlatform}
+        soldAt={sold.soldAt}
+        seller={soldSeller}
+        similar={soldSimilar}
+        description={soldAbout}
+      />
+    );
+  }
 
   const platform = platformMap[listing.platform];
-  const [seller, similar, proofCount] = await Promise.all([
+  const [seller, similar, proofCount, about] = await Promise.all([
     getSeller(listing.sellerSlug),
     getSimilarListings(listing),
     getProofCount(listing.id),
+    getListingDescription(listing.id),
   ]);
   if (!seller) notFound();
 
@@ -129,6 +173,7 @@ export default async function ListingPage({
 
   return (
     <>
+      <JsonLd data={listingLd(siteUrl(), listing, platform)} />
       <Container className="pt-8 pb-12 sm:pt-10 sm:pb-16">
         <Breadcrumbs
           className="mb-6"
@@ -251,7 +296,8 @@ export default async function ListingPage({
 
             <div className="mt-7 flex flex-col gap-3 lg:mt-8">
               <MetricsPanel listing={listing} platform={platform} />
-              <MonetizationNotice listing={listing} />
+              <AboutPanel text={about} />
+              <MonetizationNotice listing={listing} platform={platform} />
               <TransferPanel platform={platform} />
               <ProofPanel count={proofCount} />
               <SellerPanel seller={seller} />
@@ -316,7 +362,7 @@ export default async function ListingPage({
                 href={`/browse/${platform.id}`}
                 className="inline-flex min-h-11 items-center text-sm font-medium text-fg transition-colors duration-150 hover:text-muted"
               >
-                All {platform.name} {platform.assetNoun}
+                All {platform.label}
               </Link>
             </div>
             {/* Swiped sideways on a phone, as on the homepage. */}

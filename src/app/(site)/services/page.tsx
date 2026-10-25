@@ -8,14 +8,15 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Price } from "@/components/ui/price";
 import { Container, Section } from "@/components/ui/section";
 import { SERVICES_OPEN, type Service, services } from "@/data/site";
+import { pageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Services",
   description: SERVICES_OPEN
     ? "Promotion, faceless video production, award claims, strike appeals and supervised transfers — run by vetted specialists, arranged through Channel Adda."
-    : "Coming soon: promotion, faceless video production, award claims, strike appeals and supervised transfers, run by vetted specialists and arranged through Channel Adda.",
-  alternates: { canonical: "/services" },
-};
+    : "Coming soon: promotion, faceless video production, award claims, strike appeals and supervised transfers, run by vetted specialists through Channel Adda.",
+  path: "/services",
+});
 
 export default function ServicesPage() {
   return (

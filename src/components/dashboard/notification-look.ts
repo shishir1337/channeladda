@@ -7,6 +7,7 @@ import {
   GemIcon,
   MessageSquareIcon,
   ReceiptIcon,
+  ShieldCheckIcon,
   StarIcon,
   StoreIcon,
   TagIcon,
@@ -14,6 +15,7 @@ import {
 } from "lucide-react";
 import type { NotificationKind } from "@/generated/prisma/enums";
 import { BALANCE_CORRECTION_BODY } from "@/lib/notification-text";
+import { isSecurityNotice } from "@/lib/security-notices";
 
 type Look = { label: string; icon: typeof BellIcon };
 
@@ -43,6 +45,11 @@ export function notificationLook(item: {
   title: string;
   body: string;
 }): Look {
+  // A password, email or payout address change: filed under the nearest
+  // kind, read as what it is (`@/lib/security-notices`).
+  if (isSecurityNotice(item.title)) {
+    return { label: "Security", icon: ShieldCheckIcon };
+  }
   if (item.kind === "PAYOUT") {
     if (item.body.startsWith(BALANCE_CORRECTION_BODY)) {
       return { label: "Balance", icon: WalletIcon };

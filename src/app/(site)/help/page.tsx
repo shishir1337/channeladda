@@ -6,13 +6,14 @@ import { iconTile } from "@/components/ui/icon-hue";
 import { PageHeader } from "@/components/ui/page-header";
 import { Container, Section } from "@/components/ui/section";
 import { helpArticles, helpCategories } from "@/data/help";
+import { pageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Help centre",
   description:
     "Guides on how a deal is protected, listing an account, verifying ownership, getting paid and opening a dispute.",
-  alternates: { canonical: "/help" },
-};
+  path: "/help",
+});
 
 export default function HelpPage() {
   return (

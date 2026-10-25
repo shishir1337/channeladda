@@ -17,7 +17,7 @@ const sellerSteps = [
   {
     step: "3",
     title: "Get paid, either way",
-    body: "Fastest: we pay your wallet once our agent has the channel. Safest: the buyer pays you directly.",
+    body: "Fastest: we pay your wallet once our agent has the account. Safest: the buyer pays you directly.",
   },
 ];
 
@@ -29,7 +29,7 @@ export function SellerCta() {
           <div className="grid gap-10 lg:grid-cols-2 lg:gap-16">
             <div>
               <h2 className="text-[1.625rem] leading-[1.15] font-semibold tracking-[-0.025em] sm:text-[2rem]">
-                Sell your channel safely
+                Sell your account safely
               </h2>
               <p className="mt-4 max-w-lg text-[0.9375rem] leading-relaxed text-muted sm:text-base">
                 Free to list. We only take a fee when a deal completes.

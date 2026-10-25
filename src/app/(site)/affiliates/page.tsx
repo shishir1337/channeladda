@@ -13,15 +13,16 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Price } from "@/components/ui/price";
 import { Container, Section, SectionHeading } from "@/components/ui/section";
 import { quote } from "@/lib/fees";
+import { pageMetadata } from "@/lib/seo";
 import { supportHref } from "@/lib/support";
 import { getFeeSettings } from "@/server/settings";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Affiliate programme",
   description:
     "Earn 20% of the Channel Adda fee on every completed deal from buyers and sellers you refer, for twelve months. Paid in crypto. The programme is not open yet.",
-  alternates: { canonical: "/affiliates" },
-};
+  path: "/affiliates",
+});
 
 const steps = [
   {
@@ -118,7 +119,16 @@ export default async function AffiliatesPage() {
             <div className="max-w-xl">
               <SectionHeading
                 title="One referred sale, one real number"
-                description={`A ${EXAMPLE_PRICE.toLocaleString("en-US")} channel sale on a Fastest deal earns Channel Adda ${exampleFee.toLocaleString("en-US")} in buyer and seller fees combined. Your share of that is ${SHARE * 100}%.`}
+                // Money as money, in the visitor's currency like the worked
+                // example beside it: this read "A 42,500 channel sale earns
+                // Channel Adda 1,275", two bare numbers with no currency.
+                description={
+                  <>
+                    A <Price usd={EXAMPLE_PRICE} /> sale on a Fastest deal earns
+                    Channel Adda <Price usd={exampleFee} /> in buyer and seller
+                    fees combined. Your share of that is {SHARE * 100}%.
+                  </>
+                }
               />
               <ul className="mt-7 flex flex-col gap-2.5">
                 {[
@@ -148,7 +158,7 @@ export default async function AffiliatesPage() {
                 <div className="flex items-center justify-between gap-3">
                   <dt className="text-muted">Sale price</dt>
                   <dd className="font-medium">
-                    <Price usd={42_500} />
+                    <Price usd={EXAMPLE_PRICE} />
                   </dd>
                 </div>
                 <div className="flex items-center justify-between gap-3">

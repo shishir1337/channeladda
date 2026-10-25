@@ -244,6 +244,19 @@ export async function getSellerSlugs(): Promise<string[]> {
   return users.map((u) => u.slug as string);
 }
 
+/** Every public seller page, and when its member last changed, for the sitemap. */
+export async function getSellerSitemap(): Promise<
+  { slug: string; updatedAt: Date }[]
+> {
+  const users = await db.user.findMany({
+    where: { slug: { not: null }, kycStatus: "APPROVED" },
+    select: { slug: true, updatedAt: true },
+  });
+  return users.flatMap((u) =>
+    u.slug ? [{ slug: u.slug, updatedAt: u.updatedAt }] : [],
+  );
+}
+
 /** Headline figures for the homepage and about page. */
 export async function getSiteStats() {
   const [settled, transfers, verifiedSellers] = await Promise.all([

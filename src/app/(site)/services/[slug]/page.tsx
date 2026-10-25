@@ -15,6 +15,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Price } from "@/components/ui/price";
 import { Container, Section } from "@/components/ui/section";
 import { SERVICES_OPEN, serviceMap, services } from "@/data/site";
+import { pageMetadata } from "@/lib/seo";
 import { supportHref } from "@/lib/support";
 
 export function generateStaticParams() {
@@ -30,12 +31,11 @@ export async function generateMetadata({
   const service = serviceMap[slug];
   if (!service) return { title: "Service not found" };
 
-  return {
+  return pageMetadata({
     title: service.title,
     description: service.description,
-    openGraph: { title: service.title, description: service.description },
-    alternates: { canonical: `/services/${service.slug}` },
-  };
+    path: `/services/${service.slug}`,
+  });
 }
 
 export default async function ServicePage({

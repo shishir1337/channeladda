@@ -13,18 +13,20 @@ import { iconTile } from "@/components/ui/icon-hue";
 import { PageHeader } from "@/components/ui/page-header";
 import { Container, Section } from "@/components/ui/section";
 import { helpArticles } from "@/data/help";
+import { pageMetadata } from "@/lib/seo";
 import {
   ESCROW_AGENT_HREF,
   ESCROW_AGENT_NAME,
   REPLY_PROMISE,
 } from "@/lib/support-chat";
+import { getCurrentUser } from "@/server/session";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Contact support",
   description:
     "Write to a person on our support team. Email is answered within 12 hours, and disputes are reviewed by a moderator within 24 hours.",
-  alternates: { canonical: "/support" },
-};
+  path: "/support",
+});
 
 const channels: {
   icon: typeof MailIcon;
@@ -75,6 +77,13 @@ export default async function SupportPage({
   // Pages link here with a topic preselected — the two-factor page does —
   // and the form used to ignore it.
   const topic = typeof params.topic === "string" ? params.topic : undefined;
+  // A page that sends somebody here may say what they wanted ("Add funds"),
+  // and a signed-in member is not asked for the email we already have.
+  const message =
+    typeof params.message === "string"
+      ? params.message.slice(0, 500)
+      : undefined;
+  const me = await getCurrentUser();
 
   return (
     <>
@@ -124,11 +133,23 @@ export default async function SupportPage({
           </ul>
 
           <div className="mt-10 lg:grid lg:grid-cols-[1fr_20rem] lg:gap-10">
-            <SupportForm topic={topic} />
+            <SupportForm
+              topic={topic}
+              message={message}
+              member={me ? { name: me.name, email: me.email } : undefined}
+            />
 
-            <aside className="mt-8 lg:mt-0">
+            {/* A named section, not an aside: inside the page's main an
+                aside is a landmark in the wrong place. */}
+            <section
+              aria-labelledby="quick-help-heading"
+              className="mt-8 lg:mt-0"
+            >
               <div className="rounded-card border border-line bg-surface p-5">
-                <h2 className="text-[0.9375rem] font-semibold text-fg">
+                <h2
+                  id="quick-help-heading"
+                  className="text-[0.9375rem] font-semibold text-fg"
+                >
                   Answers you might need first
                 </h2>
                 <ul className="mt-4 flex flex-col gap-1">
@@ -155,7 +176,7 @@ export default async function SupportPage({
                   <ArrowRightIcon aria-hidden="true" className="size-4" />
                 </Link>
               </div>
-            </aside>
+            </section>
           </div>
         </Container>
       </Section>

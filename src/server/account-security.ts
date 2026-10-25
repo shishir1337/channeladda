@@ -17,6 +17,11 @@ import {
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { emailVerificationRequired } from "@/lib/email-verification";
+import {
+  EMAIL_CHANGED,
+  NOT_YOU,
+  PASSWORD_CHANGED,
+} from "@/lib/security-notices";
 import { siteUrl } from "@/lib/site-url";
 import {
   clearAttempts,
@@ -26,6 +31,7 @@ import {
 } from "@/server/attempt-limit";
 import { recordAudit } from "@/server/audit";
 import { type Mail, sendMail } from "@/server/mailer";
+import { notify as notifyInApp } from "@/server/notifications";
 
 /**
  * A member changing their own password or email, from the security page.
@@ -226,6 +232,15 @@ export async function changePassword(
 
   clearAttempts(key);
   await notify(passwordChangedMail(user.email));
+  // In the bell too: most installs send no mail, and this is the one change
+  // a member most needs to hear about when it was not them.
+  await notifyInApp({
+    userId: user.id,
+    kind: "IDENTITY",
+    title: PASSWORD_CHANGED,
+    body: `You were signed out on your other devices. ${NOT_YOU}`,
+    href: "/dashboard/security",
+  });
   await recordAudit({
     actorId: user.id,
     action: "user.password_changed",
@@ -446,6 +461,13 @@ async function afterEmailChange(
   confirmed: boolean,
 ) {
   await notify(emailChangedMail(user.email, newEmail));
+  await notifyInApp({
+    userId: user.id,
+    kind: "IDENTITY",
+    title: `${EMAIL_CHANGED} to ${maskEmail(newEmail)}`,
+    body: `Emails about your account go there from now on. ${NOT_YOU}`,
+    href: "/dashboard/security",
+  });
   await recordAudit({
     actorId: user.id,
     action: "user.email_changed",

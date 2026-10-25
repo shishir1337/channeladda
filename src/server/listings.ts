@@ -350,6 +350,56 @@ export async function getListing(slug: string): Promise<Listing | null> {
 }
 
 /**
+ * A listing whose deal completed, for the page its old link still opens.
+ *
+ * Saved links, links in chats and the seller's own page pointed at a 404
+ * once a listing sold. Only SOLD: a paused, removed or never-live listing
+ * is still nobody's business, and stays a 404. When it sold is the
+ * completed deal's date; a listing marked sold some other way falls back to
+ * when it last changed.
+ */
+export async function getSoldListing(
+  slug: string,
+): Promise<{ listing: Listing; soldAt: Date } | null> {
+  const row = await db.listing.findFirst({
+    where: { slug, status: "SOLD" },
+    include: {
+      ...include,
+      orders: {
+        where: { status: "COMPLETED", completedAt: { not: null } },
+        orderBy: { completedAt: "desc" },
+        select: { completedAt: true },
+        take: 1,
+      },
+    },
+  });
+  if (!row) return null;
+  const stats = await sellerStatsFor([row.sellerId]);
+  return {
+    listing: { ...toListing(row, stats.get(row.sellerId)), tag: undefined },
+    soldAt: row.orders[0]?.completedAt ?? row.updatedAt,
+  };
+}
+
+/**
+ * The seller's own words about the account — "About this account" on the
+ * listing form — or null when they wrote none.
+ *
+ * Fetched on its own rather than carried on every `Listing`: it can be four
+ * thousand characters, and listings travel to the browser on every card and
+ * in the buy panel, where it is never shown.
+ */
+export async function getListingDescription(
+  listingId: string,
+): Promise<string | null> {
+  const row = await db.listing.findUnique({
+    where: { id: listingId },
+    select: { description: true },
+  });
+  return row?.description?.trim() || null;
+}
+
+/**
  * How many proof screenshots the seller uploaded.
  *
  * The listing page used to fill this section with the same three sample
@@ -362,12 +412,18 @@ export async function getProofCount(listingId: string): Promise<number> {
   return db.listingProof.count({ where: { listingId } });
 }
 
-export async function getListingSlugs(): Promise<string[]> {
-  const rows = await db.listing.findMany({
-    where: { status: "LIVE" },
-    select: { slug: true },
+/**
+ * Every listing a buyer can open, for the sitemap: the live ones and the
+ * ones held for a buyer, which keep their page. When each last changed, so
+ * a search engine re-reads an edited listing rather than guessing.
+ */
+export async function getListingSitemap(): Promise<
+  { slug: string; updatedAt: Date }[]
+> {
+  return db.listing.findMany({
+    where: { status: { in: ["LIVE", "RESERVED"] } },
+    select: { slug: true, updatedAt: true },
   });
-  return rows.map((r) => r.slug);
 }
 
 export async function getSimilarListings(

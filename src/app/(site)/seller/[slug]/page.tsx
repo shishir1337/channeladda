@@ -16,6 +16,7 @@ import { Stars } from "@/components/ui/stars";
 import { platformMap } from "@/data/platforms";
 import { databaseGate } from "@/lib/db-gate";
 import { countOf } from "@/lib/plural";
+import { pageMetadata } from "@/lib/seo";
 import { emptyRecord } from "@/lib/track-record";
 import { getSellerListings } from "@/server/listings";
 import { sellerReviewsBySlug } from "@/server/reviews";
@@ -39,14 +40,14 @@ export async function generateMetadata({
 
   // "Verified" only for an approved ID check, as on the page itself.
   const description = `${seller.name} has completed ${seller.sales} supervised sales on Channel Adda and holds ${pointsLabel(seller.points ?? 0)}. ${seller.verified ? "ID verified, member" : "Member"} since ${seller.memberSince}.`;
-  return {
+  return pageMetadata({
     title: seller.verified
       ? `${seller.name} — verified seller`
       : `${seller.name} — seller on Channel Adda`,
     description,
-    openGraph: { title: `${seller.name} on Channel Adda`, description },
-    alternates: { canonical: `/seller/${seller.slug}` },
-  };
+    path: `/seller/${seller.slug}`,
+    type: "profile",
+  });
 }
 
 export default async function SellerPage({

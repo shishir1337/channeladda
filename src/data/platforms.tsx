@@ -25,8 +25,29 @@ export type Platform = {
   searchPlaceholder: string;
   /** Plural noun for the asset, used in headings and copy. */
   assetNoun: string;
+  /**
+   * The asset in one word, for sentences about this platform's deals: a
+   * Telegram channel, an Instagram page, a website. "We hold the channel"
+   * was printed on every listing, a page and a website included.
+   */
+  noun: "channel" | "page" | "site";
+  /**
+   * The whole category, for headings and titles. Usually the name and the
+   * plural noun; "Websites" rather than "Website sites".
+   */
+  label: string;
+  /** One of them: "Instagram page", "Website". */
+  labelOne: string;
   /** Landing-page intro. Distinct per platform for search. */
   blurb: string;
+  /** The landing page's search description: the blurb in 160 characters. */
+  summary: string;
+  /**
+   * What the Fastest hold means on this platform, in one sentence for the
+   * buyer. It follows the handover in `transferSteps`: a YouTube buyer is
+   * an owner during Google's wait, an Instagram buyer has the login.
+   */
+  fastestHold: string;
   /** How ownership actually moves on this platform, in plain language. */
   transferNote: string;
   /** A Fastest deal's holding period, in days: how long the buyer is a
@@ -65,8 +86,15 @@ export const platforms: Platform[] = [
     metricLabel: "Subscribers",
     searchPlaceholder: "Try “monetized tech channel, 100K+ subs”",
     assetNoun: "channels",
+    noun: "channel",
+    label: "YouTube channels",
+    labelOne: "YouTube channel",
     blurb:
       "Monetized and faceless YouTube channels with verified watch time, revenue history and a clean strike record. Every channel is checked for ownership before it is listed, and we confirm whether it sits on a Brand Account before a sale can start.",
+    summary:
+      "Buy monetized and faceless YouTube channels with verified watch time, revenue and strike record. Ownership is checked before a channel is listed.",
+    fastestHold:
+      "On Fastest we hold your payment for 7 days while you are an owner, then the seller is paid and our agent makes you primary owner.",
     transferNote:
       "A Brand Account channel moves cleanly: the seller invites our agent as owner, and after Google’s 7-day waiting period our agent becomes primary owner. Our agent then invites you, and makes you primary owner once Google’s 7 days have passed for you too. Channels on a personal Google account cannot be transferred this way, so we flag them separately.",
     holdDays: 7,
@@ -95,8 +123,15 @@ export const platforms: Platform[] = [
     metricLabel: "Followers",
     searchPlaceholder: "Try “fashion page, 500K followers, India”",
     assetNoun: "pages",
+    noun: "page",
+    label: "Instagram pages",
+    labelOne: "Instagram page",
     blurb:
       "Instagram pages across fashion, fitness, food and travel, with real engagement figures and audience-country breakdowns. Follower counts are checked against engagement so inflated accounts do not reach this page.",
+    summary:
+      "Buy Instagram pages in fashion, fitness, food and travel. Engagement and audience countries are checked, so inflated accounts never reach the list.",
+    fastestHold:
+      "On Fastest we hold your payment for 21 days after the login is yours, because a previous owner can try to recover the page for weeks. Then the seller is paid.",
     transferNote:
       "Instagram has no official ownership transfer, so a handover means credentials plus the recovery email and phone. That is why Instagram deals carry our longest hold — a previous owner can attempt recovery for weeks.",
     holdDays: 21,
@@ -124,8 +159,15 @@ export const platforms: Platform[] = [
     metricLabel: "Followers",
     searchPlaceholder: "Try “monetized page, in-stream ads enabled”",
     assetNoun: "pages",
+    noun: "page",
+    label: "Facebook pages",
+    labelOne: "Facebook page",
     blurb:
       "Facebook Pages with in-stream ads and reels bonuses already switched on, plus the linked groups that often come with them. Monetization status is verified from the payouts dashboard, not a screenshot.",
+    summary:
+      "Buy Facebook Pages with in-stream ads and reels bonuses switched on. Monetization is verified from the payouts dashboard, not from a screenshot.",
+    fastestHold:
+      "On Fastest we hold your payment for 7 days after you have full control of the Page, then the seller is paid.",
     transferNote:
       "Pages are the cleanest transfer on the marketplace. You are added with full control through Business Suite and the seller removes themselves, which is an official, reversible-free process Meta supports.",
     holdDays: 7,
@@ -153,8 +195,15 @@ export const platforms: Platform[] = [
     metricLabel: "Members",
     searchPlaceholder: "Try “crypto signals channel, 50K members”",
     assetNoun: "channels",
+    noun: "channel",
+    label: "Telegram channels",
+    labelOne: "Telegram channel",
     blurb:
       "Telegram channels with high open rates and, in many cases, an existing paid-sponsorship pipeline. Member counts and post reach are verified before listing.",
+    summary:
+      "Buy Telegram channels with high open rates and, often, paid sponsorships already running. Member counts and post reach are verified before listing.",
+    fastestHold:
+      "On Fastest we hold your payment for 3 days after the channel is transferred to you, then the seller is paid.",
     transferNote:
       "Telegram supports a real Transfer Ownership action, which makes it the fastest and safest handover here. Once it completes it is effectively irreversible, so funds release after just three days.",
     holdDays: 3,
@@ -182,8 +231,15 @@ export const platforms: Platform[] = [
     metricLabel: "Visits / mo",
     searchPlaceholder: "Try “AdSense blog, $500/mo revenue”",
     assetNoun: "sites",
+    noun: "site",
+    label: "Websites",
+    labelOne: "Website",
     blurb:
       "Content websites and blogs with organic search traffic, email lists and affiliate or display-ad income. Traffic is verified from analytics, and we confirm the domain is outside its transfer lock before a deal opens.",
+    summary:
+      "Buy content websites and blogs with organic traffic, email lists and ad or affiliate income. Traffic is verified from analytics before a deal opens.",
+    fastestHold:
+      "On Fastest we hold your payment for 14 days after the domain and the site are moved to you, then the seller is paid.",
     transferNote:
       "A website sale is really three transfers: the domain via an auth code, the hosting and database, and the analytics properties. AdSense income does not transfer — the buyer must connect their own account.",
     holdDays: 14,
@@ -208,3 +264,12 @@ export const platforms: Platform[] = [
 export const platformMap = Object.fromEntries(
   platforms.map((p) => [p.id, p]),
 ) as Record<PlatformId, Platform>;
+
+/**
+ * The asset's one word for a platform given either way it is stored — the
+ * route's "instagram" or the database's "INSTAGRAM". "account" for anything
+ * unknown, which is true of every platform.
+ */
+export function platformNoun(platform: string): string {
+  return platformMap[platform.toLowerCase() as PlatformId]?.noun ?? "account";
+}

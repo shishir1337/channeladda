@@ -6,13 +6,14 @@ import { Button } from "@/components/ui/button";
 import { iconText } from "@/components/ui/icon-hue";
 import { PageHeader } from "@/components/ui/page-header";
 import { Container, Section, SectionHeading } from "@/components/ui/section";
+import { pageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Trust & safety",
   description:
     "Live ownership checks, a Verified badge for checked IDs, a record of every deal and disputes decided by people: the checks that make a Channel Adda deal safe.",
-  alternates: { canonical: "/trust-safety" },
-};
+  path: "/trust-safety",
+});
 
 const disputeSteps = [
   {

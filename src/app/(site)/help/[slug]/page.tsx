@@ -8,6 +8,7 @@ import { Container, Section } from "@/components/ui/section";
 import { helpArticleMap, helpArticles, helpCategories } from "@/data/help";
 import { badgeValues, fillHelpText } from "@/lib/help-text";
 import { RESELLER_DEFAULTS } from "@/lib/reseller";
+import { pageMetadata } from "@/lib/seo";
 import { getSettings } from "@/server/settings";
 
 export function generateStaticParams() {
@@ -26,12 +27,14 @@ export async function generateMetadata({
   const article = helpArticleMap[slug];
   if (!article) return { title: "Article not found" };
 
-  return {
+  // The summary alone is a line; the article's opening follows it, cut to
+  // whole sentences that fit a search result.
+  return pageMetadata({
     title: article.title,
-    description: article.summary,
-    openGraph: { title: article.title, description: article.summary },
-    alternates: { canonical: `/help/${article.slug}` },
-  };
+    description: `${article.summary} ${article.body[0] ?? ""}`,
+    path: `/help/${article.slug}`,
+    type: "article",
+  });
 }
 
 export default async function HelpArticlePage({

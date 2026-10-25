@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import { AppProviders } from "@/components/theme-provider";
+import { SITE_DESCRIPTION } from "@/lib/seo";
 import "./globals.css";
 
 const inter = Inter({
@@ -25,8 +26,9 @@ export const metadata: Metadata = {
     default: "Channel Adda — Buy & sell social media accounts, safely",
     template: "%s | Channel Adda",
   },
-  description:
-    "The supervised marketplace for YouTube channels, Instagram, Facebook and Telegram accounts and content websites. Ownership-checked listings, crypto payments via Cryptomus, and a Channel Adda agent holding either the account or the money until the handover is confirmed.",
+  // Under 160 characters, the most a search result shows. Every page that
+  // has none of its own falls back to this one.
+  description: SITE_DESCRIPTION,
   keywords: [
     "buy youtube channel",
     "sell instagram account",
@@ -37,11 +39,11 @@ export const metadata: Metadata = {
   ],
   openGraph: {
     title: "Channel Adda — Buy & sell social media accounts, safely",
-    description:
-      "Ownership-checked listings, crypto payments, and an agent holding one side of every deal until the handover is confirmed.",
+    description: SITE_DESCRIPTION,
     siteName: "Channel Adda",
     type: "website",
   },
+  twitter: { card: "summary_large_image" },
   other: {
     // Payment-processor domain verification. Both tags must be served on every
     // page, so they live on the root layout rather than a single route — the

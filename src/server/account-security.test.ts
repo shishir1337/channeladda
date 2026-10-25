@@ -96,6 +96,11 @@ test(
     expect(await canSignIn(email, PASSWORD)).toBe(true);
     expect(await canSignIn(email, "a-brand-new-password")).toBe(false);
     expect(sent).toEqual([]);
+    expect(
+      await db.notification.count({
+        where: { user: { email: email.toLowerCase() } },
+      }),
+    ).toBe(0);
   }),
 );
 
@@ -154,6 +159,21 @@ test(
       where: { action: "user.password_changed", entityId: user.id },
     });
     expect(audit?.actorId).toBe(user.id);
+
+    // And in the bell, where it is seen when no mail is set up (QA: none
+    // of these changes left a trace).
+    expect(
+      await db.notification.findMany({
+        where: { userId: user.id },
+        select: { title: true, body: true, href: true },
+      }),
+    ).toEqual([
+      {
+        title: "Your password was changed",
+        body: expect.stringContaining("If this wasn't you, contact support"),
+        href: "/dashboard/security",
+      },
+    ]);
   }),
 );
 
@@ -321,6 +341,18 @@ test(
       before: { email },
       after: { email: newEmail, confirmed: false },
     });
+
+    // In the bell as well, with the new address masked as in the mail.
+    const notices = await db.notification.findMany({
+      where: { userId: user.id },
+      select: { title: true, body: true },
+    });
+    expect(notices).toEqual([
+      {
+        title: "Your email was changed to n***@example.test",
+        body: expect.stringContaining("If this wasn't you, contact support"),
+      },
+    ]);
   }),
 );
 

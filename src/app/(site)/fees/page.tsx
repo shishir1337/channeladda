@@ -6,15 +6,16 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Price } from "@/components/ui/price";
 import { Container, Section, SectionHeading } from "@/components/ui/section";
 import { buyerTotal, formatRate, sellerPayout } from "@/lib/fees";
+import { pageMetadata } from "@/lib/seo";
 import { getFeeSettings, getSettings } from "@/server/settings";
 
 export async function generateMetadata(): Promise<Metadata> {
   const fees = await getFeeSettings();
-  return {
+  return pageMetadata({
     title: "Pricing & fees",
     description: `Buyers pay ${formatRate(fees.buyerFeeBpSafest)}% on top of the listing price. ${fees.sellerFeeBp > 0 ? `Sellers pay ${formatRate(fees.sellerFeeBp)}% when a Fastest sale is paid out.` : "Sellers pay nothing."} No listing fee and no monthly cost.`,
-    alternates: { canonical: "/fees" },
-  };
+    path: "/fees",
+  });
 }
 
 const EXAMPLES = [8_900, 42_500, 74_000];

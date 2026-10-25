@@ -9,6 +9,7 @@ import { StartDeal } from "@/components/listing/start-deal";
 import { Button } from "@/components/ui/button";
 import { Price } from "@/components/ui/price";
 import type { Listing } from "@/data/listings";
+import { platformNoun } from "@/data/platforms";
 import type { Platform } from "@/generated/prisma/enums";
 import type { FeeSettings } from "@/lib/fees";
 
@@ -114,8 +115,8 @@ export function BuyPanel({
           aria-hidden="true"
           className="mt-0.5 size-4 shrink-0 text-verified"
         />
-        Either way, our agent holds the channel or the money until the other
-        side has delivered.
+        Either way, our agent holds the {platformNoun(listing.platform)} or the
+        money until the other side has delivered.
       </p>
 
       <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
