@@ -1,7 +1,7 @@
 import { ArrowUpRightIcon } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { Reference } from "@/components/app/kit";
 import { ResellerBadge } from "@/components/app/reseller-badge";
 import { AgentInvite } from "@/components/deals/agent-invite";
@@ -25,9 +25,14 @@ import {
 } from "@/components/messages/chat-layout";
 import { channelOf, ThreadHeader } from "@/components/messages/chat-parts";
 import { DealPanel } from "@/components/messages/deal-panel";
+import { ListingTabs } from "@/components/messages/listing-tabs";
 import { LiveRefresh } from "@/components/messages/live-refresh";
 import type { OfferComposerConfig } from "@/components/messages/offer-composer";
-import { toMessageViews, toPanelView } from "@/components/messages/serialize";
+import {
+  toListingViews,
+  toMessageViews,
+  toPanelView,
+} from "@/components/messages/serialize";
 import { ThreadView } from "@/components/messages/thread-view";
 import { Badge } from "@/components/ui/badge";
 import { mayEndHolds } from "@/lib/custody-roles";
@@ -36,12 +41,18 @@ import { dealPanelState } from "@/lib/deal-panel";
 import { templateFor } from "@/lib/deal-templates";
 import { fromCents } from "@/lib/listing-form";
 import { withResellerDiscount } from "@/lib/reseller";
+import { pickFocus, tabsFor } from "@/lib/thread-focus";
+import { threadHref } from "@/lib/thread-href";
 import { writesInClosedThread } from "@/lib/thread-rules";
 import { cn } from "@/lib/utils";
 import { certificateFor } from "@/server/certificate";
 import { loadPanelInput } from "@/server/deal-panel";
 import { getDealFor } from "@/server/deals";
-import { getThread, markThreadRead } from "@/server/messages";
+import {
+  getThread,
+  markThreadRead,
+  resolveThreadAlias,
+} from "@/server/messages";
 import { activeResellers, ratingFor } from "@/server/reseller-status";
 import { reviewPromptFor } from "@/server/reviews";
 import { requireUser } from "@/server/session";
@@ -96,14 +107,23 @@ function viewFor(withPanel: boolean) {
 /**
  * One conversation: the people, the negotiation and the deal, in one place.
  *
+ * A conversation is one buyer and one seller, about every listing they have
+ * talked about. The page is about one of them at a time, the focus
+ * (`pickFocus`): the one asked for in the address (`?about=`), else the one
+ * where it is the reader's move, else the one talked about last. The header,
+ * the deal panel and the message box follow it; with two deals going at
+ * once, tabs above the panel switch between them.
+ *
  * Above the timeline sits the one thing the reader can do next, worked out
  * on the server from the same records every other page reads. Nothing here
  * decides what is allowed; each button calls an action that checks again.
  */
 export default async function ThreadPage({
   params,
+  searchParams,
 }: PageProps<"/dashboard/messages/[id]">) {
   const { id } = await params;
+  const { about } = await searchParams;
   const user = await requireUser(`/dashboard/messages/${id}`);
   // Taken before the thread is read, never after: a change landing between
   // the two would otherwise be in the fingerprint but not on the page, and
@@ -112,23 +132,43 @@ export default async function ThreadPage({
   const thread = await getThread(id, user);
 
   // `getThread` returns null both for a thread that does not exist and for one
-  // this person is not in, so guessing ids tells you nothing either way.
-  if (!thread || !fingerprint) notFound();
+  // this person is not in, so guessing ids tells you nothing either way. A
+  // thread from before one conversation per buyer and seller opens the
+  // conversation it became, on the listing it was about — for those in it.
+  if (!thread || !fingerprint) {
+    const moved = await resolveThreadAlias(id, user);
+    if (moved) redirect(threadHref(moved.conversationId, moved.listingId));
+    notFound();
+  }
 
   await markThreadRead(id, user);
 
-  // The listing the page is about: the one the newest line is about.
-  const lastListing = thread.messages.at(-1)?.listingId;
-  const focus =
-    thread.listings.find((listing) => listing.id === lastListing) ??
-    thread.listings[0] ??
-    null;
-
-  const [panelInput, settings] = await Promise.all([
-    focus ? loadPanelInput(id, focus.id, thread.viewerRole) : null,
+  // Every listing's panel, for the tabs and to know where it is the
+  // reader's move; then the one the page is about.
+  const [panelInputs, settings] = await Promise.all([
+    Promise.all(
+      thread.listings.map(async (listing) => ({
+        listingId: listing.id,
+        input: await loadPanelInput(id, listing.id, thread.viewerRole),
+      })),
+    ),
     getSettings(),
   ]);
-  const panel = panelInput ? dealPanelState(panelInput) : null;
+  const panels = panelInputs.flatMap(({ listingId, input }) =>
+    input ? [{ listingId, input, state: dealPanelState(input) }] : [],
+  );
+  const focusId = pickFocus({
+    about,
+    listings: thread.listings,
+    panels,
+    messages: thread.messages,
+  });
+  const focus =
+    thread.listings.find((listing) => listing.id === focusId) ?? null;
+  const focused = panels.find((panel) => panel.listingId === focusId);
+  const panelInput = focused?.input ?? null;
+  const panel = focused?.state ?? null;
+  const tabs = tabsFor({ listings: thread.listings, panels, focus: focusId });
 
   // Only what the panel's card for this state needs, and only then: the
   // deal for a deal state, the balance only when paying.
@@ -302,6 +342,22 @@ export default async function ThreadPage({
       >
         {panel && focus ? (
           <div className={cn("min-w-0 shrink-0", PANEL_COLUMN)}>
+            {tabs.length > 0 ? (
+              <ListingTabs
+                current={focusId}
+                tabs={tabs.map((tab) => {
+                  const listing = thread.listings.find(
+                    (each) => each.id === tab.listingId,
+                  );
+                  return {
+                    ...tab,
+                    title: listing?.title ?? "",
+                    reference: listing?.dealReference ?? null,
+                    href: threadHref(thread.id, tab.listingId),
+                  };
+                })}
+              />
+            ) : null}
             {certificate && deal ? (
               // A deal that went through ends on congratulations and the
               // certificate, not on "This deal has ended".
@@ -321,7 +377,7 @@ export default async function ThreadPage({
               <DealPanel
                 // Remounted when the situation changes, so on a phone it opens
                 // again the moment it becomes the reader's move.
-                key={`${panel.kind}:${"yourMove" in panel ? panel.yourMove : ""}`}
+                key={`${focusId}:${panel.kind}:${"yourMove" in panel ? panel.yourMove : ""}`}
                 state={toPanelView(panel)}
                 viewerRole={thread.viewerRole}
                 otherName={otherSide.split(/\s+/)[0] || otherSide}
@@ -408,7 +464,8 @@ export default async function ThreadPage({
         >
           <ThreadView
             conversationId={thread.id}
-            listingId={focus?.id ?? null}
+            listings={toListingViews(thread.listings)}
+            focusListingId={focusId}
             otherSide={otherSide}
             closed={composerClosed}
             viewerRole={thread.viewerRole}

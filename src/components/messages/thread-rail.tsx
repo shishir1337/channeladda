@@ -24,19 +24,29 @@ import { cn } from "@/lib/utils";
  * The Escrow Agent sits above all of it, outside the filter: a member who
  * needs help should find it in the same place every time, however many
  * conversations they have and whatever they last typed into the box.
+ *
+ * One row per person, not per listing: a conversation is everything the
+ * two of them have talked about. The row names the listing talked about
+ * last and how many more there are, and the filter finds any of them.
  */
 export type RailThread = {
   id: string;
-  listingTitle: string;
-  listingHandle: string;
+  /** The listing of the newest line. */
+  latestListingTitle: string;
+  /** Every listing talked about here, for the filter. */
+  listingTitles: string[];
+  listingHandles: string[];
   withName: string;
+  /** The other side, when the reader is one of the two. */
+  withId: string | null;
+  role: "buyer" | "seller" | "agent" | "staff";
   lastMessageAt: string;
   preview: string;
   unread: boolean;
   flagged: boolean;
   closed: boolean;
-  /** The deal still running here: these rows are listed first. */
-  deal: { reference: string; mode: "SAFEST" | "FASTEST" } | null;
+  /** The deals still running here, newest first: these rows come first. */
+  deals: { reference: string; mode: "SAFEST" | "FASTEST" }[];
 };
 
 /** The pinned Escrow Agent row. */
@@ -80,16 +90,30 @@ export function ThreadRail({
     const q = query.trim().toLowerCase();
     if (!q) return threads;
     return threads.filter((thread) =>
-      [thread.listingTitle, thread.listingHandle, thread.withName]
+      [...thread.listingTitles, ...thread.listingHandles, thread.withName]
         .join(" ")
         .toLowerCase()
         .includes(q),
     );
   }, [threads, query]);
 
+  // Somebody you both buy from and sell to has two rows, one each way: those
+  // say which is which.
+  const twoWay = useMemo(() => {
+    const seen = new Map<string, number>();
+    for (const thread of threads) {
+      if (thread.withId) {
+        seen.set(thread.withId, (seen.get(thread.withId) ?? 0) + 1);
+      }
+    }
+    return new Set(
+      [...seen].filter(([, count]) => count > 1).map(([id]) => id),
+    );
+  }, [threads]);
+
   const unreadCount = threads.filter((thread) => thread.unread).length;
-  const deals = shown.filter((thread) => thread.deal);
-  const others = shown.filter((thread) => !thread.deal);
+  const deals = shown.filter((thread) => thread.deals.length > 0);
+  const others = shown.filter((thread) => thread.deals.length === 0);
 
   return (
     <aside
@@ -168,6 +192,7 @@ export function ThreadRail({
                   label="Running deals"
                   threads={deals}
                   activeId={params?.id}
+                  twoWay={twoWay}
                 />
               ) : null}
               {others.length > 0 ? (
@@ -175,6 +200,7 @@ export function ThreadRail({
                   label={deals.length > 0 ? "Other conversations" : null}
                   threads={others}
                   activeId={params?.id}
+                  twoWay={twoWay}
                 />
               ) : null}
             </div>
@@ -189,11 +215,14 @@ function Group({
   label,
   threads,
   activeId,
+  twoWay,
 }: {
   /** Null when there is only one group, which needs no heading. */
   label: string | null;
   threads: RailThread[];
   activeId?: string;
+  /** The people the reader has a conversation with each way. */
+  twoWay: Set<string>;
 }) {
   const headingId = useId();
   return (
@@ -209,7 +238,11 @@ function Group({
       <ul className="flex flex-col gap-px">
         {threads.map((thread) => (
           <li key={thread.id}>
-            <ThreadRow thread={thread} active={activeId === thread.id} />
+            <ThreadRow
+              thread={thread}
+              active={activeId === thread.id}
+              twoWay={thread.withId !== null && twoWay.has(thread.withId)}
+            />
           </li>
         ))}
       </ul>
@@ -285,11 +318,23 @@ function EscrowAgentRow({
 function ThreadRow({
   thread,
   active,
+  twoWay,
 }: {
   thread: RailThread;
   active: boolean;
+  /** There is a second row with this person, the other way round. */
+  twoWay: boolean;
 }) {
-  const DealIcon = thread.deal?.mode === "FASTEST" ? ZapIcon : ShieldCheckIcon;
+  const deal = thread.deals[0];
+  const DealIcon = deal?.mode === "FASTEST" ? ZapIcon : ShieldCheckIcon;
+  const more = thread.listingTitles.length - 1;
+  const side = twoWay
+    ? thread.role === "buyer"
+      ? "Buying · "
+      : thread.role === "seller"
+        ? "Selling · "
+        : ""
+    : "";
   return (
     <Link
       href={`/dashboard/messages/${thread.id}`}
@@ -323,15 +368,26 @@ function ThreadRow({
           </time>
         </span>
         <span className="flex items-center gap-1.5">
-          {thread.deal ? (
+          {deal ? (
             <span className="inline-flex shrink-0 items-center gap-1 text-xs leading-5 font-medium text-primary-text tabular-nums">
               <DealIcon aria-hidden="true" className="size-3" />
-              {thread.deal.reference}
+              {deal.reference}
+              {thread.deals.length > 1 ? (
+                <span className="font-normal text-subtle">
+                  +{thread.deals.length - 1}
+                </span>
+              ) : null}
             </span>
           ) : null}
           <span className="min-w-0 truncate text-xs leading-5 text-subtle">
-            {thread.listingTitle}
+            {side}
+            {thread.latestListingTitle}
           </span>
+          {more > 0 ? (
+            <span className="shrink-0 text-xs leading-5 text-subtle tabular-nums">
+              +{more} more
+            </span>
+          ) : null}
         </span>
         <span className="mt-0.5 flex items-center gap-2">
           <span

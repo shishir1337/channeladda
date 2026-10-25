@@ -118,6 +118,12 @@ export function StaffControls({
         >
           {closed ? "Reopen conversation" : "Close conversation"}
         </Button>
+        {/* One conversation is everything these two say to each other, so
+            closing it, or clearing its flag, is not about one listing. */}
+        <p className="mt-1 text-xs leading-relaxed text-subtle">
+          This covers everything these two people say to each other, on every
+          listing.
+        </p>
 
         {error ? (
           <p

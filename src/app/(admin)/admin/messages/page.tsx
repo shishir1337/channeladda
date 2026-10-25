@@ -42,6 +42,7 @@ export default async function AdminMessagesPage({
     id: thread.id,
     listingTitle: thread.latestListingTitle,
     listingHandle: thread.listingHandles[0] ?? "",
+    moreListings: Math.max(0, thread.listingTitles.length - 1),
     withName: thread.withName,
     lastMessageAt: thread.lastMessageAt.toISOString(),
     preview: thread.preview,
@@ -57,7 +58,7 @@ export default async function AdminMessagesPage({
           flagged count, in red when there are any, is on its filter. */}
       <PageHeader
         title="Conversations"
-        info="Every buyer–seller thread. Read any of them, and write into any as Channel Adda."
+        info="One conversation per buyer and seller, covering every listing they have talked about. Read any of them, and write into any as Channel Adda."
       />
 
       <FilterBar label="Filter conversations">

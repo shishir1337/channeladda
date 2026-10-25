@@ -5,17 +5,17 @@ import { Initials } from "@/components/messages/chat-parts";
 import { Badge } from "@/components/ui/badge";
 
 /**
- * A list of conversations.
- *
- * Shared by the member inbox and the staff queue, because they are the same
- * object seen from two sides — and a moderator who has learned to read one
- * should not have to learn the other.
+ * A list of conversations, for the staff queue: one row per buyer and
+ * seller, naming the listing they talked about last and how many more.
  */
 
 export type ThreadRow = {
   id: string;
+  /** The listing talked about last. */
   listingTitle: string;
   listingHandle: string;
+  /** How many other listings the two have talked about here. */
+  moreListings: number;
   withName: string;
   lastMessageAt: string;
   preview: string;
@@ -91,8 +91,15 @@ export function ThreadList({
                   {when(thread.lastMessageAt)}
                 </time>
               </div>
-              <p className="truncate text-xs leading-5 text-subtle">
-                {thread.listingHandle} · {thread.listingTitle}
+              <p className="flex min-w-0 gap-1.5 text-xs leading-5 text-subtle">
+                <span className="min-w-0 truncate">
+                  {thread.listingHandle} · {thread.listingTitle}
+                </span>
+                {thread.moreListings > 0 ? (
+                  <span className="shrink-0 tabular-nums">
+                    +{thread.moreListings} more
+                  </span>
+                ) : null}
               </p>
               <p className="mt-0.5 truncate text-[0.8125rem] leading-5 text-muted">
                 {thread.preview}

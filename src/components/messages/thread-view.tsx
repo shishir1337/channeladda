@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  ChevronDownIcon,
   CircleAlertIcon,
   ClockIcon,
   EyeIcon,
@@ -11,11 +12,14 @@ import {
   ScissorsIcon,
   SendIcon,
   ShieldCheckIcon,
+  StoreIcon,
   TagIcon,
   XIcon,
 } from "lucide-react";
 import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import {
+  Fragment,
   type ReactNode,
   useEffect,
   useRef,
@@ -37,6 +41,7 @@ import {
 import { OfferActions } from "@/components/offers/offer-actions";
 import { Button } from "@/components/ui/button";
 import { iconText } from "@/components/ui/icon-hue";
+import { money } from "@/lib/chat-events";
 import { chatTime } from "@/lib/chat-time";
 import { MAX_MESSAGE } from "@/lib/messages";
 import { cn } from "@/lib/utils";
@@ -57,6 +62,10 @@ import {
 export type ThreadMessageView = {
   id: string;
   kind: "TEXT" | "OFFER" | "EVENT";
+  /** The listing it is about. Null in the Escrow Agent chat. */
+  listingId: string | null;
+  /** The first line of a deal: "opened a Safest deal". */
+  opensDeal: boolean;
   body: string;
   createdAt: string;
   mine: boolean;
@@ -74,6 +83,142 @@ export type ThreadMessageView = {
   attachmentExpiresAt: string | null;
   attachmentRemoved: boolean;
 };
+
+/** One listing a conversation is about, as the thread draws it. */
+export type ThreadListingView = {
+  id: string;
+  slug: string;
+  title: string;
+  priceCents: number;
+  /** Its public page exists: on sale or reserved. */
+  onSale: boolean;
+  /** The newest deal on it in this conversation. */
+  dealReference: string | null;
+};
+
+/** The thread opened on one listing, from wherever it is now. */
+function aboutHref(pathname: string, listingId: string) {
+  return `${pathname}?about=${encodeURIComponent(listingId)}`;
+}
+
+/** A link in a divider: small words, a finger-sized target. */
+const DIVIDER_LINK =
+  "inline-flex min-h-11 items-center rounded-md px-2 text-xs font-medium text-muted underline-offset-4 transition-colors duration-150 hover:text-fg hover:underline pointer-fine:min-h-7";
+
+/**
+ * Where the conversation turns to another listing: "About: Gaming channel ·
+ * $2,500.00". A conversation is the two people, so it carries everything
+ * they have talked about; this is how the reader tells which part is about
+ * what. "View listing" opens its page while it has one; "Show deal" (or,
+ * with no deal on it, "Talk about this") turns the page to it.
+ */
+function ListingDivider({
+  listing,
+  focused,
+}: {
+  listing: ThreadListingView;
+  focused: boolean;
+}) {
+  const pathname = usePathname();
+  return (
+    <li className="flex flex-col items-center pt-1">
+      <div className="flex w-full items-center gap-3">
+        <span aria-hidden="true" className="h-px min-w-4 flex-1 bg-line" />
+        <p className="flex max-w-[calc(100%-3rem)] min-w-0 items-center gap-1.5 text-xs text-muted">
+          <StoreIcon
+            aria-hidden="true"
+            className={cn("size-3.5 shrink-0", iconText(StoreIcon))}
+          />
+          <span className="truncate">
+            About: <span className="font-medium text-fg">{listing.title}</span>
+          </span>
+          <span className="shrink-0 text-subtle tabular-nums">
+            · {money(listing.priceCents)}
+          </span>
+        </p>
+        <span aria-hidden="true" className="h-px min-w-4 flex-1 bg-line" />
+      </div>
+      {listing.onSale || !focused ? (
+        <div className="-mb-2 flex items-center">
+          {listing.onSale ? (
+            <Link href={`/listing/${listing.slug}`} className={DIVIDER_LINK}>
+              View listing
+            </Link>
+          ) : null}
+          {!focused ? (
+            <Link
+              href={aboutHref(pathname, listing.id)}
+              replace
+              scroll={false}
+              className={DIVIDER_LINK}
+            >
+              {listing.dealReference ? "Show deal" : "Talk about this"}
+            </Link>
+          ) : null}
+        </div>
+      ) : null}
+    </li>
+  );
+}
+
+/**
+ * What a message written now is about, over the message box. With one
+ * listing it only says so; with more it switches between them, turning the
+ * whole page — header, deal panel, offer box — to the one chosen. A native
+ * picker underneath, because on a phone that is the system's own list.
+ */
+function AboutChip({
+  listings,
+  value,
+  onChange,
+}: {
+  listings: ThreadListingView[];
+  value: string;
+  onChange: (listingId: string) => void;
+}) {
+  const current = listings.find((listing) => listing.id === value);
+  if (!current) return null;
+  const chip =
+    "relative mb-1.5 inline-flex min-h-11 max-w-full min-w-0 items-center gap-1.5 rounded-full border border-line bg-surface px-3 text-[0.8125rem] text-muted pointer-fine:min-h-8 dark:bg-surface-2";
+  const label = (
+    <>
+      <StoreIcon
+        aria-hidden="true"
+        className={cn("size-3.5 shrink-0", iconText(StoreIcon))}
+      />
+      <span className="truncate">
+        About: <span className="font-medium text-fg">{current.title}</span>
+      </span>
+    </>
+  );
+  if (listings.length < 2) return <p className={chip}>{label}</p>;
+  return (
+    <label
+      className={cn(
+        chip,
+        "cursor-pointer transition-[border-color,box-shadow] duration-150 hover:border-line-strong has-[select:focus-visible]:border-primary has-[select:focus-visible]:ring-[3px] has-[select:focus-visible]:ring-primary/20",
+      )}
+    >
+      {label}
+      <ChevronDownIcon
+        aria-hidden="true"
+        className="size-3.5 shrink-0 text-subtle"
+      />
+      <select
+        aria-label="What this message is about"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="absolute inset-0 cursor-pointer appearance-none opacity-0"
+      >
+        {listings.map((listing) => (
+          <option key={listing.id} value={listing.id}>
+            {listing.title}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
 
 /** How long is left on an attachment, in words. */
 function expiresIn(iso: string): string | null {
@@ -451,7 +596,8 @@ function Bubble({
 
 export function ThreadView({
   conversationId,
-  listingId = null,
+  listings = [],
+  focusListingId = null,
   messages,
   closed,
   otherSide,
@@ -464,8 +610,13 @@ export function ThreadView({
   footnote = null,
 }: {
   conversationId: string;
-  /** The listing a line written here is about. */
-  listingId?: string | null;
+  /**
+   * Every listing the conversation is about, as the reader may see them.
+   * With two or more, the lines are divided by listing.
+   */
+  listings?: ThreadListingView[];
+  /** The listing the page is about, and a line written here is about. */
+  focusListingId?: string | null;
   messages: ThreadMessageView[];
   closed: boolean;
   /** Who the reader is talking to, for the empty state. */
@@ -501,6 +652,17 @@ export function ThreadView({
    */
   footnote?: ReactNode;
 }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  // What the next line is about. Follows the page's focus, and changes the
+  // moment the reader picks another listing, before the page has turned —
+  // a line typed in between is about what they chose.
+  const [about, setAbout] = useState(focusListingId);
+  const [aboutFrom, setAboutFrom] = useState(focusListingId);
+  if (aboutFrom !== focusListingId) {
+    setAboutFrom(focusListingId);
+    setAbout(focusListingId);
+  }
   const [offering, setOffering] = useState(false);
   const [draft, setDraft] = useState("");
   const [note, setNote] = useState<string | null>(null);
@@ -571,6 +733,21 @@ export function ThreadView({
     };
   }, []);
 
+  // Lines are divided by listing only when there is more than one.
+  const divided = listings.length > 1;
+  const byListing = new Map(listings.map((listing) => [listing.id, listing]));
+  /** The listing the line at `index` turns the conversation to, if any. */
+  const turnsTo = (index: number): string | null => {
+    const listingId = messages[index]?.listingId ?? null;
+    if (!divided || !listingId) return null;
+    return messages[index - 1]?.listingId === listingId ? null : listingId;
+  };
+
+  function choose(listingId: string) {
+    setAbout(listingId);
+    router.replace(aboutHref(pathname, listingId), { scroll: false });
+  }
+
   const over = draft.length > MAX_MESSAGE;
   const left = MAX_MESSAGE - draft.length;
   const hasSomething = draft.trim().length > 0 || attachment !== null;
@@ -589,8 +766,8 @@ export function ThreadView({
     startTransition(async () => {
       const result = sendWith
         ? await sendWith(body, attachment?.key)
-        : listingId
-          ? await postMessage(conversationId, listingId, body, attachment?.key)
+        : about
+          ? await postMessage(conversationId, about, body, attachment?.key)
           : { ok: false as const, error: "Pick what this message is about." };
       if (!result.ok) {
         setError(result.error);
@@ -661,7 +838,8 @@ export function ThreadView({
                 Channel Adda can read this conversation and will step in if
                 something goes wrong. Phone numbers, emails and links are
                 removed automatically. Photos and clips are deleted after 48
-                hours, and a thread with no deal on it clears after 10 days.
+                hours, and messages about a listing with no deal clear after 10
+                days.
               </InfoTip>
             </p>
           )}
@@ -682,45 +860,79 @@ export function ThreadView({
               {messages.map((message, index) => {
                 const prev = messages[index - 1];
                 const next = messages[index + 1];
-                return message.kind === "EVENT" ? (
-                  <EventLine
-                    key={message.id}
-                    message={message}
-                    // A run of history lines reads as one block of record.
-                    className={prev?.kind === "EVENT" ? "-mt-3" : undefined}
-                  />
-                ) : message.kind === "OFFER" && message.offer ? (
-                  <ChatOfferCard
-                    key={message.id}
-                    offer={message.offer}
-                    viewerRole={viewerRole}
-                    senderName={message.mine ? "You" : displayName(message)}
-                    senderHref={message.mine ? null : message.senderHref}
-                    mine={message.mine}
-                    createdAt={message.createdAt}
-                    actions={
-                      (viewerRole === "buyer" || viewerRole === "seller") &&
-                      message.offer.effectiveStatus === "OPEN" ? (
-                        <OfferActions
-                          offer={{
-                            id: message.offer.id,
-                            amount: message.offer.amountCents / 100,
-                            awaiting: message.offer.awaiting,
-                            bySeller: message.offer.bySeller,
-                            effectiveStatus: message.offer.effectiveStatus,
-                          }}
-                          viewingAs={viewerRole}
-                        />
-                      ) : undefined
-                    }
-                  />
+                const divider = turnsTo(index);
+                const listing = divider ? byListing.get(divider) : undefined;
+                const item =
+                  message.kind === "EVENT" ? (
+                    <EventLine
+                      key={message.id}
+                      message={message}
+                      // A run of history lines reads as one block of record.
+                      className={
+                        prev?.kind === "EVENT" && !divider ? "-mt-3" : undefined
+                      }
+                      // The line that opened a deal turns the page to it.
+                      action={
+                        message.opensDeal &&
+                        divided &&
+                        message.listingId &&
+                        message.listingId !== about
+                          ? {
+                              href: aboutHref(pathname, message.listingId),
+                              label: "Show deal",
+                            }
+                          : null
+                      }
+                    />
+                  ) : message.kind === "OFFER" && message.offer ? (
+                    <ChatOfferCard
+                      key={message.id}
+                      offer={message.offer}
+                      viewerRole={viewerRole}
+                      senderName={message.mine ? "You" : displayName(message)}
+                      senderHref={message.mine ? null : message.senderHref}
+                      mine={message.mine}
+                      createdAt={message.createdAt}
+                      actions={
+                        (viewerRole === "buyer" || viewerRole === "seller") &&
+                        message.offer.effectiveStatus === "OPEN" ? (
+                          <OfferActions
+                            offer={{
+                              id: message.offer.id,
+                              amount: message.offer.amountCents / 100,
+                              awaiting: message.offer.awaiting,
+                              bySeller: message.offer.bySeller,
+                              effectiveStatus: message.offer.effectiveStatus,
+                            }}
+                            viewingAs={viewerRole}
+                          />
+                        ) : undefined
+                      }
+                    />
+                  ) : (
+                    <Bubble
+                      key={message.id}
+                      message={message}
+                      first={
+                        !prev || divider !== null || !sameTurn(prev, message)
+                      }
+                      last={
+                        !next ||
+                        turnsTo(index + 1) !== null ||
+                        !sameTurn(message, next)
+                      }
+                    />
+                  );
+                return listing ? (
+                  <Fragment key={message.id}>
+                    <ListingDivider
+                      listing={listing}
+                      focused={listing.id === about}
+                    />
+                    {item}
+                  </Fragment>
                 ) : (
-                  <Bubble
-                    key={message.id}
-                    message={message}
-                    first={!prev || !sameTurn(prev, message)}
-                    last={!next || !sameTurn(message, next)}
-                  />
+                  item
                 );
               })}
             </ul>
@@ -751,6 +963,9 @@ export function ThreadView({
         // edge, and is capped so an open offer form scrolls inside it rather
         // than pushing its top off screen.
         <div className="sticky bottom-0 z-10 -mx-3 border-t border-line bg-bg/95 px-3 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] backdrop-blur-xl max-lg:max-h-[70dvh] max-lg:overflow-y-auto max-lg:overscroll-contain sm:-mx-6 sm:px-6 lg:mx-0 lg:border-t-0 lg:bg-bg lg:px-0 lg:pt-2 lg:pb-6 lg:backdrop-blur-none lg:before:pointer-events-none lg:before:absolute lg:before:inset-x-0 lg:before:bottom-full lg:before:h-4 lg:before:bg-linear-to-t lg:before:from-bg lg:before:to-transparent">
+          {about && listings.length > 0 ? (
+            <AboutChip listings={listings} value={about} onChange={choose} />
+          ) : null}
           {offering && offerComposer ? (
             <OfferComposerForm
               config={offerComposer}

@@ -1,15 +1,20 @@
 import { FlagIcon } from "lucide-react";
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { Callout } from "@/components/app/kit";
 import { CHAT_WINDOW_WIDE } from "@/components/messages/chat-layout";
 import { channelOf, ThreadHeader } from "@/components/messages/chat-parts";
 import { LiveRefresh } from "@/components/messages/live-refresh";
-import { toMessageViews } from "@/components/messages/serialize";
+import {
+  toListingViews,
+  toMessageViews,
+} from "@/components/messages/serialize";
 import { StaffControls } from "@/components/messages/staff-controls";
 import { ThreadView } from "@/components/messages/thread-view";
 import { Badge } from "@/components/ui/badge";
-import { getThread } from "@/server/messages";
+import { pickFocus } from "@/lib/thread-focus";
+import { threadHref } from "@/lib/thread-href";
+import { getThread, resolveThreadAlias } from "@/server/messages";
 import { requireStaff } from "@/server/session";
 import { threadFingerprint } from "@/server/thread-fingerprint";
 
@@ -18,22 +23,42 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
+/**
+ * One conversation, for staff: everything the two people have said to each
+ * other, about every listing, with the staff controls beside it. Closing or
+ * clearing a flag covers all of it. The header and the message box follow
+ * one listing at a time — the one in the address (`?about=`), else the one
+ * talked about last.
+ */
 export default async function AdminThreadPage({
   params,
+  searchParams,
 }: PageProps<"/admin/messages/[id]">) {
   const { id } = await params;
+  const { about } = await searchParams;
   const staff = await requireStaff();
   // Before the thread is read, for the reason the dashboard page gives.
   const fingerprint = await threadFingerprint(id, staff);
   const thread = await getThread(id, staff);
-  if (!thread || !fingerprint) notFound();
+  if (!thread || !fingerprint) {
+    // A thread from before one conversation per buyer and seller.
+    const moved = await resolveThreadAlias(id, staff);
+    if (moved) {
+      redirect(
+        threadHref(moved.conversationId, moved.listingId, "/admin/messages"),
+      );
+    }
+    notFound();
+  }
 
-  // The listing the page is about: the one the newest line is about.
-  const lastListing = thread.messages.at(-1)?.listingId;
+  const focusId = pickFocus({
+    about,
+    listings: thread.listings,
+    panels: [],
+    messages: thread.messages,
+  });
   const focus =
-    thread.listings.find((listing) => listing.id === lastListing) ??
-    thread.listings[0] ??
-    null;
+    thread.listings.find((listing) => listing.id === focusId) ?? null;
   const flagged = thread.flaggedAt !== null;
   const closed = thread.closedAt !== null;
 
@@ -104,7 +129,8 @@ export default async function AdminThreadPage({
           <div className="flex min-h-0 min-w-0 flex-col">
             <ThreadView
               conversationId={thread.id}
-              listingId={focus?.id ?? null}
+              listings={toListingViews(thread.listings)}
+              focusListingId={focusId}
               otherSide={`${thread.buyerName} and ${thread.sellerName}`}
               closed={false}
               viewerRole="staff"

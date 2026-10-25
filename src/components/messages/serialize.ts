@@ -1,7 +1,26 @@
 import type { PanelStateView } from "@/components/messages/deal-panel";
-import type { ThreadMessageView } from "@/components/messages/thread-view";
+import type {
+  ThreadListingView,
+  ThreadMessageView,
+} from "@/components/messages/thread-view";
 import type { PanelState } from "@/lib/deal-panel";
-import type { ThreadMessage } from "@/server/messages";
+import type { ThreadListing, ThreadMessage } from "@/server/messages";
+
+/**
+ * A thread's listings, as the timeline draws them: only what a divider and
+ * the message box show. The seller's own link to the account stays on the
+ * server, where the header checks it before linking it.
+ */
+export function toListingViews(listings: ThreadListing[]): ThreadListingView[] {
+  return listings.map((listing) => ({
+    id: listing.id,
+    slug: listing.slug,
+    title: listing.title,
+    priceCents: listing.priceCents,
+    onSale: listing.onSale,
+    dealReference: listing.dealReference,
+  }));
+}
 
 /** The panel's state, ready to cross into the browser. */
 export function toPanelView(state: PanelState): PanelStateView {
