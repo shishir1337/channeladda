@@ -4,6 +4,7 @@ import { HeartIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { useSession } from "@/lib/auth-client";
+import { withSaved } from "@/lib/saved-ids";
 import { cn } from "@/lib/utils";
 
 /**
@@ -52,9 +53,7 @@ const store = {
   },
 
   set(listingId: string, favourited: boolean) {
-    if (!store.ids) store.ids = new Set();
-    if (favourited) store.ids.add(listingId);
-    else store.ids.delete(listingId);
+    store.ids = withSaved(store.ids, listingId, favourited);
     store.emit();
   },
 };

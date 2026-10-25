@@ -96,6 +96,8 @@ export default async function DashboardLayout({ children }: LayoutProps<"/">) {
           icon: "offers",
           waiting: waiting.offers,
         },
+        // What the heart saved: it had nowhere to be seen again.
+        { label: "Saved", href: "/dashboard/saved", icon: "saved" },
         {
           label: "Messages",
           href: "/dashboard/messages",

@@ -26,11 +26,23 @@ export type ToggleResult =
   | { ok: true; favourited: boolean }
   | { ok: false; reason: "not-found" };
 
+/** Two saves of the same listing at once: the unique index refused one. */
+function isUniqueViolation(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    (error as { code?: string }).code === "P2002"
+  );
+}
+
 /**
  * Saves or unsaves, and reports which it ended up as.
  *
  * The unique constraint on (userId, listingId) is what makes this safe to
- * double-click: a second save cannot create a second row.
+ * double-click: a second save cannot create a second row. Each save is a
+ * person watching the listing, so `watching` moves with it, in the same
+ * transaction as the row — it sat at whatever the listing was created with
+ * for ever. Never below zero: seeded figures were not made of rows.
  */
 export async function toggleFavourite(
   userId: string,
@@ -48,10 +60,31 @@ export async function toggleFavourite(
   });
 
   if (existing) {
-    await db.favourite.delete({ where: { id: existing.id } });
+    await db.$transaction(async (tx) => {
+      const gone = await tx.favourite.deleteMany({
+        where: { userId, listingId },
+      });
+      if (gone.count === 1) {
+        await tx.listing.updateMany({
+          where: { id: listingId, watching: { gt: 0 } },
+          data: { watching: { decrement: 1 } },
+        });
+      }
+    });
     return { ok: true, favourited: false };
   }
 
-  await db.favourite.create({ data: { userId, listingId } });
+  try {
+    await db.$transaction(async (tx) => {
+      await tx.favourite.create({ data: { userId, listingId } });
+      await tx.listing.update({
+        where: { id: listingId },
+        data: { watching: { increment: 1 } },
+      });
+    });
+  } catch (error) {
+    // The other press saved it, and counted it.
+    if (!isUniqueViolation(error)) throw error;
+  }
   return { ok: true, favourited: true };
 }

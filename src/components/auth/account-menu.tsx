@@ -8,6 +8,7 @@ import {
   CoinsIcon,
   ExternalLinkIcon,
   HandshakeIcon,
+  HeartIcon,
   LayoutDashboardIcon,
   LifeBuoyIcon,
   LogOutIcon,
@@ -77,6 +78,7 @@ const PLACES: { label: string | null; items: Place[] }[] = [
         count: "deals",
       },
       { label: "Offers", href: "/dashboard/offers", icon: HandshakeIcon },
+      { label: "Saved", href: "/dashboard/saved", icon: HeartIcon },
       {
         label: "Messages",
         href: "/dashboard/messages",

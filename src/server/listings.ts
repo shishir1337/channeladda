@@ -466,6 +466,23 @@ export async function getFeaturedListings(take = 24): Promise<Listing[]> {
   return toListings(rows);
 }
 
+/**
+ * What this member has saved with the heart, still on the market (or held
+ * for somebody, which may yet come back). Sold and removed ones drop out.
+ */
+export async function getSavedListings(userId: string): Promise<Listing[]> {
+  const rows = await db.listing.findMany({
+    where: {
+      status: { in: ["LIVE", "RESERVED"] },
+      favourites: { some: { userId } },
+    },
+    include,
+    orderBy: { listedAt: "desc" },
+    take: 200,
+  });
+  return toListings(rows);
+}
+
 export async function getSellerListings(slug: string): Promise<Listing[]> {
   const rows = await db.listing.findMany({
     where: { status: "LIVE", seller: { slug } },
