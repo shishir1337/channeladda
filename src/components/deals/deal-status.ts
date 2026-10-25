@@ -1,6 +1,7 @@
 import type { BadgeVariant } from "@/components/ui/badge";
 import type { DealMode, OrderStatus, Platform } from "@/generated/prisma/enums";
 import type { DealActor } from "@/lib/deal-machine";
+import { templateFor } from "@/lib/deal-templates";
 
 /**
  * Database values, translated.
@@ -14,10 +15,10 @@ import type { DealActor } from "@/lib/deal-machine";
  *
  * The rule this copy must never break: nobody is ever exposed. On Fastest the
  * buyer pays Channel Adda, we hold it, and the seller is paid into their
- * Channel Adda wallet once our agent is the channel's primary owner; our agent
- * then makes the buyer primary owner. On Safest our agent holds the channel
- * first, and only then does the buyer pay the seller directly — Channel Adda
- * takes the admin fee and nothing else.
+ * Channel Adda wallet once our agent has full control; our agent then hands
+ * it to the buyer. On Safest our agent holds it first, and only then does
+ * the buyer pay the seller directly — Channel Adda takes the admin fee and
+ * nothing else.
  */
 
 export type StatusTone = BadgeVariant;
@@ -104,119 +105,789 @@ export const ACTOR_LABELS: Record<DealActor, string> = {
   system: "Channel Adda",
 };
 
-/**
- * What each step is called on screen, for whoever is reading.
- *
- * The stored labels are identifiers as much as words — running deals are
- * matched on them, and `deals:in-flight` treats a changed one as old steps —
- * so they stay, and this is what is shown instead. Each name says who does
- * it, from the reader's side ("You pay", "The seller invites our agent"), so
- * the list needs no "Then the seller" under every line. Staff, and a step
- * from an earlier template, see the stored label.
- */
-export const STEP_TITLES: Readonly<
-  Record<string, Record<"buyer" | "seller" | "agent", string>>
-> = {
-  // Safest
-  "Pay the admin fee": {
-    buyer: "You pay our fee",
-    seller: "The buyer pays our fee",
-    agent: "The buyer pays our fee",
-  },
-  "Accept the owner invite": {
-    buyer: "Our agent accepts the invite",
-    seller: "Our agent accepts your invite",
-    agent: "You accept the owner invite",
-  },
-  "Verify the channel": {
-    buyer: "Our agent checks the channel",
-    seller: "Our agent checks the channel",
-    agent: "You check the channel",
-  },
-  "Pay the seller": {
-    buyer: "You pay the seller",
-    seller: "The buyer pays you",
-    agent: "The buyer pays the seller",
-  },
-  "Confirm the payment arrived": {
-    buyer: "The seller confirms your payment",
-    seller: "You confirm the payment arrived",
-    agent: "The seller confirms the payment",
-  },
-  // Safest's last step before 2026-10-25, on the deals finished with it.
-  "Transfer ownership to the buyer": {
-    buyer: "Our agent hands you the channel",
-    seller: "Our agent hands the channel to the buyer",
-    agent: "You hand the channel to the buyer",
-  },
-  // Fastest
-  "Pay the full amount": {
-    buyer: "You pay",
-    seller: "The buyer pays us",
-    agent: "The buyer pays us",
-  },
-  "Confirm primary ownership": {
-    buyer: "Our agent confirms they own it",
-    seller: "Our agent confirms, and you are paid",
-    agent: "You confirm you are primary owner",
-  },
-  // Both
-  "Invite the buyer as owner": {
-    buyer: "Our agent invites you as owner",
-    seller: "Our agent invites the buyer",
-    agent: "You invite the buyer as owner",
-  },
-  "Make the buyer primary owner": {
-    buyer: "Our agent makes you primary owner",
-    seller: "Our agent makes the buyer primary owner",
-    agent: "You make the buyer primary owner",
-  },
-  "Invite the agent as owner": {
-    buyer: "The seller invites our agent",
-    seller: "You invite our agent as owner",
-    agent: "The seller invites you as owner",
-  },
-  "Make the agent primary owner": {
-    buyer: "The seller makes our agent primary owner",
-    seller: "You make our agent primary owner",
-    agent: "The seller makes you primary owner",
-  },
-};
-
-export function stepTitle(label: string, viewer: DealActor): string {
-  if (viewer !== "buyer" && viewer !== "seller" && viewer !== "agent") {
-    return label;
-  }
-  return STEP_TITLES[label]?.[viewer] ?? label;
-}
-
 /** "you" when it is the reader's own move, which is the whole point. */
 export function actorLabel(actor: DealActor, viewer: DealActor): string {
   return actor === viewer ? "you" : ACTOR_LABELS[actor];
 }
 
+// ---------------------------------------------------------------------------
+// The words that depend on the platform
+// ---------------------------------------------------------------------------
+
 /**
- * The few words that depend on the platform.
+ * How each platform's account actually changes hands.
  *
- * On YouTube the account our agent is invited with is a Google account, and
- * Google makes a new owner wait 7 days before they can be made primary owner.
- * Neither is true anywhere else, and a Telegram seller told to wait for
- * Google was told something false.
+ * The step labels are YouTube's — "invite as owner", "primary owner" — and
+ * they are stored on every running deal, so they stay. What is shown comes
+ * from here instead: on Instagram the seller hands over the login and our
+ * agent moves its email, phone and two-factor to Channel Adda; on Facebook
+ * the seller adds our agent to the Page with full control and leaves it; on
+ * Telegram our agent is made an admin and then owner; a website moves by its
+ * domain and hosting. An Instagram seller told to "invite our agent as
+ * owner" was told to look for a button that does not exist.
  */
-type Words = {
+export type Words = {
+  platform: Platform;
   /** "Google account" on YouTube, "account" elsewhere. */
   account: string;
   /** Google's 7-day wait applies. */
   googleWait: boolean;
+  /** What is being sold: "channel", "account", "Page", "website". */
+  asset: string;
+  /** Where the seller finds what they hand it to. */
+  agentOnPage: string;
+  /** The card that shows the seller our agent's account. */
+  agentCard: { invite: string; primary: string };
+  /** What the buyer accepts after our agent gives them access, if anything. */
+  buyerAccept: string | null;
+  /** The buyer's badge on the step that hands it to them. */
+  buyerNext: string;
 };
 
-function wordsFor(platform: Platform): Words {
-  const youtube = platform === "YOUTUBE";
+const WORDS: Readonly<Record<Platform, Omit<Words, "platform">>> = {
+  YOUTUBE: {
+    account: "Google account",
+    googleWait: true,
+    asset: "channel",
+    agentOnPage: "The account to invite is on this page.",
+    agentCard: {
+      invite: "Invite this account as owner",
+      primary: "Make this account primary owner",
+    },
+    buyerAccept: "Accept our agent's owner invite if you have not yet.",
+    buyerNext: "You become primary owner next",
+  },
+  INSTAGRAM: {
+    account: "account",
+    googleWait: false,
+    asset: "account",
+    agentOnPage:
+      "Our agent's email, which the account moves to, is on this page.",
+    agentCard: {
+      invite: "The account moves to this email",
+      primary: "The account moves to this email",
+    },
+    buyerAccept: null,
+    buyerNext: "The account moves to you next",
+  },
+  FACEBOOK: {
+    account: "Facebook account",
+    googleWait: false,
+    asset: "Page",
+    agentOnPage: "Our agent's Facebook account is on this page.",
+    agentCard: {
+      invite: "Add this account to the Page",
+      primary: "Leave the Page to this account",
+    },
+    buyerAccept: "Accept our agent's Page invite if you have not yet.",
+    buyerNext: "You get full control next",
+  },
+  TELEGRAM: {
+    account: "Telegram account",
+    googleWait: false,
+    asset: "channel",
+    agentOnPage: "Our agent's Telegram account is on this page.",
+    agentCard: {
+      invite: "Make this account an admin",
+      primary: "Transfer ownership to this account",
+    },
+    buyerAccept: null,
+    buyerNext: "You become the owner next",
+  },
+  WEBSITE: {
+    account: "email",
+    googleWait: false,
+    asset: "website",
+    agentOnPage: "Our agent's email is on this page.",
+    agentCard: {
+      invite: "Give this email access",
+      primary: "Transfer the domain to this email",
+    },
+    buyerAccept: null,
+    buyerNext: "The website moves to you next",
+  },
+};
+
+export function wordsFor(platform: Platform): Words {
+  return { platform, ...WORDS[platform] };
+}
+
+/** Who a step's words are about, from where the reader stands. */
+type Them = {
+  agent: string;
+  agentPoss: string;
+  /** "you are" / "they are", for our agent. */
+  agentIs: string;
+  buyer: string;
+  buyerPoss: string;
+  seller: string;
+  sellerPoss: string;
+};
+
+function them(reader: DealActor): Them {
   return {
-    account: youtube ? "Google account" : "account",
-    googleWait: youtube,
+    agent: reader === "agent" ? "you" : "our agent",
+    agentPoss: reader === "agent" ? "your" : "our agent's",
+    agentIs: reader === "agent" ? "you are" : "they are",
+    buyer: reader === "buyer" ? "you" : "the buyer",
+    buyerPoss: reader === "buyer" ? "your" : "the buyer's",
+    seller: reader === "seller" ? "you" : "the seller",
+    sellerPoss: reader === "seller" ? "your" : "their",
   };
 }
+
+/**
+ * One step, in every form it is shown in.
+ *
+ * `to` is the step as an instruction ("invite our agent as owner"), with
+ * its objects from the reader's side, so the same words read "The seller
+ * invites you as owner" to our agent and "You invite our agent as owner" to
+ * the seller. Every form starts with its verb, which is how the third person
+ * and the "-ing" form are made from it.
+ */
+type Act = {
+  to: (o: Them) => string;
+  /** Shorter, for a badge: "invite our agent". Defaults to `to`. */
+  ask?: (o: Them) => string;
+  /** After a name, in the deal chat's record: "invited our agent as owner". */
+  did: string;
+  /** What it involves, to whoever does it. */
+  how: string;
+  /** What it involves, to anybody watching. */
+  what: (o: Them) => string;
+  /** The button. */
+  button: string;
+  /** A name that reads better for one reader than the made one. */
+  titles?: Partial<Record<"buyer" | "seller" | "agent", string>>;
+  /** Asked once more before the press counts. */
+  caution?: string;
+};
+
+/** The steps that are about money, the same on every platform. */
+function moneyActs(w: Words): Record<string, Act> {
+  return {
+    "Pay the admin fee": {
+      to: () => "pay our fee",
+      did: "paid our fee",
+      how: `Channel Adda's fee, to start — the only payment Channel Adda takes on this deal. You pay the price to the seller directly, once our agent holds the ${w.asset}.`,
+      what: () =>
+        `The buyer pays Channel Adda's fee to start. The price goes to the seller directly, once our agent holds the ${w.asset}.`,
+      button: "Mark this done",
+    },
+    "Pay the full amount": {
+      to: () => "pay",
+      did: "paid",
+      how: `The price and our fee together. Channel Adda holds all of it until our agent has the ${w.asset}.`,
+      what: () =>
+        `The buyer pays the price and our fee to Channel Adda, which holds it until our agent has the ${w.asset}.`,
+      button: "Mark this done",
+      titles: { seller: "The buyer pays us", agent: "The buyer pays us" },
+    },
+    "Pay the seller": {
+      to: (o) => `pay ${o.seller}`,
+      did: "marked the price as paid",
+      how: "Pay the seller the price directly, to the details the seller gave on this page, then press Paid. Put the transaction id or a screenshot in the deal chat: it is your proof.",
+      what: (o) =>
+        `The buyer pays ${o.seller} the price directly, to the details ${o.seller === "you" ? "you" : "the seller"} gave on this page, then presses Paid. The proof goes in the deal chat.`,
+      button: "Paid",
+      caution:
+        "Only once you have sent the money. The seller is asked to confirm it arrived, and the moment you press this is the record.",
+    },
+    "Confirm the payment arrived": {
+      to: (o) => `confirm ${o.buyerPoss} payment arrived`,
+      did: "confirmed the payment arrived",
+      how: `Press Received once the money is in your account. Only then does our agent hand the ${w.asset} to the buyer. If it has not arrived, say so in the deal chat and a moderator will look.`,
+      what: (o) =>
+        `The seller presses Received once the money is in their account. Only then does our agent hand the ${w.asset} to ${o.buyer}.`,
+      button: "Received",
+      caution: `Only if the money is in your account. Once you press it our agent hands the ${w.asset} to the buyer, and it cannot come back to you.`,
+    },
+    // Safest's last step before 2026-10-25, on the deals finished with it.
+    "Transfer ownership to the buyer": {
+      to: (o) => `hand the ${w.asset} to ${o.buyer}`,
+      did: "handed it to the buyer",
+      how: "You transferred ownership to the buyer's account. That completed the deal.",
+      what: () =>
+        "Our agent transferred ownership to the buyer's account. That completed the deal.",
+      button: "I have transferred it",
+    },
+  };
+}
+
+/** What closes every hand-over step, by mode. */
+const PAID_WHEN = "That is when you are paid.";
+
+function youtubeActs(m: DealMode): Record<string, Act> {
+  return {
+    "Invite the agent as owner": {
+      to: (o) => `invite ${o.agent} as owner`,
+      ask: (o) => `invite ${o.agent}`,
+      did: "invited our agent as owner",
+      how: "Invite our agent's Google account, shown on this page, as an owner of the channel.",
+      what: (o) =>
+        `The seller invites ${o.agentPoss} Google account as an owner of the channel.`,
+      button: "I have invited the agent",
+    },
+    "Accept the owner invite": {
+      to: () => "accept the owner invite",
+      did: "accepted the owner invite",
+      how: "Accept the seller's invite. That starts Google's 7-day wait before you can be made primary owner.",
+      what: () =>
+        "Our agent accepts the seller's invite. That starts Google's 7-day wait before an owner can be made primary owner.",
+      button: "I have accepted it",
+    },
+    "Invite the buyer as owner": {
+      to: (o) => `invite ${o.buyer} as owner`,
+      ask: (o) => `invite ${o.buyer}`,
+      did: "invited the buyer as owner",
+      how:
+        m === "FASTEST"
+          ? "Accept the seller's invite, then invite the buyer's Google account, named on this page, as an owner. That starts the holding period, which is also Google's 7-day wait before you can be made primary owner."
+          : "Invite the buyer's Google account, named on this page, as an owner. That starts Google's 7-day wait before they can be made primary owner.",
+      what: (o) =>
+        m === "FASTEST"
+          ? `Our agent accepts the seller's invite and invites ${o.buyerPoss} Google account, named on this page, as an owner. That starts the holding period.`
+          : `Our agent invites ${o.buyerPoss} Google account, named on this page, as an owner. That starts Google's 7-day wait before ${o.buyer === "you" ? "you" : "they"} can be made primary owner.`,
+      button: "I have invited the buyer",
+    },
+    "Make the agent primary owner": {
+      to: (o) => `make ${o.agent} primary owner`,
+      did: "made our agent primary owner",
+      how:
+        m === "FASTEST"
+          ? `Make our agent's Google account primary owner of the channel. ${PAID_WHEN}`
+          : "Make our agent's Google account primary owner of the channel.",
+      what: (o) =>
+        m === "FASTEST"
+          ? `The seller makes ${o.agent} primary owner of the channel. That is when the seller is paid.`
+          : `The seller makes ${o.agent} primary owner of the channel.`,
+      button: "I have made the agent primary owner",
+      caution:
+        m === "FASTEST"
+          ? "Only once our agent's account is primary owner. Our agent confirms it next, and that is when you are paid. You cannot take the channel back."
+          : "Only once our agent's account is primary owner. Our agent checks the channel next, and you cannot take it back.",
+    },
+    "Confirm primary ownership": {
+      to: (o) => `confirm ${o.agentIs} primary owner`,
+      did: "confirmed primary ownership",
+      how: "Confirm once you are the channel's primary owner. That pays the seller from the buyer's money.",
+      what: (o) =>
+        `Our agent confirms they are primary owner. Channel Adda then pays ${o.seller} into ${o.sellerPoss} Channel Adda wallet.`,
+      button: "I am the primary owner",
+      titles: {
+        buyer: "Our agent confirms they own it",
+        seller: "Our agent confirms, and you are paid",
+      },
+      caution:
+        "Only once you are the channel's primary owner. This pays the seller from the buyer's money, and cannot be undone.",
+    },
+    "Verify the channel": {
+      to: () => "check the channel",
+      did: "checked the channel",
+      how: "Check you are primary owner, then the monetization, the strikes and that the channel is genuine. Post the latest proof in the deal chat, then confirm here.",
+      what: () =>
+        "Our agent checks they are primary owner, the monetization, the strikes and that the channel is genuine, and posts the latest proof in the deal chat. From here the channel is out of the seller's hands.",
+      button: "The channel checks out",
+      caution:
+        "Only once ownership, monetization and strikes check out and you have posted the latest proof in the deal chat. The buyer pays the seller next.",
+    },
+    "Make the buyer primary owner": {
+      to: (o) => `make ${o.buyer} primary owner`,
+      did: "made the buyer primary owner",
+      how: "Make the buyer's Google account, named on this page, primary owner, then leave the channel. That completes the deal.",
+      what: (o) =>
+        `Our agent makes ${o.buyerPoss} Google account primary owner and leaves the channel. That completes the deal.`,
+      button: "I have made the buyer primary owner",
+      caution:
+        "Only once the buyer's account is primary owner. This completes the deal, and cannot be undone.",
+    },
+  };
+}
+
+function instagramActs(m: DealMode): Record<string, Act> {
+  const secure: Act = {
+    to: () => "secure the login",
+    did: "secured the login",
+    how:
+      m === "FASTEST"
+        ? "Sign in, move the email and phone to Channel Adda's, change the password and turn on two-factor, so the seller can no longer sign in. That starts the holding period."
+        : "Sign in, move the email and phone to Channel Adda's, change the password and turn on two-factor, so the seller can no longer sign in.",
+    what: () =>
+      m === "FASTEST"
+        ? "Our agent signs in, moves the email and phone to Channel Adda's, changes the password and turns on two-factor. That starts the holding period."
+        : "Our agent signs in, moves the email and phone to Channel Adda's, changes the password and turns on two-factor.",
+    button: "I have secured it",
+  };
+  return {
+    "Invite the agent as owner": {
+      to: (o) => `send ${o.agent} the login`,
+      did: "sent our agent the login",
+      how: "Send our agent the account's username and password in the deal chat, and the login code when they ask for it.",
+      what: (o) =>
+        `The seller sends ${o.agent} the account's username and password.`,
+      button: "I have sent the login",
+    },
+    "Accept the owner invite": secure,
+    // Fastest: our agent secures it before the holding period. Safest: the
+    // seller has been paid, and the buyer gets the login.
+    "Invite the buyer as owner":
+      m === "FASTEST"
+        ? secure
+        : {
+            to: (o) => `send ${o.buyer} the login`,
+            did: "sent the buyer the login",
+            how: "Send the buyer the username and password in the deal chat, so they can sign in and check the account.",
+            what: (o) =>
+              `Our agent sends ${o.buyer} the username and password in the deal chat.`,
+            button: "I have sent the login",
+          },
+    "Make the agent primary owner": {
+      to: () => "unlink the account from Meta",
+      did: "unlinked the account from Meta",
+      how:
+        m === "FASTEST"
+          ? `In Meta Accounts Center, remove this account from yours, and take off any email or phone of yours still on it. ${PAID_WHEN}`
+          : "In Meta Accounts Center, remove this account from yours, and take off any email or phone of yours still on it.",
+      what: () =>
+        m === "FASTEST"
+          ? "The seller removes the account from their Meta Accounts Center. That is when the seller is paid."
+          : "The seller removes the account from their Meta Accounts Center.",
+      button: "I have unlinked it",
+      caution:
+        m === "FASTEST"
+          ? "Only once the account is out of your Meta Accounts Center. Our agent checks it next, and that is when you are paid. You cannot take the account back."
+          : "Only once the account is out of your Meta Accounts Center. Our agent checks it next, and you cannot take it back.",
+    },
+    "Confirm primary ownership": {
+      to: () => "confirm only Channel Adda can sign in",
+      did: "confirmed only Channel Adda can sign in",
+      how: "Check the email, phone and two-factor are Channel Adda's and nothing links the account to the seller. Confirming pays the seller from the buyer's money.",
+      what: (o) =>
+        `Our agent checks only Channel Adda can sign in. Channel Adda then pays ${o.seller} into ${o.sellerPoss} Channel Adda wallet.`,
+      button: "Only we can sign in",
+      titles: { seller: "Our agent confirms, and you are paid" },
+      caution:
+        "Only once nobody but Channel Adda can sign in. This pays the seller from the buyer's money, and cannot be undone.",
+    },
+    "Verify the channel": {
+      to: () => "check the account",
+      did: "checked the account",
+      how: "Check only you can sign in, that the account is genuine and has no restrictions. Post the latest proof in the deal chat, then confirm here.",
+      what: () =>
+        "Our agent checks only Channel Adda can sign in and the account has no restrictions, and posts proof in the deal chat. From here the account is out of the seller's hands.",
+      button: "The account checks out",
+      caution:
+        "Only once the account checks out and you have posted the latest proof in the deal chat. The buyer pays the seller next.",
+    },
+    "Make the buyer primary owner": {
+      to: (o) => `move the account to ${o.buyer}`,
+      did: "moved the account to the buyer",
+      how: "Change the account's email to the buyer's, named on this page, send them the password, and turn off two-factor so they can set their own. That completes the deal.",
+      what: (o) =>
+        `Our agent changes the account's email to ${o.buyerPoss} email, named on this page, and hands over the password. That completes the deal.`,
+      button: "I have moved it to the buyer",
+      caution:
+        "Only once the email is the buyer's and they have the password. This completes the deal, and cannot be undone.",
+    },
+  };
+}
+
+function facebookActs(m: DealMode): Record<string, Act> {
+  return {
+    "Invite the agent as owner": {
+      to: (o) => `add ${o.agent} to the Page`,
+      did: "added our agent to the Page",
+      how: "In Meta Business Suite, add our agent's Facebook account, shown on this page, to the Page with full control.",
+      what: (o) =>
+        `The seller adds ${o.agentPoss} Facebook account to the Page with full control.`,
+      button: "I have added the agent",
+    },
+    "Accept the owner invite": {
+      to: () => "accept the Page invite",
+      did: "accepted the Page invite",
+      how: "Accept the seller's invite to the Page.",
+      what: () => "Our agent accepts the seller's invite to the Page.",
+      button: "I have accepted it",
+    },
+    "Invite the buyer as owner": {
+      to: (o) => `add ${o.buyer} to the Page`,
+      did: "added the buyer to the Page",
+      how:
+        m === "FASTEST"
+          ? "Accept the seller's invite, then add the buyer's Facebook account, named on this page, to the Page with partial access. That starts the holding period."
+          : "Add the buyer's Facebook account, named on this page, to the Page with partial access.",
+      what: (o) =>
+        m === "FASTEST"
+          ? `Our agent accepts the seller's invite and adds ${o.buyerPoss} Facebook account to the Page. That starts the holding period.`
+          : `Our agent adds ${o.buyerPoss} Facebook account to the Page.`,
+      button: "I have added the buyer",
+    },
+    "Make the agent primary owner": {
+      to: () => "leave the Page",
+      did: "left the Page",
+      how:
+        m === "FASTEST"
+          ? `Remove yourself from the Page and take it out of your Business Manager, so only our agent has full control. ${PAID_WHEN}`
+          : "Remove yourself from the Page and take it out of your Business Manager, so only our agent has full control.",
+      what: () =>
+        m === "FASTEST"
+          ? "The seller leaves the Page and takes it out of their Business Manager. That is when the seller is paid."
+          : "The seller leaves the Page and takes it out of their Business Manager.",
+      button: "I have left the Page",
+      caution:
+        m === "FASTEST"
+          ? "Only once you have left the Page and its Business Manager. Our agent checks it next, and that is when you are paid. You cannot take the Page back."
+          : "Only once you have left the Page and its Business Manager. Our agent checks it next, and you cannot take it back.",
+    },
+    "Confirm primary ownership": {
+      to: () => "confirm full control",
+      did: "confirmed full control of the Page",
+      how: "Check the seller is gone from the Page and its Business Manager. Confirming pays the seller from the buyer's money.",
+      what: (o) =>
+        `Our agent checks they alone have full control. Channel Adda then pays ${o.seller} into ${o.sellerPoss} Channel Adda wallet.`,
+      button: "I have full control",
+      titles: { seller: "Our agent confirms, and you are paid" },
+      caution:
+        "Only once you alone have full control of the Page. This pays the seller from the buyer's money, and cannot be undone.",
+    },
+    "Verify the channel": {
+      to: () => "check the Page",
+      did: "checked the Page",
+      how: "Check you alone have full control, then the Page's monetization and any restrictions. Post the latest proof in the deal chat, then confirm here.",
+      what: () =>
+        "Our agent checks they alone have full control, the monetization and any restrictions, and posts proof in the deal chat. From here the Page is out of the seller's hands.",
+      button: "The Page checks out",
+      caution:
+        "Only once the Page checks out and you have posted the latest proof in the deal chat. The buyer pays the seller next.",
+    },
+    "Make the buyer primary owner": {
+      to: (o) => `give ${o.buyer} full control`,
+      did: "gave the buyer full control",
+      how: "Give the buyer's Facebook account, named on this page, full control of the Page, then leave it. That completes the deal.",
+      what: (o) =>
+        `Our agent gives ${o.buyerPoss} Facebook account full control and leaves the Page. That completes the deal.`,
+      button: "I have given the buyer full control",
+      caution:
+        "Only once the buyer's account has full control and you have left the Page. This completes the deal, and cannot be undone.",
+    },
+  };
+}
+
+function telegramActs(m: DealMode): Record<string, Act> {
+  return {
+    "Invite the agent as owner": {
+      to: (o) => `make ${o.agent} an admin`,
+      did: "made our agent an admin",
+      how: "Add our agent's Telegram account, shown on this page, to the channel as an admin.",
+      what: (o) =>
+        `The seller adds ${o.agentPoss} Telegram account to the channel as an admin.`,
+      button: "I have made the agent an admin",
+    },
+    "Accept the owner invite": {
+      to: (o) => `check ${o.agentIs} an admin`,
+      did: "checked their admin access",
+      how: "Check you are an admin of the channel, then confirm here.",
+      what: () => "Our agent checks they are an admin of the channel.",
+      button: "I am an admin",
+    },
+    "Invite the buyer as owner": {
+      to: (o) => `make ${o.buyer} an admin`,
+      did: "made the buyer an admin",
+      how:
+        m === "FASTEST"
+          ? "Add the buyer's Telegram username, named on this page, to the channel as an admin. That starts the holding period."
+          : "Add the buyer's Telegram username, named on this page, to the channel as an admin.",
+      what: (o) =>
+        m === "FASTEST"
+          ? `Our agent adds ${o.buyerPoss} Telegram account to the channel as an admin. That starts the holding period.`
+          : `Our agent adds ${o.buyerPoss} Telegram account to the channel as an admin.`,
+      button: "I have made the buyer an admin",
+    },
+    "Make the agent primary owner": {
+      to: (o) => `transfer ownership to ${o.agent}`,
+      did: "transferred ownership to our agent",
+      how:
+        m === "FASTEST"
+          ? `In the channel's admin settings, use Transfer Ownership to make our agent the owner. ${PAID_WHEN}`
+          : "In the channel's admin settings, use Transfer Ownership to make our agent the owner.",
+      what: (o) =>
+        m === "FASTEST"
+          ? `The seller transfers ownership of the channel to ${o.agent}. That is when the seller is paid.`
+          : `The seller transfers ownership of the channel to ${o.agent}.`,
+      button: "I have transferred ownership",
+      caution:
+        m === "FASTEST"
+          ? "Only once our agent is the channel's owner. Our agent confirms it next, and that is when you are paid. You cannot take the channel back."
+          : "Only once our agent is the channel's owner. Our agent checks it next, and you cannot take it back.",
+    },
+    "Confirm primary ownership": {
+      to: (o) => `confirm ${o.agentIs} the owner`,
+      did: "confirmed ownership",
+      how: "Confirm once the channel shows you as its owner. That pays the seller from the buyer's money.",
+      what: (o) =>
+        `Our agent confirms they own the channel. Channel Adda then pays ${o.seller} into ${o.sellerPoss} Channel Adda wallet.`,
+      button: "I am the owner",
+      titles: {
+        buyer: "Our agent confirms they own it",
+        seller: "Our agent confirms, and you are paid",
+      },
+      caution:
+        "Only once you are the channel's owner. This pays the seller from the buyer's money, and cannot be undone.",
+    },
+    "Verify the channel": {
+      to: () => "check the channel",
+      did: "checked the channel",
+      how: "Check you are the owner, the member count and that the channel is genuine. Post the latest proof in the deal chat, then confirm here.",
+      what: () =>
+        "Our agent checks they are the owner, the members and that the channel is genuine, and posts proof in the deal chat. From here the channel is out of the seller's hands.",
+      button: "The channel checks out",
+      caution:
+        "Only once the channel checks out and you have posted the latest proof in the deal chat. The buyer pays the seller next.",
+    },
+    "Make the buyer primary owner": {
+      to: (o) => `transfer ownership to ${o.buyer}`,
+      did: "transferred ownership to the buyer",
+      how: "Use Transfer Ownership to make the buyer's username, named on this page, the owner, then leave the channel. That completes the deal.",
+      what: (o) =>
+        `Our agent transfers ownership to ${o.buyerPoss} Telegram account and leaves the channel. That completes the deal.`,
+      button: "I have transferred ownership",
+      caution:
+        "Only once the buyer is the channel's owner. This completes the deal, and cannot be undone.",
+    },
+  };
+}
+
+function websiteActs(m: DealMode): Record<string, Act> {
+  return {
+    "Invite the agent as owner": {
+      to: (o) => `give ${o.agent} access`,
+      did: "gave our agent access",
+      how: "Give our agent access to the site's hosting and admin, using the email shown on this page.",
+      what: (o) =>
+        `The seller gives ${o.agent} access to the site's hosting and admin.`,
+      button: "I have given the agent access",
+    },
+    "Accept the owner invite": {
+      to: () => "check the access",
+      did: "checked their access",
+      how: "Sign in to the hosting and the site's admin, then confirm here.",
+      what: () => "Our agent signs in to the hosting and the site's admin.",
+      button: "I have access",
+    },
+    "Invite the buyer as owner": {
+      to: (o) => `give ${o.buyer} access`,
+      did: "gave the buyer access",
+      how:
+        m === "FASTEST"
+          ? "Check your access, then give the buyer's email, named on this page, access to the site's admin. That starts the holding period."
+          : "Give the buyer's email, named on this page, access to the site's admin.",
+      what: (o) =>
+        m === "FASTEST"
+          ? `Our agent checks their access and gives ${o.buyer} access to the site's admin. That starts the holding period.`
+          : `Our agent gives ${o.buyer} access to the site's admin.`,
+      button: "I have given the buyer access",
+    },
+    "Make the agent primary owner": {
+      to: (o) => `transfer the domain to ${o.agent}`,
+      did: "transferred the domain to our agent",
+      how:
+        m === "FASTEST"
+          ? `Unlock the domain, send our agent the auth code, approve the transfer, and hand over the hosting account. ${PAID_WHEN}`
+          : "Unlock the domain, send our agent the auth code, approve the transfer, and hand over the hosting account.",
+      what: (o) =>
+        m === "FASTEST"
+          ? `The seller transfers the domain and hosting to ${o.agent}. That is when the seller is paid.`
+          : `The seller transfers the domain and hosting to ${o.agent}.`,
+      button: "I have transferred the domain",
+      caution:
+        m === "FASTEST"
+          ? "Only once the domain and hosting are on their way to our agent. Our agent confirms it next, and that is when you are paid. You cannot take the website back."
+          : "Only once the domain and hosting are on their way to our agent. Our agent checks it next, and you cannot take it back.",
+    },
+    "Confirm primary ownership": {
+      to: () => "confirm the domain is ours",
+      did: "confirmed the domain and hosting are Channel Adda's",
+      how: "Confirm once the domain and hosting are in Channel Adda's name. That pays the seller from the buyer's money.",
+      what: (o) =>
+        `Our agent confirms the domain and hosting are Channel Adda's. Channel Adda then pays ${o.seller} into ${o.sellerPoss} Channel Adda wallet.`,
+      button: "The domain is ours",
+      titles: { seller: "Our agent confirms, and you are paid" },
+      caution:
+        "Only once the domain and hosting are in Channel Adda's name. This pays the seller from the buyer's money, and cannot be undone.",
+    },
+    "Verify the channel": {
+      to: () => "check the website",
+      did: "checked the website",
+      how: "Check the domain and hosting are Channel Adda's, then the traffic and the income. Post the latest proof in the deal chat, then confirm here.",
+      what: () =>
+        "Our agent checks the domain and hosting are Channel Adda's, the traffic and the income, and posts proof in the deal chat. From here the website is out of the seller's hands.",
+      button: "The website checks out",
+      caution:
+        "Only once the website checks out and you have posted the latest proof in the deal chat. The buyer pays the seller next.",
+    },
+    "Make the buyer primary owner": {
+      to: (o) => `transfer the website to ${o.buyer}`,
+      did: "transferred the website to the buyer",
+      how: "Transfer the domain and hosting to the buyer's email, named on this page, and hand over the site's admin. That completes the deal.",
+      what: (o) =>
+        `Our agent transfers the domain and hosting to ${o.buyerPoss} email and hands over the admin. That completes the deal.`,
+      button: "I have transferred it",
+      caution:
+        "Only once the domain and hosting are in the buyer's name. This completes the deal, and cannot be undone.",
+    },
+  };
+}
+
+const PLATFORM_ACTS: Readonly<
+  Record<Platform, (m: DealMode) => Record<string, Act>>
+> = {
+  YOUTUBE: youtubeActs,
+  INSTAGRAM: instagramActs,
+  FACEBOOK: facebookActs,
+  TELEGRAM: telegramActs,
+  WEBSITE: websiteActs,
+};
+
+function actFor(mode: DealMode, label: string, platform: Platform) {
+  const w = wordsFor(platform);
+  return PLATFORM_ACTS[platform](mode)[label] ?? moneyActs(w)[label] ?? null;
+}
+
+/** Steps from earlier templates, still on deals finished with them. */
+const LEGACY_ACTORS: Readonly<Record<string, DealActor>> = {
+  "Transfer ownership to the buyer": "agent",
+};
+
+/** Who does this step in this mode, by the template. */
+function actorOf(mode: DealMode, label: string): DealActor | null {
+  return (
+    templateFor(mode).find((s) => s.label === label)?.actor ??
+    LEGACY_ACTORS[label] ??
+    null
+  );
+}
+
+const SUBJECT: Record<DealActor, string> = {
+  buyer: "The buyer",
+  seller: "The seller",
+  agent: "Our agent",
+  staff: "Channel Adda",
+  system: "Channel Adda",
+};
+
+/** Irregular "-ing" forms among the verbs a step starts with. */
+const GERUND: Readonly<Record<string, string>> = {
+  transfer: "transferring",
+};
+
+function splitVerb(phrase: string): [string, string] {
+  const space = phrase.indexOf(" ");
+  return space === -1
+    ? [phrase, ""]
+    : [phrase.slice(0, space), phrase.slice(space)];
+}
+
+/** "invite our agent" → "invites our agent". */
+export function third(phrase: string): string {
+  const [verb, rest] = splitVerb(phrase);
+  return `${verb}s${rest}`;
+}
+
+/** "invite our agent" → "inviting our agent". */
+export function gerund(phrase: string): string {
+  const [verb, rest] = splitVerb(phrase);
+  const ing =
+    GERUND[verb] ??
+    (verb.endsWith("e") && !verb.endsWith("ee")
+      ? `${verb.slice(0, -1)}ing`
+      : `${verb}ing`);
+  return `${ing}${rest}`;
+}
+
+function cap(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+function lowerFirst(text: string): string {
+  // "I have…" stays as it is.
+  if (/^I\b/.test(text)) return text;
+  return text.charAt(0).toLowerCase() + text.slice(1);
+}
+
+/**
+ * What each step is called on screen, for whoever is reading, on this
+ * platform.
+ *
+ * The stored labels are identifiers as much as words — running deals are
+ * matched on them, and `deals:in-flight` treats a changed one as old steps —
+ * so they stay, and this is what is shown instead. Each name says who does
+ * it, from the reader's side ("You pay", "The seller invites our agent as
+ * owner"), so the list needs no "Then the seller" under every line. Staff,
+ * and a step from an earlier template, see the stored label.
+ */
+export function stepTitle(
+  label: string,
+  viewer: DealActor,
+  platform: Platform,
+  mode: DealMode,
+): string {
+  if (viewer !== "buyer" && viewer !== "seller" && viewer !== "agent") {
+    return label;
+  }
+  const act = actFor(mode, label, platform);
+  const actor = actorOf(mode, label);
+  if (!act || !actor) return label;
+  const own = act.titles?.[viewer];
+  if (own) return own;
+  if (actor === viewer) return `You ${act.to(them(viewer))}`;
+  return `${SUBJECT[actor]} ${third(act.to(them(viewer)))}`;
+}
+
+function otherMode(mode: DealMode): DealMode {
+  return mode === "SAFEST" ? "FASTEST" : "SAFEST";
+}
+
+/**
+ * The step as an instruction to whoever does it: "Invite our agent as owner".
+ * What a notification or an email asks them for.
+ */
+export function stepAsk(
+  label: string,
+  platform: Platform,
+  mode: DealMode,
+): string {
+  const act = actFor(mode, label, platform);
+  const actor = actorOf(mode, label);
+  if (!act || !actor) return label;
+  return cap(act.to(them(actor)));
+}
+
+/**
+ * The step, done, after the name of whoever did it — the deal chat's line
+ * ("Nadia Rahman invited our agent as owner"). Nobody's "you": the line is
+ * written once and read by both sides.
+ */
+export function stepDone(
+  label: string,
+  platform: Platform,
+  mode: DealMode,
+): string {
+  return actFor(mode, label, platform)?.did ?? `completed “${label}”`;
+}
+
+/** The badge's short instruction for the doer: "Invite our agent now". */
+function askNow(act: Act, actor: DealActor): string {
+  return `${cap((act.ask ?? act.to)(them(actor)))} now`;
+}
+
+/** "Waiting for the seller to invite our agent". */
+function waitingFor(act: Act, actor: DealActor, reader: DealActor): string {
+  return `Waiting for ${SUBJECT[actor].toLowerCase()} to ${(act.ask ?? act.to)(them(reader))}`;
+}
+
+// ---------------------------------------------------------------------------
+// What a status means, for this reader
+// ---------------------------------------------------------------------------
 
 /**
  * What this status means for this reader, in one sentence.
@@ -229,56 +900,61 @@ export function statusSentence(
   status: OrderStatus,
   mode: DealMode,
   viewer: DealActor,
+  platform: Platform = "YOUTUBE",
 ): string {
   const safest = mode === "SAFEST";
+  const w = wordsFor(platform);
+  const asset = w.asset;
+  const handover = actFor(mode, "Invite the agent as owner", platform);
+  const last = actFor(mode, "Make the buyer primary owner", platform);
 
   switch (status) {
     case "AWAITING_PAYMENT":
       if (viewer === "buyer") {
         return safest
-          ? "Nothing starts until our fee is paid. You do not pay the channel's price now: you pay it to the seller directly, once our agent holds the channel."
-          : "Nothing starts until your payment reaches Channel Adda. We hold it until our agent has the channel, and our agent then makes you primary owner.";
+          ? `Nothing starts until our fee is paid. You do not pay the price now: you pay it to the seller directly, once our agent holds the ${asset}.`
+          : `Nothing starts until you pay Channel Adda. We then hold your payment until our agent has the ${asset}, and our agent hands it to you.`;
       }
       if (viewer === "seller") {
-        return "The buyer has not paid yet. Your channel stays with you, and nothing is asked of you until they do.";
+        return `The buyer has not paid yet. Your ${asset} stays with you, and nothing is asked of you until they do.`;
       }
       return "The buyer has not paid yet, so no step has opened.";
 
     case "AGENT_VERIFYING":
       if (viewer === "buyer") {
-        return "Channel Adda is holding your payment. The seller is inviting our agent as owner of the channel, and our agent then invites you.";
+        return `Channel Adda is holding your payment while the seller hands the ${asset} to our agent.`;
       }
       if (viewer === "seller") {
-        return "Invite our agent as owner of the channel. The account to invite is on this page. The buyer's payment is with Channel Adda in the meantime.";
+        return `${handover ? cap(handover.to(them("seller"))) : "Hand it to our agent"}. ${w.agentOnPage} The buyer's payment is with Channel Adda in the meantime.`;
       }
-      return "The seller is inviting you as owner of the channel.";
+      return `The seller is handing the ${asset} to you.`;
 
     case "AWAITING_CUSTODY":
       if (viewer === "buyer") {
-        return "The seller is handing the channel to our agent. You have paid our fee and nothing else — you pay the seller only once our agent holds the channel.";
+        return `The seller is handing the ${asset} to our agent. You have paid our fee and nothing else — you pay the seller only once our agent holds the ${asset}.`;
       }
       if (viewer === "seller") {
-        return "Invite our agent as owner of the channel. The account to invite is on this page.";
+        return `${handover ? cap(handover.to(them("seller"))) : "Hand it to our agent"}. ${w.agentOnPage}`;
       }
-      return "The seller is inviting you as owner of the channel.";
+      return `The seller is handing the ${asset} to you.`;
 
     case "IN_CUSTODY":
       if (safest) {
         if (viewer === "buyer") {
-          return "Our agent holds the channel now, not the seller. Pay the seller the price directly, to the details they gave on this page, then press Paid.";
+          return `Our agent holds the ${asset} now, not the seller. Pay the seller the price directly, to the details they gave on this page, then press Paid.`;
         }
         if (viewer === "seller") {
-          return "Our agent holds the channel. The buyer pays you directly next, to the details you gave on this page.";
+          return `Our agent holds the ${asset}. The buyer pays you directly next, to the details you gave on this page.`;
         }
-        return "You hold this channel. The buyer pays the seller directly next.";
+        return `You hold this ${asset}. The buyer pays the seller directly next.`;
       }
       if (viewer === "buyer") {
-        return "Our agent is primary owner and the seller has been paid. Our agent makes you primary owner next.";
+        return `Our agent has the ${asset} and the seller has been paid. ${last ? `Our agent ${third(last.to(them("buyer")))}` : "Our agent hands it to you"} next.`;
       }
       if (viewer === "seller") {
-        return "Our agent holds the channel and your money is in your Channel Adda wallet. Nothing more is needed from you.";
+        return `Our agent holds the ${asset} and your money is in your Channel Adda wallet. Nothing more is needed from you.`;
       }
-      return "You are primary owner and the seller has been paid. Make the buyer primary owner, using the account on this page.";
+      return `The seller has been paid. ${last ? cap(last.to(them("agent"))) : "Hand it to the buyer"}, using the account on this page.`;
 
     case "AWAITING_BUYER_PAYMENT":
     case "AWAITING_RELEASE":
@@ -289,26 +965,26 @@ export function statusSentence(
     case "AWAITING_HANDOVER":
       if (safest) {
         if (viewer === "buyer") {
-          return "The seller confirmed your payment. Our agent is handing the channel to you.";
+          return `The seller confirmed your payment. Our agent is handing the ${asset} to you.`;
         }
         if (viewer === "seller") {
-          return "You confirmed the buyer's payment, so your part is done. Our agent is handing the channel to the buyer.";
+          return `You confirmed the buyer's payment, so your part is done. Our agent is handing the ${asset} to the buyer.`;
         }
-        return "Hand the channel to the buyer, using the account on this page.";
+        return `Hand the ${asset} to the buyer, using the account on this page.`;
       }
       if (viewer === "buyer") {
-        return "Accept our agent's owner invite if you have not yet. After the holding period our agent becomes primary owner, the seller is paid, and our agent makes you primary owner.";
+        return `${w.buyerAccept ? `${w.buyerAccept} ` : ""}After the holding period the seller hands the ${asset} fully to our agent and is paid, and our agent then hands it to you.`;
       }
       if (viewer === "seller") {
-        return "When the holding period ends, make our agent primary owner of the channel. That is when you are paid. We email you the moment you can.";
+        return `When the holding period ends, hand the ${asset} fully to our agent. That is when you are paid. We tell you the moment you can.`;
       }
-      return "The holding period, then the seller makes you primary owner.";
+      return `The holding period, then the seller hands the ${asset} fully to you.`;
 
     case "COMPLETED":
-      if (viewer === "buyer") return "Finished. The channel is yours.";
+      if (viewer === "buyer") return `Finished. The ${asset} is yours.`;
       if (viewer === "seller") {
         return safest
-          ? "Finished. The channel is the buyer's, and the buyer paid you directly."
+          ? `Finished. The ${asset} is the buyer's, and the buyer paid you directly.`
           : "Finished. Channel Adda paid your money into your Channel Adda wallet.";
       }
       return "Finished. Nothing is outstanding on this deal.";
@@ -321,9 +997,9 @@ export function statusSentence(
 
     case "RETURNED_TO_SELLER":
       if (viewer === "seller") {
-        return "Our agent has given the channel back to you. Nothing was transferred to the buyer.";
+        return `Our agent has given the ${asset} back to you. Nothing was transferred to the buyer.`;
       }
-      return "Our agent returned the channel to the seller, so nothing was transferred.";
+      return `Our agent returned the ${asset} to the seller, so nothing was transferred.`;
 
     case "REFUNDED":
       if (viewer === "buyer") {
@@ -343,14 +1019,41 @@ export function statusSentence(
 export type DealHeadline = { label: string; short: string; sentence: string };
 
 type Reader = "buyer" | "seller";
+type Viewer = "buyer" | "seller" | "agent";
 
-type Override = {
-  label: string;
-  /** The badge for the buyer or the seller, where the neutral one would name them. */
-  labelFor?: Partial<Record<Reader, string>>;
-  short: string;
-  sentence: (w: Words) => Record<"buyer" | "seller" | "agent", string>;
+/** Everything a step's headline is made from. */
+type Ctx = {
+  w: Words;
+  mode: DealMode;
+  /** The deal's hold is still running. */
+  held: boolean;
+  /** This deal's step, in this platform's words. */
+  act: (label: string) => Act;
 };
+
+/** "The seller invites you as owner", for this reader. */
+function said(c: Ctx, label: string, reader: DealActor): string {
+  const act = c.act(label);
+  const actor = actorOf(c.mode, label) ?? "agent";
+  return actor === reader
+    ? cap(act.to(them(reader)))
+    : `${SUBJECT[actor]} ${third(act.to(them(reader)))}`;
+}
+
+type Override = (c: Ctx, reader: Viewer) => DealHeadline;
+
+/** The badge for an open step: your move, or whose it is. */
+function stepLabel(c: Ctx, label: string, reader: Viewer): string {
+  const act = c.act(label);
+  const actor = actorOf(c.mode, label) ?? "agent";
+  if (actor === reader) return askNow(act, actor);
+  if (actor === "agent") {
+    return `Our agent is ${gerund((act.ask ?? act.to)(them(reader)))}`;
+  }
+  return waitingFor(act, actor, reader);
+}
+
+const WAITING = "In the waiting period";
 
 /**
  * The steps whose status-level copy would be wrong, keyed
@@ -360,165 +1063,221 @@ type Override = {
  * step has not moved, never reads as running. Everything else falls back.
  */
 const BY_OPEN_STEP: Partial<Record<string, Override>> = {
-  "SAFEST:AWAITING_CUSTODY:3": {
-    label: "Our agent is accepting the invite",
-    short: "Agent accepting",
-    sentence: (w) => ({
-      buyer: w.googleWait
-        ? "The seller has invited our agent as owner. Our agent accepts it next, and then Google's 7-day wait starts."
-        : "The seller has invited our agent as owner. Our agent accepts it next.",
-      seller: w.googleWait
-        ? "You have invited our agent, so your part is done for now. They accept it next, and then Google's 7-day wait starts."
-        : "You have invited our agent, so your part is done for now. They accept it next.",
-      agent: w.googleWait
-        ? "The seller has invited you as owner. Accept it, then confirm here — that starts Google's 7-day wait."
-        : "The seller has invited you as owner. Accept it, then confirm here.",
-    }),
+  "SAFEST:AWAITING_CUSTODY:2": (c, r) => {
+    const step = "Invite the agent as owner";
+    return {
+      label: stepLabel(c, step, r),
+      short: "Handing over to us",
+      sentence: {
+        buyer: `The seller is handing the ${c.w.asset} to our agent. You have paid our fee and nothing else — you pay the seller only once our agent holds the ${c.w.asset}.`,
+        seller: `${said(c, step, "seller")}. ${c.w.agentOnPage}`,
+        agent: `The seller is handing the ${c.w.asset} to you.`,
+      }[r],
+    };
   },
-  "SAFEST:AWAITING_CUSTODY:4": {
-    label: "Our agent becomes primary owner next",
-    short: "Agent to primary",
-    sentence: (w) => ({
-      buyer: w.googleWait
-        ? "Our agent is an owner. After Google's 7-day wait, the seller makes our agent primary owner."
-        : "Our agent is an owner. The seller makes them primary owner next.",
-      seller: w.googleWait
-        ? "When Google's 7-day wait ends, make our agent primary owner of the channel. We email you the moment you can."
-        : "Make our agent primary owner of the channel.",
-      agent: w.googleWait
-        ? "Google's 7-day wait, then the seller makes you primary owner."
-        : "The seller makes you primary owner next.",
-    }),
+  "SAFEST:AWAITING_CUSTODY:3": (c, r) => {
+    const step = "Accept the owner invite";
+    const wait = c.w.googleWait;
+    return {
+      label: stepLabel(c, step, r),
+      short: "Agent taking over",
+      sentence: {
+        buyer: `The seller has handed the ${c.w.asset} to our agent. ${said(c, step, "buyer")} next${wait ? ", and then Google's 7-day wait starts" : ""}.`,
+        seller: `You have handed the ${c.w.asset} to our agent, so your part is done for now. ${said(c, step, "seller")} next${wait ? ", and then Google's 7-day wait starts" : ""}.`,
+        agent: `The seller has handed the ${c.w.asset} to you. ${said(c, step, "agent")}, then confirm here${wait ? " — that starts Google's 7-day wait" : ""}.`,
+      }[r],
+    };
   },
-  "SAFEST:AWAITING_CUSTODY:5": {
-    label: "Our agent is verifying the channel",
-    short: "Agent verifying",
-    sentence: () => ({
-      buyer:
-        "Our agent is primary owner and is checking ownership, monetization and strikes. The latest proof comes to you in the deal chat, then you pay the seller.",
-      seller:
-        "You have made our agent primary owner. They verify the channel next, then the buyer pays you.",
-      agent:
-        "You are primary owner. Check ownership, monetization, strikes and that the channel is genuine, post the latest proof in the deal chat, then confirm here.",
-    }),
+  "SAFEST:AWAITING_CUSTODY:4": (c, r) => {
+    const step = "Make the agent primary owner";
+    if (c.held && c.w.googleWait) {
+      return {
+        label: WAITING,
+        short: "Waiting period",
+        sentence: {
+          buyer:
+            "Our agent is an owner. After Google's 7-day wait, the seller makes our agent primary owner.",
+          seller:
+            "When Google's 7-day wait ends, make our agent primary owner of the channel. We tell you the moment you can.",
+          agent:
+            "Google's 7-day wait is running. Then the seller makes you primary owner.",
+        }[r],
+      };
+    }
+    return {
+      label: stepLabel(c, step, r),
+      short: "Handing over to us",
+      sentence: {
+        buyer: `${said(c, step, "buyer")} next.`,
+        seller: `${said(c, step, "seller")}.`,
+        agent: `${said(c, step, "agent")} next.`,
+      }[r],
+    };
   },
-  "SAFEST:IN_CUSTODY:6": {
-    label: "Waiting for the buyer to pay the seller",
-    labelFor: {
+  "SAFEST:AWAITING_CUSTODY:5": (c, r) => {
+    const step = "Verify the channel";
+    return {
+      label: stepLabel(c, step, r),
+      short: "Agent checking",
+      sentence: {
+        buyer: `Our agent has the ${c.w.asset} and is checking it. The latest proof comes to you in the deal chat, then you pay the seller.`,
+        seller: `You have handed the ${c.w.asset} to our agent. They check it next, then the buyer pays you.`,
+        agent: c.act(step).how,
+      }[r],
+    };
+  },
+  "SAFEST:IN_CUSTODY:6": (c, r) => ({
+    label: {
       buyer: "Pay the seller now",
       seller: "Waiting for the buyer to pay you",
-    },
+      agent: "Waiting for the buyer to pay the seller",
+    }[r],
     short: "Buyer paying",
-    sentence: () => ({
-      buyer:
-        "Our agent holds the channel now, not the seller. Pay the seller the price directly, to the details they gave on this page, then press Paid.",
-      seller:
-        "Our agent holds the channel. The buyer pays you directly next, to the details you gave on this page.",
-      agent: "You hold the channel. The buyer is paying the seller directly.",
-    }),
-  },
-  "SAFEST:IN_CUSTODY:7": {
-    label: "Waiting for the seller to confirm the payment",
-    labelFor: { seller: "Confirm the buyer's payment" },
+    sentence: {
+      buyer: `Our agent holds the ${c.w.asset} now, not the seller. Pay the seller the price directly, to the details they gave on this page, then press Paid.`,
+      seller: `Our agent holds the ${c.w.asset}. The buyer pays you directly next, to the details you gave on this page.`,
+      agent: `You hold the ${c.w.asset}. The buyer is paying the seller directly.`,
+    }[r],
+  }),
+  "SAFEST:IN_CUSTODY:7": (c, r) => ({
+    label: {
+      buyer: "Waiting for the seller to confirm your payment",
+      seller: "Confirm the buyer's payment",
+      agent: "Waiting for the seller to confirm the payment",
+    }[r],
     short: "Seller confirming",
-    sentence: () => ({
-      buyer:
-        "You have marked it paid. Once the seller confirms the money arrived, our agent starts handing the channel to you.",
+    sentence: {
+      buyer: `You have marked it paid. Once the seller confirms the money arrived, our agent starts handing the ${c.w.asset} to you.`,
       seller:
         "The buyer says they have paid you. When the money is in your account, press Received. If it has not arrived, say so in the deal chat.",
       agent:
         "The buyer says they have paid. Waiting for the seller to confirm it arrived.",
-    }),
+    }[r],
+  }),
+  "SAFEST:AWAITING_HANDOVER:8": (c, r) => {
+    const step = "Invite the buyer as owner";
+    const next = c.act("Make the buyer primary owner");
+    return {
+      label: stepLabel(c, step, r),
+      short: "Agent handing over",
+      sentence: {
+        buyer: c.w.googleWait
+          ? "The seller confirmed your payment. Our agent invites your account as owner next. Then Google's 7-day wait starts, and after it you are made primary owner."
+          : `The seller confirmed your payment. ${said(c, step, "buyer")} next, then ${third(next.to(them("buyer")))}.`,
+        seller: `You confirmed the buyer's payment, so your part is done. Our agent hands the ${c.w.asset} to the buyer now.`,
+        agent: c.w.googleWait
+          ? "Invite the buyer's account on this page as owner, then confirm here. That starts Google's 7-day wait before you can make them primary owner."
+          : `${said(c, step, "agent")}, using the account on this page, then confirm here.`,
+      }[r],
+    };
   },
-  "SAFEST:AWAITING_HANDOVER:8": {
-    label: "Our agent is inviting the buyer",
-    labelFor: { buyer: "Our agent is inviting you" },
-    short: "Agent inviting",
-    sentence: (w) => ({
-      buyer: w.googleWait
-        ? "The seller confirmed your payment. Our agent invites your account as owner next. Then Google's 7-day wait starts, and after it you are made primary owner."
-        : "The seller confirmed your payment. Our agent invites your account as owner next, then makes you primary owner.",
-      seller:
-        "You confirmed the buyer's payment, so your part is done. Our agent hands the channel to the buyer now.",
-      agent: w.googleWait
-        ? "Invite the buyer's account on this page as owner, then confirm here. That starts Google's 7-day wait before you can make them primary owner."
-        : "Invite the buyer's account on this page as owner, then confirm here.",
-    }),
+  "SAFEST:AWAITING_HANDOVER:9": (c, r) => {
+    const step = "Make the buyer primary owner";
+    const wait = c.held && c.w.googleWait;
+    return {
+      label:
+        r === "agent" && !c.held
+          ? stepLabel(c, step, r)
+          : r === "buyer"
+            ? c.w.buyerNext
+            : wait
+              ? WAITING
+              : "Handing over to the buyer",
+      short: wait ? "Waiting period" : "Handing over",
+      sentence: {
+        buyer: wait
+          ? "Accept our agent's owner invite if you have not yet. Our agent makes you primary owner once Google's 7-day wait is over — we tell you then."
+          : `${c.w.buyerAccept ? `${c.w.buyerAccept} ` : ""}${said(c, step, "buyer")} next.`,
+        seller: wait
+          ? "Your part is done. Our agent makes the buyer primary owner once Google's 7-day wait is over."
+          : `Your part is done. ${said(c, step, "seller")} next.`,
+        agent: wait
+          ? "Once Google's 7-day wait is over, make the buyer primary owner, using the account on this page. That completes the deal."
+          : `${said(c, step, "agent")}, using the account on this page. That completes the deal.`,
+      }[r],
+    };
   },
-  "SAFEST:AWAITING_HANDOVER:9": {
-    label: "The buyer becomes primary owner next",
-    labelFor: { buyer: "You become primary owner next" },
-    short: "Buyer to primary",
-    sentence: (w) => ({
-      buyer: w.googleWait
-        ? "Accept our agent's owner invite if you have not yet. Our agent makes you primary owner once Google's 7-day wait is over — we email you then."
-        : "Accept our agent's owner invite if you have not yet. Our agent makes you primary owner next.",
-      seller: w.googleWait
-        ? "Your part is done. Our agent makes the buyer primary owner once Google's 7-day wait is over."
-        : "Your part is done. Our agent makes the buyer primary owner next.",
-      agent: w.googleWait
-        ? "Once Google's 7-day wait is over, make the buyer primary owner, using the account on this page. That completes the deal."
-        : "Make the buyer primary owner, using the account on this page. That completes the deal.",
-    }),
+  "FASTEST:AGENT_VERIFYING:2": (c, r) => {
+    const step = "Invite the agent as owner";
+    return {
+      label: stepLabel(c, step, r),
+      short: "Handing over to us",
+      sentence: {
+        buyer: `Channel Adda is holding your payment. The seller is handing the ${c.w.asset} to our agent.`,
+        seller: `${said(c, step, "seller")}. ${c.w.agentOnPage} The buyer's payment is with Channel Adda in the meantime.`,
+        agent: `The seller is handing the ${c.w.asset} to you.`,
+      }[r],
+    };
   },
-  "FASTEST:AGENT_VERIFYING:2": {
-    label: "Waiting for the seller to invite our agent",
-    labelFor: { seller: "Invite our agent now" },
-    short: "Seller inviting",
-    sentence: () => ({
-      buyer:
-        "Channel Adda is holding your payment. The seller is inviting our agent as owner of the channel.",
-      seller:
-        "Invite our agent as owner of the channel. The account to invite is on this page. The buyer's payment is with Channel Adda in the meantime.",
-      agent: "The seller is inviting you as owner of the channel.",
-    }),
+  "FASTEST:AGENT_VERIFYING:3": (c, r) => {
+    const step = "Invite the buyer as owner";
+    return {
+      label: stepLabel(c, step, r),
+      short: "Agent taking over",
+      sentence: {
+        buyer: `The seller has handed the ${c.w.asset} to our agent. ${said(c, step, "buyer")} next — that starts the holding period.`,
+        seller: `You have handed the ${c.w.asset} to our agent, so your part is done for now. ${said(c, step, "seller")} next, and then the holding period starts.`,
+        agent: `The seller has handed the ${c.w.asset} to you. ${c.act(step).how}`,
+      }[r],
+    };
   },
-  "FASTEST:AGENT_VERIFYING:3": {
-    label: "Our agent is inviting the buyer",
-    short: "Agent inviting",
-    sentence: () => ({
-      buyer:
-        "The seller has invited our agent. Our agent accepts and invites your account as owner next — that starts the holding period.",
-      seller:
-        "You have invited our agent, so your part is done for now. They invite the buyer next, and then the holding period starts.",
-      agent:
-        "The seller has invited you. Accept it, invite the buyer's account on this page as owner, then confirm here — that starts the holding period.",
-    }),
+  "FASTEST:AWAITING_HANDOVER:4": (c, r) => {
+    const step = "Make the agent primary owner";
+    const last = c.act("Make the buyer primary owner");
+    const thenBuyer = `our agent then ${third(last.to(them(r)))}`;
+    if (c.held) {
+      return {
+        label: "In the holding period",
+        short: "Holding period",
+        sentence: {
+          buyer: `${c.w.buyerAccept ? `${c.w.buyerAccept} ` : ""}When the holding period ends, the seller ${third(c.act(step).to(them("buyer")))} and is paid, and ${thenBuyer}.`,
+          seller: `When the holding period ends, ${c.act(step).to(them("seller"))}. That is when you are paid. We tell you the moment you can.`,
+          agent: `The holding period is running. Then the seller ${third(c.act(step).to(them("agent")))}.`,
+        }[r],
+      };
+    }
+    return {
+      label: stepLabel(c, step, r),
+      short: "Handing over to us",
+      sentence: {
+        buyer: `The holding period is over. The seller ${third(c.act(step).to(them("buyer")))} next and is paid, and ${thenBuyer}.`,
+        seller: `The holding period is over. ${said(c, step, "seller")} — that is when you are paid.`,
+        agent: `The holding period is over. ${said(c, step, "agent")} next.`,
+      }[r],
+    };
   },
-  "FASTEST:AWAITING_HANDOVER:4": {
-    label: "Our agent becomes primary owner next",
-    short: "Agent to primary",
-    sentence: () => ({
-      buyer:
-        "Accept our agent's owner invite if you have not yet. When the holding period ends, the seller makes our agent primary owner and is paid, and our agent then makes you primary owner.",
-      seller:
-        "When the holding period ends, make our agent primary owner of the channel. That is when you are paid. We email you the moment you can.",
-      agent: "The holding period, then the seller makes you primary owner.",
-    }),
+  "FASTEST:AWAITING_HANDOVER:5": (c, r) => {
+    const step = "Confirm primary ownership";
+    const last = c.act("Make the buyer primary owner");
+    return {
+      label:
+        r === "agent"
+          ? stepLabel(c, step, r)
+          : r === "seller"
+            ? "Our agent is checking, then you are paid"
+            : "Our agent is checking it",
+      short: "Agent confirming",
+      sentence: {
+        buyer: `The seller says they have handed it over. Our agent checks, the seller is paid, and then our agent ${third(last.to(them("buyer")))}.`,
+        seller: `You have handed the ${c.w.asset} over. Once our agent confirms it, your money reaches your Channel Adda wallet.`,
+        agent: `The seller says they have handed it over. ${c.act(step).how}`,
+      }[r],
+    };
   },
-  "FASTEST:AWAITING_HANDOVER:5": {
-    label: "Our agent is confirming ownership",
-    short: "Agent confirming",
-    sentence: () => ({
-      buyer:
-        "The seller says our agent is primary owner. Our agent confirms it, the seller is paid, and then you are made primary owner.",
-      seller:
-        "You have made our agent primary owner. Once they confirm it, your money reaches your Channel Adda wallet.",
-      agent:
-        "The seller says you are primary owner. Confirm once you are — that pays the seller.",
-    }),
-  },
-  "FASTEST:IN_CUSTODY:6": {
-    label: "Our agent is transferring the channel",
-    short: "Transferring",
-    sentence: () => ({
-      buyer:
-        "Our agent is primary owner and the seller has been paid. Our agent makes you primary owner next.",
-      seller:
-        "Our agent holds the channel and your money is in your Channel Adda wallet. Your part is done.",
-      agent:
-        "You are primary owner and the seller has been paid. Make the buyer primary owner, using the account on this page. That completes the deal.",
-    }),
+  "FASTEST:IN_CUSTODY:6": (c, r) => {
+    const step = "Make the buyer primary owner";
+    return {
+      label:
+        r === "agent"
+          ? stepLabel(c, step, r)
+          : `Our agent is handing the ${c.w.asset} to ${them(r).buyer}`,
+      short: "Transferring",
+      sentence: {
+        buyer: `Our agent has the ${c.w.asset} and the seller has been paid. ${said(c, step, "buyer")} next.`,
+        seller: `Our agent has the ${c.w.asset} and your money is in your Channel Adda wallet. Your part is done.`,
+        agent: `The seller has been paid. ${said(c, step, "agent")}, using the account on this page. That completes the deal.`,
+      }[r],
+    };
   },
 };
 
@@ -534,8 +1293,6 @@ const PERSONAL_LABELS: Partial<
     buyer: "Waiting for your payment",
     seller: "Waiting for the buyer to pay",
   },
-  // Only step 2 reaches this: steps 3 to 5 have their own copy above.
-  AWAITING_CUSTODY: { seller: "Invite our agent now" },
   AWAITING_BUYER_PAYMENT: {
     buyer: "Pay the seller now",
     seller: "Waiting for the buyer to pay you",
@@ -548,13 +1305,20 @@ function isReader(viewer: DealActor): viewer is Reader {
   return viewer === "buyer" || viewer === "seller";
 }
 
+/** A status label about "the channel", in this platform's word. */
+function inWords(text: string, w: Words): string {
+  return text.replace(/\bchannel\b/g, w.asset);
+}
+
 /**
  * What the deal says at the top for this reader, given which step is open.
  *
  * A status can cover several steps owned by different people, and copy
  * written for the status alone went stale the moment the first of them was
  * done: the seller who had just invited the agent was still told to invite
- * the agent, and the agent's desk still said "with the seller".
+ * the agent, and the agent's desk still said "with the seller". It follows
+ * the deal's hold too: a step whose wait is over no longer says "when the
+ * holding period ends".
  */
 export function dealHeadline(
   status: OrderStatus,
@@ -564,16 +1328,19 @@ export function dealHeadline(
   platform: Platform,
   /** The open step waits for Channel Adda to assign an agent. */
   awaitingAgent = false,
+  /** The deal's hold — Google's wait, or the holding period — is running. */
+  held = false,
 ): DealHeadline {
+  const w = wordsFor(platform);
   if (awaitingAgent) {
     return {
       label: "Channel Adda is assigning an agent",
       short: "Assigning an agent",
       sentence:
         viewer === "seller"
-          ? "Channel Adda is assigning an agent to run this deal. You will be told the account to invite as soon as they join."
+          ? `Channel Adda is assigning an agent to run this deal. We tell you who to hand the ${w.asset} to as soon as they join.`
           : viewer === "buyer"
-            ? "Your payment is with Channel Adda. We are assigning an agent to run the deal, and the seller invites them next."
+            ? "Your payment is with Channel Adda. We are assigning an agent to run the deal, and the seller hands it to them next."
             : "This deal is waiting for an agent.",
     };
   }
@@ -582,22 +1349,28 @@ export function dealHeadline(
       ? undefined
       : BY_OPEN_STEP[`${mode}:${status}:${openStep}`];
   if (override) {
-    const reader =
-      viewer === "buyer" || viewer === "seller" ? viewer : ("agent" as const);
-    return {
-      label:
-        (isReader(viewer) ? override.labelFor?.[viewer] : undefined) ??
-        override.label,
-      short: override.short,
-      sentence: override.sentence(wordsFor(platform))[reader],
-    };
+    const reader: Viewer =
+      viewer === "buyer" || viewer === "seller" ? viewer : "agent";
+    const acts = PLATFORM_ACTS[platform](mode);
+    const money = moneyActs(w);
+    return override(
+      {
+        w,
+        mode,
+        held,
+        act: (label) => acts[label] ?? money[label],
+      },
+      reader,
+    );
   }
   return {
-    label:
+    label: inWords(
       (isReader(viewer) ? PERSONAL_LABELS[status]?.[viewer] : undefined) ??
-      STATUS_LABELS[status],
-    short: STATUS_SHORT[status],
-    sentence: statusSentence(status, mode, viewer),
+        STATUS_LABELS[status],
+      w,
+    ),
+    short: inWords(STATUS_SHORT[status], w),
+    sentence: statusSentence(status, mode, viewer, platform),
   };
 }
 
@@ -642,118 +1415,82 @@ export function moneyNote(
   return "Channel Adda holds the whole amount until you are primary owner, then pays the seller.";
 }
 
+/** What the running wait is called, in a sentence. */
+export function waitName(mode: DealMode, platform: Platform): string {
+  if (mode === "FASTEST") return "the holding period";
+  return platform === "YOUTUBE" ? "Google's 7-day wait" : "the wait";
+}
+
 /** The deal's running hold, on the step it is holding back. */
 export function holdNote(mode: DealMode, platform: Platform): string {
   if (mode === "SAFEST") {
-    return "Google makes a new owner wait 7 days before they can be made primary owner. There is nothing to do but wait — we email you the moment it ends.";
+    if (platform !== "YOUTUBE") {
+      return "There is nothing to do until the wait ends — we tell you the moment it does.";
+    }
+    return "Google makes a new owner wait 7 days before they can be made primary owner. There is nothing to do but wait — we tell you the moment it ends.";
   }
   return platform === "YOUTUBE"
-    ? "The holding period runs while our agent and the buyer are owners — it is also Google's 7-day wait before our agent can be made primary owner. There is nothing to do until then — we email you the moment it ends."
-    : "The holding period runs while our agent and the buyer have the channel's access. There is nothing to do until then — we email you the moment it ends.";
+    ? "The holding period is also Google's 7-day wait before our agent can be made primary owner. There is nothing to do until then — we tell you the moment it ends."
+    : `The seller is paid only after the holding period, once the ${wordsFor(platform).asset} has stayed safely with our agent. There is nothing to do until then — we tell you the moment it ends.`;
 }
 
 /**
- * What each step actually involves, in words a first-time seller can act on.
- *
- * Keyed by mode and then by the step labels in `@/lib/deal-templates`: the
- * two deals share a label or two that mean different things. An unknown
- * label gets no explanation rather than a wrong one, so adding a step to a
- * template can never make this file lie.
+ * Staff ending a hold early, in words true of the platform: only Google
+ * can let a YouTube transfer through sooner.
  */
-const STEP_HELP: Readonly<
-  Record<DealMode, Record<string, (w: Words) => string>>
-> = {
-  SAFEST: {
-    "Pay the admin fee": () =>
-      "Channel Adda's fee, to start, and the only payment Channel Adda takes on this deal. The channel's price goes to the seller directly, once our agent holds the channel.",
-    "Invite the agent as owner": (w) =>
-      `The seller invites our agent's ${w.account}, shown on this page, as an owner of the channel.`,
-    "Accept the owner invite": (w) =>
-      w.googleWait
-        ? "Our agent accepts the invite. That starts Google's 7-day wait before an owner can be made primary owner."
-        : "Our agent accepts the invite.",
-    "Make the agent primary owner": (w) =>
-      w.googleWait
-        ? "Once Google's 7-day wait is over, the seller makes our agent the channel's primary owner. We email the seller the moment they can."
-        : "The seller makes our agent the channel's primary owner.",
-    "Verify the channel": () =>
-      "Our agent confirms they are primary owner, checks ownership, monetization, strikes and that the channel is genuine, and posts the latest proof in the deal chat for the buyer. From here the channel is out of the seller's hands.",
-    "Pay the seller": () =>
-      "The buyer pays the seller the price directly, to the details the seller gave on this page — crypto, bank, bKash, whatever they agreed — then presses Paid. Put the transaction id or a screenshot in the chat: it is your proof.",
-    "Confirm the payment arrived": () =>
-      "The seller presses Received once the money is in their account. Only then does our agent transfer the channel. If it has not arrived, say so in the chat and a moderator will look.",
-    "Invite the buyer as owner": (w) =>
-      w.googleWait
-        ? "Our agent invites the buyer's account, named on this page, as an owner. That starts Google's 7-day wait before the buyer can be made primary owner."
-        : "Our agent invites the buyer's account, named on this page, as an owner.",
-    "Make the buyer primary owner": (w) =>
-      w.googleWait
-        ? "Once Google's 7-day wait is over, our agent makes the buyer's account primary owner and leaves the channel. That completes the deal."
-        : "Our agent makes the buyer's account primary owner and leaves the channel. That completes the deal.",
-    // Deals finished on the steps of 2026-10-20 still show this one.
-    "Transfer ownership to the buyer": () =>
-      "Our agent transferred ownership to the buyer's account. That completed the deal.",
-  },
-  FASTEST: {
-    "Pay the full amount": () =>
-      "The channel's price and our fee together. Channel Adda holds all of it until our agent has the channel.",
-    "Invite the agent as owner": (w) =>
-      `The seller invites our agent's ${w.account}, shown on this page, as an owner of the channel.`,
-    "Invite the buyer as owner": (w) =>
-      w.googleWait
-        ? "Our agent accepts the seller's invite and invites the buyer's account, named on this page, as an owner. That starts the holding period, shown in the chat — Google's 7-day wait before our agent can be made primary owner runs at the same time."
-        : "Our agent accepts the seller's invite and gives the buyer's account, named on this page, access to the channel. That starts the holding period, shown in the chat.",
-    "Make the agent primary owner": () =>
-      "When the holding period ends, the seller makes our agent the channel's primary owner. We email the seller the moment they can.",
-    "Confirm primary ownership": () =>
-      "Our agent confirms they are primary owner. The channel is out of the seller's hands, so Channel Adda pays the seller into their Channel Adda wallet now.",
-    "Make the buyer primary owner": () =>
-      "Our agent makes the buyer's account primary owner and leaves the channel. That completes the deal.",
-  },
-};
+export function endWaitCheck(platform: Platform, mode: DealMode): string {
+  if (platform === "YOUTUBE") {
+    return "Only if Google already lets the transfer go ahead. The next step opens straight away and we tell whoever does it.";
+  }
+  return mode === "FASTEST"
+    ? `Only if you are sure the ${wordsFor(platform).asset} is safe with our agent and the holding period can end early. The next step opens straight away and we tell whoever does it.`
+    : "The next step opens straight away and we tell whoever does it.";
+}
 
-/** Clearer than "Mark this done" where the step is a statement of fact. */
-const CONFIRM_LABELS: Readonly<Record<string, string>> = {
-  "Invite the agent as owner": "I have invited the agent",
-  "Accept the owner invite": "I have accepted it",
-  "Make the agent primary owner": "I have made the agent primary owner",
-  "Verify the channel": "The channel checks out",
-  // The client's own words for the two that are the record of the price.
-  "Pay the seller": "Paid",
-  "Confirm the payment arrived": "Received",
-  "Transfer ownership to the buyer": "I have transferred it",
-  "Invite the buyer as owner": "I have invited the buyer",
-  "Confirm primary ownership": "I am the primary owner",
-  "Make the buyer primary owner": "I have made the buyer primary owner",
-};
+/**
+ * What each step actually involves, in words a first-time seller can act on,
+ * written to whoever is reading: an instruction to the person whose step it
+ * is ("Invite our agent's Google account…"), a description to everybody
+ * else, with them in it as "you" where it is about them.
+ *
+ * Keyed by the step labels in `@/lib/deal-templates`. An unknown label gets
+ * no explanation rather than a wrong one, so adding a step to a template can
+ * never make this file lie. While the deal's hold runs, the step after it
+ * says it waits for the hold, so nobody reads it as theirs to do now.
+ */
+export function stepHelp(
+  mode: DealMode,
+  label: string,
+  platform: Platform,
+  viewer: DealActor = "staff",
+  held = false,
+): string | undefined {
+  const act = actFor(mode, label, platform);
+  if (!act) return undefined;
+  const actor = actorOf(mode, label);
+  const text = actor === viewer ? act.how : act.what(them(viewer));
+  return held
+    ? `When ${waitName(mode, platform)} ends, ${lowerFirst(text)}`
+    : text;
+}
 
 /**
  * The presses that decide where the money and the channel go, which ask
- * once more before they count, keyed `MODE:label`. Received above all:
- * pressed by mistake, the seller's channel goes to a buyer who has not
- * paid, and cannot come back. Our agent's last press ends the deal, and on
- * Fastest their custody pays the seller.
+ * once more before they count. Received above all: pressed by mistake, the
+ * seller's channel goes to a buyer who has not paid, and cannot come back.
+ * The seller handing full control to our agent cannot be taken back either.
+ * Our agent's last press ends the deal, and on Fastest their custody pays
+ * the seller.
  */
-const CONFIRM_FIRST: Readonly<Record<string, string>> = {
-  "SAFEST:Verify the channel":
-    "Only once ownership, monetization and strikes check out and you have posted the latest proof in the deal chat. The buyer pays the seller next.",
-  "SAFEST:Pay the seller":
-    "Only once you have sent the money. The seller is asked to confirm it arrived, and the moment you press this is the record.",
-  "SAFEST:Confirm the payment arrived":
-    "Only if the money is in your account. Once you press it our agent transfers the channel to the buyer, and it cannot come back to you.",
-  "SAFEST:Make the buyer primary owner":
-    "Only once the buyer's account is primary owner. This completes the deal, and cannot be undone.",
-  "FASTEST:Confirm primary ownership":
-    "Only once you are the channel's primary owner. This pays the seller from the buyer's money, and cannot be undone.",
-  "FASTEST:Make the buyer primary owner":
-    "Only once the buyer's account is primary owner. This completes the deal, and cannot be undone.",
-};
-
 export function confirmFirst(
   mode: DealMode,
   label: string,
+  platform: Platform = "YOUTUBE",
 ): string | undefined {
-  return CONFIRM_FIRST[`${mode}:${label}`];
+  const act = actFor(mode, label, platform);
+  // Verifying is Safest's alone; Fastest has no such step.
+  if (!act || !actorOf(mode, label)) return undefined;
+  return act.caution;
 }
 
 /** The second press, in words that say what is being sworn to. */
@@ -763,19 +1500,109 @@ const CONFIRM_YES: Readonly<Record<string, string>> = {
   "Confirm the payment arrived": "Yes, it arrived",
 };
 
-export function confirmYes(label: string): string {
-  return CONFIRM_YES[label] ?? `Yes, ${confirmLabel(label)}`;
+export function confirmYes(
+  label: string,
+  platform: Platform = "YOUTUBE",
+  mode: DealMode = "FASTEST",
+): string {
+  return (
+    CONFIRM_YES[label] ??
+    `Yes, ${lowerFirst(confirmLabel(label, platform, mode))}`
+  );
 }
 
 /** What the step's button says. */
-export function confirmLabel(label: string): string {
-  return CONFIRM_LABELS[label] ?? "Mark this done";
+export function confirmLabel(
+  label: string,
+  platform: Platform = "YOUTUBE",
+  mode: DealMode = "FASTEST",
+): string {
+  return (
+    actFor(mode, label, platform)?.button ??
+    actFor(otherMode(mode), label, platform)?.button ??
+    "Mark this done"
+  );
 }
 
-export function stepHelp(
-  mode: DealMode,
-  label: string,
+/**
+ * What a step does with the buyer's account, for the email that names it to
+ * whoever will use it, or null for a step that does not touch it.
+ */
+export function handoverUse(platform: Platform, handsOver: boolean): string {
+  const uses: Record<Platform, [string, string]> = {
+    YOUTUBE: [
+      "Invite this account as an owner",
+      "Make this account the primary owner",
+    ],
+    INSTAGRAM: [
+      "The account moves to this email at the end",
+      "Move the account to this email",
+    ],
+    FACEBOOK: [
+      "Add this account to the Page",
+      "Give this account full control",
+    ],
+    TELEGRAM: [
+      "Make this account an admin",
+      "Transfer ownership to this account",
+    ],
+    WEBSITE: [
+      "Give this email access to the site's admin",
+      "Transfer the website to this email",
+    ],
+  };
+  return uses[platform][handsOver ? 1 : 0];
+}
+
+/**
+ * What the buyer is told when our agent first gives them access — or, on
+ * Instagram, has only secured the login, since a Fastest buyer gets
+ * nothing to sign in to until the end.
+ */
+export function buyerAccessNote(
   platform: Platform,
-): string | undefined {
-  return STEP_HELP[mode][label]?.(wordsFor(platform));
+  mode: DealMode,
+  holdStarted: boolean,
+): { title: string; body: string } {
+  const last = actFor(mode, "Make the buyer primary owner", platform);
+  const end = last
+    ? `our agent ${third(last.to(them("buyer")))}`
+    : "our agent hands it to you";
+  const after = !holdStarted
+    ? `${cap(end)} next.`
+    : mode === "SAFEST"
+      ? `Google's 7-day wait has started, and when it ends ${end}.`
+      : `The holding period has started, and when it ends the seller is paid and ${end}.`;
+  switch (platform) {
+    case "YOUTUBE":
+      return {
+        title: "Accept our agent's owner invite",
+        body: `Our agent has invited the account you gave on the deal as an owner. Accept it. ${after}`,
+      };
+    case "FACEBOOK":
+      return {
+        title: "Accept our agent's Page invite",
+        body: `Our agent has added the account you gave on the deal to the Page. Accept the invite. ${after}`,
+      };
+    case "TELEGRAM":
+      return {
+        title: "Our agent made you an admin",
+        body: `Our agent has added your Telegram account to the channel as an admin. ${after}`,
+      };
+    case "INSTAGRAM":
+      return mode === "FASTEST"
+        ? {
+            title: "Our agent has secured the login",
+            body: `Only Channel Adda can sign in to the account now. ${after}`,
+          }
+        : {
+            title: "Our agent sent you the login",
+            body: `The username and password are in the deal chat, so you can sign in and check the account. ${after}`,
+          };
+    case "WEBSITE":
+      return {
+        title: "Our agent gave you access",
+        body: `Your email now has access to the site's admin. ${after}`,
+      };
+  }
 }

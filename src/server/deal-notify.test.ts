@@ -210,6 +210,6 @@ test(
     const turn = await db.notification.findFirst({
       where: { userId: seller.id, kind: "ORDER" },
     });
-    expect(turn?.title).toContain("Invite the agent as owner");
+    expect(turn?.title).toContain("Invite our agent as owner");
   }),
 );

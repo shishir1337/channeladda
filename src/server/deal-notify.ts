@@ -1,6 +1,12 @@
 import "server-only";
 
-import type { DealMode } from "@/generated/prisma/enums";
+import {
+  handoverUse,
+  stepAsk,
+  stepTitle,
+  wordsFor,
+} from "@/components/deals/deal-status";
+import type { DealMode, Platform } from "@/generated/prisma/enums";
 import { CUSTODIAN_ROLES, withinLevel } from "@/lib/custody-roles";
 import { db } from "@/lib/db";
 import type { DealActor } from "@/lib/deal-machine";
@@ -58,12 +64,15 @@ export function turnEmail(input: {
   handoverTo?: string | null;
   /** What this step does with it (`handoverAction`). */
   handoverAction?: string | null;
+  /** Names what is being sold: "channel", "Page", "account". */
+  platform?: Platform;
 }) {
   const greeting = input.name ? `Hi ${input.name},` : "Hi there,";
+  const asset = wordsFor(input.platform ?? "YOUTUBE").asset;
   const mode =
     input.mode === "SAFEST"
-      ? "This is a Safest deal: our agent takes the channel first and verifies it, the buyer then pays the seller directly, and once the seller confirms it arrived our agent transfers it to the buyer. Channel Adda takes only its fee."
-      : "This is a Fastest deal: Channel Adda holds the buyer's payment while our agent takes the channel from the seller. Once our agent is primary owner the seller is paid, and our agent makes the buyer primary owner.";
+      ? `This is a Safest deal: our agent takes the ${asset} first and verifies it, the buyer then pays the seller directly, and once the seller confirms it arrived our agent transfers it to the buyer. Channel Adda takes only its fee.`
+      : `This is a Fastest deal: Channel Adda holds the buyer's payment while our agent takes the ${asset} from the seller. Once our agent has full control${input.platform === "YOUTUBE" || input.platform === undefined ? " (primary owner)" : ""} the seller is paid, and our agent hands it to the buyer.`;
 
   return {
     subject: `Your move: ${input.stepLabel} (${input.reference})`,
@@ -101,11 +110,11 @@ export function turnEmail(input: {
 export function handoverAction(
   mode: DealMode,
   position: number,
+  platform: Platform = "YOUTUBE",
 ): string | null {
   const step = templateFor(mode).find((s) => s.position === position);
   if (!step || !(step.usesHandover || step.handsOver)) return null;
-  if (!step.handsOver) return "Invite this account as an owner";
-  return "Make this account the primary owner";
+  return handoverUse(platform, Boolean(step.handsOver));
 }
 
 /**
@@ -136,7 +145,7 @@ export async function notifyNextActor(orderId: string): Promise<void> {
         handoverTo: true,
         holdUntil: true,
         priceUsd: true,
-        listing: { select: { title: true } },
+        listing: { select: { title: true, platform: true } },
         steps: {
           where: { completedAt: null },
           orderBy: { position: "asc" },
@@ -147,6 +156,8 @@ export async function notifyNextActor(orderId: string): Promise<void> {
     });
 
     if (!order) return;
+    const platform = order.listing.platform;
+    const mode = order.mode as DealMode;
 
     // While the deal's hold runs the next step exists but cannot be taken,
     // so "your move" would be a lie. The sweep that sees the hold end
@@ -162,6 +173,10 @@ export async function notifyNextActor(orderId: string): Promise<void> {
     // the seller hears when the agent joins (`assignAgent` calls this again).
     if (awaitsAgent(order.mode as DealMode, next.position, order.agentId)) {
       await askForAgent(order);
+      // The seller hears that the buyer has paid, rather than nothing until
+      // an agent is assigned. This is the moment just after the payment:
+      // nothing else asks for an agent on this step.
+      await notifyBuyerPaid(order.id);
       return;
     }
 
@@ -174,12 +189,21 @@ export async function notifyNextActor(orderId: string): Promise<void> {
     if (!userId) return;
 
     const href = dealHref(order);
+    // The step in the platform's own words, as an instruction to them:
+    // "Send our agent the login", not the stored "Invite the agent as owner".
+    const ask = stepAsk(next.label, platform, mode);
+    // The seller's first step comes straight after the buyer pays.
+    const firstForSeller = templateFor(mode).find(
+      (s) => s.position === next.position,
+    )?.needsAgent;
     await db.notification.create({
       data: {
         userId,
         kind: "ORDER",
-        title: `${next.label} — ${order.reference}`,
-        body: `Your move on ${order.listing.title}.`,
+        title: `${ask} — ${order.reference}`,
+        body: firstForSeller
+          ? `The buyer has paid. Your move on ${order.listing.title}.`
+          : `Your move on ${order.listing.title}.`,
         href,
       },
     });
@@ -200,7 +224,7 @@ export async function notifyNextActor(orderId: string): Promise<void> {
     // Only to whoever will transfer to it, and only on a step that uses it.
     // Sellers hand the channel to our agent in both modes, so the buyer's
     // account is none of theirs.
-    const action = handoverAction(order.mode as DealMode, next.position);
+    const action = handoverAction(mode, next.position, platform);
     if (person?.email) {
       await sendMail({
         to: person.email,
@@ -208,8 +232,9 @@ export async function notifyNextActor(orderId: string): Promise<void> {
           name: person.name,
           reference: order.reference,
           listingTitle: order.listing.title,
-          stepLabel: next.label,
+          stepLabel: ask,
           mode: order.mode as "SAFEST" | "FASTEST",
+          platform,
           href: `${siteUrl()}${href}`,
           handoverTo: action ? order.handoverTo : null,
           handoverAction: action,
@@ -325,24 +350,24 @@ export async function notifyBuyerWaitOver(orderId: string): Promise<void> {
         buyerId: true,
         conversationId: true,
         listingId: true,
+        listing: { select: { platform: true } },
         steps: {
           where: { completedAt: null },
           orderBy: { position: "asc" },
           take: 1,
-          select: { position: true },
+          select: { position: true, label: true },
         },
       },
     });
     const next = order?.steps[0];
     if (!order || !next) return;
-    const step = templateFor(order.mode as DealMode).find(
-      (s) => s.position === next.position,
-    );
+    const mode = order.mode as DealMode;
+    const step = templateFor(mode).find((s) => s.position === next.position);
     if (!step?.handsOver || step.actor === "buyer") return;
 
-    const title = `You become primary owner next — ${order.reference}`;
-    const body =
-      "The wait is over. Our agent makes your account primary owner now. Accept their owner invite first, if you have not yet.";
+    const w = wordsFor(order.listing.platform);
+    const title = `${w.buyerNext} — ${order.reference}`;
+    const body = `The wait is over. ${stepTitle(next.label, "buyer", order.listing.platform, mode)} now.${w.buyerAccept ? ` ${w.buyerAccept}` : ""}`;
     await notify({
       userId: order.buyerId,
       kind: "ORDER",
@@ -356,10 +381,22 @@ export async function notifyBuyerWaitOver(orderId: string): Promise<void> {
   }
 }
 
-/** Both sides, when a deal ends some way other than by completing. */
+/**
+ * Both sides, when a deal ends some way other than by completing.
+ *
+ * `detail` says who ended it and why, to everybody but them: a buyer whose
+ * deal the seller cancelled was told only "Deal cancelled", and the reason
+ * the seller had to give went nowhere (QA, CA-17288).
+ */
 export async function notifyDealEnded(
   orderId: string,
   outcome: string,
+  detail?: {
+    /** Whoever ended it, who is told `own` rather than `others`. */
+    byUserId?: string | null;
+    own?: string;
+    others?: string;
+  },
 ): Promise<void> {
   try {
     const order = await db.order.findUnique({
@@ -381,12 +418,15 @@ export async function notifyDealEnded(
       (id): id is string => Boolean(id),
     );
 
+    const closed = `The deal for ${order.listing.title} has closed.`;
     await db.notification.createMany({
       data: ids.map((userId) => ({
         userId,
         kind: "ORDER" as const,
         title: `${outcome} — ${order.reference}`,
-        body: `The deal for ${order.listing.title} has closed.`,
+        body:
+          (userId === detail?.byUserId ? detail?.own : detail?.others) ??
+          closed,
         // The agent's access to the conversation ends with the deal, so a
         // link there would be a 404 for them; the deal page is theirs.
         href:
@@ -397,6 +437,108 @@ export async function notifyDealEnded(
     });
   } catch (error) {
     console.error(`[deal-notify] ended ${orderId}`, error);
+  }
+}
+
+/**
+ * Everybody on a deal, when a dispute pauses it. A dispute is a pause, not
+ * an ending: the bell used to say the deal "has closed". Everybody but the
+ * person who raised it is told what it is about, in their words with any
+ * contact details taken out. Best effort.
+ */
+export async function notifyDealPaused(
+  orderId: string,
+  input: { byUserId: string; byName: string; reason: string | null },
+): Promise<void> {
+  try {
+    const order = await db.order.findUnique({
+      where: { id: orderId },
+      select: {
+        id: true,
+        reference: true,
+        buyerId: true,
+        sellerId: true,
+        agentId: true,
+        conversationId: true,
+        listingId: true,
+        listing: { select: { title: true } },
+      },
+    });
+    if (!order) return;
+    const ids = [order.buyerId, order.sellerId, order.agentId].filter(
+      (id): id is string => Boolean(id),
+    );
+    const title = `Deal paused: a dispute was raised — ${order.reference}`;
+    for (const userId of ids) {
+      const body =
+        userId === input.byUserId
+          ? `You raised a dispute on ${order.listing.title}. A moderator is looking at it, and nothing moves until they decide.`
+          : `${input.byName} raised a dispute on ${order.listing.title}${input.reason ? `: “${input.reason}”` : ""}. The deal is paused while a moderator looks at it — nothing moves until they decide.`;
+      await notify({
+        userId,
+        kind: "ORDER",
+        title,
+        body,
+        href:
+          userId === order.agentId
+            ? `/dashboard/deals/${order.id}`
+            : dealHref(order),
+        email: { subject: title, body },
+      });
+    }
+  } catch (error) {
+    console.error(`[deal-notify] paused ${orderId}`, error);
+  }
+}
+
+/**
+ * The seller, the moment the buyer pays, when there is no agent yet to make
+ * it their move. They used to hear nothing until an agent was assigned.
+ * With an agent already on the deal `notifyNextActor` tells them, saying
+ * the buyer has paid. Best effort.
+ */
+export async function notifyBuyerPaid(orderId: string): Promise<void> {
+  try {
+    const order = await db.order.findUnique({
+      where: { id: orderId },
+      select: {
+        id: true,
+        reference: true,
+        mode: true,
+        sellerId: true,
+        agentId: true,
+        conversationId: true,
+        listingId: true,
+        listing: { select: { title: true, platform: true } },
+        steps: {
+          where: { completedAt: null },
+          orderBy: { position: "asc" },
+          take: 1,
+          select: { position: true },
+        },
+      },
+    });
+    const next = order?.steps[0];
+    if (!order || !next) return;
+    if (!awaitsAgent(order.mode as DealMode, next.position, order.agentId)) {
+      return;
+    }
+    const asset = wordsFor(order.listing.platform).asset;
+    const title = `The buyer has paid — ${order.reference}`;
+    const body =
+      order.mode === "SAFEST"
+        ? `The buyer has paid our fee for ${order.listing.title}. We are assigning an agent to run the deal, and tell you who to hand the ${asset} to as soon as they join.`
+        : `Channel Adda is holding the buyer's payment for ${order.listing.title}. We are assigning an agent to run the deal, and tell you who to hand the ${asset} to as soon as they join.`;
+    await notify({
+      userId: order.sellerId,
+      kind: "ORDER",
+      title,
+      body,
+      href: dealHref(order),
+      email: { subject: title, body },
+    });
+  } catch (error) {
+    console.error(`[deal-notify] paid ${orderId}`, error);
   }
 }
 

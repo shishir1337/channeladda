@@ -193,7 +193,7 @@ export function StartDeal({
       <dl className="mt-4 space-y-2 border-y border-line py-3.5 text-sm">
         {mode === "FASTEST" ? (
           <div className="flex items-center justify-between gap-3">
-            <dt className="text-muted">Channel price</dt>
+            <dt className="text-muted">Price</dt>
             <dd>
               <Price usd={price} />
             </dd>

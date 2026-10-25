@@ -6,7 +6,11 @@ import { Reference } from "@/components/app/kit";
 import { ResellerBadge } from "@/components/app/reseller-badge";
 import { AgentInvite } from "@/components/deals/agent-invite";
 import { DealComplete } from "@/components/deals/deal-complete";
-import { dealHeadline, STATUS_TONE } from "@/components/deals/deal-status";
+import {
+  dealHeadline,
+  STATUS_TONE,
+  wordsFor,
+} from "@/components/deals/deal-status";
 import {
   CancelDeal,
   DealNextStep,
@@ -38,7 +42,6 @@ import { Badge } from "@/components/ui/badge";
 import { mayEndHolds } from "@/lib/custody-roles";
 import { db } from "@/lib/db";
 import { dealPanelState } from "@/lib/deal-panel";
-import { templateFor } from "@/lib/deal-templates";
 import { fromCents } from "@/lib/listing-form";
 import { withResellerDiscount } from "@/lib/reseller";
 import { pickFocus, tabsFor } from "@/lib/thread-focus";
@@ -46,8 +49,9 @@ import { threadHref } from "@/lib/thread-href";
 import { writesInClosedThread } from "@/lib/thread-rules";
 import { cn } from "@/lib/utils";
 import { certificateFor } from "@/server/certificate";
+import { isConfigured as checkoutConfigured } from "@/server/cryptomus";
 import { loadPanelInput } from "@/server/deal-panel";
-import { getDealFor } from "@/server/deals";
+import { getDealFor, secondApproversFor } from "@/server/deals";
 import {
   getThread,
   markThreadRead,
@@ -138,6 +142,19 @@ export default async function ThreadPage({
   if (!thread || !fingerprint) {
     const moved = await resolveThreadAlias(id, user);
     if (moved) redirect(threadHref(moved.conversationId, moved.listingId));
+    // An agent's way into a deal's chat closes with the deal, and the link
+    // they were following was a 404 the moment it completed. Their deal's
+    // page is still theirs: send them there, with a word on why.
+    const ended = await db.order.findFirst({
+      where: {
+        conversationId: id,
+        agentId: user.id,
+        ...(typeof about === "string" ? { listingId: about } : {}),
+      },
+      orderBy: { createdAt: "desc" },
+      select: { id: true },
+    });
+    if (ended) redirect(`/dashboard/deals/${ended.id}?chat=ended`);
     notFound();
   }
 
@@ -194,21 +211,8 @@ export default async function ThreadPage({
   // As the deal page does it: only the agent is ever asked to name a second
   // approver, only on the step that hands value across, and nobody else is
   // shown the list.
-  const staffIds =
-    deal?.viewerRole === "agent" &&
-    deal.nextStep?.actor === "agent" &&
-    templateFor(deal.mode).find(
-      (step) => step.position === deal.nextStep?.position,
-    )?.needsApprovalAbove
-      ? await db.user.findMany({
-          where: {
-            role: { in: ["MODERATOR", "FINANCE", "SUPERADMIN"] },
-            bannedAt: null,
-          },
-          orderBy: { name: "asc" },
-          select: { id: true, name: true },
-        })
-      : undefined;
+  // Above the threshold only, and never the agent themselves.
+  const staffIds = deal ? await secondApproversFor(deal, user.id) : undefined;
 
   // The agent of the deal and staff are talking to both of them.
   const otherSide =
@@ -310,6 +314,9 @@ export default async function ThreadPage({
                     deal.nextStep?.position ?? null,
                     deal.platform,
                     deal.awaitingAgent,
+                    deal.status !== "DISPUTED" &&
+                      deal.holdUntil !== null &&
+                      new Date(deal.holdUntil).getTime() > Date.now(),
                   ).label
                 }
               </Badge>
@@ -411,10 +418,19 @@ export default async function ThreadPage({
                   <div className="flex flex-col gap-3">
                     <PayNow
                       orderId={deal.id}
+                      reference={deal.reference}
                       amountUsd={deal.totalUsd}
                       priceUsd={deal.priceUsd}
                       mode={deal.mode}
                       availableUsd={wallet.availableUsd}
+                      payBy={
+                        deal.wait
+                          ? new Date(deal.wait.until).toISOString()
+                          : null
+                      }
+                      fromOffer={deal.fromOffer}
+                      checkoutOn={checkoutConfigured()}
+                      asset={wordsFor(deal.platform).asset}
                     />
                     <CancelDeal deal={deal} />
                   </div>

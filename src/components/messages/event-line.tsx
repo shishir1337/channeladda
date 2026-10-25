@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { eventForReader } from "@/lib/chat-events";
 import { chatTime } from "@/lib/chat-time";
 import { cn } from "@/lib/utils";
 
@@ -16,7 +17,13 @@ export function EventLine({
   className,
   action = null,
 }: {
-  message: { body: string; createdAt: string };
+  message: {
+    body: string;
+    createdAt: string;
+    /** The reader did this: the line reads "You …" for them. */
+    mine?: boolean;
+    senderName?: string;
+  };
   className?: string;
   /** Where the line takes the reader, e.g. to the deal it opened. */
   action?: { href: string; label: string } | null;
@@ -27,7 +34,10 @@ export function EventLine({
       <p className="max-w-[64ch] text-center text-xs leading-relaxed text-balance text-muted">
         {/* A deal reference never splits at its hyphen ("CA-" / "11235"):
             lines written before eventText used a non-breaking one too. */}
-        {message.body.replace(/\b([A-Z]{2})-(\d+)\b/g, "$1‑$2")}
+        {eventForReader(message.body, {
+          mine: message.mine ?? false,
+          senderName: message.senderName ?? "",
+        }).replace(/\b([A-Z]{2})-(\d+)\b/g, "$1‑$2")}
         <span aria-hidden="true" className="mx-1.5 text-line-strong">
           ·
         </span>

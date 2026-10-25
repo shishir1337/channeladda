@@ -59,7 +59,7 @@ test(
     // for seven days: a "your move" now would be a lie.
     expect(
       (await turns(seller.id)).filter((t) =>
-        t.title.startsWith("Make the agent primary owner"),
+        t.title.startsWith("Make our agent primary owner"),
       ),
     ).toEqual([]);
   }),
@@ -77,7 +77,7 @@ test(
 
     expect(
       (await turns(seller.id)).filter((t) =>
-        t.title.startsWith("Make the agent primary owner"),
+        t.title.startsWith("Make our agent primary owner"),
       ),
     ).toHaveLength(1);
     const conversation = await db.conversation.findFirstOrThrow({
@@ -105,7 +105,7 @@ test(
     expect(await announceEndedHolds()).toBe(1);
     expect(
       (await turns(seller.id)).filter((t) =>
-        t.title.startsWith("Make the agent primary owner"),
+        t.title.startsWith("Make our agent primary owner"),
       ),
     ).toHaveLength(1);
   }),

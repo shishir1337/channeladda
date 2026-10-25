@@ -40,6 +40,12 @@ export type PanelDeal = {
   holdUntil: Date | null;
   /** The open step waits for Channel Adda to assign an agent (`awaitsAgent`). */
   awaitingAgent: boolean;
+  /**
+   * Safest: the buyer's turn to pay the seller, and the seller has not said
+   * where. That makes it the seller's move as well: their panel collapsed
+   * to "The deal is under way" with the box to fill in hidden inside it.
+   */
+  payToMissing?: boolean;
 };
 
 export type PanelInput = {
@@ -105,7 +111,8 @@ export function dealPanelState(input: PanelInput): PanelState {
       deal.status !== "DISPUTED" &&
       !holdRunning &&
       !deal.awaitingAgent &&
-      deal.nextStep?.actor === viewer;
+      (deal.nextStep?.actor === viewer ||
+        (viewer === "seller" && deal.payToMissing === true));
     return { kind: "step", dealId: deal.id, yourMove };
   }
 

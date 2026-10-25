@@ -29,6 +29,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DEAL_TABS, type DealTab, dealTabs, openTab } from "@/lib/deal-tabs";
+import { siteDayMonth } from "@/lib/site-time";
 import type { DealListRow } from "@/server/deals";
 import { listDealsFor } from "@/server/deals";
 import { requireUser } from "@/server/session";
@@ -209,16 +210,13 @@ function DealRows({ deals }: { deals: DealListRow[] }) {
                         deal.openStep,
                         deal.platform,
                         deal.awaitingAgent,
+                        deal.waitingUntil !== null && !frozen,
                       ).short
                     }
                   </Badge>
                   {deal.waitingUntil && !frozen ? (
                     <span className="text-xs whitespace-nowrap text-subtle tabular-nums">
-                      Opens{" "}
-                      {deal.waitingUntil.toLocaleDateString("en-GB", {
-                        day: "numeric",
-                        month: "short",
-                      })}
+                      Opens {siteDayMonth(deal.waitingUntil, "short")}
                     </span>
                   ) : deal.awaiting && !frozen ? (
                     <TurnFlag
@@ -231,7 +229,7 @@ function DealRows({ deals }: { deals: DealListRow[] }) {
 
               <Amount
                 cents={deal.priceUsd}
-                caption="channel price"
+                caption="price"
                 className="shrink-0 sm:w-28"
               />
 

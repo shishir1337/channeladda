@@ -4,12 +4,14 @@ import {
   confirmLabel,
   confirmYes,
   dealHeadline,
+  endWaitCheck,
   holdNote,
   moneyNote,
   STATUS_LABELS,
   STATUS_SHORT,
-  STEP_TITLES,
   statusSentence,
+  stepAsk,
+  stepDone,
   stepHelp,
   stepTitle,
 } from "@/components/deals/deal-status";
@@ -217,7 +219,7 @@ describe("the headline follows the open step, not just the status", () => {
     expect(
       dealHeadline("AWAITING_CUSTODY", "SAFEST", "agent", 3, "YOUTUBE")
         .sentence,
-    ).toMatch(/^The seller has invited you/);
+    ).toMatch(/^The seller has handed the channel to you/);
   });
 
   test("while the seller's step 2 is owed, the seller is asked to invite the agent", () => {
@@ -294,7 +296,7 @@ describe("the headline follows the open step, not just the status", () => {
       9,
       "YOUTUBE",
     );
-    expect(agent.sentence).toMatch(/make the buyer primary owner/);
+    expect(agent.sentence).toMatch(/make the buyer primary owner/i);
     expect(agent.sentence).toMatch(/completes the deal/);
 
     // Nobody waits on Google for an Instagram account.
@@ -333,7 +335,7 @@ describe("the headline follows the open step, not just the status", () => {
       4,
       "YOUTUBE",
     );
-    expect(seller.sentence).toMatch(/make our agent primary owner/);
+    expect(seller.sentence).toMatch(/make our agent primary owner/i);
     expect(seller.sentence).toMatch(/paid/);
   });
 
@@ -432,38 +434,272 @@ describe("each step is named for whoever is reading it", () => {
     for (const mode of ["SAFEST", "FASTEST"] as const) {
       for (const step of templateFor(mode)) {
         for (const viewer of ["buyer", "seller", "agent"] as const) {
-          expect(stepTitle(step.label, viewer)).toBeTruthy();
+          for (const platform of PLATFORMS) {
+            const title = stepTitle(step.label, viewer, platform, mode);
+            expect(title, `${mode} ${step.label} ${platform}`).not.toBe(
+              step.label,
+            );
+          }
         }
-        expect(STEP_TITLES[step.label]).toBeDefined();
       }
     }
   });
 
   test("the buyer, the seller and our agent each read their own words", () => {
-    expect(stepTitle("Pay the full amount", "buyer")).toBe("You pay");
-    expect(stepTitle("Pay the full amount", "seller")).toBe(
-      "The buyer pays us",
-    );
-    expect(stepTitle("Invite the agent as owner", "seller")).toBe(
+    const t = (label: string, viewer: "buyer" | "seller" | "agent") =>
+      stepTitle(label, viewer, "YOUTUBE", "FASTEST");
+    expect(t("Pay the full amount", "buyer")).toBe("You pay");
+    expect(t("Pay the full amount", "seller")).toBe("The buyer pays us");
+    expect(t("Invite the agent as owner", "seller")).toBe(
       "You invite our agent as owner",
     );
-    expect(stepTitle("Invite the agent as owner", "buyer")).toBe(
-      "The seller invites our agent",
+    expect(t("Invite the agent as owner", "buyer")).toBe(
+      "The seller invites our agent as owner",
     );
-    expect(stepTitle("Make the buyer primary owner", "buyer")).toBe(
+    expect(t("Invite the agent as owner", "agent")).toBe(
+      "The seller invites you as owner",
+    );
+    expect(t("Make the buyer primary owner", "buyer")).toBe(
       "Our agent makes you primary owner",
     );
-    expect(stepTitle("Make the agent primary owner", "agent")).toBe(
+    expect(t("Make the agent primary owner", "agent")).toBe(
       "The seller makes you primary owner",
     );
   });
 
   test("staff, and a step from older templates, keep the stored label", () => {
-    expect(stepTitle("Pay the full amount", "staff")).toBe(
-      "Pay the full amount",
-    );
-    expect(stepTitle("Release the seller's funds", "buyer")).toBe(
-      "Release the seller's funds",
-    );
+    expect(
+      stepTitle("Pay the full amount", "staff", "YOUTUBE", "FASTEST"),
+    ).toBe("Pay the full amount");
+    expect(
+      stepTitle("Release the seller's funds", "buyer", "YOUTUBE", "FASTEST"),
+    ).toBe("Release the seller's funds");
+  });
+});
+
+describe("each platform's deal speaks its own handover", () => {
+  // QA, 2026-10-26: Instagram, Telegram, Facebook and website deals told
+  // sellers to "invite our agent as owner" and "make our agent primary
+  // owner", and asked staff whether "Google already lets the transfer go
+  // ahead". None of those exist off YouTube.
+  const YOUTUBE_WORDS = /owner invite|primary owner|as owner|Google/;
+  const OTHERS = PLATFORMS.filter((p) => p !== "YOUTUBE");
+  const VIEWERS = ["buyer", "seller", "agent"] as const;
+
+  test("no step title, help, button or ask uses YouTube's words elsewhere", () => {
+    for (const mode of ["SAFEST", "FASTEST"] as const) {
+      for (const platform of OTHERS) {
+        for (const step of templateFor(mode)) {
+          const texts = [
+            stepAsk(step.label, platform, mode),
+            stepDone(step.label, platform, mode),
+            confirmLabel(step.label, platform, mode),
+            confirmYes(step.label, platform, mode),
+            confirmFirst(mode, step.label, platform) ?? "",
+            ...VIEWERS.flatMap((viewer) => [
+              stepTitle(step.label, viewer, platform, mode),
+              stepHelp(mode, step.label, platform, viewer) ?? "",
+              stepHelp(mode, step.label, platform, viewer, true) ?? "",
+            ]),
+          ];
+          for (const text of texts) {
+            expect(text, `${mode} ${platform} ${step.label}`).not.toMatch(
+              YOUTUBE_WORDS,
+            );
+          }
+        }
+      }
+    }
+  });
+
+  test("no headline uses YouTube's words elsewhere, held or not", () => {
+    for (const mode of ["SAFEST", "FASTEST"] as const) {
+      for (const platform of OTHERS) {
+        for (const step of templateFor(mode)) {
+          for (const viewer of VIEWERS) {
+            for (const status of Object.keys(STATUS_LABELS)) {
+              for (const held of [false, true]) {
+                const h = dealHeadline(
+                  status as keyof typeof STATUS_LABELS,
+                  mode,
+                  viewer,
+                  step.position,
+                  platform,
+                  false,
+                  held,
+                );
+                expect(
+                  `${h.label} ${h.sentence}`,
+                  `${mode} ${platform} ${status} ${step.position} ${viewer}`,
+                ).not.toMatch(YOUTUBE_WORDS);
+              }
+            }
+          }
+        }
+      }
+    }
+  });
+
+  test("an Instagram seller hands over the login, and our agent secures it", () => {
+    expect(
+      stepTitle("Invite the agent as owner", "seller", "INSTAGRAM", "FASTEST"),
+    ).toBe("You send our agent the login");
+    expect(
+      stepHelp("FASTEST", "Invite the buyer as owner", "INSTAGRAM", "agent"),
+    ).toMatch(/two-factor/);
+    expect(
+      stepTitle(
+        "Make the buyer primary owner",
+        "buyer",
+        "INSTAGRAM",
+        "FASTEST",
+      ),
+    ).toBe("Our agent moves the account to you");
+  });
+
+  test("Telegram and Facebook name their own actions", () => {
+    expect(
+      stepTitle(
+        "Make the agent primary owner",
+        "seller",
+        "TELEGRAM",
+        "FASTEST",
+      ),
+    ).toBe("You transfer ownership to our agent");
+    expect(
+      stepTitle("Invite the agent as owner", "agent", "FACEBOOK", "SAFEST"),
+    ).toBe("The seller adds you to the Page");
+    expect(
+      stepHelp("FASTEST", "Make the agent primary owner", "WEBSITE", "seller"),
+    ).toMatch(/domain/);
+  });
+
+  test("ending a wait early mentions Google only on YouTube", () => {
+    expect(endWaitCheck("YOUTUBE", "FASTEST")).toMatch(/Google/);
+    for (const platform of OTHERS) {
+      expect(endWaitCheck(platform, "FASTEST")).not.toMatch(/Google/);
+    }
+  });
+
+  test("the chat's record of a step names nobody as you", () => {
+    for (const mode of ["SAFEST", "FASTEST"] as const) {
+      for (const platform of PLATFORMS) {
+        for (const step of templateFor(mode)) {
+          expect(stepDone(step.label, platform, mode)).not.toMatch(
+            /\byou(r)?\b/i,
+          );
+        }
+      }
+    }
+  });
+});
+
+describe("a step's words are written to whoever reads them", () => {
+  // QA: the seller read "The seller invites our agent's account…" under
+  // their own step, and our agent read "Our agent accepts…".
+  test("whoever does the step is told what to do, not told about themselves", () => {
+    for (const mode of ["SAFEST", "FASTEST"] as const) {
+      for (const platform of PLATFORMS) {
+        for (const step of templateFor(mode)) {
+          const help = stepHelp(mode, step.label, platform, step.actor) ?? "";
+          expect(help, `${mode} ${platform} ${step.label}`).not.toMatch(
+            /^(The seller|Our agent|The buyer)\b/,
+          );
+        }
+      }
+    }
+    expect(
+      stepHelp("FASTEST", "Invite the agent as owner", "YOUTUBE", "seller"),
+    ).toMatch(/^Invite our agent's Google account/);
+    expect(
+      stepHelp("SAFEST", "Accept the owner invite", "YOUTUBE", "agent"),
+    ).toMatch(/^Accept the seller's invite/);
+  });
+
+  test("the buyer reads about their own account as theirs", () => {
+    expect(
+      stepHelp("FASTEST", "Make the buyer primary owner", "YOUTUBE", "buyer"),
+    ).toMatch(/your Google account/);
+  });
+
+  test("while the wait runs, the step after it says it waits", () => {
+    expect(
+      stepHelp(
+        "FASTEST",
+        "Make the agent primary owner",
+        "YOUTUBE",
+        "seller",
+        true,
+      ),
+    ).toMatch(/^When the holding period ends, make our agent's/);
+  });
+
+  test("the agent's own step is headed as their move", () => {
+    const h = dealHeadline("AWAITING_CUSTODY", "SAFEST", "agent", 3, "YOUTUBE");
+    expect(h.label).toBe("Accept the owner invite now");
+  });
+
+  test("once the holding period is over, nobody is told to wait for it", () => {
+    for (const viewer of ["buyer", "seller", "agent"] as const) {
+      const over = dealHeadline(
+        "AWAITING_HANDOVER",
+        "FASTEST",
+        viewer,
+        4,
+        "YOUTUBE",
+        false,
+        false,
+      );
+      expect(over.sentence, viewer).not.toMatch(/When the holding period ends/);
+      expect(over.sentence, viewer).toMatch(/holding period is over/);
+      const running = dealHeadline(
+        "AWAITING_HANDOVER",
+        "FASTEST",
+        viewer,
+        4,
+        "YOUTUBE",
+        false,
+        true,
+      );
+      expect(running.sentence, viewer).not.toMatch(/is over/);
+    }
+  });
+
+  test("no deal promises an email: we tell you, in the app and by email", () => {
+    for (const mode of ["SAFEST", "FASTEST"] as const) {
+      for (const platform of PLATFORMS) {
+        expect(holdNote(mode, platform)).not.toMatch(/email/);
+        for (const step of templateFor(mode)) {
+          for (const held of [false, true]) {
+            for (const viewer of ["buyer", "seller", "agent"] as const) {
+              for (const status of Object.keys(STATUS_LABELS)) {
+                expect(
+                  dealHeadline(
+                    status as keyof typeof STATUS_LABELS,
+                    mode,
+                    viewer,
+                    step.position,
+                    platform,
+                    false,
+                    held,
+                  ).sentence,
+                ).not.toMatch(/we email/i);
+              }
+            }
+          }
+        }
+      }
+    }
+  });
+
+  test("the seller handing full control to our agent asks first, on every platform", () => {
+    for (const mode of ["SAFEST", "FASTEST"] as const) {
+      for (const platform of PLATFORMS) {
+        expect(
+          confirmFirst(mode, "Make the agent primary owner", platform),
+          `${mode} ${platform}`,
+        ).toMatch(/cannot take/);
+      }
+    }
   });
 });

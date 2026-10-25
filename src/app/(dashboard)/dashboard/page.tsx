@@ -181,7 +181,7 @@ export default async function DashboardPage() {
           deal.status === "AWAITING_PAYMENT" && deal.side === "buyer"
             ? "Pay to start the deal"
             : deal.openLabel
-              ? stepTitle(deal.openLabel, deal.side)
+              ? stepTitle(deal.openLabel, deal.side, deal.platform, deal.mode)
               : dealHeadline(
                   deal.status,
                   deal.mode,
@@ -469,7 +469,7 @@ export default async function DashboardPage() {
             value={<Price usd={selling.paidToWallet} />}
             note={
               selling.walletSales > 0
-                ? `${countOf(selling.walletSales, "Fastest sale")}, after our fee.`
+                ? `${countOf(selling.walletSales, "Fastest sale")}${selling.sellerFeesUsd > 0 ? ", after our fee" : ""}.`
                 : "Fastest sales are paid here."
             }
             tone={selling.paidToWallet > 0 ? "verified" : "neutral"}

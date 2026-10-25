@@ -60,6 +60,7 @@ export async function loadPanelInput(
         status: true,
         holdUntil: true,
         agentId: true,
+        sellerPayTo: true,
         steps: {
           where: { completedAt: null },
           orderBy: { position: "asc" },
@@ -106,6 +107,11 @@ export async function loadPanelInput(
           awaitingAgent:
             !isTerminal(order.status) &&
             awaitsAgent(order.mode, next?.position ?? null, order.agentId),
+          payToMissing:
+            order.mode === "SAFEST" &&
+            !isTerminal(order.status) &&
+            next?.label === "Pay the seller" &&
+            !order.sellerPayTo?.trim(),
         }
       : null,
     now,

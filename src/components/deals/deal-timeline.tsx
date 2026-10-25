@@ -14,7 +14,9 @@ import {
   type ComponentType,
   type ReactNode,
   type SVGProps,
+  useEffect,
   useId,
+  useRef,
   useState,
   useTransition,
 } from "react";
@@ -28,13 +30,14 @@ import {
   Ring,
   TurnFlag,
 } from "@/components/app/kit";
-import { TextField } from "@/components/auth/fields";
+import { TextArea, TextField } from "@/components/auth/fields";
 import {
   ACTOR_LABELS,
   actorLabel,
   confirmFirst,
   confirmLabel,
   confirmYes,
+  endWaitCheck,
   holdNote,
   stepHelp,
   stepTitle,
@@ -42,8 +45,11 @@ import {
 import { Button } from "@/components/ui/button";
 import { iconText } from "@/components/ui/icon-hue";
 import { Price } from "@/components/ui/price";
+import type { DealMode, Platform } from "@/generated/prisma/enums";
 import { memberMayCancel } from "@/lib/deal-cancel";
+import { MAX_DEAL_NOTE } from "@/lib/deal-endings";
 import { isTerminal } from "@/lib/deal-machine";
+import { siteDayMonth, siteMoment } from "@/lib/site-time";
 import { cn } from "@/lib/utils";
 import { completeStep, endDeal, endWaitNow } from "@/server/actions/deals";
 import type { DealStepView, DealView } from "@/server/deals";
@@ -66,6 +72,11 @@ import type { DealStepView, DealView } from "@/server/deals";
  * it is.
  */
 
+/**
+ * Staff who can second a high-value handover, other than whoever is asking.
+ * Undefined when this step needs no second approval at this price; empty
+ * when it does and there is nobody else to give it.
+ */
 type StaffList = { id: string; name: string }[];
 
 /**
@@ -78,22 +89,39 @@ function stepState(deal: DealView, step: DealStepView) {
   const frozen = deal.status === "DISPUTED";
   // The deal's hold — Google's wait, or the holding period: the next step
   // exists, and is not available yet. Offering the button would only
-  // produce a refusal.
+  // produce a refusal. A paused deal's clock means nothing, so it is not
+  // shown counting down to a step that will not open on that date.
   const heldUntil =
-    deal.holdUntil && new Date(deal.holdUntil) > new Date()
+    !frozen && deal.holdUntil && new Date(deal.holdUntil) > new Date()
       ? new Date(deal.holdUntil)
       : null;
   // The seller's step that brings our agent in, with no agent yet: there is
   // nobody to invite, and the server refuses the press. It waits on Channel
   // Adda, so it is nobody's move.
   const awaitingAgent = deal.awaitingAgent;
+  // Safest: the buyer's turn to pay the seller, and the seller has not said
+  // where. That is the seller's move, and the buyer's Paid waits for it.
+  const payToMissing =
+    !frozen &&
+    deal.mode === "SAFEST" &&
+    step.label === "Pay the seller" &&
+    !deal.sellerPayTo;
   return {
     frozen,
     heldUntil,
     awaitingAgent,
+    payToMissing,
     mine:
       !frozen && !heldUntil && !awaitingAgent && step.actor === deal.viewerRole,
-    help: stepHelp(deal.mode, step.label, deal.platform),
+    // The seller adding where to be paid, while the step is the buyer's.
+    sellerOwesPayTo: payToMissing && deal.viewerRole === "seller",
+    help: stepHelp(
+      deal.mode,
+      step.label,
+      deal.platform,
+      deal.viewerRole,
+      heldUntil !== null,
+    ),
     // Step 1 is completed by the payment clearing and by nothing else, so
     // the buyer gets the payment panel rather than a button the server will
     // refuse.
@@ -148,7 +176,7 @@ export function BusyLabel({
 
 /** Whose step it is, in words — gold only when it is the reader's. */
 function Whose({ state, who }: { state: StepState; who: string }) {
-  if (state.mine) return <TurnFlag mine />;
+  if (state.mine || state.sellerOwesPayTo) return <TurnFlag mine />;
   if (state.awaitingAgent) {
     return (
       <span className="text-xs font-medium text-muted">
@@ -161,6 +189,15 @@ function Whose({ state, who }: { state: StepState; who: string }) {
       <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted">
         <Dot tone="danger" />
         Paused
+      </span>
+    );
+  }
+  // While the wait runs it is nobody's move, the reader's included: "Waiting
+  // on you" beside "nothing to do until then" said two things at once.
+  if (state.heldUntil) {
+    return (
+      <span className="text-xs font-medium text-muted">
+        Opens when the wait ends
       </span>
     );
   }
@@ -188,23 +225,23 @@ const NOTHING_FROM_YOU =
  * keeps its line on the page: the pause is news.
  */
 function StepInfo({
-  step,
+  title,
   state,
   className,
 }: {
-  step: DealStepView;
+  title: string;
   state: StepState;
   className?: string;
 }) {
   const parts: string[] = [];
   if (!state.mine) {
     if (state.help) parts.push(state.help);
-    if (!state.frozen) parts.push(NOTHING_FROM_YOU);
+    if (!state.frozen && !state.sellerOwesPayTo) parts.push(NOTHING_FROM_YOU);
   }
   if (parts.length === 0) return null;
 
   return (
-    <InfoTip label={`About this step: ${step.label}`} className={className}>
+    <InfoTip label={`About this step: ${title}`} className={className}>
       {parts.map((text, index) => (
         <p key={text} className={index > 0 ? "mt-2" : undefined}>
           {text}
@@ -261,6 +298,12 @@ export function DealNextStep({
   const step = deal.nextStep;
   if (!step) return null;
   const state = stepState(deal, step);
+  const title = stepTitle(
+    step.label,
+    deal.viewerRole,
+    deal.platform,
+    deal.mode,
+  );
 
   return (
     <Card className="@container">
@@ -276,9 +319,9 @@ export function DealNextStep({
             id="next-step-heading"
             className="min-w-0 text-[0.9375rem] leading-6 font-semibold text-fg"
           >
-            {stepTitle(step.label, deal.viewerRole)}
+            {title}
           </h2>
-          <StepInfo step={step} state={state} className="mt-0.5" />
+          <StepInfo title={title} state={state} className="mt-0.5" />
         </div>
         <StepDetail
           deal={deal}
@@ -344,22 +387,30 @@ function StepDetail({
       {state.heldUntil ? (
         <Note icon={ClockIcon}>
           <span className="font-medium text-fg tabular-nums">
-            Opens on{" "}
-            {state.heldUntil.toLocaleDateString("en-GB", {
-              day: "numeric",
-              month: "long",
-            })}
-            .
+            Opens on {siteMoment(state.heldUntil)}.
           </span>{" "}
           {holdNote(deal.mode, deal.platform)}
         </Note>
       ) : null}
-      {state.heldUntil && canEndWait ? <EndWaitNow orderId={deal.id} /> : null}
+      {state.heldUntil && canEndWait ? (
+        <EndWaitNow
+          orderId={deal.id}
+          platform={deal.platform}
+          mode={deal.mode}
+        />
+      ) : null}
 
       {state.awaitingAgent && step.actor === deal.viewerRole ? (
         <Note icon={ClockIcon}>
-          Channel Adda is assigning an agent to this deal. The account to invite
-          appears here as soon as they join, and we tell you by email.
+          Channel Adda is assigning an agent to this deal. Who to hand it to
+          appears here as soon as they join, and we tell you.
+        </Note>
+      ) : null}
+
+      {state.sellerOwesPayTo ? (
+        <Note>
+          Say where {deal.buyerName} should pay you, in the box on this page.
+          They cannot pay you until you do.
         </Note>
       ) : null}
 
@@ -370,8 +421,22 @@ function StepDetail({
             no button for it, so nobody can record a payment that has not
             arrived.
           </Note>
+        ) : state.payToMissing ? (
+          <Note>
+            {deal.sellerName} has not said where to pay them yet. We have asked
+            them. Once their details show on this page, pay them and press Paid
+            — do not send money to details given anywhere else.
+          </Note>
         ) : (
-          <StepAction deal={deal} step={step} staffIds={staffIds} />
+          // Keyed by the step, so the next step never opens already armed:
+          // the agent's "Yes" on step 5 stayed armed for step 6, in the same
+          // place, and a double tap finished the deal.
+          <StepAction
+            key={`${deal.id}:${step.position}`}
+            deal={deal}
+            step={step}
+            staffIds={staffIds}
+          />
         )
       ) : null}
     </>
@@ -379,15 +444,38 @@ function StepDetail({
 }
 
 /**
- * Staff ending the wait before its date, when Google already lets the
- * transfer go ahead. One press opens a plain check, so it is never done by
- * a stray tap; the next person is told it is their move.
+ * Brings a confirmation that has just opened into view. On a phone it
+ * opened below the fold, behind the tab bar, and looked like nothing had
+ * happened.
  */
-export function EndWaitNow({ orderId }: { orderId: string }) {
+function useIntoView<T extends HTMLElement>(shown: boolean) {
+  const ref = useRef<T>(null);
+  useEffect(() => {
+    if (!shown) return;
+    ref.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }, [shown]);
+  return ref;
+}
+
+/**
+ * Staff ending the wait before its date — on YouTube, when Google already
+ * lets the transfer go ahead. One press opens a plain check, so it is never
+ * done by a stray tap; the next person is told it is their move.
+ */
+export function EndWaitNow({
+  orderId,
+  platform = "YOUTUBE",
+  mode = "FASTEST",
+}: {
+  orderId: string;
+  platform?: Platform;
+  mode?: DealMode;
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const ref = useIntoView<HTMLDivElement>(open);
 
   if (!open) {
     return (
@@ -405,13 +493,17 @@ export function EndWaitNow({ orderId }: { orderId: string }) {
   }
 
   return (
-    <div className="mt-3 max-w-[62ch] rounded-lg border border-line bg-surface p-3 sm:p-3.5">
+    <div
+      ref={ref}
+      role="alertdialog"
+      aria-label="End the wait now?"
+      className="mt-3 max-w-[62ch] scroll-mb-24 rounded-lg border border-line bg-surface p-3 sm:p-3.5"
+    >
       <p className="text-[0.8125rem] font-semibold text-fg">
         End the wait now?
       </p>
       <p className="mt-0.5 text-[0.8125rem] leading-relaxed text-muted">
-        Only if Google already lets the transfer go ahead. The next step opens
-        straight away and we tell whoever does it.
+        {endWaitCheck(platform, mode)}
       </p>
       <div className="mt-3 flex flex-wrap gap-2">
         <Button
@@ -480,10 +572,12 @@ function StepAction({
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   // The presses that decide where the money and the channel go ask once
-  // more: Paid, Received, and our agent's custody and transfer.
-  const caution = confirmFirst(deal.mode, step.label);
+  // more: Paid, Received, the seller handing over, and our agent's custody
+  // and transfer.
+  const caution = confirmFirst(deal.mode, step.label, deal.platform);
   const [armed, setArmed] = useState(false);
-  const label = confirmLabel(step.label);
+  const confirmRef = useIntoView<HTMLDivElement>(armed);
+  const label = confirmLabel(step.label, deal.platform, deal.mode);
 
   const complete = () => {
     setError(null);
@@ -491,44 +585,53 @@ function StepAction({
       const result = await completeStep(deal.id, step.position, {
         ...(approvedById ? { approvedById } : {}),
       });
+      setArmed(false);
       if (!result.ok) {
         setError(result.error);
-        setArmed(false);
         return;
       }
       router.refresh();
     });
   };
 
-  // Offered whenever the server says this step can need a second signature.
-  // The server decides whether it is actually required for this price, so a
-  // blank selection is fine below the threshold.
-  const wantsApprover = Boolean(staffIds && staffIds.length > 0);
+  // Set only when this step needs a second staff member at this price. The
+  // acting agent is never on the list — the server refuses self-approval —
+  // so with nobody else to ask, the step says so instead of offering a
+  // menu that can only produce a refusal.
+  const approval = staffIds;
+  const approvalBlocked =
+    approval !== undefined && (approval.length === 0 || approvedById === "");
 
   return (
     <div className="mt-4 flex flex-col gap-4">
-      {wantsApprover ? (
+      {approval && approval.length === 0 ? (
+        <Note>
+          A second staff member has to approve this. Add one in Team, or change
+          the second-approval amount in Settings.
+        </Note>
+      ) : approval ? (
         <div className="max-w-sm">
           <label htmlFor={approverId} className={labelClass}>
             Second approval from
+            <span className="ml-0.5 text-danger">*</span>
           </label>
           <select
             id={approverId}
             value={approvedById}
+            required
             onChange={(e) => setApprovedById(e.target.value)}
             className={cn(inputClass, "mt-1.5 cursor-pointer")}
           >
-            <option value="">No second approver</option>
-            {staffIds?.map((person) => (
+            <option value="">Choose who approved it</option>
+            {approval.map((person) => (
               <option key={person.id} value={person.id}>
                 {person.name}
               </option>
             ))}
           </select>
           <p className={hintClass}>
-            Required above the platform's threshold. Recorded against your name
-            and theirs in the audit trail — only name someone who has actually
-            agreed to it.
+            Needed at this price. Recorded against your name and theirs in the
+            audit trail — only name someone who has actually agreed to it.
           </p>
         </div>
       ) : null}
@@ -536,9 +639,10 @@ function StepAction({
       <div>
         {caution && armed ? (
           <div
+            ref={confirmRef}
             role="alertdialog"
             aria-label={`Confirm: ${label}`}
-            className="max-w-[62ch] rounded-lg border border-primary/40 bg-primary-soft/60 p-3"
+            className="max-w-[62ch] scroll-mb-24 rounded-lg border border-primary/40 bg-primary-soft/60 p-3"
           >
             <p className="text-[0.8125rem] leading-relaxed text-fg">
               {caution}
@@ -548,12 +652,12 @@ function StepAction({
                 type="button"
                 size="md"
                 className={STEP_BUTTON}
-                disabled={pending}
+                disabled={pending || approvalBlocked}
                 onClick={complete}
               >
                 <BusyLabel busy={pending} busyText="Saving…">
                   <CheckIcon aria-hidden="true" />
-                  {confirmYes(step.label)}
+                  {confirmYes(step.label, deal.platform, deal.mode)}
                 </BusyLabel>
               </Button>
               <Button
@@ -573,7 +677,7 @@ function StepAction({
             type="button"
             size="md"
             className={STEP_BUTTON}
-            disabled={pending}
+            disabled={pending || approvalBlocked}
             onClick={caution ? () => setArmed(true) : complete}
           >
             <BusyLabel busy={pending} busyText="Saving…">
@@ -708,6 +812,12 @@ function Step({
   canEndWait?: boolean;
 }) {
   const done = step.completedAt !== null;
+  const title = stepTitle(
+    step.label,
+    deal.viewerRole,
+    deal.platform,
+    deal.mode,
+  );
 
   return (
     <li aria-current={current ? "step" : undefined} className="flex gap-3">
@@ -734,9 +844,9 @@ function Step({
           <>
             <div className="flex items-start gap-1.5">
               <p className="min-w-0 text-sm leading-5 font-semibold text-fg">
-                {stepTitle(step.label, deal.viewerRole)}
+                {title}
               </p>
-              <StepInfo step={step} state={current} />
+              <StepInfo title={title} state={current} />
             </div>
             <div className="mt-1.5">
               <Whose
@@ -764,17 +874,15 @@ function Step({
                 done ? "text-muted" : "text-subtle",
               )}
             >
-              {stepTitle(step.label, deal.viewerRole)}
+              {title}
             </p>
             {/* The name already says who does it, so a step still to come
-                needs nothing under it; a finished one says when. */}
-            {done ? (
+                needs nothing under it; a finished one says when — in the
+                site's own time zone, as the certificate and the server's
+                own render give it. */}
+            {done && step.completedAt ? (
               <p className="text-xs text-subtle">
-                Done{" "}
-                {step.completedAt?.toLocaleDateString("en-GB", {
-                  day: "numeric",
-                  month: "short",
-                })}
+                Done {siteDayMonth(new Date(step.completedAt), "short")}
               </p>
             ) : null}
           </div>
@@ -891,10 +999,13 @@ export function RaiseDispute({ deal }: { deal: DealView }) {
           including every step and the payment references on it. Nothing moves
           again until they decide.
         </p>
-        <TextField
+        <TextArea
           id={noteId}
           name="note"
           label="What has gone wrong"
+          hint="The other side sees this too, without any contact details."
+          rows={4}
+          maxLength={MAX_DEAL_NOTE}
           value={note}
           onChange={(e) => setNote(e.target.value)}
           className="mt-4 max-w-md"
@@ -1000,6 +1111,8 @@ export function CancelDeal({ deal }: { deal: DealView }) {
           id={noteId}
           name="note"
           label="Why"
+          hint={`${deal.viewerRole === "buyer" ? "The seller" : "The buyer"} is told this, without any contact details.`}
+          maxLength={MAX_DEAL_NOTE}
           value={note}
           onChange={(e) => setNote(e.target.value)}
           className="mt-4 max-w-md"

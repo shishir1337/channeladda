@@ -369,3 +369,28 @@ const ROWS: Row[] = [
 test.each(ROWS)("$name", ({ viewer, input, want }) => {
   expect(dealPanelState({ ...base, ...input, viewer })).toEqual(want);
 });
+
+test("a Safest seller who has not said where to be paid has a move when the buyer's turn comes", () => {
+  // QA: at step 6 the seller's panel collapsed to "The deal is under way",
+  // with the box to add payment details hidden inside it.
+  const payStep = {
+    status: "IN_CUSTODY" as const,
+    nextStep: { position: 6, label: "Pay the seller", actor: "buyer" as const },
+  };
+  expect(
+    dealPanelState({
+      ...base,
+      viewer: "seller",
+      listingStatus: "RESERVED",
+      deal: deal({ ...payStep, payToMissing: true }),
+    }),
+  ).toEqual({ kind: "step", dealId: "d1", yourMove: true });
+  expect(
+    dealPanelState({
+      ...base,
+      viewer: "seller",
+      listingStatus: "RESERVED",
+      deal: deal({ ...payStep, payToMissing: false }),
+    }),
+  ).toEqual({ kind: "step", dealId: "d1", yourMove: false });
+});

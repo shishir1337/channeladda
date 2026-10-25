@@ -1,4 +1,5 @@
 import type { DealMode } from "@/generated/prisma/enums";
+import { siteDate } from "@/lib/site-time";
 
 /**
  * What a conversation says happened.
@@ -39,16 +40,21 @@ export type ChatEvent =
     }
   | { type: "payment-received" | "payment-lapsed"; reference: string }
   | { type: "agent-joined" | "agent-changed"; agentName: string }
-  | { type: "step-done"; name: string; label: string }
+  // `did` is the step in its platform's words, after the name: "invited
+  // our agent as owner", "sent our agent the login". Lines written before
+  // it existed carry only the stored label.
+  | { type: "step-done"; name: string; label: string; did?: string }
   | { type: "hold-started"; until: Date }
   | { type: "hold-ended" }
   // Fastest: our agent is primary owner, so the seller has been paid. No
   // amount: the buyer reads this line too, and the seller's fee is theirs.
-  | { type: "seller-paid" }
+  | { type: "seller-paid"; asset?: string }
   // Safest: the seller said where to be paid. Never the details themselves:
   // this line is shown in previews.
   | { type: "pay-to-saved"; name: string; changed: boolean }
-  | { type: "dispute-raised"; name: string }
+  // What it is about, in the raiser's words with contact details taken
+  // out: the other side used to learn only that one had been raised.
+  | { type: "dispute-raised"; name: string; reason?: string }
   | { type: "deal-ended"; outcome: string }
   // After a completed deal: the buyer's stars for the seller. The words of
   // the review stay on the seller's page, not in previews.
@@ -102,15 +108,15 @@ export function eventText(event: ChatEvent): string {
     case "agent-joined":
       return `${who(event.agentName)} from Channel Adda joined to run this deal`;
     case "agent-changed":
-      return `${who(event.agentName)} from Channel Adda now runs this deal. The account to invite has changed: use the one shown on this deal, not an earlier one`;
+      return `${who(event.agentName)} from Channel Adda now runs this deal. The account to invite or hand it to has changed: use the one shown on this deal, not an earlier one`;
     case "step-done":
-      return `Done: ${event.label} (${who(event.name)})`;
+      return event.did
+        ? `${who(event.name)} ${event.did}`
+        : `Done: ${event.label} (${who(event.name)})`;
     case "hold-started":
-      return `Waiting period until ${event.until.toLocaleDateString("en-GB", {
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-      })}. The next step opens then`;
+      // In the site's time zone: written on a UTC server, a wait ending
+      // early on an Indian morning read as the day before.
+      return `Waiting period until ${siteDate(event.until)}. The next step opens then`;
     case "hold-ended":
       return "The waiting period is over. The next step is open";
     case "pay-to-saved":
@@ -118,12 +124,39 @@ export function eventText(event: ChatEvent): string {
         ? `${who(event.name)} changed where to be paid`
         : `${who(event.name)} added where to be paid`;
     case "seller-paid":
-      return "Our agent is primary owner, so the seller has been paid. Our agent makes the buyer primary owner next";
+      return event.asset
+        ? `Our agent has the ${event.asset} now, so the seller has been paid. Our agent hands it to the buyer next`
+        : "Our agent is primary owner, so the seller has been paid. Our agent makes the buyer primary owner next";
     case "dispute-raised":
-      return `${who(event.name)} raised a dispute. The deal is paused while Channel Adda looks at it`;
+      return event.reason
+        ? `${who(event.name)} raised a dispute: “${event.reason}”. The deal is paused while Channel Adda looks at it`
+        : `${who(event.name)} raised a dispute. The deal is paused while Channel Adda looks at it`;
     case "deal-ended":
       return event.outcome;
     case "seller-reviewed":
       return `${who(event.name)} gave ${who(event.seller)} ${event.rating} ${event.rating === 1 ? "star" : "stars"}`;
   }
+}
+
+/**
+ * A stored line, read from the reader's side.
+ *
+ * A line is written once, with the name of whoever did it, and both sides
+ * read it — so on Bilal's own screen it said "Bilal Ahmed opened a Safest
+ * deal" (QA, 2026-10-26). The person who did it reads "You": the name that
+ * starts the line is theirs, or the one in brackets on a line written
+ * before lines led with it. Nothing else in the line changes.
+ */
+export function eventForReader(
+  body: string,
+  reader: { mine: boolean; senderName: string },
+): string {
+  const name = reader.senderName.trim();
+  if (!reader.mine || !name) return body;
+  if (body.startsWith(`${name} `)) return `You ${body.slice(name.length + 1)}`;
+  const older = ` (${name})`;
+  if (body.startsWith("Done: ") && body.endsWith(older)) {
+    return `${body.slice(0, -older.length)} (you)`;
+  }
+  return body;
 }

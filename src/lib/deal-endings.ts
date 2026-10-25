@@ -7,6 +7,31 @@ import type { DealMode } from "@/generated/prisma/enums";
  * does with the channel and the money is pinned by a test: on Safest the
  * desk once promised to pay out and refund a price Channel Adda never holds.
  */
+/**
+ * The longest note a deal's ending or dispute may carry: the raiser's own
+ * words and the desk's alike. The same limit as the dispute desk's notes.
+ */
+export const MAX_DEAL_NOTE = 2_000;
+
+/**
+ * How the panel says what cannot be undone, counted from the outcomes it
+ * actually shows — a paused deal is not offered the pause again, and "four
+ * of these five" sat above four options.
+ */
+export function undoLine(shown: readonly Pick<Ending, "weight">[]): string {
+  const final = shown.filter((ending) => ending.weight !== "pause").length;
+  if (final === 0) return "None of these is final.";
+  if (final === shown.length) {
+    return final === 1
+      ? "This cannot be undone."
+      : "None of these can be undone.";
+  }
+  const words = ["no", "one", "two", "three", "four", "five", "six"];
+  const say = (n: number) => words[n] ?? String(n);
+  const first = say(final);
+  return `${first.charAt(0).toUpperCase()}${first.slice(1)} of these ${say(shown.length)} cannot be undone.`;
+}
+
 export type EndingTo =
   | "DISPUTED"
   | "RETURNED_TO_SELLER"

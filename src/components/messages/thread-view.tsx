@@ -93,6 +93,8 @@ export type ThreadMessageView = {
   /** Null once the file has been deleted, which happens after 48 hours. */
   attachmentExpiresAt: string | null;
   attachmentRemoved: boolean;
+  /** A deal here is running: the file stays until every deal has ended. */
+  attachmentKeptForDeal?: boolean;
 };
 
 /** One listing a conversation is about, as the thread draws it. */
@@ -297,7 +299,14 @@ function Attachment({ message }: { message: ThreadMessageView }) {
           />
         </a>
       )}
-      {left ? (
+      {message.attachmentKeptForDeal ? (
+        // The real rule in a deal's conversation: evidence stays while the
+        // deal can still be disputed.
+        <figcaption className="mt-1.5 flex items-center gap-1.5 text-xs text-subtle">
+          <ClockIcon aria-hidden="true" className="size-3" />
+          Kept while the deal runs; removed after it ends
+        </figcaption>
+      ) : left ? (
         <figcaption className="mt-1.5 flex items-center gap-1.5 text-xs text-subtle">
           <ClockIcon aria-hidden="true" className="size-3" />
           Removed in {left}

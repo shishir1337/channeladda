@@ -25,6 +25,7 @@ import {
   dealHeadline,
   STATUS_LABELS,
   STATUS_TONE,
+  wordsFor,
 } from "@/components/deals/deal-status";
 import {
   CancelDeal,
@@ -40,13 +41,13 @@ import { Button } from "@/components/ui/button";
 import { iconText } from "@/components/ui/icon-hue";
 import { Price } from "@/components/ui/price";
 import { mayEndHolds } from "@/lib/custody-roles";
-import { db } from "@/lib/db";
 import { isTerminal } from "@/lib/deal-machine";
-import { templateFor } from "@/lib/deal-templates";
+import { siteMoment } from "@/lib/site-time";
 import { threadHref } from "@/lib/thread-href";
 import { cn } from "@/lib/utils";
 import { certificateFor } from "@/server/certificate";
-import { getDealFor } from "@/server/deals";
+import { isConfigured as checkoutConfigured } from "@/server/cryptomus";
+import { getDealFor, secondApproversFor } from "@/server/deals";
 import { reviewPromptFor } from "@/server/reviews";
 import { requireUser } from "@/server/session";
 import { getSettings } from "@/server/settings";
@@ -70,8 +71,12 @@ export const metadata: Metadata = {
  */
 export default async function DealPage({
   params,
+  searchParams,
 }: PageProps<"/dashboard/deals/[id]">) {
   const { id } = await params;
+  // Sent here from a deal chat that closed to them: an agent's access to
+  // it ends with the deal.
+  const { chat } = await searchParams;
   const user = await requireUser(`/dashboard/deals/${id}`);
   const deal = await getDealFor(user.id, id);
 
@@ -86,6 +91,23 @@ export default async function DealPage({
   // deal ends: from then on the money is theirs and only the channel is held.
   const sellerPaid = !safest && deal.custodyAt !== null;
   const disputed = deal.status === "DISPUTED";
+  const unpaid = deal.status === "AWAITING_PAYMENT";
+  const words = wordsFor(deal.platform);
+  // The deal's hold is running: the open step exists and waits for it.
+  const held =
+    !disputed &&
+    deal.holdUntil !== null &&
+    new Date(deal.holdUntil).getTime() > Date.now();
+  // When an unpaid deal lapses: the payment window's clock.
+  const payBy = unpaid && deal.wait ? deal.wait.until : null;
+  // Safest: the buyer's turn to pay the seller, and the seller has not
+  // said where. Adding it is the seller's move.
+  const payToOwed =
+    safest &&
+    viewer === "seller" &&
+    deal.nextStep?.label === "Pay the seller" &&
+    !deal.sellerPayTo &&
+    !disputed;
   // By whose step is open as well as by status: one status can cover the
   // seller's step and then the agent's, and the headline has to move on
   // the moment the first is done.
@@ -96,36 +118,26 @@ export default async function DealPage({
     deal.nextStep?.position ?? null,
     deal.platform,
     deal.awaitingAgent,
+    held,
   );
-  const sentence = headline.sentence;
+  // A deal that stopped short says why: who cancelled it and their reason,
+  // or that another buyer paid first — not only "Cancelled".
+  const sentence = deal.endedLine ?? headline.sentence;
 
-  // Only the agent is ever asked to name a second approver, and only on the
-  // step that hands value across. Nobody else needs the staff list, and
-  // buyers and sellers must not be shown it.
-  const needsApprover =
-    viewer === "agent" &&
-    deal.nextStep?.actor === "agent" &&
-    Boolean(
-      templateFor(deal.mode).find(
-        (step) => step.position === deal.nextStep?.position,
-      )?.needsApprovalAbove,
-    );
-  const staffIds = needsApprover
-    ? await db.user.findMany({
-        where: {
-          role: { in: ["MODERATOR", "FINANCE", "SUPERADMIN"] },
-          bannedAt: null,
-        },
-        orderBy: { name: "asc" },
-        select: { id: true, name: true },
-      })
-    : undefined;
+  // Only the agent is ever asked to name a second approver, only on the
+  // step that hands value across, and only above the platform's threshold.
+  // Nobody else needs the staff list, and buyers and sellers must not be
+  // shown it. The agent themselves is never on it.
+  const staffIds = await secondApproversFor(deal, user.id);
 
   // The opening payment, when the buyer owes it, is the action at this
   // point, so it takes the place of the step's own action rather than
   // sitting beside it. It is the only payment Channel Adda takes.
-  const paying = viewer === "buyer" && deal.status === "AWAITING_PAYMENT";
-  const yourMove = paying || deal.nextStep?.actor === viewer;
+  const paying = viewer === "buyer" && unpaid;
+  const yourMove =
+    paying ||
+    payToOwed ||
+    (deal.nextStep?.actor === viewer && !held && !deal.awaitingAgent);
   const wallet = paying ? await getWallet(user.id) : null;
 
   const ModeIcon = safest ? ShieldCheckIcon : ZapIcon;
@@ -192,6 +204,12 @@ export default async function DealPage({
       <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start lg:gap-6">
         {/* ---- where it is, and every step ---------------------------- */}
         <div className="flex min-w-0 flex-col gap-4">
+          {chat === "ended" && viewer === "agent" && terminal ? (
+            <Callout title="This deal's chat has closed to you.">
+              Your access to it ended with the deal. Everything that happened is
+              on this page.
+            </Callout>
+          ) : null}
           {certificate ? (
             <DealComplete
               dealId={deal.id}
@@ -241,6 +259,13 @@ export default async function DealPage({
                 <p className="max-w-[66ch] text-sm leading-relaxed text-fg">
                   {sentence}
                 </p>
+                {/* The seller waiting on an unpaid deal sees the same clock
+                    the buyer pays against. */}
+                {payBy && viewer !== "buyer" ? (
+                  <p className="mt-1.5 text-[0.8125rem] text-muted tabular-nums">
+                    The buyer has until {siteMoment(new Date(payBy))} to pay.
+                  </p>
+                ) : null}
               </section>
             )}
             <DealSteps
@@ -251,10 +276,15 @@ export default async function DealPage({
                 paying && wallet ? (
                   <PayNow
                     orderId={deal.id}
+                    reference={deal.reference}
                     amountUsd={deal.totalUsd}
                     priceUsd={deal.priceUsd}
                     mode={deal.mode}
                     availableUsd={wallet.availableUsd}
+                    payBy={payBy ? new Date(payBy).toISOString() : null}
+                    fromOffer={deal.fromOffer}
+                    checkoutOn={checkoutConfigured()}
+                    asset={words.asset}
                     inline
                   />
                 ) : undefined
@@ -295,7 +325,7 @@ export default async function DealPage({
               />
               <dl className="px-4 sm:px-5">
                 <Line
-                  label="Channel price"
+                  label="Price"
                   value={<Price usd={deal.priceUsd / 100} />}
                   money
                   note={
@@ -304,12 +334,14 @@ export default async function DealPage({
                         ? "paid to the seller directly, and confirmed by them"
                         : deal.buyerPaidAt
                           ? "paid to the seller directly, the buyer says; the seller confirms it next"
-                          : "paid to the seller directly, once our agent holds the channel"
+                          : `paid to the seller directly, once our agent holds the ${words.asset}`
                       : sellerPaid
                         ? viewer === "seller"
-                          ? "paid into your Channel Adda wallet when our agent became primary owner"
-                          : "paid to the seller when our agent became primary owner"
-                        : "part of what Channel Adda is holding"
+                          ? `paid into your Channel Adda wallet when our agent took the ${words.asset}`
+                          : `paid to the seller when our agent took the ${words.asset}`
+                        : unpaid
+                          ? "paid to Channel Adda with our fee, to start"
+                          : "part of what Channel Adda is holding"
                   }
                 />
                 <Line
@@ -322,9 +354,42 @@ export default async function DealPage({
                       : "paid by the buyer, up front"
                   }
                 />
-                {/* Only while the deal is live: once it has ended, nothing is
-                    being held and a present-tense claim here would be false. */}
-                {terminal ? null : (
+                {/* Before anybody has paid, nothing is held: what happens
+                    to the money is said in the future tense. "Channel Adda
+                    is holding $1,184.50" sat on a deal nobody had paid. */}
+                {unpaid ? (
+                  <Line
+                    label={
+                      viewer === "buyer"
+                        ? "You pay to start"
+                        : "The buyer pays to start"
+                    }
+                    value={<Price usd={deal.totalUsd / 100} />}
+                    money
+                    note={
+                      safest
+                        ? "our fee only, to Channel Adda. Nothing is held for the price: it goes to the seller directly later."
+                        : `to Channel Adda, which holds it until our agent has the ${words.asset}, then pays the seller`
+                    }
+                  />
+                ) : null}
+                {/* What came back, on a deal that ended without finishing. */}
+                {terminal && deal.refundedUsd > 0 ? (
+                  <Line
+                    label={
+                      viewer === "buyer"
+                        ? "Refunded to you"
+                        : "Refunded to the buyer"
+                    }
+                    value={<Price usd={deal.refundedUsd / 100} />}
+                    money
+                    note="paid back into the buyer's Channel Adda balance"
+                  />
+                ) : null}
+                {/* Only while the deal is live and paid: once it has ended,
+                    nothing is being held and a present-tense claim here
+                    would be false — and before payment, nothing is yet. */}
+                {terminal || unpaid ? null : (
                   <Line
                     label={
                       safest || sellerPaid
@@ -333,7 +398,7 @@ export default async function DealPage({
                     }
                     value={
                       safest || sellerPaid ? (
-                        "The channel"
+                        `The ${words.asset}`
                       ) : (
                         <Price usd={deal.totalUsd / 100} />
                       )
@@ -341,7 +406,7 @@ export default async function DealPage({
                     money
                     note={
                       safest || sellerPaid
-                        ? "our agent holds it until it is handed to the buyer"
+                        ? `our agent holds it until it is handed to the buyer`
                         : "the price and our fee together"
                     }
                   />
@@ -378,8 +443,8 @@ export default async function DealPage({
                   }
                   note={
                     safest
-                      ? "hands the channel to our agent, is paid by the buyer directly"
-                      : "transfers the channel, is paid by Channel Adda"
+                      ? `hands the ${words.asset} to our agent, is paid by the buyer directly`
+                      : `hands the ${words.asset} to our agent, is paid by Channel Adda`
                   }
                 />
                 <Line
@@ -393,8 +458,8 @@ export default async function DealPage({
                   }
                   note={
                     safest
-                      ? "takes ownership of the channel, then passes it on"
-                      : "supervises the handover, then releases the money"
+                      ? `takes the ${words.asset}, then passes it on`
+                      : `takes the ${words.asset}, then hands it to the buyer`
                   }
                 />
               </dl>

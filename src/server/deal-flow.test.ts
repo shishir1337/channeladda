@@ -165,9 +165,11 @@ test(
   "a step already done cannot be done again",
   withCleanDb(async () => {
     const { orderId, actors } = await runTo("SAFEST", 3);
+    // Said as what it is: pressed again, or from a page loaded before it
+    // was done — not "an earlier step is still open".
     expect(
       await advanceStep({ orderId, position: 2, userId: actors.seller }),
-    ).toMatchObject({ ok: false, reason: "wrong-step" });
+    ).toMatchObject({ ok: false, reason: "already-done" });
   }),
 );
 

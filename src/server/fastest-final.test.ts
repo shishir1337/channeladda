@@ -149,7 +149,7 @@ test(
       await db.notification.count({
         where: {
           userId: t.seller.id,
-          title: { startsWith: "Invite the agent as owner" },
+          title: { startsWith: "Invite our agent as owner" },
         },
       }),
     ).toBe(0);
@@ -185,7 +185,7 @@ test(
       await db.notification.count({
         where: {
           userId: t.seller.id,
-          title: { startsWith: "Invite the agent as owner" },
+          title: { startsWith: "Invite our agent as owner" },
         },
       }),
     ).toBe(1);

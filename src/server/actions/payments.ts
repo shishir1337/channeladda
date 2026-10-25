@@ -8,7 +8,7 @@ import {
   createInvoice,
   isConfigured,
 } from "@/server/cryptomus";
-import { getDealFor } from "@/server/deals";
+import { closedForPayment, getDealFor } from "@/server/deals";
 import {
   newReference,
   reconcileInvoice,
@@ -38,6 +38,8 @@ export type PayResult =
       manual?: boolean;
       /** Not a failure: a message about a payment already made. */
       notice?: boolean;
+      /** The deal has closed under the page: it should be redrawn. */
+      closed?: boolean;
     };
 
 function siteUrl(): string {
@@ -66,6 +68,9 @@ export async function startPayment(orderId: string): Promise<PayResult> {
       ? ({ purpose: "DEAL", amountUsd: deal.totalUsd } as const)
       : null;
   if (!stage) {
+    // Closed under the page: say why, and let it redraw.
+    const why = await closedForPayment(deal.id, user.id);
+    if (why) return { ok: false, error: why, closed: true };
     return { ok: false, error: "This deal has nothing left to pay." };
   }
 
@@ -86,7 +91,9 @@ export async function startPayment(orderId: string): Promise<PayResult> {
     revalidatePath(`/dashboard/deals/${deal.id}`);
     return {
       ok: false,
+      closed: true,
       error:
+        (await closedForPayment(deal.id, user.id)) ??
         "This account is no longer for sale, so we closed this deal. You were not charged.",
     };
   }
@@ -110,8 +117,9 @@ export async function startPayment(orderId: string): Promise<PayResult> {
       ok: false,
       manual: true,
       error:
-        "Card and crypto checkout is not switched on yet. Channel Adda will " +
-        "send you payment details and confirm it against this deal by hand.",
+        "Paying online is not switched on yet. Ask Channel Adda for payment " +
+        "details — we reply here in the app — and once your money reaches " +
+        "us it is recorded against this deal.",
     };
   }
 

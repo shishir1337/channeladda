@@ -1,4 +1,5 @@
 import { expect, test } from "vitest";
+import { stepDone } from "@/components/deals/deal-status";
 import { eventText } from "@/lib/chat-events";
 import { db } from "@/lib/db";
 import { templateFor } from "@/lib/deal-templates";
@@ -200,6 +201,8 @@ test(
             type: "step-done",
             name: actors[step.actor as keyof typeof actors].name,
             label: step.label,
+            // The step in its platform's words, after the name.
+            did: stepDone(step.label, "YOUTUBE", "FASTEST"),
           }),
           senderId: actors[step.actor as keyof typeof actors].id,
         })),
@@ -362,7 +365,12 @@ test(
     const lines = (await events(orderId)).slice(-2);
     expect(lines).toMatchObject([
       {
-        body: eventText({ type: "dispute-raised", name: buyer.name }),
+        // What it is about reaches the other side, in the raiser's words.
+        body: eventText({
+          type: "dispute-raised",
+          name: buyer.name,
+          reason: "The seller stopped answering.",
+        }),
         senderId: buyer.id,
       },
       {

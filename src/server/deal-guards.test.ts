@@ -122,9 +122,10 @@ test(
     expect(
       await advanceStep({ orderId, position: 3, userId: actors.agent }),
     ).toMatchObject({ ok: true });
+    // Refused, and said as what it is: already done.
     expect(
       await advanceStep({ orderId, position: 3, userId: actors.agent }),
-    ).toMatchObject({ ok: false, reason: "wrong-step" });
+    ).toMatchObject({ ok: false, reason: "already-done" });
   }),
 );
 

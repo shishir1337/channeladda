@@ -1,5 +1,6 @@
 import { MailIcon } from "lucide-react";
 import { Callout, Card } from "@/components/app/kit";
+import { wordsFor } from "@/components/deals/deal-status";
 import { iconText } from "@/components/ui/icon-hue";
 import type { DealView } from "@/server/deals";
 
@@ -21,6 +22,9 @@ export function AgentInvite({ deal }: { deal: DealView }) {
   if (!deal.nextStep || deal.nextStep.position > 5) return null;
   const primary = deal.nextStep.position >= 4;
   const seller = deal.viewerRole === "seller";
+  // What the seller does with it differs by platform: invite it as owner on
+  // YouTube, add it to the Page on Facebook, make it an admin on Telegram.
+  const card = wordsFor(deal.platform).agentCard;
 
   return (
     <Card>
@@ -34,9 +38,7 @@ export function AgentInvite({ deal }: { deal: DealView }) {
             id="invite-heading"
             className="min-w-0 text-sm leading-6 font-semibold text-fg"
           >
-            {primary
-              ? "Make this account primary owner"
-              : "Invite this account as owner"}
+            {primary ? card.primary : card.invite}
           </h2>
         </div>
         <div className="flex flex-col gap-3 p-4 sm:p-5">

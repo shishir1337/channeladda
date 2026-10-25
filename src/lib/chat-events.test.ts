@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { type ChatEvent, eventText } from "@/lib/chat-events";
+import { type ChatEvent, eventForReader, eventText } from "@/lib/chat-events";
 
 // One of each, so a variant added later without words fails here.
 const EXAMPLES: ChatEvent[] = [
@@ -65,4 +65,43 @@ test("a missing name still reads as a sentence", () => {
   expect(
     eventText({ type: "offer-accepted", name: "  ", amountCents: 100 }),
   ).toMatch(/^Someone /);
+});
+
+test("a line reads from the side of whoever reads it", () => {
+  // QA: "Bilal Ahmed opened a Safest deal" on Bilal's own screen.
+  const opened = eventText({
+    type: "deal-opened",
+    name: "Bilal Ahmed",
+    mode: "SAFEST",
+    reference: "CA-17139",
+    priceCents: 145_000,
+  });
+  expect(
+    eventForReader(opened, { mine: true, senderName: "Bilal Ahmed" }),
+  ).toMatch(/^You opened a Safest deal/);
+  expect(
+    eventForReader(opened, { mine: false, senderName: "Bilal Ahmed" }),
+  ).toBe(opened);
+  // Lines from before they led with the name.
+  expect(
+    eventForReader("Done: Invite the agent as owner (Imran Khan)", {
+      mine: true,
+      senderName: "Imran Khan",
+    }),
+  ).toBe("Done: Invite the agent as owner (you)");
+  // A step, in its platform's words.
+  expect(
+    eventText({
+      type: "step-done",
+      name: "Imran Khan",
+      label: "Invite the agent as owner",
+      did: "sent our agent the login",
+    }),
+  ).toBe("Imran Khan sent our agent the login");
+});
+
+test("a dispute line says what it is about", () => {
+  expect(
+    eventText({ type: "dispute-raised", name: "Rafi", reason: "No reply." }),
+  ).toMatch(/^Rafi raised a dispute: “No reply\.”/);
 });

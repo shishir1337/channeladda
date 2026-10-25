@@ -112,6 +112,12 @@ export type ThreadMessage = {
   attachmentExpiresAt: Date | null;
   /** True once the file has been deleted, so the gap can be explained. */
   attachmentRemoved: boolean;
+  /**
+   * A deal in this conversation is still running, so the file is kept
+   * until every one of them has ended (`purgeExpiredMedia`) — not removed
+   * on its 48-hour date, as its label used to say.
+   */
+  attachmentKeptForDeal?: boolean;
 };
 
 /** One listing a conversation is about. */
@@ -386,9 +392,14 @@ export async function getThread(
     db.order.findMany({
       where: { conversationId, ...only },
       orderBy: { createdAt: "desc" },
-      select: { listingId: true, reference: true },
+      select: { listingId: true, reference: true, status: true },
     }),
   ]);
+  // Media in a conversation with a deal still running is kept until every
+  // deal in it has ended: the evidence a dispute is decided on.
+  const dealRunning = deals.some(
+    (deal) => !TERMINAL_STATUSES.includes(deal.status),
+  );
 
   // In the order they were first talked about; a deal with no line about it
   // yet (one from before the deal chat) after them.
@@ -479,6 +490,10 @@ export async function getThread(
         attachmentKind: message.attachmentKind,
         attachmentExpiresAt: message.attachmentExpiresAt,
         attachmentRemoved: message.attachmentRemovedAt !== null,
+        attachmentKeptForDeal:
+          dealRunning &&
+          message.attachmentUrl !== null &&
+          message.attachmentRemovedAt === null,
       };
     }),
   };

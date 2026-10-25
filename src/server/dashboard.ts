@@ -62,6 +62,12 @@ export type SellerSummary = {
   paidToWallet: number;
   walletSales: number;
   /**
+   * Dollars of seller fee taken from those sales. "After our fee" is said
+   * only when one was: at a 0% seller fee it promised a deduction that
+   * never happened.
+   */
+  sellerFeesUsd: number;
+  /**
    * Dollars Safest buyers paid the seller directly — never through the
    * wallet — counted once the seller pressed Received, and how many sales.
    * One figure for both was "showing in earnings but not added in wallet"
@@ -73,7 +79,7 @@ export type SellerSummary = {
 };
 
 export async function getSellerSummary(userId: string): Promise<SellerSummary> {
-  const [byStatus, toWallet, direct, watching] = await Promise.all([
+  const [byStatus, toWallet, direct, watching, fees] = await Promise.all([
     db.listing.groupBy({
       by: ["status"],
       where: { sellerId: userId },
@@ -102,6 +108,11 @@ export async function getSellerSummary(userId: string): Promise<SellerSummary> {
       where: { sellerId: userId, status: "LIVE" },
       _sum: { watching: true },
     }),
+    db.ledgerEntry.groupBy({
+      by: ["kind"],
+      where: { userId, orderId: { not: null }, kind: "SELLER_FEE" },
+      _sum: { amountUsd: true },
+    }),
   ]);
 
   const count = (status: string) =>
@@ -114,6 +125,8 @@ export async function getSellerSummary(userId: string): Promise<SellerSummary> {
     paidToWallet:
       toWallet.reduce((sum, row) => sum + (row._sum.amountUsd ?? 0), 0) / 100,
     walletSales: toWallet.length,
+    sellerFeesUsd:
+      -fees.reduce((sum, row) => sum + (row._sum.amountUsd ?? 0), 0) / 100,
     paidDirect: (direct._sum.priceUsd ?? 0) / 100,
     directSales: direct._count._all,
     watching: watching._sum.watching ?? 0,

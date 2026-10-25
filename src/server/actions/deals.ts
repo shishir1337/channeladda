@@ -3,12 +3,14 @@
 import { revalidatePath } from "next/cache";
 import type { DealMode } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
+import { MAX_DEAL_NOTE } from "@/lib/deal-endings";
 import { needsEmailVerification } from "@/lib/email-verification";
 import { parseHandoverTo } from "@/lib/handover-target";
 import { agentIdentity } from "@/server/admin-users";
 import * as repo from "@/server/deals";
 import { type PayToFailure, saveSellerPayTo } from "@/server/pay-to";
 import { requireRole, requireUser } from "@/server/session";
+import { payFromWallet, type WalletFailure } from "@/server/wallet";
 
 /**
  * Deals, from every side.
@@ -32,16 +34,19 @@ const MESSAGES: Record<repo.DealFailure, string> = {
   taken: "Someone else got there first — this listing is no longer available.",
   "wrong-actor": "This step is not yours to complete.",
   "wrong-step": "An earlier step is still open.",
+  "already-done": "This step is already done.",
+  "no-pay-to":
+    "The seller has not said where to pay them yet. We have asked them — press Paid once their details show on this deal.",
   terminal: "This deal is already closed.",
   "cap-reached":
-    "This agent is holding as many channels as they can. Assign another.",
+    "This agent is holding as many channels as one agent may. Give it to somebody else.",
   "needs-approval": "A second staff member has to approve this handover.",
   "not-paid": "The opening payment has not cleared yet.",
   disputed: "This deal is with Channel Adda while the dispute is open.",
   "needs-dispute":
     "One side says this already happened, so reversing it is a decision, not a correction. Pause it for review first — then it can be decided with both accounts of it on the record.",
   "on-hold":
-    "The waiting period is still running, so this step is not open yet. The chat shows when it ends, and we email you the moment it does.",
+    "The waiting period is still running, so this step is not open yet. The chat shows when it ends, and we tell you the moment it does.",
   "not-on-hold": "The waiting period on this deal has already ended.",
   "not-handed-over":
     "The seller has not handed the channel over yet, so paying them now would leave them with the money and the channel both. Refund the buyer instead.",
@@ -73,8 +78,49 @@ const MESSAGES: Record<repo.DealFailure, string> = {
     "What Channel Adda is holding for this deal does not match what the deal says was paid, so nothing has been moved. It is listed on the money desk for a developer to look at.",
 };
 
-function fail(reason: repo.DealFailure): DealResult {
-  return { ok: false, error: MESSAGES[reason] };
+/**
+ * Some refusals read differently to an agent taking a deal for themselves
+ * than to staff handing it to somebody: "Assign another" means nothing to
+ * the person who is the agent.
+ */
+const SELF_MESSAGES: Partial<Record<repo.DealFailure, string>> = {
+  "cap-reached":
+    "You are holding as many channels as one agent may. Finish or hand one on before you take another.",
+  "out-of-level": "This deal's price is outside your level.",
+};
+
+function fail(reason: repo.DealFailure, reader?: "self"): DealResult {
+  return {
+    ok: false,
+    error:
+      (reader === "self" ? SELF_MESSAGES[reason] : undefined) ??
+      MESSAGES[reason],
+  };
+}
+
+/**
+ * The public pages a deal's ending changes: a sold listing leaves the
+ * seller's page, the sellers list and the browse pages, and lands on the
+ * sold page. They are cached for a minute, and the seller's page still
+ * showed a sold listing as live right after the sale (QA, 2026-10-26).
+ */
+async function refreshPublicFor(orderId: string, onlyIfCompleted = false) {
+  const order = await db.order.findUnique({
+    where: { id: orderId },
+    select: {
+      status: true,
+      listing: { select: { slug: true } },
+      seller: { select: { slug: true } },
+    },
+  });
+  if (!order || (onlyIfCompleted && order.status !== "COMPLETED")) return;
+  revalidatePath(`/listing/${order.listing.slug}`);
+  if (order.seller.slug) revalidatePath(`/seller/${order.seller.slug}`);
+  revalidatePath("/sellers");
+  revalidatePath("/sold");
+  revalidatePath("/browse");
+  revalidatePath("/browse/[platform]", "page");
+  revalidatePath("/");
 }
 
 function refresh(orderId?: string) {
@@ -173,6 +219,8 @@ export async function completeStep(
   extra?: { proofUrl?: string; approvedById?: string },
 ): Promise<DealResult> {
   const user = await requireUser();
+  // The buyer's Paid waits for the seller's payment details.
+  if (await repo.payToMissing(orderId, position)) return fail("no-pay-to");
   const result = await repo.advanceStep({
     orderId,
     position,
@@ -183,6 +231,8 @@ export async function completeStep(
   if (!result.ok) return fail(result.reason);
 
   refresh(orderId);
+  // The last step sells the listing.
+  await refreshPublicFor(orderId, true);
   return { ok: true, message: "Done." };
 }
 
@@ -193,24 +243,33 @@ export async function completeStep(
  */
 export async function claimDeal(
   orderId: string,
-  agentEmail: string,
-  agentBrand: string,
+  /** Ignored: the stored transfer identity is used. Kept for old clients. */
+  _agentEmail?: string,
+  _agentBrand?: string,
 ): Promise<DealResult> {
   const user = await requireRole("AGENT", "MODERATOR");
-  // The agent's stored identity wins over whatever was typed. It used to be
-  // typed per deal, so one agent reached different sellers under different
-  // names — and a seller told to invite the wrong address as owner hands
-  // their channel to nobody.
+  // The agent's stored identity, and nothing else. It used to be typed per
+  // deal, so one agent reached different sellers under different names —
+  // and the desk prefilled a staff member's sign-in email when they had no
+  // identity, so a seller was told to invite demo-admin@… as owner (QA,
+  // 2026-10-26). A login email is never shown to a member.
   const stored = await agentIdentity(user.id);
+  if (!stored) {
+    return {
+      ok: false,
+      error:
+        "Set your transfer identity first — the account sellers hand deals to. It is under Your deal desk, on your Security page.",
+    };
+  }
   const result = await repo.assignAgent({
     orderId,
     agentId: user.id,
-    agentEmail: stored?.email ?? agentEmail,
-    agentBrand: stored?.brand ?? agentBrand,
+    agentEmail: stored.email,
+    agentBrand: stored.brand,
     byUserId: user.id,
   });
 
-  if (!result.ok) return fail(result.reason);
+  if (!result.ok) return fail(result.reason, "self");
 
   refresh(orderId);
   return { ok: true, message: "You are on this deal." };
@@ -220,16 +279,26 @@ export async function claimDeal(
 export async function assignDealAgent(
   orderId: string,
   agentId: string,
-  agentEmail: string,
-  agentBrand: string,
+  /** Ignored: the stored transfer identity is used. Kept for old clients. */
+  _agentEmail?: string,
+  _agentBrand?: string,
 ): Promise<DealResult> {
   const user = await requireRole("MODERATOR", "FINANCE");
+  // As for claiming: only a stored transfer identity, never a login email
+  // and never what was typed.
   const stored = await agentIdentity(agentId);
+  if (!stored) {
+    return {
+      ok: false,
+      error:
+        "This person has no transfer identity yet — the account sellers hand deals to. Set it on their Team page first.",
+    };
+  }
   const result = await repo.assignAgent({
     orderId,
     agentId,
-    agentEmail: stored?.email ?? agentEmail,
-    agentBrand: stored?.brand ?? agentBrand,
+    agentEmail: stored.email,
+    agentBrand: stored.brand,
     byUserId: user.id,
   });
 
@@ -321,6 +390,12 @@ export async function endDeal(
   if (!reason) {
     return { ok: false, error: "Say why — this goes in the audit trail." };
   }
+  if (reason.length > MAX_DEAL_NOTE) {
+    return {
+      ok: false,
+      error: `Keep it under ${MAX_DEAL_NOTE.toLocaleString("en-US")} characters.`,
+    };
+  }
 
   const result = await repo.resolveDeal({
     orderId,
@@ -332,7 +407,7 @@ export async function endDeal(
   if (!result.ok) return fail(result.reason);
 
   refresh(orderId);
-  revalidatePath("/browse");
+  await refreshPublicFor(orderId);
 
   const messages = {
     CANCELLED: "Deal cancelled.",
@@ -355,6 +430,57 @@ export async function endWaitNow(orderId: string): Promise<DealResult> {
   if (!result.ok) return fail(result.reason);
   refresh(orderId);
   return { ok: true, message: "The wait is over. The next step is open now." };
+}
+
+/** What a payment from the balance can be refused for, in plain words. */
+const BALANCE_MESSAGES: Partial<Record<WalletFailure, string>> = {
+  "not-found": "That deal is no longer available.",
+  "wrong-actor": "Only the buyer pays this.",
+  insufficient: "Your available balance does not cover this payment.",
+  held: "The seller has accepted another buyer's offer for this account. If they do not pay in time, it comes back on sale and you can pay.",
+  "being-paid":
+    "Another buyer is paying for this listing right now. If they have not paid within the hour, you can buy it.",
+};
+
+/**
+ * The buyer paying a deal from their Channel Adda balance.
+ *
+ * Here rather than beside the wallet's own actions so a deal that closed
+ * under the buyer's page says why: from a page loaded before another buyer
+ * paid, the answer was "This deal is not waiting on a payment" and the pay
+ * buttons stayed (QA, CA-75504, CA-27051).
+ */
+export async function payFromBalance(
+  orderId: string,
+): Promise<DealResult & { closed?: boolean }> {
+  const user = await requireUser();
+  const result = await payFromWallet(orderId, user.id);
+  refresh(orderId);
+  revalidatePath("/dashboard/wallet");
+  // A paid deal takes the listing off sale.
+  if (result.ok) await refreshPublicFor(orderId);
+  if (result.ok) {
+    return {
+      ok: true,
+      message: "Paid from your balance. The deal is under way.",
+    };
+  }
+  if (result.reason === "not-payable" || result.reason === "taken") {
+    const why = await repo.closedForPayment(orderId, user.id);
+    return {
+      ok: false,
+      closed: true,
+      error:
+        why ??
+        "This account is no longer for sale, so we closed this deal. You were not charged.",
+    };
+  }
+  return {
+    ok: false,
+    error:
+      BALANCE_MESSAGES[result.reason] ??
+      "That payment did not go through. Nothing has been charged.",
+  };
 }
 
 const PAY_TO_MESSAGES: Record<PayToFailure, string> = {
