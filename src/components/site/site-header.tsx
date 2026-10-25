@@ -9,6 +9,7 @@ import {
 } from "@/components/auth/account-menu";
 import { ChannelAddaLogo } from "@/components/icons/brand-icons";
 import { CurrencySwitcher } from "@/components/site/currency-switcher";
+import { useSiteMenu } from "@/components/site/site-menu";
 import { ThemeRow, ThemeToggle } from "@/components/site/theme-toggle";
 import { HeaderWallet } from "@/components/site/wallet-balance";
 import { Button } from "@/components/ui/button";
@@ -33,7 +34,8 @@ const navLinks = [
 
 export function SiteHeader() {
   const [scrolled, setScrolled] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
+  // Shared with "More" on the phone's tab bar, which opens this same menu.
+  const { open: menuOpen, setOpen: setMenuOpen, returnFocus } = useSiteMenu();
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8);
@@ -106,7 +108,7 @@ export function SiteHeader() {
                 <MenuIcon aria-hidden="true" className="size-5" />
               </button>
             </SheetTrigger>
-            <SheetContent>
+            <SheetContent onCloseAutoFocus={returnFocus}>
               <SheetTitle className="border-b border-line px-6 py-5 text-base font-semibold">
                 Menu
               </SheetTitle>

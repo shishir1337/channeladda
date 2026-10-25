@@ -21,7 +21,10 @@ const socials = [
 
 export function SiteFooter() {
   return (
-    <footer className="border-t border-line bg-bg-subtle">
+    // The last thing on every page, so it keeps the room for the phone's
+    // tab bar (60px and the home indicator) — and on a listing, whose buy
+    // bar sits on top of the tab bar, for that bar too.
+    <footer className="border-t border-line bg-bg-subtle max-lg:pb-[calc(3.75rem+env(safe-area-inset-bottom))] max-lg:[body:has([data-buy-bar])_&]:pb-[calc(8.25rem+env(safe-area-inset-bottom))]">
       <Container className="py-12 sm:py-16">
         <div className="grid gap-10 lg:grid-cols-[minmax(0,20rem)_1fr] lg:gap-16">
           <div>

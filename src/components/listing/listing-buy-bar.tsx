@@ -39,12 +39,18 @@ export function ListingBuyBar({
   }, [targetId]);
 
   return (
+    // Sits on top of the phone's tab bar (`@/components/app/dock`: 60px
+    // and the home indicator, which the tab bar clears), and tucks away
+    // under it. Beneath it in the stack, so the tab bar's edge is the line
+    // between them. `data-buy-bar` tells the footer to leave room for both.
     <div
+      data-buy-bar=""
       className={cn(
-        "fixed inset-x-0 bottom-0 z-30 border-t border-line bg-bg/90 backdrop-blur-xl transition-transform duration-300 ease-[var(--ease-out-soft)] lg:hidden",
-        visible ? "translate-y-0" : "translate-y-full",
+        "fixed inset-x-0 bottom-[calc(3.75rem+env(safe-area-inset-bottom))] z-20 border-t border-line bg-bg/90 backdrop-blur-xl transition-[translate,opacity] duration-300 ease-[var(--ease-out-soft)] lg:hidden",
+        visible
+          ? "translate-y-0 opacity-100"
+          : "pointer-events-none translate-y-full opacity-0",
       )}
-      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
       aria-hidden={!visible}
     >
       <div className="flex items-center gap-3 px-4 py-3">
