@@ -135,12 +135,15 @@ export default async function VerificationPage() {
               description="It tells buyers and sellers a real person is behind your account."
             />
             <CardBody>
-              <p className="flex flex-wrap items-center gap-2 text-sm font-semibold text-fg">
+              {/* Labelled as a preview: shown bare, it read as if they were
+                  verified already. */}
+              <p className="text-xs text-subtle">How your name will look</p>
+              <p className="mt-1.5 flex flex-wrap items-center gap-2 rounded-lg border border-dashed border-line-strong px-3 py-2.5 text-sm font-semibold text-fg">
                 {me.name}
                 <VerifiedBadge />
               </p>
               <ul className="mt-3 flex flex-col gap-1.5 text-[0.8125rem] leading-relaxed text-muted">
-                <li>Optional. You can buy and sell without it.</li>
+                <li>You can buy and sell without it.</li>
                 <li>Takes about five minutes on your phone.</li>
                 <li>
                   A person checks it, usually within {KYC_REVIEW_HOURS} hours.

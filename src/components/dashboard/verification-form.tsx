@@ -3,8 +3,10 @@
 import {
   CameraIcon,
   CheckIcon,
+  ChevronDownIcon,
   LockIcon,
   RotateCcwIcon,
+  UploadIcon,
   VideoIcon,
   XIcon,
 } from "lucide-react";
@@ -17,8 +19,12 @@ import {
   useState,
   useTransition,
 } from "react";
-import { hintClass, labelClass } from "@/components/app/kit";
+import { hintClass, inputClass, labelClass } from "@/components/app/kit";
 import { FormNotice, TextField } from "@/components/auth/fields";
+import {
+  CameraRecorder,
+  canRecord,
+} from "@/components/dashboard/camera-recorder";
 import { BusyLabel } from "@/components/messages/chat-parts";
 import { Button } from "@/components/ui/button";
 import { sendUpload } from "@/components/upload/image-upload";
@@ -59,6 +65,10 @@ const IMAGE_ACCEPT = IMAGE_TYPES.join(",");
 // Any video: the phone's own camera decides the format, and the server
 // checks the bytes either way (MP4, MOV or WebM).
 const VIDEO_ACCEPT = "video/*";
+
+/** What the on-page camera records: the 10 to 30 seconds the steps ask for. */
+const RECORD_MIN_SECONDS = 5;
+const RECORD_MAX_SECONDS = 30;
 
 /** How long a clip is, or null when the browser cannot tell. Never throws. */
 function readDuration(file: File): Promise<number | null> {
@@ -160,6 +170,11 @@ function FileField({
   const [sending, setSending] = useState(false);
   const [progress, setProgress] = useState(0);
   const [problem, setProblem] = useState<string | null>(null);
+  // The video is recorded on the page by default (the owner, 2026-10-26);
+  // a browser that cannot record offers the upload alone.
+  const [recording, setRecording] = useState(false);
+  const [camera, setCamera] = useState(false);
+  useEffect(() => setCamera(media === "video" && canRecord()), [media]);
 
   // The object URL lives as long as the field does.
   useEffect(
@@ -204,6 +219,26 @@ function FileField({
   const shown = problem ?? error;
   const Icon = media === "image" ? CameraIcon : VideoIcon;
 
+  if (recording) {
+    return (
+      <div>
+        <p className={labelClass}>
+          {label}
+          <span className="ml-0.5 text-danger">*</span>
+        </p>
+        <CameraRecorder
+          minSeconds={RECORD_MIN_SECONDS}
+          maxSeconds={RECORD_MAX_SECONDS}
+          onRecorded={(file) => {
+            setRecording(false);
+            void choose(file);
+          }}
+          onCancel={() => setRecording(false)}
+        />
+      </div>
+    );
+  }
+
   return (
     <div>
       <p className={labelClass}>
@@ -244,14 +279,33 @@ function FileField({
             <span className="truncate">Added</span>
           </p>
           <div className="flex flex-wrap gap-2">
+            {camera ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                onClick={() => setRecording(true)}
+              >
+                <RotateCcwIcon aria-hidden="true" />
+                Record again
+              </Button>
+            ) : null}
             <Button
               type="button"
               size="sm"
-              variant="secondary"
+              variant={camera ? "ghost" : "secondary"}
               onClick={() => inputRef.current?.click()}
             >
-              <RotateCcwIcon aria-hidden="true" />
-              {media === "image" ? "Use another photo" : "Use another video"}
+              {camera ? (
+                <UploadIcon aria-hidden="true" />
+              ) : (
+                <RotateCcwIcon aria-hidden="true" />
+              )}
+              {media === "image"
+                ? "Use another photo"
+                : camera
+                  ? "Upload one instead"
+                  : "Use another video"}
             </Button>
             {optional ? (
               <Button type="button" size="sm" variant="ghost" onClick={clear}>
@@ -260,6 +314,45 @@ function FileField({
               </Button>
             ) : null}
           </div>
+        </div>
+      ) : camera && !sending ? (
+        <div
+          className={cn(
+            "mt-2 flex flex-col items-center gap-3 rounded-lg border border-dashed border-line-strong bg-surface px-4 py-5 text-center dark:bg-surface-2/40",
+            shown && "border-danger",
+          )}
+        >
+          <span className="flex size-10 items-center justify-center rounded-lg border border-line bg-surface text-muted shadow-xs dark:bg-surface-2">
+            <VideoIcon aria-hidden="true" className="size-4.5" />
+          </span>
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+            <Button
+              type="button"
+              size="md"
+              className="w-full sm:w-auto"
+              onClick={() => {
+                setProblem(null);
+                setRecording(true);
+              }}
+            >
+              <CameraIcon aria-hidden="true" />
+              Record with camera
+            </Button>
+            <Button
+              type="button"
+              size="md"
+              variant="secondary"
+              className="w-full sm:w-auto"
+              onClick={() => inputRef.current?.click()}
+            >
+              <UploadIcon aria-hidden="true" />
+              Upload a video
+            </Button>
+          </div>
+          <span className="text-xs text-subtle">
+            {RECORD_MAX_SECONDS} seconds at most · or MP4, MOV or WebM up to{" "}
+            {KYC_VIDEO_MAX_MB}MB
+          </span>
         </div>
       ) : (
         <label
@@ -429,66 +522,60 @@ export function VerificationForm({
       className="flex flex-col gap-5"
     >
       <Step n={1} title="Your ID">
-        <fieldset
-          aria-describedby={
-            errors.documentType ? `${groupId}-error` : undefined
-          }
-        >
-          <legend className={labelClass}>
+        <div>
+          <label htmlFor={groupId} className={labelClass}>
             Which ID are you sending?
             <span className="ml-0.5 text-danger">*</span>
-          </legend>
-          <div className="mt-2 grid grid-cols-2 gap-2.5">
-            {KYC_DOCUMENTS.map((option) => {
-              const selected = option.id === documentType;
-              return (
-                <label
-                  key={option.id}
-                  className={cn(
-                    "relative flex min-h-14 cursor-pointer items-start gap-2.5 rounded-lg border p-3 transition-[border-color,background-color] duration-150 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-primary/40",
-                    selected
-                      ? "border-primary bg-primary-soft"
-                      : "border-line bg-surface hover:border-line-strong dark:bg-surface-2",
-                  )}
-                >
-                  <input
-                    type="radio"
-                    name={groupId}
-                    value={option.id}
-                    checked={selected}
-                    onChange={() => {
-                      setDocumentType(option.id);
-                      setErrors(({ documentType: _, ...rest }) => rest);
-                      // A PAN card or a passport has no back to send.
-                      if (!option.back) setBack(null);
-                    }}
-                    className="sr-only"
-                  />
-                  <span
-                    aria-hidden="true"
-                    className={cn(
-                      "mt-0.5 inline-flex size-4.5 shrink-0 items-center justify-center rounded-full border",
-                      selected
-                        ? "border-primary bg-primary text-primary-fg"
-                        : "border-line-strong",
-                    )}
-                  >
-                    {selected ? <CheckIcon className="size-3" /> : null}
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block text-sm leading-5 font-medium text-fg">
-                      {option.label}
-                    </span>
-                    {option.hint ? (
-                      <span className="mt-0.5 block text-xs leading-snug text-muted">
-                        {option.hint}
-                      </span>
-                    ) : null}
-                  </span>
-                </label>
-              );
-            })}
+          </label>
+          <div className="relative mt-1.5">
+            <select
+              id={groupId}
+              name="documentType"
+              value={documentType}
+              aria-invalid={errors.documentType ? true : undefined}
+              aria-describedby={
+                [
+                  doc ? `${groupId}-hint` : null,
+                  errors.documentType ? `${groupId}-error` : null,
+                ]
+                  .filter(Boolean)
+                  .join(" ") || undefined
+              }
+              onChange={(event) => {
+                const option = documentOption(event.target.value);
+                setDocumentType((option?.id ?? "") as KycDocumentId | "");
+                setErrors(({ documentType: _, ...rest }) => rest);
+                // A PAN card or a passport has no back to send.
+                if (!option?.back) setBack(null);
+              }}
+              className={cn(
+                inputClass,
+                "cursor-pointer appearance-none pr-10",
+                !documentType && "text-subtle",
+              )}
+            >
+              <option value="" disabled>
+                Choose your ID
+              </option>
+              {KYC_DOCUMENTS.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <ChevronDownIcon
+              aria-hidden="true"
+              className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-muted"
+            />
           </div>
+          {doc ? (
+            <p id={`${groupId}-hint`} className={hintClass}>
+              {doc.hint ? `${doc.hint}. ` : ""}
+              {doc.back
+                ? "You send the front, and the back if it has details on it."
+                : `You send the ${doc.front.toLowerCase()} only.`}
+            </p>
+          ) : null}
           {errors.documentType ? (
             <p
               id={`${groupId}-error`}
@@ -498,7 +585,7 @@ export function VerificationForm({
               {errors.documentType}
             </p>
           ) : null}
-        </fieldset>
+        </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
           <TextField
@@ -564,7 +651,9 @@ export function VerificationForm({
 
       <Step n={3} title="Selfie video">
         <div className="text-[0.8125rem] leading-relaxed text-muted">
-          <p>Record a short video of yourself, 10 to 30 seconds:</p>
+          <p>
+            Record a short video of yourself with your camera, 10 to 30 seconds:
+          </p>
           <ol className="mt-1.5 list-decimal space-y-1 pl-5 marker:text-subtle">
             <li>
               Hold the same ID next to your face, photo side to the camera.

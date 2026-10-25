@@ -15,11 +15,12 @@ const securityHeaders = [
   // handover" button is the obvious attack.
   { key: "X-Frame-Options", value: "DENY" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-  // No page here needs any of these, and a compromised dependency asking for
-  // the camera should fail rather than prompt.
+  // The site's own pages may ask for the camera and microphone — the ID
+  // check records its selfie video on the page — and nothing framed in them
+  // may. Location and payment stay off.
   {
     key: "Permissions-Policy",
-    value: "camera=(), microphone=(), geolocation=(), payment=()",
+    value: "camera=(self), microphone=(self), geolocation=(), payment=()",
   },
   { key: "X-DNS-Prefetch-Control", value: "on" },
 ];
