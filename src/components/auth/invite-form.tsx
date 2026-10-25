@@ -133,7 +133,6 @@ export function AcceptInviteForm({
           hint={`At least ${minPassword} characters, and not one you use anywhere else.`}
           value={password}
           onChange={(event) => setPassword(event.target.value)}
-          placeholder="••••••••••••"
           autoComplete="new-password"
           error={fieldErrors.password}
           required
@@ -144,7 +143,6 @@ export function AcceptInviteForm({
           label="Confirm your password"
           value={confirm}
           onChange={(event) => setConfirm(event.target.value)}
-          placeholder="••••••••••••"
           autoComplete="new-password"
           error={fieldErrors.confirm}
           required

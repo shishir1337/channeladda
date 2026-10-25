@@ -8,6 +8,7 @@ import { IconTile } from "@/components/app/kit";
 import { FormNotice, PasswordField, TextField } from "@/components/auth/fields";
 import { Button } from "@/components/ui/button";
 import { authClient, signIn, signUp } from "@/lib/auth-client";
+import { authErrorMessage } from "@/lib/auth-messages";
 import { emailVerificationRequired } from "@/lib/email-verification";
 import { safeNext } from "@/lib/safe-next";
 
@@ -17,34 +18,6 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD = 10;
 
 type Errors = Record<string, string>;
-
-/**
- * Turns a Better Auth failure into something worth reading.
- *
- * Sign-in deliberately never distinguishes "no such account" from "wrong
- * password" — that difference is how an attacker learns which addresses are
- * registered.
- */
-function messageFor(code: string | undefined, fallback: string) {
-  switch (code) {
-    case "INVALID_EMAIL_OR_PASSWORD":
-    case "INVALID_PASSWORD":
-    case "USER_NOT_FOUND":
-      return "That email and password do not match an account.";
-    case "USER_ALREADY_EXISTS":
-    case "USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL":
-      return "An account already exists for that email. Try signing in instead.";
-    case "PASSWORD_TOO_SHORT":
-      return `Use at least ${MIN_PASSWORD} characters.`;
-    case "EMAIL_NOT_VERIFIED":
-      return "Confirm your email address before signing in, with the code we emailed you.";
-    case "INVALID_TOKEN":
-    case "TOKEN_EXPIRED":
-      return "That link has expired. Request a new one and try again.";
-    default:
-      return fallback;
-  }
-}
 
 export function SignInForm({ next }: { next?: string }) {
   const emailId = useId();
@@ -75,7 +48,7 @@ export function SignInForm({ next }: { next?: string }) {
         const { error } = await signIn.email({ email, password });
         if (error) {
           setErrors({
-            form: messageFor(error.code, "Could not sign you in. Try again."),
+            form: authErrorMessage(error, "Could not sign you in. Try again."),
           });
           setPending(false);
           return;
@@ -109,7 +82,6 @@ export function SignInForm({ next }: { next?: string }) {
           name="password"
           label="Password"
           autoComplete="current-password"
-          placeholder="••••••••"
           error={errors.password}
           required
           aside={
@@ -174,8 +146,8 @@ export function SignUpForm({ next }: { next?: string }) {
         const { error } = await signUp.email({ name, email, password });
         if (error) {
           setErrors({
-            form: messageFor(
-              error.code,
+            form: authErrorMessage(
+              error,
               "Could not create the account. Try again.",
             ),
           });
@@ -220,7 +192,6 @@ export function SignUpForm({ next }: { next?: string }) {
           label="Password"
           hint={`At least ${MIN_PASSWORD} characters. Two-factor can be added later in settings.`}
           autoComplete="new-password"
-          placeholder="••••••••"
           error={errors.password}
           required
         />
@@ -423,8 +394,8 @@ export function ResetPasswordForm({ token }: { token?: string }) {
         });
         if (error) {
           setErrors({
-            form: messageFor(
-              error.code,
+            form: authErrorMessage(
+              error,
               "Could not update the password. Try again.",
             ),
           });
@@ -442,7 +413,6 @@ export function ResetPasswordForm({ token }: { token?: string }) {
           label="New password"
           hint={`At least ${MIN_PASSWORD} characters.`}
           autoComplete="new-password"
-          placeholder="••••••••"
           error={errors.password}
           required
         />
@@ -451,7 +421,6 @@ export function ResetPasswordForm({ token }: { token?: string }) {
           name="confirm"
           label="Confirm new password"
           autoComplete="new-password"
-          placeholder="••••••••"
           error={errors.confirm}
           required
         />
