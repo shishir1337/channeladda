@@ -25,7 +25,9 @@ import { useViewerZone } from "@/components/app/time-zone";
 import { TextField } from "@/components/auth/fields";
 import { Button } from "@/components/ui/button";
 import { checkPayoutAddress, PAYOUT_NETWORKS } from "@/lib/payout-address";
+import { supportHref } from "@/lib/support";
 import { dayAndTime } from "@/lib/time";
+import { parseAmount, UNREADABLE } from "@/lib/typed-number";
 import { cn } from "@/lib/utils";
 import {
   requestPayout,
@@ -224,9 +226,33 @@ function BusyLabel({
 
 const PRESETS = [50, 250, 1_000];
 
-export function TopUp() {
+/**
+ * The support form, asking for funds by hand, with the amount when it can be
+ * read. The same message the server sends when a top-up is refused.
+ */
+function askForFundsHref(dollars: number) {
+  const text = Number.isFinite(dollars)
+    ? `Add funds: $${dollars.toLocaleString("en-US")} to my balance, please.`
+    : "Add funds to my balance, please.";
+  return `${supportHref("Payments or withdrawals")}&message=${encodeURIComponent(text)}`;
+}
+
+export function TopUp({
+  cryptoOn,
+}: {
+  /**
+   * Whether paying in crypto is switched on. Off, the panel says so before
+   * anything is pressed: it used to promise "Nothing is charged until you
+   * confirm the payment on the next page" and only say top-ups were off
+   * once the button had been pressed.
+   */
+  cryptoOn: boolean;
+}) {
   const id = useId();
   const [amount, setAmount] = useState("250");
+  // "$250" and "1,000" are amounts too: `Number()` read them as nothing and
+  // the server answered "Enter an amount."
+  const dollars = parseAmount(amount);
   const [error, setError] = useState<{
     text: string;
     help?: { href: string; label: string };
@@ -247,7 +273,7 @@ export function TopUp() {
             type="button"
             size="sm"
             variant="secondary"
-            aria-pressed={Number(amount) === preset}
+            aria-pressed={dollars === preset}
             disabled={pending}
             onClick={() => setAmount(String(preset))}
             // Picked reads as a pressed key, not as a second gold button
@@ -271,33 +297,55 @@ export function TopUp() {
         required
       />
 
+      {cryptoOn ? null : (
+        <Note icon={LockIcon} className="mt-4">
+          Paying in crypto here is not switched on yet. Ask our team instead —
+          say how much, and they reply with how to pay and add it for you.
+        </Note>
+      )}
+
       <div className="mt-auto pt-5">
-        <Button
-          type="button"
-          size="md"
-          className="w-full sm:w-auto"
-          disabled={pending || !amount.trim()}
-          onClick={() => {
-            setError(null);
-            startTransition(async () => {
-              const result = await startTopUp(Number(amount));
-              if (!result.ok) {
-                setError({ text: result.error, help: result.help });
+        {cryptoOn ? (
+          <Button
+            type="button"
+            size="md"
+            className="w-full sm:w-auto"
+            disabled={pending || !amount.trim()}
+            onClick={() => {
+              setError(null);
+              if (Number.isNaN(dollars)) {
+                setError({ text: UNREADABLE.amount });
                 return;
               }
-              if (result.url) window.location.href = result.url;
-            });
-          }}
-        >
-          <BusyLabel
-            pending={pending}
-            idle="Add funds"
-            busy="Opening the payment page…"
-          />
-        </Button>
-        <p className="mt-2 text-xs leading-relaxed text-subtle">
-          Nothing is charged until you confirm the payment on the next page.
-        </p>
+              startTransition(async () => {
+                const result = await startTopUp(dollars);
+                if (!result.ok) {
+                  setError({ text: result.error, help: result.help });
+                  return;
+                }
+                if (result.url) window.location.href = result.url;
+              });
+            }}
+          >
+            <BusyLabel
+              pending={pending}
+              idle="Add funds"
+              busy="Opening the payment page…"
+            />
+          </Button>
+        ) : (
+          <Button asChild size="md" className="w-full sm:w-auto">
+            <Link href={askForFundsHref(dollars)}>
+              Ask to add funds
+              <ArrowRightIcon aria-hidden="true" />
+            </Link>
+          </Button>
+        )}
+        {cryptoOn ? (
+          <p className="mt-2 text-xs leading-relaxed text-subtle">
+            Nothing is charged until you confirm the payment on the next page.
+          </p>
+        ) : null}
         <Notice message={error?.text ?? null} help={error?.help} bad />
       </div>
     </Panel>
@@ -627,14 +675,22 @@ export function RequestPayout({
                 setMessage(null);
                 // The floor is known here, so it is said here, with the
                 // figure — not as "below the smallest we can send".
-                const cents = Math.round(Number(amount) * 100);
-                if (Number.isFinite(cents) && cents > 0 && cents < minimumUsd) {
+                // "$20" and "1,000" are amounts too: `Number()` read them as
+                // nothing and the server answered "Enter an amount."
+                const dollars = parseAmount(amount);
+                if (Number.isNaN(dollars)) {
+                  setBad(true);
+                  setMessage(UNREADABLE.amount);
+                  return;
+                }
+                const cents = Math.round(dollars * 100);
+                if (cents > 0 && cents < minimumUsd) {
                   setBad(true);
                   setMessage(`The smallest withdrawal is ${minLabel}.`);
                   return;
                 }
                 startTransition(async () => {
-                  const result = await requestPayout(Number(amount));
+                  const result = await requestPayout(dollars);
                   setBad(!result.ok);
                   setMessage(result.ok ? result.message : result.error);
                   if (result.ok) {

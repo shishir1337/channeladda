@@ -1,6 +1,12 @@
 import { z } from "zod";
 import { stripBidi } from "@/lib/bidi";
 import { CONTACT_REFUSED, hasContactDetails } from "@/lib/contact-details";
+import {
+  parseAmount,
+  parseCount,
+  parsePercent,
+  UNREADABLE,
+} from "@/lib/typed-number";
 
 /**
  * What a seller may set on a listing.
@@ -30,6 +36,94 @@ const dollars = (max: number) =>
     .min(0, "That cannot be negative.")
     .max(max, `That is above the ${max.toLocaleString()} limit.`)
     .refine((n) => Number.isFinite(n), "Enter a number.");
+
+/**
+ * A number field as the form sends it: the text the seller typed, read the
+ * way people write numbers — "30,500", "$1,250", "4.5%" (`@/lib/typed-number`).
+ * A number is taken as it is.
+ *
+ * Blank is NaN, which is "not filled in yet": a draft allows it and sending
+ * refuses it with the field's own message. Text that cannot be read is
+ * refused here, saying what to type. It used to become NaN as well — the
+ * form ran it through `Number()` — so a draft saved "30,500" followers and
+ * a "1,250" price as 0, and a live listing answered "1,250" with "Enter an
+ * amount.", as if nothing had been typed.
+ */
+function typed<T extends z.ZodType>(
+  parse: (raw: string) => number,
+  unreadable: string,
+  schema: T,
+) {
+  return z.preprocess((value: number | string, ctx) => {
+    if (typeof value !== "string") return value;
+    if (value.trim() === "") return Number.NaN;
+    const n = parse(value);
+    if (Number.isNaN(n)) {
+      ctx.addIssue({ code: "custom", message: unreadable, input: value });
+    }
+    return n;
+  }, schema);
+}
+
+const asCount = <T extends z.ZodType>(schema: T) =>
+  typed(parseCount, UNREADABLE.count, schema);
+const asYears = <T extends z.ZodType>(schema: T) =>
+  typed(parseCount, UNREADABLE.years, schema);
+const asPercent = <T extends z.ZodType>(schema: T) =>
+  typed(parsePercent, UNREADABLE.percent, schema);
+const asAmount = <T extends z.ZodType>(schema: T) =>
+  typed(parseAmount, UNREADABLE.amount, schema);
+
+/**
+ * Blank (NaN), or the figure. Not `z.union([z.nan(), figure])`: a fraction
+ * fails both branches on its type, and a union then answers "Invalid input"
+ * instead of the figure's own "Whole numbers only."
+ */
+function blankOr(figure: z.ZodType<number>) {
+  return z
+    .custom<number>((value) => typeof value === "number", "Enter a number.")
+    .superRefine((value, ctx) => {
+      if (Number.isNaN(value)) return;
+      const read = figure.safeParse(value);
+      if (read.success) return;
+      for (const issue of read.error.issues) {
+        ctx.addIssue({ code: "custom", message: issue.message });
+      }
+    });
+}
+
+/** The figures, once read: what each must be. */
+const FIGURE = {
+  audience: z
+    .number({ message: "Enter the audience size." })
+    .int("Whole numbers only.")
+    .min(1, "That cannot be zero.")
+    .max(5_000_000_000, "That is not a real audience size."),
+
+  /** Dollars per month. Zero is normal and not an error. */
+  monthlyRevenue: dollars(10_000_000),
+  /** Asked for separately rather than taken as twelve times the month: this
+   *  trade is seasonal and 12x a good month is a number nobody believes. */
+  yearlyRevenue: dollars(100_000_000),
+
+  /** A percentage, e.g. 7.4. Stored as 74. */
+  engagement: z
+    .number({ message: "Enter an engagement rate." })
+    .min(0, "That cannot be negative.")
+    .max(100, "Engagement cannot be above 100%."),
+
+  ageYears: z
+    .number({ message: "How old is the account?" })
+    .int("Whole years only.")
+    .min(0, "That cannot be negative.")
+    .max(40, "That is older than the platform."),
+
+  /** Dollars. */
+  price: dollars(50_000_000).refine(
+    (n) => n >= 1,
+    "Set a price of at least $1.",
+  ),
+};
 
 const listingFields = z.object({
   platform: z.enum(PLATFORM_IDS, { message: "Choose a platform." }),
@@ -72,37 +166,13 @@ const listingFields = z.object({
     .min(2, "Where is most of the audience?")
     .max(60, "Too long."),
 
-  audience: z
-    .number({ message: "Enter the audience size." })
-    .int("Whole numbers only.")
-    .min(1, "That cannot be zero.")
-    .max(5_000_000_000, "That is not a real audience size."),
-
+  audience: asCount(FIGURE.audience),
   monetized: z.boolean(),
-
-  /** Dollars per month. Zero is normal and not an error. */
-  monthlyRevenue: dollars(10_000_000),
-  /** Asked for separately rather than taken as twelve times the month: this
-   *  trade is seasonal and 12x a good month is a number nobody believes. */
-  yearlyRevenue: dollars(100_000_000),
-
-  /** A percentage, e.g. 7.4. Stored as 74. */
-  engagement: z
-    .number({ message: "Enter an engagement rate." })
-    .min(0, "That cannot be negative.")
-    .max(100, "Engagement cannot be above 100%."),
-
-  ageYears: z
-    .number({ message: "How old is the account?" })
-    .int("Whole years only.")
-    .min(0, "That cannot be negative.")
-    .max(40, "That is older than the platform."),
-
-  /** Dollars. */
-  price: dollars(50_000_000).refine(
-    (n) => n >= 1,
-    "Set a price of at least $1.",
-  ),
+  monthlyRevenue: asAmount(FIGURE.monthlyRevenue),
+  yearlyRevenue: asAmount(FIGURE.yearlyRevenue),
+  engagement: asPercent(FIGURE.engagement),
+  ageYears: asYears(FIGURE.ageYears),
+  price: asAmount(FIGURE.price),
 
   // Not required here. A draft is allowed to be half-finished, and these
   // two are the slowest fields to fill: the seller has to go and take a
@@ -213,7 +283,7 @@ const submitFields = listingFields.extend({
   // Blank (NaN from the form) is allowed here and refused below for every
   // platform but a website, which has visits rather than a feed to engage
   // with: Website sellers could not send a listing without inventing one.
-  engagement: z.union([z.nan(), listingFields.shape.engagement]),
+  engagement: asPercent(blankOr(FIGURE.engagement)),
   coverUrl: z.string().min(1, "Add a cover image."),
   avatarUrl: z.string().min(1, "Add a profile picture."),
   proofs: listingFields.shape.proofs.unwrap().min(1, {
@@ -313,25 +383,22 @@ export type ListingLiveEdit = z.output<typeof listingLiveEditSchema>;
  * dollar — so a seller who typed a handle and went to find their analytics
  * came back to a form that refused to save and told them off.
  *
- * `NaN` is what the form sends for an empty number field, and empty string
- * for an empty text one. Both mean “not filled in yet” here.
+ * A blank number field reads as `NaN` (see `typed`), and an empty text one
+ * is an empty string. Both mean “not filled in yet” here.
  */
 const blankText = z.literal("");
-const blankNumber = z.custom<number>(
-  (v) => typeof v === "number" && Number.isNaN(v),
-);
 
 export const listingDraftSchema = listingFields
   .extend({
     title: z.union([blankText, listingFields.shape.title]),
     niche: z.union([blankText, listingFields.shape.niche]),
     country: z.union([blankText, listingFields.shape.country]),
-    audience: z.union([blankNumber, listingFields.shape.audience]),
-    engagement: z.union([blankNumber, listingFields.shape.engagement]),
-    ageYears: z.union([blankNumber, listingFields.shape.ageYears]),
-    price: z.union([blankNumber, listingFields.shape.price]),
-    monthlyRevenue: z.union([blankNumber, listingFields.shape.monthlyRevenue]),
-    yearlyRevenue: z.union([blankNumber, listingFields.shape.yearlyRevenue]),
+    audience: asCount(blankOr(FIGURE.audience)),
+    engagement: asPercent(blankOr(FIGURE.engagement)),
+    ageYears: asYears(blankOr(FIGURE.ageYears)),
+    price: asAmount(blankOr(FIGURE.price)),
+    monthlyRevenue: asAmount(blankOr(FIGURE.monthlyRevenue)),
+    yearlyRevenue: asAmount(blankOr(FIGURE.yearlyRevenue)),
     coverUrl: z.string().default(""),
     avatarUrl: z.string().default(""),
   })

@@ -73,16 +73,7 @@ export function amountProblem(input: {
 }
 
 /**
- * An amount as people type it: "2,100", "$150", " 1 250.00 ".
- *
- * `Number("2,100")` is NaN, so the button stayed greyed out with no reason
- * given. Separators, a dollar sign and spaces are dropped; anything else
- * that is not a plain positive number is NaN.
+ * An amount as people type it: "2,100", "$150", " 1 250.00 ". One reader
+ * for every number field on the site, in `@/lib/typed-number`.
  */
-export function parseAmount(raw: string): number {
-  const cleaned = raw.replace(/[\s,$]/g, "");
-  if (!/^\d+(\.\d+)?$/.test(cleaned) && !/^\.\d+$/.test(cleaned)) {
-    return Number.NaN;
-  }
-  return Number(cleaned);
-}
+export { parseAmount } from "@/lib/typed-number";

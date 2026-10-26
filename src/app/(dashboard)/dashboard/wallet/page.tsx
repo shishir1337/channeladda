@@ -38,6 +38,7 @@ import type { LedgerKind } from "@/generated/prisma/enums";
 import { shortDate } from "@/lib/time";
 import { cn } from "@/lib/utils";
 import { walletDetail } from "@/lib/wallet-lines";
+import { isConfigured as cryptoOn } from "@/server/cryptomus";
 import { ratingFor } from "@/server/reseller-status";
 import { requireUser } from "@/server/session";
 import { getSettings } from "@/server/settings";
@@ -347,7 +348,7 @@ export default async function WalletPage({
       {/* ---- putting money in, taking it out ----------------------------- */}
       <Section>
         <div className="grid gap-4 lg:grid-cols-2">
-          <TopUp />
+          <TopUp cryptoOn={cryptoOn()} />
           <RequestPayout
             availableUsd={wallet.availableUsd}
             hasAddress={wallet.payoutAddress !== null}

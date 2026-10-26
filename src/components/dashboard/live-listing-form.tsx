@@ -15,12 +15,14 @@ import type { ReactNode } from "react";
 import { useEffect, useId, useRef, useState, useTransition } from "react";
 import { Card, CardBody, CardHeader, labelClass } from "@/components/app/kit";
 import { FormNotice, TextArea, TextField } from "@/components/auth/fields";
+import { handoverExample } from "@/components/dashboard/listing-form";
 import { Button } from "@/components/ui/button";
 import { ImageUpload } from "@/components/upload/image-upload";
 import { type FeeSettings, quote } from "@/lib/fees";
 import type { ListingLiveEditInput } from "@/lib/listing-form";
 import { VERIFIED_FACTS_CHECKED } from "@/lib/listing-lock";
 import { supportHref } from "@/lib/support";
+import { parseAmount } from "@/lib/typed-number";
 import { saveLiveListing } from "@/server/actions/listings";
 
 /** The form's own copy of the fields, as typed: numbers stay strings. */
@@ -51,13 +53,6 @@ function whole(value: string) {
 /** A figure in a locked field: digits that line up. */
 function Figure({ children }: { children: ReactNode }) {
   return <span className="tabular-nums">{children}</span>;
-}
-
-/** "" and a stray "12abc" both have to become something zod will reject. */
-function num(value: string) {
-  if (value.trim() === "") return Number.NaN;
-  const n = Number(value);
-  return Number.isFinite(n) ? n : Number.NaN;
 }
 
 function money(value: number) {
@@ -126,6 +121,8 @@ export function LiveListingForm({
   /** Which account this is. Shown, never sent. */
   account: {
     platform: string;
+    /** "instagram": which platform's examples the hints give. */
+    platformId: string;
     handle: string;
     link: string | null;
     metricLabel: string;
@@ -156,7 +153,10 @@ export function LiveListingForm({
     value: LiveListingValues[K],
   ) => setValues((current) => ({ ...current, [key]: value }));
 
-  const price = num(values.price);
+  // For the payout line only: the price goes to the server as typed, and it
+  // reads "1,250" and "$1250" too (`@/lib/typed-number`).
+  const price = parseAmount(values.price);
+  const handover = handoverExample(account.platformId);
   const payout =
     Number.isFinite(price) && price > 0
       ? quote(price, fees, "FASTEST").payout
@@ -183,7 +183,7 @@ export function LiveListingForm({
       niche: values.niche,
       country: values.country,
       description: values.description,
-      price,
+      price: values.price,
       coverUrl: values.coverUrl ?? "",
       avatarUrl: values.avatarUrl ?? "",
       transferProfile: values.transferProfile,
@@ -436,7 +436,8 @@ export function LiveListingForm({
             id={ids.transferProfile}
             name="transferProfile"
             label="Anything specific about this account (optional)"
-            hint="For example: sits on a Brand Account, or the domain is at Cloudflare."
+            hint={handover.hint}
+            placeholder={handover.placeholder}
             value={values.transferProfile}
             onChange={(e) => set("transferProfile", e.target.value)}
             error={errors.transferProfile}

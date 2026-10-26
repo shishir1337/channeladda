@@ -26,6 +26,7 @@ import {
 import { FormNotice } from "@/components/auth/fields";
 import { Button } from "@/components/ui/button";
 import { formatRate, quote } from "@/lib/fees";
+import { parseAmount, parseCount, parsePercent } from "@/lib/typed-number";
 import { cn } from "@/lib/utils";
 import { saveSettings } from "@/server/actions/settings";
 
@@ -39,9 +40,14 @@ function usd(value: number) {
   });
 }
 
-/** A percentage typed by a person -> basis points. "2.75" -> 275. */
+/**
+ * A percentage typed by a person -> basis points. "2.75" -> 275, and "2.75%"
+ * too. Every figure here is read as typed (`@/lib/typed-number`): through
+ * `Number()`, "1,000" was nothing and a blank field was 0 — and 0 means
+ * something in "Second approval above".
+ */
 function toBp(value: string) {
-  const n = Number(value);
+  const n = parsePercent(value);
   if (!Number.isFinite(n)) return Number.NaN;
   return Math.round(n * 100);
 }
@@ -285,35 +291,38 @@ export function SettingsForm({
       label: "Channels one agent may hold",
       from: String(current.maxHoldsPerAgent),
       to: holds,
-      changed: Number(holds) !== current.maxHoldsPerAgent,
+      changed: parseCount(holds) !== current.maxHoldsPerAgent,
     },
     {
       label: "Second approval above",
       from: usd(current.secondApprovalAboveUsd / 100),
-      to: usd(Number(approval) || 0),
+      to: usd(parseAmount(approval) || 0),
       changed:
-        Math.round(Number(approval) * 100) !== current.secondApprovalAboveUsd,
+        Math.round(parseAmount(approval) * 100) !==
+        current.secondApprovalAboveUsd,
     },
     {
       label: "Offers expire after",
       from: `${current.offerExpiryHours}h`,
       to: `${offerHours}h`,
-      changed: Number(offerHours) !== current.offerExpiryHours,
+      changed: parseCount(offerHours) !== current.offerExpiryHours,
     },
     {
       label: "Smallest withdrawal",
       from: usd(current.minWithdrawalUsd / 100),
-      to: usd(Number(minWithdrawal) || 0),
+      to: usd(parseAmount(minWithdrawal) || 0),
       changed:
-        Math.round(Number(minWithdrawal) * 100) !== current.minWithdrawalUsd ||
-        Number(paymentWindow) !== current.paymentWindowHours,
+        Math.round(parseAmount(minWithdrawal) * 100) !==
+          current.minWithdrawalUsd ||
+        parseCount(paymentWindow) !== current.paymentWindowHours,
     },
     {
       label: "Reseller badge, 30 days",
       from: usd(current.resellerPriceUsd / 100),
-      to: usd(Number(resellerPrice) || 0),
+      to: usd(parseAmount(resellerPrice) || 0),
       changed:
-        Math.round(Number(resellerPrice) * 100) !== current.resellerPriceUsd,
+        Math.round(parseAmount(resellerPrice) * 100) !==
+        current.resellerPriceUsd,
     },
     {
       label: "Reseller fee discount",
@@ -325,7 +334,8 @@ export function SettingsForm({
       label: "Reseller points multiplier",
       from: `${current.resellerPointsMultiplier}x`,
       to: `${resellerMultiplier}x`,
-      changed: Number(resellerMultiplier) !== current.resellerPointsMultiplier,
+      changed:
+        parseCount(resellerMultiplier) !== current.resellerPointsMultiplier,
     },
     {
       label: "Google review link",
@@ -351,14 +361,14 @@ export function SettingsForm({
             buyerFeeBpSafest: toBp(safest),
             buyerFeeBpFastest: toBp(fastest),
             sellerFeeBp: toBp(seller),
-            maxHoldsPerAgent: Number(holds),
-            secondApprovalAbove: Number(approval),
-            offerExpiryHours: Number(offerHours),
-            minWithdrawal: Number(minWithdrawal),
-            paymentWindowHours: Number(paymentWindow),
-            resellerPrice: Number(resellerPrice),
+            maxHoldsPerAgent: parseCount(holds),
+            secondApprovalAbove: parseAmount(approval),
+            offerExpiryHours: parseCount(offerHours),
+            minWithdrawal: parseAmount(minWithdrawal),
+            paymentWindowHours: parseCount(paymentWindow),
+            resellerPrice: parseAmount(resellerPrice),
             resellerDiscountBp: toBp(resellerDiscount),
-            resellerPointsMultiplier: Number(resellerMultiplier),
+            resellerPointsMultiplier: parseCount(resellerMultiplier),
             googleReviewUrl: googleReview,
           });
           if (!result.ok) {

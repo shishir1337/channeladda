@@ -6,6 +6,7 @@ import {
   listingLiveEditSchema,
   listingSubmitSchema,
 } from "@/lib/listing-form";
+import { UNREADABLE } from "@/lib/typed-number";
 
 /**
  * Everything a seller can realistically have typed before they go hunting for
@@ -302,4 +303,103 @@ test("a website may be sent without an engagement rate", () => {
   expect(
     fields(listingSubmitSchema.safeParse({ ...site, platform: "instagram" })),
   ).toEqual(["engagement"]);
+});
+
+// ------------------------------------------------- numbers as they are typed
+
+test("a draft reads the figures as sellers type them", () => {
+  // QA: "30,500" followers and a "1,250" price were saved as 0 and $0.00 —
+  // `Number("30,500")` is NaN, and NaN is what a blank field sends.
+  const result = listingDraftSchema.safeParse({
+    ...TYPED,
+    audience: "30,500",
+    engagement: "4.5%",
+    ageYears: " 3 ",
+    monthlyRevenue: "$1,200",
+    yearlyRevenue: "14 400",
+    price: "$1,250.00",
+  });
+  expect(result.success).toBe(true);
+  if (!result.success) return;
+  expect(result.data).toMatchObject({
+    audience: 30_500,
+    engagement: 4.5,
+    ageYears: 3,
+    monthlyRevenue: 1_200,
+    yearlyRevenue: 14_400,
+    price: 1_250,
+  });
+});
+
+test("a draft refuses what it cannot read, saying what to type, rather than saving 0", () => {
+  const result = listingDraftSchema.safeParse({
+    ...TYPED,
+    audience: "30k",
+    engagement: "high",
+    ageYears: "three",
+    price: "1,25",
+  });
+  expect(messages(result)).toEqual({
+    audience: UNREADABLE.count,
+    engagement: UNREADABLE.percent,
+    ageYears: UNREADABLE.years,
+    price: UNREADABLE.amount,
+  });
+});
+
+test("a blank figure is still blank: fine on a draft, asked for on sending", () => {
+  const blank = {
+    ...TYPED,
+    audience: "",
+    engagement: " ",
+    ageYears: "",
+    price: "",
+  };
+  const draft = listingDraftSchema.safeParse(blank);
+  expect(draft.success).toBe(true);
+  if (draft.success) expect(draft.data.audience).toBeNaN();
+
+  expect(messages(listingSubmitSchema.safeParse(blank))).toMatchObject({
+    audience: "Enter the audience size.",
+    engagement: "Enter an engagement rate.",
+    ageYears: "How old is the account?",
+    price: "Enter an amount.",
+  });
+});
+
+test("sending for review reads typed figures too", () => {
+  const result = listingSubmitSchema.safeParse({
+    ...TYPED,
+    audience: "1,250",
+    price: "$1250",
+  });
+  // Only the pictures, the proof and the link are missing; the figures read.
+  expect(fields(result).sort()).toEqual([
+    "avatarUrl",
+    "coverUrl",
+    "proofs",
+    "sourceUrl",
+  ]);
+});
+
+test("a live edit reads a price with a comma or a dollar sign", () => {
+  // QA: "1,250" and "$1250" on a live listing were refused with "Enter an
+  // amount."
+  for (const price of ["1,250", "$1250", " $1,250.00 "]) {
+    const result = listingLiveEditSchema.safeParse({ ...LIVE, price });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.price).toBe(1_250);
+  }
+  expect(
+    messages(listingLiveEditSchema.safeParse({ ...LIVE, price: "12 bucks" })),
+  ).toEqual({ price: UNREADABLE.amount });
+  expect(
+    messages(listingLiveEditSchema.safeParse({ ...LIVE, price: "" })),
+  ).toEqual({ price: "Enter an amount." });
+});
+
+test("a whole-number field says so for a fraction", () => {
+  expect(
+    messages(listingDraftSchema.safeParse({ ...TYPED, audience: "30,500.5" })),
+  ).toEqual({ audience: "Whole numbers only." });
 });

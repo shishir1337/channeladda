@@ -54,6 +54,7 @@ export default async function EditListingPage({
         fees={fees}
         account={{
           platform: platform?.name ?? listing.platform,
+          platformId: listing.platform,
           handle: listing.handle,
           link: listing.sourceUrl,
           metricLabel: platform?.metricLabel ?? "Audience",

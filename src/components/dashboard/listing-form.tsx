@@ -40,6 +40,7 @@ import {
   mergeImport,
   undoImport,
 } from "@/lib/listing-import";
+import { parseAmount } from "@/lib/typed-number";
 import { cn } from "@/lib/utils";
 import { saveListing } from "@/server/actions/listings";
 
@@ -142,11 +143,14 @@ const EXAMPLES: Record<
   },
 };
 
-/** "" and a stray "12abc" both have to become something zod will reject. */
-function num(value: string) {
-  if (value.trim() === "") return Number.NaN;
-  const n = Number(value);
-  return Number.isFinite(n) ? n : Number.NaN;
+/**
+ * The handover field's example in this platform's own terms, for the live
+ * edit form too: it said "sits on a Brand Account, or the domain is at
+ * Cloudflare" to an Instagram seller.
+ */
+export function handoverExample(platform: string) {
+  const examples = EXAMPLES[platform as PlatformId] ?? EXAMPLES.youtube;
+  return { hint: examples.transferHint, placeholder: examples.transfer };
 }
 
 function money(value: number) {
@@ -552,7 +556,9 @@ export function ListingForm({
       draft.handle !== "" ||
       draft.sourceUrl.trim() !== "");
 
-  const priceNumber = num(draft.price);
+  // For the payout preview only. The figures go to the server as typed, and
+  // it reads "1,250" and "$1250" the same way (`@/lib/typed-number`).
+  const priceNumber = parseAmount(draft.price);
   const showPayout = Number.isFinite(priceNumber) && priceNumber > 0;
   const preview = showPayout ? quote(priceNumber, fees, "FASTEST") : null;
   // The other mode's figure, so a payout number never stands on its own
@@ -719,15 +725,18 @@ export function ListingForm({
       title: draft.title,
       niche: draft.niche,
       country: draft.country,
-      audience: num(draft.audience),
+      // Sent as typed: the server reads "30,500" and "$1,250", and refuses
+      // what it cannot read with what to type. Run through `Number()` here,
+      // they were NaN — blank — and a draft saved them as 0.
+      audience: draft.audience,
       monetized: draft.monetized,
       // Hidden unless monetized, so never sent from a field nobody can see:
       // a figure typed before unticking would otherwise ride along.
-      monthlyRevenue: draft.monetized ? num(draft.monthlyRevenue) : 0,
-      yearlyRevenue: draft.monetized ? num(draft.yearlyRevenue) : 0,
-      engagement: num(draft.engagement),
-      ageYears: num(draft.ageYears),
-      price: priceNumber,
+      monthlyRevenue: draft.monetized ? draft.monthlyRevenue : 0,
+      yearlyRevenue: draft.monetized ? draft.yearlyRevenue : 0,
+      engagement: draft.engagement,
+      ageYears: draft.ageYears,
+      price: draft.price,
       // The uploader hands back a URL or nothing; "" makes zod produce the
       // "Add a cover image" message rather than a type complaint.
       coverUrl: draft.coverUrl ?? "",
