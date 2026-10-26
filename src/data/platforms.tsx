@@ -48,12 +48,27 @@ export type Platform = {
    * an owner during Google's wait, an Instagram buyer has the login.
    */
   fastestHold: string;
-  /** How ownership actually moves on this platform, in plain language. */
+  /**
+   * How ownership actually moves on this platform, in plain language, for
+   * anyone: the public pages say "the seller" and "the buyer".
+   */
   transferNote: string;
+  /**
+   * The same, told to the seller listing an account: "You add our agent…".
+   * The new-listing form showed them the buyer's side — "You are added with
+   * full control… and the seller removes themselves".
+   */
+  sellerNote: string;
   /** A Fastest deal's holding period, in days: how long the buyer is a
    *  manager before being made primary owner and the seller is paid. */
   holdDays: number;
-  /** Buyer-facing handover checklist shown on every listing for this platform. */
+  /**
+   * Buyer-facing handover checklist shown on every listing for this platform.
+   * Every deal goes through our agent: the seller hands the account to our
+   * agent, and our agent hands it to the buyer. It said "Seller runs
+   * Transfer Ownership to your account", as though the seller and the buyer
+   * dealt with each other.
+   */
   transferSteps: string[];
   /**
    * Where a seller puts the ownership code on this platform, in their words.
@@ -97,6 +112,8 @@ export const platforms: Platform[] = [
       "On Fastest we hold your payment for 7 days while you are an owner, then the seller is paid and our agent makes you primary owner.",
     transferNote:
       "A Brand Account channel moves cleanly: the seller invites our agent as owner, and after Google’s 7-day waiting period our agent becomes primary owner. Our agent then invites you, and makes you primary owner once Google’s 7 days have passed for you too. Channels on a personal Google account cannot be transferred this way, so we flag them separately.",
+    sellerNote:
+      "You invite our agent’s Google account as an owner. After Google’s 7-day wait, you make our agent primary owner, and our agent hands the channel to the buyer. Only a channel on a Brand Account can move this way.",
     holdDays: 7,
     transferSteps: [
       "Seller invites our agent’s Google account as an owner",
@@ -133,14 +150,16 @@ export const platforms: Platform[] = [
     fastestHold:
       "On Fastest we hold your payment for 21 days after the login is yours, because a previous owner can try to recover the page for weeks. Then the seller is paid.",
     transferNote:
-      "Instagram has no official ownership transfer, so a handover means credentials plus the recovery email and phone. That is why Instagram deals carry our longest hold — a previous owner can attempt recovery for weeks.",
+      "Instagram has no ownership transfer, so the login moves instead. The seller sends our agent the login, our agent moves the email, phone and two-factor to Channel Adda, then hands the account to the buyer. Instagram deals have our longest hold, because a past owner can try to recover an account for weeks.",
+    sellerNote:
+      "Instagram has no ownership transfer, so you send our agent the login. Our agent moves the email, phone and two-factor to Channel Adda, you remove the account from your Meta Accounts Center, and our agent hands it to the buyer.",
     holdDays: 21,
     transferSteps: [
-      "Seller hands over the login and the current recovery email",
-      "You change the password and the email to your own",
-      "You replace the recovery phone number",
-      "You enable two-factor authentication",
-      "Seller confirms the page is detached from their Meta account",
+      "Seller sends our agent the login",
+      "Our agent moves the email, phone and two-factor to Channel Adda",
+      "Seller removes the account from their Meta Accounts Center",
+      "Our agent changes the email to yours and sends you the password",
+      "You set your own password, recovery phone and two-factor",
     ],
     ownershipCheck: {
       place: "the page’s bio",
@@ -169,14 +188,16 @@ export const platforms: Platform[] = [
     fastestHold:
       "On Fastest we hold your payment for 7 days after you have full control of the Page, then the seller is paid.",
     transferNote:
-      "Pages are the cleanest transfer on the marketplace. You are added with full control through Business Suite and the seller removes themselves, which is an official, reversible-free process Meta supports.",
+      "A Page moves the official way, through Meta Business Suite. The seller adds our agent to the Page with full control, then leaves it, and our agent gives the buyer full control.",
+    sellerNote:
+      "A Page moves the official way, through Meta Business Suite. You add our agent’s Facebook account to the Page with full control, then remove yourself from the Page and your Business Manager. Our agent then gives the buyer full control.",
     holdDays: 7,
     transferSteps: [
-      "Seller adds you with full control in Business Suite",
-      "You accept the Page invitation",
-      "You confirm access to Page settings and the payouts dashboard",
-      "Seller removes themselves from the Page",
-      "Page is detached from the seller’s Business Manager",
+      "Seller adds our agent to the Page with full control in Business Suite",
+      "Seller leaves the Page and takes it out of their Business Manager",
+      "Our agent checks only they have control of the Page",
+      "Our agent gives your Facebook account full control of the Page",
+      "You check the Page settings and the payouts dashboard",
     ],
     ownershipCheck: {
       place: "the Page’s bio",
@@ -205,14 +226,16 @@ export const platforms: Platform[] = [
     fastestHold:
       "On Fastest we hold your payment for 3 days after the channel is transferred to you, then the seller is paid.",
     transferNote:
-      "Telegram supports a real Transfer Ownership action, which makes it the fastest and safest handover here. Once it completes it is effectively irreversible, so funds release after just three days.",
+      "Telegram has a real Transfer Ownership button, which makes this the quickest handover here. The seller transfers the channel to our agent, and our agent transfers it to the buyer. A finished transfer cannot be undone, so the Fastest hold is only three days.",
+    sellerNote:
+      "You make our agent’s Telegram account an admin of the channel, then use Transfer Ownership to make our agent the owner. Our agent then transfers it to the buyer. Turn on two-step verification well before: Telegram asks for it before it lets you transfer.",
     holdDays: 3,
     transferSteps: [
-      "Seller confirms two-factor has been active long enough",
-      "Seller runs Transfer Ownership to your account",
-      "You accept the transfer",
-      "You verify you are the sole remaining owner",
-      "Seller leaves the channel",
+      "Seller makes our agent an admin of the channel",
+      "Seller uses Transfer Ownership to make our agent the owner",
+      "Our agent checks they own the channel",
+      "Our agent transfers ownership to your Telegram account",
+      "You check you are the only owner",
     ],
     ownershipCheck: {
       place: "the channel description",
@@ -241,13 +264,15 @@ export const platforms: Platform[] = [
     fastestHold:
       "On Fastest we hold your payment for 14 days after the domain and the site are moved to you, then the seller is paid.",
     transferNote:
-      "A website sale is really three transfers: the domain via an auth code, the hosting and database, and the analytics properties. AdSense income does not transfer — the buyer must connect their own account.",
+      "A website moves in three parts: the domain, by its auth code; the hosting and database; and the analytics. The seller moves them to our agent, and our agent moves them to the buyer. AdSense income does not transfer, so the buyer connects their own account.",
+    sellerNote:
+      "A website moves in three parts: the domain (you unlock it and send our agent the auth code), the hosting and database, and the analytics. You move them to our agent, and our agent moves them to the buyer. AdSense does not transfer: the buyer connects their own.",
     holdDays: 14,
     transferSteps: [
-      "Seller unlocks the domain and sends the auth code",
-      "You start the registrar transfer and approve it by email",
-      "Files and database are migrated to your hosting",
-      "Analytics and Search Console properties are handed over",
+      "Seller gives our agent access to the hosting and the site’s admin",
+      "Seller unlocks the domain and transfers it to our agent",
+      "Our agent checks the domain, hosting, traffic and income",
+      "Our agent moves the domain, hosting and analytics to you",
       "You connect your own AdSense or ad network",
     ],
     ownershipCheck: {

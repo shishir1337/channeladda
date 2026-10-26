@@ -59,7 +59,8 @@ const choices: PlatformChoice[] = platforms.map((p) => ({
   id: p.id,
   name: p.name,
   metricLabel: p.metricLabel,
-  transferNote: p.transferNote,
+  // The seller's side of the handover: they are the one listing.
+  transferNote: p.sellerNote,
   tint: p.tint,
 }));
 

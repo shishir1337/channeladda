@@ -57,7 +57,7 @@ export default async function EditListingPage({
           handle: listing.handle,
           link: listing.sourceUrl,
           metricLabel: platform?.metricLabel ?? "Audience",
-          transferNote: platform?.transferNote,
+          transferNote: platform?.sellerNote,
         }}
         initial={{
           title: listing.title,
