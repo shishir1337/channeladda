@@ -6,11 +6,13 @@ import {
   ClockIcon,
   FlameIcon,
   SlidersHorizontalIcon,
+  StoreIcon,
   TagIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { ListingCard } from "@/components/home/listing-card";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Container, Section, SectionHeading } from "@/components/ui/section";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { Listing } from "@/data/listings";
@@ -67,42 +69,68 @@ export function ListingsShowcase({ listings }: { listings: Listing[] }) {
           description="Every one checked for ownership."
         />
 
-        <Tabs defaultValue="featured" className="mt-8 sm:mt-10">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <TabsList>
-              {views.map((view) => (
-                <TabsTrigger key={view.id} value={view.id}>
-                  <view.icon aria-hidden="true" />
-                  {view.label}
-                </TabsTrigger>
-              ))}
-            </TabsList>
+        {/* Before the first listing — after the launch reset, say — four
+            tabs over nothing read as broken. */}
+        {listings.length === 0 ? (
+          <EmptyState
+            icon={StoreIcon}
+            title="No accounts listed yet"
+            description="New listings show up here first."
+            action={
+              <Button asChild size="md">
+                <Link href="/sell">List an account</Link>
+              </Button>
+            }
+            className="mt-8 sm:mt-10"
+          />
+        ) : (
+          <Showcase listings={listings} />
+        )}
+      </Container>
+    </Section>
+  );
+}
 
-            {/* A link, not a button: the filters live on the browse page. */}
-            <Button
-              asChild
-              variant="outline"
-              size="sm"
-              className="w-full sm:w-auto"
-            >
-              <Link href="/browse">
-                <SlidersHorizontalIcon aria-hidden="true" className="size-4" />
-                All filters
-              </Link>
-            </Button>
-          </div>
+function Showcase({ listings }: { listings: Listing[] }) {
+  return (
+    <>
+      <Tabs defaultValue="featured" className="mt-8 sm:mt-10">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <TabsList>
+            {views.map((view) => (
+              <TabsTrigger key={view.id} value={view.id}>
+                <view.icon aria-hidden="true" />
+                {view.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
 
-          {views.map((view) => {
-            const items = view.select(listings).slice(0, 6);
-            return (
-              <TabsContent
-                key={view.id}
-                value={view.id}
-                className="mt-6 sm:mt-8"
-              >
-                {/* A row to swipe on a phone, as app stores do: six tall
+          {/* A link, not a button: the filters live on the browse page. */}
+          <Button
+            asChild
+            variant="outline"
+            size="sm"
+            className="w-full sm:w-auto"
+          >
+            <Link href="/browse">
+              <SlidersHorizontalIcon aria-hidden="true" className="size-4" />
+              All filters
+            </Link>
+          </Button>
+        </div>
+
+        {views.map((view) => {
+          const items = view.select(listings).slice(0, 6);
+          return (
+            <TabsContent key={view.id} value={view.id} className="mt-6 sm:mt-8">
+              {/* A row to swipe on a phone, as app stores do: six tall
                     cards stacked were three screens of scrolling. A grid
                     from a tablet up. */}
+              {items.length === 0 ? (
+                <p className="rounded-card border border-line bg-surface px-5 py-10 text-center text-sm text-muted">
+                  None right now.
+                </p>
+              ) : (
                 <ul className="no-scrollbar -mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:snap-none sm:grid-cols-2 sm:gap-4 sm:overflow-visible sm:px-0 sm:pb-0 xl:grid-cols-3">
                   {items.map((listing) => (
                     <li
@@ -113,25 +141,25 @@ export function ListingsShowcase({ listings }: { listings: Listing[] }) {
                     </li>
                   ))}
                 </ul>
-              </TabsContent>
-            );
-          })}
-        </Tabs>
+              )}
+            </TabsContent>
+          );
+        })}
+      </Tabs>
 
-        <div className="mt-9 flex justify-center sm:mt-12">
-          <Button
-            asChild
-            variant="secondary"
-            size="lg"
-            className="w-full sm:w-auto"
-          >
-            <Link href="/browse">
-              View all listings
-              <ArrowRightIcon aria-hidden="true" className="size-4" />
-            </Link>
-          </Button>
-        </div>
-      </Container>
-    </Section>
+      <div className="mt-9 flex justify-center sm:mt-12">
+        <Button
+          asChild
+          variant="secondary"
+          size="lg"
+          className="w-full sm:w-auto"
+        >
+          <Link href="/browse">
+            View all listings
+            <ArrowRightIcon aria-hidden="true" className="size-4" />
+          </Link>
+        </Button>
+      </div>
+    </>
   );
 }

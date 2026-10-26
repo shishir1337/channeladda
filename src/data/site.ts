@@ -157,55 +157,25 @@ export const faqs = [
   },
 ];
 
-export const footerNav: {
-  title: string;
-  links: { label: string; href: string }[];
-}[] = [
-  {
-    title: "Marketplace",
-    links: [
-      { label: "Browse all accounts", href: "/browse" },
-      { label: "Buy YouTube channels", href: "/browse/youtube" },
-      { label: "Instagram pages", href: "/browse/instagram" },
-      { label: "Facebook pages", href: "/browse/facebook" },
-      { label: "Telegram channels", href: "/browse/telegram" },
-      { label: "Websites & blogs", href: "/browse/website" },
-      { label: "Recently sold", href: "/sold" },
-    ],
-  },
-  {
-    title: "Sell",
-    links: [
-      { label: "Create a listing", href: "/sell" },
-      { label: "Sell a YouTube channel", href: "/sell/youtube" },
-      { label: "Pricing & fees", href: "/fees" },
-      { label: "Listing rules", href: "/listing-rules" },
-      { label: "Verified sellers", href: "/sellers" },
-      { label: "Services", href: "/services" },
-      { label: "Affiliates", href: "/affiliates" },
-    ],
-  },
-  {
-    title: "Trust & safety",
-    links: [
-      { label: "How a deal works", href: "/how-it-works" },
-      { label: "Trust & safety", href: "/trust-safety" },
-      { label: "KYC verification", href: "/aml-kyc" },
-      { label: "Dispute resolution", href: "/help/opening-a-dispute" },
-      { label: "Refund policy", href: "/refunds" },
-      { label: "Transfer checklist", href: "/help/confirming-a-handover" },
-      { label: "Check a certificate", href: "/certificate" },
-    ],
-  },
-  {
-    title: "Company",
-    links: [
-      { label: "About Channel Adda", href: "/about" },
-      { label: "Guides", href: "/guides" },
-      { label: "Help centre", href: "/help" },
-      { label: "Contact support", href: "/support" },
-      { label: "Sign in", href: "/signin" },
-      { label: "Create an account", href: "/signup" },
-    ],
-  },
+/**
+ * The footer's links: one short row (the owner, 2026-10-27, "make it short
+ * minimal clean"). The rest of the site is in the header, its menu and the
+ * pages themselves; the policies are in the footer's bottom line.
+ */
+export const footerLinks: { label: string; href: string }[] = [
+  { label: "Buy YouTube channels", href: "/browse/youtube" },
+  { label: "Sell a YouTube channel", href: "/sell/youtube" },
+  { label: "How it works", href: "/how-it-works" },
+  { label: "Fees", href: "/fees" },
+  { label: "Guides", href: "/guides" },
+  { label: "About", href: "/about" },
+  { label: "Help", href: "/help" },
+  { label: "Contact", href: "/support" },
+];
+
+export const legalLinks: { label: string; href: string }[] = [
+  { label: "Terms", href: "/terms" },
+  { label: "Privacy", href: "/privacy" },
+  { label: "Refunds", href: "/refunds" },
+  { label: "AML & KYC", href: "/aml-kyc" },
 ];

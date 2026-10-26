@@ -1,3 +1,5 @@
+import { CONTACT_EMAIL } from "@/lib/seo";
+
 export type LegalSection = {
   heading: string;
   paragraphs?: string[];
@@ -85,7 +87,7 @@ export const legalDocs: Record<string, LegalDoc> = {
     slug: "privacy",
     title: "Privacy policy",
     summary: "What we collect, why we collect it, and who else can see it.",
-    updated: "26 October 2026",
+    updated: "27 October 2026",
     sections: [
       {
         heading: "What we collect",
@@ -122,7 +124,7 @@ export const legalDocs: Record<string, LegalDoc> = {
       {
         heading: "Your rights",
         paragraphs: [
-          "You can request a copy of your data, ask us to correct it, or ask us to delete it. Deletion requests cannot override the retention periods above where the law requires us to keep records. Write to privacy@channeladda.com.",
+          `You can request a copy of your data, ask us to correct it, or ask us to delete it. Deletion requests cannot override the retention periods above where the law requires us to keep records. Write to ${CONTACT_EMAIL}.`,
         ],
       },
     ],

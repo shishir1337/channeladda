@@ -178,9 +178,11 @@ export default async function DashboardLayout({ children }: LayoutProps<"/">) {
 
   // The phone's tab bar: where members go most. Everything else is in "More".
   // Browse, not Wallet: the balance is in the top bar on every screen, and
-  // the marketplace was the one place a phone could not get back to.
+  // the marketplace was the one place a phone could not get back to. Home is
+  // the homepage, the same tab as on the website, so it is one tap back from
+  // anywhere (the owner, 2026-10-27); Overview is the first thing in "More".
   const tabs: NavItem[] = [
-    { label: "Overview", href: "/dashboard", icon: "overview" },
+    { label: "Home", href: "/", icon: "home" },
     { label: "Browse", href: "/browse", icon: "browse" },
     {
       label: "Deals",

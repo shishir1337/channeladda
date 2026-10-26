@@ -3,7 +3,6 @@
 import {
   ArrowLeftRightIcon,
   HouseIcon,
-  LayoutDashboardIcon,
   MenuIcon,
   MessageSquareIcon,
   SearchIcon,
@@ -20,7 +19,6 @@ import { isTabActive, type SiteTabIcon, siteTabs } from "@/lib/site-dock";
 
 const ICONS = {
   home: HouseIcon,
-  overview: LayoutDashboardIcon,
   browse: SearchIcon,
   sell: TagIcon,
   signin: UserRoundIcon,
@@ -35,7 +33,6 @@ const ICONS = {
  */
 const TINT: Record<SiteTabIcon, string> = {
   home: HUE_TEXT.sky,
-  overview: iconText(LayoutDashboardIcon),
   browse: HUE_TEXT.cyan,
   sell: iconText(TagIcon),
   signin: iconText(UserRoundIcon),

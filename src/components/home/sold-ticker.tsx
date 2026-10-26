@@ -6,6 +6,9 @@ import { platformMap } from "@/data/platforms";
 import { formatCompact } from "@/lib/utils";
 
 export function SoldTicker({ items }: { items: SoldItem[] }) {
+  // Nothing sold yet: an empty band under the header read as broken.
+  if (items.length === 0) return null;
+
   // Two copies, so the -50% marquee keyframe loops without a gap. Each copy
   // is named, so a key never depends on position. The second is there for
   // the eye alone: hidden from screen readers, which read each sale once.

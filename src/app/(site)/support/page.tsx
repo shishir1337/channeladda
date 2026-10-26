@@ -13,7 +13,7 @@ import { iconTile } from "@/components/ui/icon-hue";
 import { PageHeader } from "@/components/ui/page-header";
 import { Container, Section } from "@/components/ui/section";
 import { helpArticles } from "@/data/help";
-import { pageMetadata } from "@/lib/seo";
+import { CONTACT_EMAIL, pageMetadata } from "@/lib/seo";
 import {
   ESCROW_AGENT_HREF,
   ESCROW_AGENT_NAME,
@@ -53,13 +53,14 @@ const channels: {
   {
     icon: MailIcon,
     title: "Email",
-    body: "support@channeladda.com for anything that is not urgent.",
+    body: "For anything that is not urgent.",
     meta: "Answered within 12 hours",
+    link: { href: `mailto:${CONTACT_EMAIL}`, label: CONTACT_EMAIL },
   },
   {
     icon: GavelIcon,
     title: "Disputes",
-    body: "disputes@channeladda.com, or open one from the order page.",
+    body: `Open one from the order page, or write to ${CONTACT_EMAIL}.`,
     meta: "Reviewed by a moderator within 24 hours",
   },
 ];

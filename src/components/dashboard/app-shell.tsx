@@ -56,6 +56,8 @@ import { cn } from "@/lib/utils";
  */
 const ICONS = {
   bell: BellIcon,
+  /** The website's homepage: the phone's first tab. */
+  home: HouseIcon,
   overview: LayoutDashboardIcon,
   offers: HandshakeIcon,
   saved: HeartIcon,
@@ -90,6 +92,8 @@ export type NavIcon = keyof typeof ICONS;
  * plus, a magnifier) or shares a colour with a neighbour in the rail.
  */
 const NAV_HUE: Partial<Record<NavIcon, Hue>> = {
+  // Sky, as on the website's tab bar.
+  home: "sky",
   new: "yellow",
   browse: "cyan",
   review: "cyan",

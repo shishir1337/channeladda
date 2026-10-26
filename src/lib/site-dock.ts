@@ -6,11 +6,14 @@
  * under the thumb. Signed out, it is the four things a visitor can do
  * without an account. "More" is the fifth in both, and is drawn by the bar.
  *
+ * Home is the homepage for members too, not the dashboard's Overview: one
+ * tap back to the website from anywhere (the owner, 2026-10-27). Overview
+ * is in "More" and the account menu.
+ *
  * Icons are names, as in the app shell, so this stays a plain module.
  */
 export type SiteTabIcon =
   | "home"
-  | "overview"
   | "browse"
   | "sell"
   | "signin"
@@ -33,7 +36,7 @@ export function siteTabs(
 ): SiteTab[] {
   if (member) {
     return [
-      { label: "Overview", href: "/dashboard", icon: "overview" },
+      { label: "Home", href: "/", icon: "home" },
       { label: "Browse", href: "/browse", icon: "browse" },
       {
         label: "Deals",

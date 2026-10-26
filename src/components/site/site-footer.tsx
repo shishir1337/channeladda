@@ -1,167 +1,65 @@
-import { MailIcon, MessagesSquareIcon, ShieldCheckIcon } from "lucide-react";
 import Link from "next/link";
-import {
-  ChannelAddaLogo,
-  CryptomusIcon,
-  FacebookIcon,
-  InstagramIcon,
-  TelegramIcon,
-  YouTubeIcon,
-} from "@/components/icons/brand-icons";
-import { iconText } from "@/components/ui/icon-hue";
+import { ChannelAddaLogo } from "@/components/icons/brand-icons";
 import { Container } from "@/components/ui/section";
-import { footerNav } from "@/data/site";
+import { footerLinks, legalLinks } from "@/data/site";
+import { CONTACT_EMAIL } from "@/lib/seo";
 
-/** The platforms whose accounts are traded here: not our own pages. */
-const traded = [
-  { label: "Telegram", icon: TelegramIcon },
-  { label: "YouTube", icon: YouTubeIcon },
-  { label: "Instagram", icon: InstagramIcon },
-  { label: "Facebook", icon: FacebookIcon },
-];
+const linkClass =
+  "inline-flex min-h-9 items-center text-muted transition-colors duration-150 hover:text-fg";
 
+/**
+ * Short, on purpose: the logo and one row of links, then a line for the
+ * small print. It used to be four columns of links, a support box, the
+ * platforms and a payments badge, a phone's full screen and more (the owner,
+ * 2026-10-27: "too much big, make it short minimal clean").
+ *
+ * The Cryptomus verification line went on 2026-10-26; the domain is still
+ * verified by the `cryptomus` and `heleket` meta tags on the root layout.
+ */
 export function SiteFooter() {
   return (
     // The last thing on every page, so it keeps the room for the phone's
     // tab bar (60px and the home indicator) — and on a listing, whose buy
     // bar sits on top of the tab bar, for that bar too.
     <footer className="border-t border-line bg-bg-subtle max-lg:pb-[calc(3.75rem+env(safe-area-inset-bottom))] max-lg:[body:has([data-buy-bar])_&]:pb-[calc(8.25rem+env(safe-area-inset-bottom))]">
-      <Container className="py-12 sm:py-16">
-        <div className="grid gap-10 lg:grid-cols-[minmax(0,20rem)_1fr] lg:gap-16">
-          <div>
-            <Link
-              href="/"
-              className="inline-flex min-h-11 items-center gap-2.5 rounded-lg"
-              aria-label="Channel Adda home"
-            >
-              <ChannelAddaLogo className="size-8" />
-              <span className="text-[1.0625rem] font-semibold tracking-[-0.02em]">
-                Channel <span className="text-primary-text">Adda</span>
-              </span>
-            </Link>
-            <p className="mt-4 max-w-xs text-sm leading-relaxed text-muted">
-              The supervised marketplace for social media accounts, channels and
-              content websites.
-            </p>
+      <Container className="py-8 sm:py-10">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between lg:gap-10">
+          <Link
+            href="/"
+            className="inline-flex min-h-11 w-fit shrink-0 items-center gap-2.5 rounded-lg"
+            aria-label="Channel Adda home"
+          >
+            <ChannelAddaLogo className="size-7" />
+            <span className="text-base font-semibold tracking-[-0.02em]">
+              Channel <span className="text-primary-text">Adda</span>
+            </span>
+          </Link>
 
-            <div className="mt-5 inline-flex items-center gap-2 rounded-lg border border-line bg-surface px-3 py-2">
-              <CryptomusIcon aria-hidden="true" className="size-4 text-muted" />
-              <span className="text-[0.8125rem] text-muted">
-                Payments secured by{" "}
-                <span className="font-medium text-fg">Cryptomus</span>
-              </span>
-            </div>
-
-            {/* The icons used to be links to /browse, labelled “Channel Adda
-                on Telegram” and so on, so clicking one reloaded the
-                marketplace. Until there are real accounts to point at, they
-                say which platforms we trade rather than pretending to be
-                somewhere we are not — to a screen reader too, which heard
-                "Channel Adda on Telegram" and expected a link. */}
-            <ul
-              aria-label="Platforms we trade"
-              className="mt-6 flex items-center gap-2"
-            >
-              {traded.map((platform) => (
-                <li
-                  key={platform.label}
-                  className="inline-flex size-9 items-center justify-center rounded-lg border border-line text-subtle"
-                >
-                  <platform.icon aria-hidden="true" className="size-4" />
-                  <span className="sr-only">{platform.label}</span>
+          <nav aria-label="Footer">
+            <ul className="flex flex-wrap gap-x-5 text-sm lg:justify-end">
+              {footerLinks.map((link) => (
+                <li key={link.href}>
+                  <Link href={link.href} className={linkClass}>
+                    {link.label}
+                  </Link>
                 </li>
               ))}
             </ul>
-          </div>
-
-          <nav aria-label="Footer">
-            <div className="grid grid-cols-2 gap-8 sm:grid-cols-4 sm:gap-6">
-              {footerNav.map((group) => (
-                <div key={group.title}>
-                  <h2 className="text-sm font-semibold text-fg">
-                    {group.title}
-                  </h2>
-                  <ul className="mt-3 flex flex-col gap-1">
-                    {group.links.map((link) => (
-                      <li key={link.href}>
-                        <Link
-                          href={link.href}
-                          className="inline-flex min-h-9 items-center text-sm text-muted transition-colors duration-150 hover:text-fg"
-                        >
-                          {link.label}
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </div>
           </nav>
         </div>
 
-        <div className="mt-12 grid gap-4 rounded-card border border-line bg-surface p-5 sm:grid-cols-2">
-          <Link href="/support" className="group flex items-start gap-3">
-            <MessagesSquareIcon
-              aria-hidden="true"
-              className={`mt-0.5 size-4.5 shrink-0 ${iconText(MessagesSquareIcon)}`}
-            />
-            <div>
-              <h2 className="text-sm font-semibold text-fg group-hover:underline group-hover:underline-offset-4">
-                Support
-              </h2>
-              <p className="mt-1 text-sm text-muted">
-                Chat with an Escrow Agent from Messages, or write to us from the
-                support page. A person replies.
-              </p>
-            </div>
-          </Link>
-          <div className="flex items-start gap-3">
-            <MailIcon
-              aria-hidden="true"
-              className={`mt-0.5 size-4.5 shrink-0 ${iconText(MailIcon)}`}
-            />
-            <div>
-              <h2 className="text-sm font-semibold text-fg">
-                Disputes & escalations
-              </h2>
-              <p className="mt-1 text-sm text-muted">
-                Open one from the deal page, or write to
-                disputes@channeladda.com. Reviewed by a moderator within 24
-                hours.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-10 flex flex-col gap-5 border-t border-line pt-8 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex flex-col gap-1 text-[0.8125rem] text-subtle">
-            <p>
-              © {new Date().getFullYear()} Channel Adda. All rights reserved.
-            </p>
-            <p>
-              Designed &amp; built by{" "}
-              <a
-                href="https://arrowbin.com/"
-                target="_blank"
-                rel="noopener"
-                className="font-medium text-muted underline decoration-line-strong underline-offset-4 transition-colors duration-150 hover:text-fg hover:decoration-fg"
-              >
-                Arrowbin
-              </a>
-            </p>
-          </div>
-          <ul className="flex flex-wrap items-center gap-x-5 gap-y-2">
-            {[
-              { label: "Terms of service", href: "/terms" },
-              { label: "Privacy policy", href: "/privacy" },
-              { label: "Refund policy", href: "/refunds" },
-              { label: "AML & KYC", href: "/aml-kyc" },
-            ].map((link) => (
+        <div className="mt-5 flex flex-col gap-x-8 gap-y-1 border-t border-line pt-5 text-[0.8125rem] text-subtle lg:flex-row lg:items-center lg:justify-between">
+          <p className="flex flex-wrap items-center gap-x-2">
+            <span>© {new Date().getFullYear()} Channel Adda</span>
+            <span aria-hidden="true">·</span>
+            <a href={`mailto:${CONTACT_EMAIL}`} className={linkClass}>
+              {CONTACT_EMAIL}
+            </a>
+          </p>
+          <ul className="flex flex-wrap gap-x-5">
+            {legalLinks.map((link) => (
               <li key={link.href}>
-                <Link
-                  href={link.href}
-                  className="inline-flex min-h-9 items-center text-[0.8125rem] text-subtle transition-colors duration-150 hover:text-fg"
-                >
+                <Link href={link.href} className={linkClass}>
                   {link.label}
                 </Link>
               </li>
@@ -169,22 +67,22 @@ export function SiteFooter() {
           </ul>
         </div>
 
-        {/* The Cryptomus verification line printed here was removed at the
-            owner's request, 2026-10-26. The domain is still verified by the
-            `cryptomus` and `heleket` meta tags on the root layout. */}
-        <p className="mt-8 flex items-start gap-2.5 text-xs leading-relaxed text-subtle">
-          <ShieldCheckIcon
-            aria-hidden="true"
-            className={`mt-0.5 size-4 shrink-0 ${iconText(ShieldCheckIcon)}`}
-          />
-          <span>
-            Channel Adda is an independent marketplace and is not affiliated
-            with, endorsed by, or sponsored by YouTube, Google, Meta or
-            Telegram. All trademarks belong to their respective owners. Sellers
-            are responsible for complying with each platform&apos;s terms of
-            service when transferring an account.
-          </span>
-        </p>
+        <div className="mt-2 flex flex-col gap-x-8 gap-y-2 text-xs leading-relaxed text-subtle lg:flex-row lg:justify-between">
+          <p>
+            Independent. Not affiliated with YouTube, Google, Meta or Telegram.
+          </p>
+          <p className="shrink-0">
+            Designed &amp; built by{" "}
+            <a
+              href="https://arrowbin.com/"
+              target="_blank"
+              rel="noopener"
+              className="font-medium text-muted underline decoration-line-strong underline-offset-4 transition-colors duration-150 hover:text-fg hover:decoration-fg"
+            >
+              Arrowbin
+            </a>
+          </p>
+        </div>
       </Container>
     </footer>
   );

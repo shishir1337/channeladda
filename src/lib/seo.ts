@@ -13,6 +13,12 @@ import type { Metadata } from "next";
 export const SITE_NAME = "Channel Adda";
 
 /**
+ * The one address people write to, for anything: support, disputes,
+ * privacy and the policies (the owner, 2026-10-27).
+ */
+export const CONTACT_EMAIL = "info@channeladda.com";
+
+/**
  * The other ways people write the name into a search box. Given to search
  * engines with the name, so "channeladda" finds the site as "Channel Adda"
  * does.
@@ -187,7 +193,7 @@ export function siteLd(base: string, description: string) {
       url: `${base}/`,
       logo: `${base}/email/mark.png`,
       description,
-      email: "support@channeladda.com",
+      email: CONTACT_EMAIL,
       ...(SOCIAL_PROFILES.length ? { sameAs: SOCIAL_PROFILES } : {}),
     },
     {

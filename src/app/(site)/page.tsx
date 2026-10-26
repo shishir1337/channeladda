@@ -3,7 +3,6 @@ import { Categories } from "@/components/home/categories";
 import { Faq } from "@/components/home/faq";
 import { Hero } from "@/components/home/hero";
 import { ListingsShowcase } from "@/components/home/listings-showcase";
-import { SellerCta } from "@/components/home/seller-cta";
 import { SoldTicker } from "@/components/home/sold-ticker";
 import { Testimonials } from "@/components/home/testimonials";
 import { TopSellers } from "@/components/home/top-sellers";
@@ -51,10 +50,11 @@ export default async function HomePage() {
       <Categories counts={counts} floors={floors} />
       <ListingsShowcase listings={featured} />
       {/* How it works and Trust & safety have their own pages, linked
-          from the header; the owner took them off the homepage. */}
+          from the header; the owner took them off the homepage, and
+          "Sell your account safely" too (2026-10-27): "Sell an account"
+          is in the header. */}
       <TopSellers sellers={sellers.slice(0, 4)} />
       <Testimonials />
-      <SellerCta />
       <Faq />
     </>
   );

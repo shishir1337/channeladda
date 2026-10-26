@@ -24,7 +24,10 @@ export function Categories({
               href="/browse"
               className="group inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-fg transition-colors duration-150 hover:text-muted"
             >
-              Browse all {countOf(total, "listing")}
+              {/* "Browse all 0 listings" before the first one. */}
+              {total > 0
+                ? `Browse all ${countOf(total, "listing")}`
+                : "Browse all accounts"}
               <ArrowRightIcon
                 aria-hidden="true"
                 className="size-4 transition-transform duration-150 group-hover:translate-x-0.5"

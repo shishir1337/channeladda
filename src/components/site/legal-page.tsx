@@ -3,6 +3,7 @@ import Link from "next/link";
 import { PageHeader } from "@/components/ui/page-header";
 import { Container, Section } from "@/components/ui/section";
 import { type LegalDoc, legalDocs } from "@/data/legal";
+import { CONTACT_EMAIL } from "@/lib/seo";
 
 const order = ["terms", "privacy", "refunds", "aml-kyc", "listing-rules"];
 
@@ -65,9 +66,12 @@ export function LegalPage({ doc }: { doc: LegalDoc }) {
 
               <p className="mt-12 rounded-card border border-line bg-surface-2 p-5 text-sm leading-relaxed text-muted">
                 Something here unclear or unfair? Tell us at{" "}
-                <span className="font-medium text-fg">
-                  legal@channeladda.com
-                </span>{" "}
+                <a
+                  href={`mailto:${CONTACT_EMAIL}`}
+                  className="font-medium text-fg underline decoration-line-strong underline-offset-4 hover:decoration-fg"
+                >
+                  {CONTACT_EMAIL}
+                </a>{" "}
                 — policies that people cannot understand are not doing their
                 job.
               </p>

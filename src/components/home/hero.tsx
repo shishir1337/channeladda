@@ -40,11 +40,18 @@ export function Hero({ stats }: { stats: Stats }) {
 
           <p className="mx-auto mt-5 max-w-xl text-base leading-relaxed text-muted sm:mt-6 sm:text-lg">
             Plus Instagram, Facebook and Telegram. Our agent holds the money or
-            the account until the handover is done.{" "}
-            <span className="tnum font-medium text-fg">
-              {stats.transfers.toLocaleString("en-US")}
-            </span>{" "}
-            deals completed.
+            the account until the handover is done.
+            {/* Said once there is something to count: "0 deals completed"
+                was the first thing a visitor read after the launch reset. */}
+            {stats.transfers > 0 ? (
+              <>
+                {" "}
+                <span className="tnum font-medium text-fg">
+                  {stats.transfers.toLocaleString("en-US")}
+                </span>{" "}
+                {stats.transfers === 1 ? "deal" : "deals"} completed.
+              </>
+            ) : null}
           </p>
         </div>
 

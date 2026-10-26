@@ -10,6 +10,10 @@ import { platformMap } from "@/data/platforms";
 import type { Seller } from "@/data/sellers";
 
 export function TopSellers({ sellers }: { sellers: Seller[] }) {
+  // Before the first completed deal there is nobody to rank, and a heading
+  // over nothing reads as broken, as "What members say" would.
+  if (sellers.length === 0) return null;
+
   return (
     <Section>
       <Container>
