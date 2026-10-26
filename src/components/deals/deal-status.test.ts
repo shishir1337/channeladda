@@ -1,14 +1,19 @@
 import { describe, expect, test } from "vitest";
 import {
+  completeWords,
   confirmFirst,
   confirmLabel,
   confirmYes,
   dealHeadline,
+  didFor,
   endWaitCheck,
+  heldLine,
   holdNote,
   moneyNote,
+  readDealLine,
   STATUS_LABELS,
   STATUS_SHORT,
+  staffWords,
   statusSentence,
   stepAsk,
   stepDone,
@@ -219,7 +224,7 @@ describe("the headline follows the open step, not just the status", () => {
     expect(
       dealHeadline("AWAITING_CUSTODY", "SAFEST", "agent", 3, "YOUTUBE")
         .sentence,
-    ).toMatch(/^The seller has handed the channel to you/);
+    ).toMatch(/^The seller invited you as owner/);
   });
 
   test("while the seller's step 2 is owed, the seller is asked to invite the agent", () => {
@@ -467,10 +472,21 @@ describe("each step is named for whoever is reading it", () => {
     );
   });
 
-  test("staff, and a step from older templates, keep the stored label", () => {
+  test("staff read the step in the third person; an older step keeps its label", () => {
+    // QA, CA-75190: the dispute desk listed "Make the agent primary owner"
+    // on a Facebook Page.
     expect(
       stepTitle("Pay the full amount", "staff", "YOUTUBE", "FASTEST"),
-    ).toBe("Pay the full amount");
+    ).toBe("The buyer pays us");
+    expect(
+      stepTitle("Invite the agent as owner", "staff", "TELEGRAM", "FASTEST"),
+    ).toBe("The seller makes our agent an admin");
+    expect(
+      stepTitle("Make the agent primary owner", "staff", "FACEBOOK", "FASTEST"),
+    ).toBe("The seller leaves the Page");
+    expect(
+      stepTitle("Invite the agent as owner", "staff", "INSTAGRAM", "SAFEST"),
+    ).toBe("The seller sends our agent the login");
     expect(
       stepTitle("Release the seller's funds", "buyer", "YOUTUBE", "FASTEST"),
     ).toBe("Release the seller's funds");
@@ -701,5 +717,240 @@ describe("a step's words are written to whoever reads them", () => {
         ).toMatch(/cannot take/);
       }
     }
+  });
+});
+
+describe("the regression run of 2026-10-26, round 2", () => {
+  const OTHERS = PLATFORMS.filter((p) => p !== "YOUTUBE");
+  const YOUTUBE_WORDS = /owner invite|primary owner|as owner|Google/;
+
+  test("staff read every step in the platform's words, not YouTube's", () => {
+    // QA, CA-75190 and CA-71352: the desks listed "Make the agent primary
+    // owner" on a Facebook Page and "Invite the agent as owner" on
+    // Instagram.
+    for (const mode of ["SAFEST", "FASTEST"] as const) {
+      for (const platform of OTHERS) {
+        for (const step of templateFor(mode)) {
+          const title = stepTitle(step.label, "staff", platform, mode);
+          expect(title, `${mode} ${platform} ${step.label}`).not.toMatch(
+            YOUTUBE_WORDS,
+          );
+          expect(title).not.toMatch(/\byou(r)?\b/i);
+        }
+      }
+    }
+    expect(
+      stepTitle("Make the buyer primary owner", "staff", "FACEBOOK", "FASTEST"),
+    ).toBe("Our agent gives the buyer full control");
+  });
+
+  test("the staff desk's facts speak the platform", () => {
+    const fb = staffWords("FACEBOOK", "FASTEST");
+    expect(fb.sellerStillHas).toBe(
+      "The seller still has the Page; our agent takes it from them first.",
+    );
+    expect(fb.handToBuyer).toBe("our agent gives the buyer full control");
+    expect(fb.agentTook).toBe("when our agent took the Page");
+    expect(staffWords("YOUTUBE").sellerStillHas).toMatch(/primary owner/);
+  });
+
+  test("with no payment details, the seller is asked and the buyer waits", () => {
+    // QA, CA-27058.
+    const at = (viewer: "buyer" | "seller" | "agent") =>
+      dealHeadline(
+        "IN_CUSTODY",
+        "SAFEST",
+        viewer,
+        6,
+        "INSTAGRAM",
+        false,
+        false,
+        true,
+        "Bilal Ahmed",
+      );
+    expect(at("seller").label).toBe("Say where Bilal Ahmed should pay you");
+    expect(at("buyer").label).toBe("Waiting for the seller's payment details");
+    expect(at("buyer").label).not.toMatch(/Pay the seller now/);
+    expect(at("agent").label).not.toMatch(/buyer to pay/);
+    // Once they are there, it is the buyer's move again.
+    expect(
+      dealHeadline("IN_CUSTODY", "SAFEST", "buyer", 6, "INSTAGRAM").label,
+    ).toBe("Pay the seller now");
+  });
+
+  test("a seller with a step still to come is never told their part is done", () => {
+    // QA, CA-82257: after making our agent an admin on Telegram the seller
+    // read "your part is done for now", with ownership still to transfer.
+    for (const platform of PLATFORMS) {
+      const fastest = dealHeadline(
+        "AGENT_VERIFYING",
+        "FASTEST",
+        "seller",
+        3,
+        platform,
+      ).sentence;
+      const safest = dealHeadline(
+        "AWAITING_CUSTODY",
+        "SAFEST",
+        "seller",
+        3,
+        platform,
+      ).sentence;
+      for (const sentence of [fastest, safest]) {
+        expect(sentence, platform).not.toMatch(/part is done/);
+        expect(sentence, platform).toMatch(/your turn again/);
+      }
+    }
+    expect(
+      dealHeadline("AGENT_VERIFYING", "FASTEST", "seller", 3, "TELEGRAM")
+        .sentence,
+    ).toMatch(/transfer ownership to our agent — that is when you are paid/);
+  });
+
+  test("the end of a deal names what changed hands", () => {
+    // QA, CA-27058 and CA-90232: "The channel is yours" on Instagram and a
+    // website.
+    expect(completeWords("buyer", "SAFEST", "INSTAGRAM").title).toBe(
+      "Congratulations! The account is yours.",
+    );
+    expect(completeWords("seller", "SAFEST", "FACEBOOK").body).toMatch(
+      /the Page is theirs/,
+    );
+    expect(completeWords("agent", "FASTEST", "WEBSITE").body).toBe(
+      "The website has changed hands and the seller has been paid.",
+    );
+    for (const platform of ["INSTAGRAM", "FACEBOOK", "WEBSITE"] as const) {
+      for (const viewer of ["buyer", "seller", "agent"] as const) {
+        const words = completeWords(viewer, "SAFEST", platform);
+        expect(`${words.title} ${words.body}`).not.toMatch(/\bchannel\b/);
+      }
+    }
+  });
+
+  test("Safest holds the account only once our agent has it", () => {
+    // QA, CA-27058: "Channel Adda holds: The account" as soon as the fee
+    // was paid.
+    const before = heldLine({
+      mode: "SAFEST",
+      platform: "INSTAGRAM",
+      idle: false,
+      inCustody: false,
+    });
+    expect(before?.label).toBe("Next");
+    expect(before?.value).toEqual({
+      kind: "text",
+      text: "Our agent takes the account",
+    });
+    expect(
+      heldLine({
+        mode: "SAFEST",
+        platform: "INSTAGRAM",
+        idle: false,
+        inCustody: true,
+      }),
+    ).toMatchObject({
+      label: "Channel Adda holds",
+      value: { kind: "text", text: "The account" },
+    });
+    expect(
+      heldLine({
+        mode: "FASTEST",
+        platform: "TELEGRAM",
+        idle: false,
+        inCustody: false,
+      })?.value,
+    ).toEqual({ kind: "total" });
+    expect(
+      heldLine({
+        mode: "FASTEST",
+        platform: "TELEGRAM",
+        idle: true,
+        inCustody: false,
+      }),
+    ).toBeNull();
+  });
+
+  test("a step done reads with the reader as you", () => {
+    // QA, CA-87042: the buyer read "Imran Hossain made the buyer an admin".
+    const ctx = (reader: "buyer" | "seller" | "agent" | "staff") => ({
+      reader,
+      platform: "TELEGRAM" as const,
+      mode: "FASTEST" as const,
+    });
+    const line = "Imran Hossain made the buyer an admin";
+    expect(readDealLine(line, ctx("buyer"))).toBe(
+      "Imran Hossain made you an admin",
+    );
+    expect(readDealLine(line, ctx("seller"))).toBe(line);
+    expect(
+      readDealLine("Nadia Rahman made our agent an admin", ctx("agent")),
+    ).toBe("Nadia Rahman made you an admin");
+    expect(
+      readDealLine(
+        "Imran Hossain transferred ownership to the buyer",
+        ctx("buyer"),
+      ),
+    ).toBe("Imran Hossain transferred ownership to you");
+    expect(didFor("made the buyer an admin", "staff")).toBe(
+      "made the buyer an admin",
+    );
+  });
+
+  test("the seller-paid line says you to the seller", () => {
+    const line =
+      "Our agent has the channel now, so the seller has been paid. Our agent hands it to the buyer next";
+    expect(
+      readDealLine(line, {
+        reader: "seller",
+        platform: "TELEGRAM",
+        mode: "FASTEST",
+      }),
+    ).toBe(
+      "Our agent has the channel now, so you have been paid. Our agent hands it to the buyer next",
+    );
+    expect(
+      readDealLine(
+        "Our agent is primary owner, so the seller has been paid. Our agent makes the buyer primary owner next",
+        { reader: "buyer", platform: "FACEBOOK", mode: "FASTEST" },
+      ),
+    ).toBe(
+      "Our agent has the Page now, so the seller has been paid. Our agent hands it to you next",
+    );
+  });
+
+  test("a line from before each platform had its words reads in them now", () => {
+    // QA, CA-17139: "Done: Invite the agent as owner" on an Instagram deal.
+    expect(
+      readDealLine("Done: Invite the agent as owner (Imran Khan)", {
+        reader: "buyer",
+        platform: "INSTAGRAM",
+        mode: "SAFEST",
+      }),
+    ).toBe("Imran Khan sent our agent the login");
+    expect(
+      readDealLine("Done: Confirm primary ownership (Imran Hossain)", {
+        reader: "seller",
+        platform: "WEBSITE",
+        mode: "FASTEST",
+      }),
+    ).toBe("Imran Hossain confirmed the domain and hosting are Channel Adda's");
+    // A step no template has any more is left as it was.
+    expect(
+      readDealLine("Done: Release the seller's funds (Sara)", {
+        reader: "buyer",
+        platform: "YOUTUBE",
+        mode: "FASTEST",
+      }),
+    ).toBe("Done: Release the seller's funds (Sara)");
+    // And a member's own words are never touched.
+    const reason =
+      "Nadia cancelled this deal. Their reason: “the buyer made me an admin”";
+    expect(
+      readDealLine(reason, {
+        reader: "buyer",
+        platform: "TELEGRAM",
+        mode: "FASTEST",
+      }),
+    ).toBe(reason);
   });
 });

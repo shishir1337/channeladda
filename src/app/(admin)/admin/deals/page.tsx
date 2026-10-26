@@ -28,7 +28,6 @@ import {
   DealHead,
   DealModeBadge,
   elapsed,
-  ORDER_STATUS,
   OrderStatusBadge,
   orderStatusLabel,
   TitleWithInfo,
@@ -435,6 +434,7 @@ export default async function AdminDealsPage({
                 {assignable ? (
                   <AssignAgent
                     orderId={order.id}
+                    platform={order.listing.platform}
                     agents={runnersFor(order.priceUsd)}
                     currentAgentId={order.agent?.id ?? null}
                   />
@@ -443,6 +443,7 @@ export default async function AdminDealsPage({
                   orderId={order.id}
                   mode={order.mode}
                   status={order.status}
+                  platform={order.listing.platform}
                   canMoveMoney={isFinance}
                   paid={order.paymentRef !== null}
                   inCustody={order.custodyAt !== null}
@@ -568,8 +569,10 @@ export default async function AdminDealsPage({
                 // "with the buyer". A handover is shared, so it says nothing.
                 // The open step decides, so the row moves on the moment
                 // the seller has done their part of a shared status.
-                const whose =
-                  order.awaiting ?? ORDER_STATUS[order.status]?.whose ?? null;
+                // `dealTurn`, as everywhere: a disputed deal is with a
+                // moderator, not "with the seller" (QA, CA-75190), and a
+                // running hold is nobody's move.
+                const turn = order.turn;
                 return (
                   <ListItem key={order.id} padded={false}>
                     <Link
@@ -587,13 +590,24 @@ export default async function AdminDealsPage({
                             <DealModeBadge mode={order.mode} />
                             <OrderStatusBadge status={order.status} />
                             <Waited since={order.createdAt} prefix="open" />
-                            {whose === "agent" ? (
+                            {turn.kind === "paused" ? (
+                              <span className="text-xs whitespace-nowrap text-danger">
+                                Paused for a moderator
+                              </span>
+                            ) : turn.kind === "held" ? (
+                              <span className="text-xs whitespace-nowrap text-subtle">
+                                In the waiting period
+                              </span>
+                            ) : turn.kind === "move" &&
+                              turn.actor === "agent" ? (
                               <TurnFlag mine />
-                            ) : whose && whose !== "transfer" ? (
+                            ) : turn.kind === "move" ? (
                               <TurnFlag
                                 mine={false}
                                 who={
-                                  whose === "staff" ? "staff" : `the ${whose}`
+                                  turn.actor === "staff"
+                                    ? "staff"
+                                    : `the ${turn.actor}`
                                 }
                               />
                             ) : null}
@@ -689,7 +703,11 @@ export default async function AdminDealsPage({
                   />
                   {isAgent ? (
                     withinLevel(myLevel, viewer.role, order.priceUsd) ? (
-                      <ClaimDeal orderId={order.id} identity={identity} />
+                      <ClaimDeal
+                        orderId={order.id}
+                        platform={order.listing.platform}
+                        identity={identity}
+                      />
                     ) : (
                       <p className="mt-2 text-xs text-subtle">
                         Outside your level ({levelLabel(myLevel).toLowerCase()}
@@ -700,6 +718,7 @@ export default async function AdminDealsPage({
                   {assignable && isStaff ? (
                     <AssignAgent
                       orderId={order.id}
+                      platform={order.listing.platform}
                       agents={runnersFor(order.priceUsd)}
                       currentAgentId={null}
                     />
@@ -708,6 +727,7 @@ export default async function AdminDealsPage({
                     orderId={order.id}
                     mode={order.mode}
                     status={order.status}
+                    platform={order.listing.platform}
                     canMoveMoney={isFinance}
                     paid={order.paymentRef !== null}
                     inCustody={order.custodyAt !== null}

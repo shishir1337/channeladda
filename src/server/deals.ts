@@ -12,7 +12,7 @@ import type {
   Platform,
   UserRole,
 } from "@/generated/prisma/enums";
-import { money } from "@/lib/chat-events";
+import { money, quoteReason } from "@/lib/chat-events";
 import { isCustodianRole, mayEndHolds, withinLevel } from "@/lib/custody-roles";
 import { db } from "@/lib/db";
 import {
@@ -29,6 +29,7 @@ import {
   templateFor,
   usesCurrentSteps,
 } from "@/lib/deal-templates";
+import { dealTurn, payToMissingOn, type Turn } from "@/lib/deal-turn";
 import { activeWait, holdDaysFor, type Wait } from "@/lib/deal-waits";
 import { orderAmounts } from "@/lib/fees";
 import { parseHandoverTo } from "@/lib/handover-target";
@@ -1528,32 +1529,9 @@ export async function advanceStep(input: {
   await notifyNextActor(order.id);
   // The last step leaves no next actor, so nobody heard that the deal they
   // were in had finished. Everyone on it does now.
-  if (completing) {
-    await notifyDealEnded(order.id, RESOLUTION_LABELS.COMPLETED);
-  }
-  // Our agent has verified the channel and the buyer pays the seller next.
-  // A seller who never said where is reminded — once, because this step
-  // completes once — or the buyer arrives at their turn with nowhere to
-  // send it.
-  if (
-    order.mode === "SAFEST" &&
-    input.position === BUYER_PAYS_AFTER_STEP &&
-    !order.sellerPayTo
-  ) {
-    const title = "The buyer is ready to pay you — add where to be paid";
-    const body =
-      "Our agent has verified the channel and the buyer pays you next. Say where they should send the money, on the deal.";
-    await notify({
-      userId: order.sellerId,
-      kind: "ORDER",
-      title,
-      body,
-      href: order.conversationId
-        ? threadHref(order.conversationId, order.listingId)
-        : `/dashboard/deals/${order.id}`,
-      email: { subject: title, body },
-    });
-  }
+  if (completing) await notifyCompleted(order.id);
+  // A Safest seller who never said where to be paid is asked by
+  // `notifyNextActor` above: the buyer's step is theirs until they do.
 
   // For a Fastest seller this is the end of their deal: the money has
   // landed. By email too, because it is the one thing they were waiting for.
@@ -1634,6 +1612,37 @@ const RESOLUTION_ACTIONS = {
 export function publicReason(note: string): string {
   const clean = redactContactDetails(note.trim()).body.replace(/\s+/g, " ");
   return clean.length > 280 ? `${clean.slice(0, 279).trimEnd()}…` : clean;
+}
+
+/**
+ * Everybody on a deal that went through, told it went through: the bell
+ * said "…has closed", word for word what a cancelled deal says (QA, round
+ * 2). The buyer reads that the account is theirs, the seller that it is
+ * the buyer's — and, on Fastest, where their money is.
+ */
+async function notifyCompleted(orderId: string): Promise<void> {
+  const order = await db.order.findUnique({
+    where: { id: orderId },
+    select: {
+      reference: true,
+      mode: true,
+      listing: { select: { title: true, platform: true } },
+      buyer: { select: { name: true } },
+    },
+  });
+  if (!order) return;
+  const asset = wordsFor(order.listing.platform).asset;
+  const buyer = order.buyer.name || "the buyer";
+  await notifyDealEnded(orderId, "Deal complete", {
+    byRole: {
+      buyer: `The ${asset} is yours now: ${order.listing.title}. Your certificate is on the deal.`,
+      seller:
+        order.mode === "FASTEST"
+          ? `The ${asset} is ${buyer}'s now, and your money is in your Channel Adda wallet. Your certificate is on the deal.`
+          : `The ${asset} is ${buyer}'s now, and they paid you directly. Your certificate is on the deal.`,
+      agent: `The ${asset} is ${buyer}'s now. Nothing is outstanding on ${order.reference}.`,
+    },
+  });
 }
 
 /** What both sides are told the outcome was. */
@@ -2261,6 +2270,8 @@ export async function resolveDeal(input: {
         ? "Channel Adda cancelled this deal"
         : `${byName} cancelled this deal${reason ? `. Their reason: “${reason}”` : ""}`
       : null;
+  // What went back to the buyer's balance, said in the ending's notice.
+  let refundedCents = 0;
   try {
     await db.$transaction(async (tx) => {
       const moved = await tx.order.updateMany({
@@ -2338,6 +2349,7 @@ export async function resolveDeal(input: {
       // the buyer's own wallet through the payout queue.
 
       const refund = async (amountUsd: number, note: string) => {
+        refundedCents += amountUsd;
         await tx.ledgerEntry.create({
           data: {
             orderId: order.id,
@@ -2457,15 +2469,43 @@ export async function resolveDeal(input: {
       href: "/admin/disputes",
     }));
   } else if (input.to === "CANCELLED" && actor !== "staff") {
-    // The other side hears who called it off and why.
+    // The other side hears who called it off and why, and the buyer hears
+    // about their own money as theirs: "Everything the buyer paid is back
+    // in their balance" reached the buyer (QA, CA-50979).
     const paid = order.paymentRef !== null;
+    const back = (reader: "buyer" | "other") =>
+      paid
+        ? reader === "buyer"
+          ? " Everything you paid is back in your Channel Adda balance."
+          : " Everything the buyer paid is back in their Channel Adda balance."
+        : "";
+    const why = reason ? ` Their reason: ${quoteReason(reason)}` : "";
+    const ended = `${byName} cancelled the deal for ${order.listing.title}.${why}`;
     await notifyDealEnded(order.id, RESOLUTION_LABELS.CANCELLED, {
       byUserId: input.byUserId,
-      own: `You cancelled the deal for ${order.listing.title}.${paid ? " Everything the buyer paid is back in their Channel Adda balance." : ""}`,
-      others: `${byName} cancelled the deal for ${order.listing.title}.${reason ? ` Their reason: “${reason}”.` : ""}${paid ? " Everything the buyer paid is back in their Channel Adda balance." : ""}`,
+      own: `You cancelled the deal for ${order.listing.title}.${back(actor === "buyer" ? "buyer" : "other")}`,
+      byRole: { buyer: `${ended}${back("buyer")}` },
+      others: `${ended}${back("other")}`,
     });
+  } else if (input.to === "COMPLETED") {
+    await notifyCompleted(order.id);
   } else {
-    await notifyDealEnded(order.id, RESOLUTION_LABELS[input.to]);
+    // A refund says how much, to the buyer and to the others: "Buyer
+    // refunded – The deal has closed" said neither (QA, CA-75190).
+    const closed = `The deal for ${order.listing.title} has closed.`;
+    const sum = money(refundedCents);
+    await notifyDealEnded(
+      order.id,
+      RESOLUTION_LABELS[input.to],
+      refundedCents > 0
+        ? {
+            byRole: {
+              buyer: `${sum} is back in your Channel Adda balance. ${closed}`,
+            },
+            others: `The buyer was refunded ${sum}. ${closed}`,
+          }
+        : undefined,
+    );
   }
 
   await recordAudit({
@@ -2509,6 +2549,11 @@ export type DealListRow = {
   listingId: string;
   /** The open step's stored label, for its name on screen. */
   openLabel: string | null;
+  /**
+   * Safest: the buyer's turn to pay, and the seller has not said where. It
+   * is the seller's move then (`dealTurn`), and `awaiting` says so.
+   */
+  payToMissing: boolean;
 };
 
 /**
@@ -2537,6 +2582,7 @@ export async function listDealsFor(userId: string): Promise<DealListRow[]> {
       createdAt: true,
       conversationId: true,
       listingId: true,
+      sellerPayTo: true,
       listing: { select: { title: true, platform: true } },
       buyer: { select: { name: true } },
       seller: { select: { name: true } },
@@ -2563,6 +2609,22 @@ export async function listDealsFor(userId: string): Promise<DealListRow[]> {
         : order.sellerId === userId
           ? ("seller" as const)
           : ("agent" as const);
+    // The seller's move while the buyer has nothing to pay to: the same
+    // rule as the deal page and the chat (`dealTurn`).
+    const payToMissing = payToMissingOn({
+      mode: order.mode,
+      status: order.status,
+      next: open
+        ? {
+            position: open.position,
+            label: open.label,
+            actor: open.actor as DealActor,
+          }
+        : null,
+      holdUntil: order.holdUntil,
+      agentId: order.agentId,
+      sellerPayTo: order.sellerPayTo,
+    });
 
     return {
       id: order.id,
@@ -2578,7 +2640,10 @@ export async function listDealsFor(userId: string): Promise<DealListRow[]> {
         ? null
         : waitsForAgent
           ? "staff"
-          : ((open?.actor as DealActor) ?? null),
+          : payToMissing
+            ? "seller"
+            : ((open?.actor as DealActor) ?? null),
+      payToMissing,
       openStep: isTerminal(order.status)
         ? null
         : (order.steps[0]?.position ?? null),
@@ -2702,6 +2767,20 @@ export type DealView = {
   endedLine: string | null;
   /** Cents handed back to the buyer's balance on this deal. */
   refundedUsd: number;
+  /**
+   * Whose move it is, the one rule every view reads (`dealTurn`): a
+   * dispute, an agent being assigned, a running hold, or somebody's move —
+   * the seller's while they have not said where to be paid.
+   */
+  turn: Turn;
+  /** Safest: the buyer's turn to pay, and the seller has not said where. */
+  payToMissing: boolean;
+  /**
+   * While a dispute holds the deal: who raised it and what about, in their
+   * words with contact details taken out. Null otherwise, and for a
+   * dispute raised by staff or by the payment processor.
+   */
+  disputeLine: string | null;
 };
 
 /**
@@ -2798,6 +2877,25 @@ export async function getDealFor(
         refundedTo(order.id, order.buyerId),
       ])
     : [null, 0];
+  const disputeLine =
+    order.status === "DISPUTED"
+      ? await disputeLineFor(order, viewerRole)
+      : null;
+  const open = order.steps.find((s) => s.completedAt === null);
+  const turnInput = {
+    mode: order.mode,
+    status: order.status,
+    next: open
+      ? {
+          position: open.position,
+          label: open.label,
+          actor: open.actor as DealActor,
+        }
+      : null,
+    holdUntil: order.holdUntil,
+    agentId: order.agentId,
+    sellerPayTo: order.sellerPayTo,
+  };
 
   const steps: DealStepView[] = order.steps.map((s) => ({
     position: s.position,
@@ -2878,7 +2976,45 @@ export async function getDealFor(
     fromOffer: order.offerId !== null,
     endedLine,
     refundedUsd,
+    turn: dealTurn(turnInput),
+    payToMissing: payToMissingOn(turnInput),
+    disputeLine,
   };
+}
+
+/**
+ * Who paused a deal and why, for the people on it: the deal page said
+ * "paused" and nothing about what (QA, CA-75190). Their own words, with
+ * contact details taken out, as the deal chat and the bell have them.
+ */
+async function disputeLineFor(
+  order: { id: string; buyerId: string; sellerId: string },
+  viewer: DealActor,
+): Promise<string | null> {
+  const raised = await db.auditLog.findFirst({
+    where: { entity: "order", entityId: order.id, action: "deal.disputed" },
+    orderBy: { createdAt: "desc" },
+    select: { actorId: true, after: true, actor: { select: { name: true } } },
+  });
+  if (!raised) return null;
+  const who =
+    raised.actorId === order.buyerId
+      ? "buyer"
+      : raised.actorId === order.sellerId
+        ? "seller"
+        : null;
+  // Staff pause a deal as Channel Adda, and their note is for the desk.
+  if (!who) return "Channel Adda paused this deal to look at it.";
+  const note = (raised.after as { note?: unknown } | null)?.note;
+  const reason =
+    typeof note === "string" && note.trim() ? publicReason(note) : null;
+  const name =
+    who === viewer
+      ? "You"
+      : raised.actor?.name || (who === "buyer" ? "The buyer" : "The seller");
+  return reason
+    ? `${name} raised it: ${quoteReason(reason)}`
+    : `${name} raised it, without a reason.`;
 }
 
 /**
@@ -2945,7 +3081,7 @@ async function endingLine(
     if (who === "staff") return "Channel Adda cancelled this deal.";
     const name =
       who === viewer ? "You" : who === "buyer" ? "The buyer" : "The seller";
-    return `${name} cancelled this deal.${reason ? ` ${who === viewer ? "Your" : "Their"} reason: “${reason}”.` : ""}`;
+    return `${name} cancelled this deal.${reason ? ` ${who === viewer ? "Your" : "Their"} reason: ${quoteReason(reason)}` : ""}`;
   }
   // Closed by the platform: somebody else's payment took the listing.
   const [lost, credited] = await Promise.all([

@@ -35,8 +35,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { iconText } from "@/components/ui/icon-hue";
 import type { UserRole } from "@/generated/prisma/enums";
-import { isCustodianRole, levelLabel } from "@/lib/custody-roles";
+import { capLoad, isCustodianRole, levelLabel } from "@/lib/custody-roles";
 import { emailVerificationRequired } from "@/lib/email-verification";
+import {
+  IDENTITY_FIELDS,
+  type IdentityField,
+  type TransferIds,
+} from "@/lib/transfer-identity";
 import { cn } from "@/lib/utils";
 import {
   INVITABLE_ROLES,
@@ -94,6 +99,56 @@ function TwoFactor({ on }: { on: boolean }) {
   );
 }
 
+/** The accounts on a member, as the transfer-identity rules read them. */
+function identityOf(member: {
+  agentEmail: string | null;
+  agentTelegram: string | null;
+  agentFacebook: string | null;
+}): TransferIds {
+  return {
+    email: member.agentEmail,
+    telegram: member.agentTelegram,
+    facebook: member.agentFacebook,
+  };
+}
+
+/** "Hands over to transfers@… · @ca_transfers · no Facebook account". */
+function handsOverTo(member: {
+  agentEmail: string | null;
+  agentTelegram: string | null;
+  agentFacebook: string | null;
+  agentBrand: string | null;
+}): string {
+  const ids = identityOf(member);
+  if (!member.agentBrand || IDENTITY_FIELDS.every(({ field }) => !ids[field])) {
+    return "No transfer identity";
+  }
+  return IDENTITY_FIELDS.map(({ field }) => ids[field] ?? MISSING[field]).join(
+    " · ",
+  );
+}
+
+/** What a row in "Worth fixing" says is missing. */
+function missingLine(member: {
+  agentEmail: string | null;
+  agentTelegram: string | null;
+  agentFacebook: string | null;
+  agentBrand: string | null;
+}): string {
+  const ids = identityOf(member);
+  const gone = IDENTITY_FIELDS.filter(({ field }) => !ids[field]);
+  if (!member.agentBrand || gone.length === IDENTITY_FIELDS.length) {
+    return "Has no transfer identity";
+  }
+  return `Has ${gone.map(({ field }) => MISSING[field]).join(" and ")}`;
+}
+
+const MISSING: Readonly<Record<IdentityField, string>> = {
+  email: "no email",
+  telegram: "no Telegram username",
+  facebook: "no Facebook account",
+};
+
 /**
  * An agent's load against the cap.
  *
@@ -118,14 +173,17 @@ function Load({
     );
   }
 
-  const atCap = holds >= cap;
-  const nearCap = !atCap && holds >= cap - 1;
+  // Over the limit is its own state: "11 of 10 · At cap" said the agent
+  // was at it (QA).
+  const load = capLoad(holds, cap);
+  const atCap = load.state === "at" || load.state === "over";
+  const nearCap = load.state === "near";
 
   return (
     <span className="inline-flex flex-col items-end gap-1">
       <span className="inline-flex items-center gap-2.5">
         <Meter
-          value={holds}
+          value={Math.min(holds, cap)}
           max={cap}
           label="Channels held against the cap"
           tone={atCap ? "danger" : nearCap ? "primary" : "neutral"}
@@ -137,13 +195,13 @@ function Load({
             atCap ? "text-danger" : nearCap ? "text-primary-text" : "text-fg",
           )}
         >
-          {holds} of {cap}
+          {load.state === "over" ? load.line : `${holds} of ${cap}`}
         </span>
       </span>
-      {atCap ? (
+      {load.state === "at" ? (
         <Badge variant="danger">
           <TriangleAlertIcon aria-hidden="true" />
-          At cap
+          At the limit
         </Badge>
       ) : nearCap ? (
         <Badge variant="primary">One left</Badge>
@@ -165,7 +223,14 @@ export default async function AdminTeamPage() {
   const available = agents.filter(
     (agent) => !agent.banned && agent.holds < maxHoldsPerAgent,
   );
-  const noIdentity = agents.filter((agent) => agent.agentEmail === null);
+  // Missing any of the accounts sellers hand a deal to: those deals cannot
+  // go to them.
+  const noIdentity = agents.filter(
+    (agent) =>
+      !agent.banned &&
+      (!agent.agentBrand ||
+        IDENTITY_FIELDS.some(({ field }) => identityOf(agent)[field] === null)),
+  );
   const noTwoFactor = members.filter(
     (member) => !member.twoFactorEnabled && !member.banned,
   );
@@ -264,9 +329,9 @@ export default async function AdminTeamPage() {
               </span>
               {noIdentity.length > 0 ? (
                 <span className="mt-2 block">
-                  Has no transfer identity, so whoever assigns them a deal types
-                  the address a seller is told to invite. One typo is a channel
-                  invited to nobody.
+                  Missing an account sellers hand a deal to — an email, a
+                  Telegram username or a Facebook account — so deals on that
+                  platform cannot be taken by them or given to them.
                 </span>
               ) : null}
               {noTwoFactor.length > 0 ? (
@@ -290,7 +355,7 @@ export default async function AdminTeamPage() {
                     <Avatar name={agent.name} className="size-8 text-xs" />
                   }
                   title={agent.name}
-                  meta="Has no transfer identity"
+                  meta={missingLine(agent)}
                   trailing={
                     <span className="hidden text-[0.8125rem] font-medium text-muted transition-colors group-hover:text-fg sm:inline">
                       Set it
@@ -376,8 +441,15 @@ export default async function AdminTeamPage() {
                             ) : null}
                           </Link>
                           <span className="block max-w-[15rem] truncate text-[0.8125rem] leading-5 text-muted">
-                            {member.agentEmail ?? member.email}
+                            {member.email}
                           </span>
+                          {/* What sellers hand their deals to, per platform:
+                              a sign-in email is not one of them. */}
+                          {isCustodianRole(member.role) ? (
+                            <span className="block max-w-[15rem] truncate text-xs leading-5 text-subtle">
+                              {handsOverTo(member)}
+                            </span>
+                          ) : null}
                         </div>
                       </div>
                     </Td>

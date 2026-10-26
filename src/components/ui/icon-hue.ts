@@ -1,6 +1,7 @@
 import {
   ActivityIcon,
   ArrowLeftRightIcon,
+  AtSignIcon,
   AwardIcon,
   BadgeCheckIcon,
   BanIcon,
@@ -185,6 +186,7 @@ const FAMILIES: Record<Hue, Icon[]> = {
     MailIcon,
     MailOpenIcon,
     MailCheckIcon,
+    AtSignIcon,
     SendIcon,
     InboxIcon,
     PhoneIcon,

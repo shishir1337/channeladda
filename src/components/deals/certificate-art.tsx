@@ -45,6 +45,15 @@ export const tight = (text: string) => text.replace(/ /g, "\u00a0");
 export const ligatureSafe = (text: string) =>
   text.replace(/(\S*f[il]\S*) /gi, "$1\u00a0");
 
+/**
+ * The certificate's one paragraph. No "fi", "fl" or "ff" in it: the
+ * renderer draws those as one glyph and leaves the gap they were measured
+ * at, and "This certifies that  the account" kept its double space after
+ * every no-break fix (QA, cert-SA). Words without the ligature have none.
+ */
+export const RECORD_LINE =
+  "This records that the account below changed hands through Channel Adda, with a Channel Adda agent supervising the handover.";
+
 const usd = (cents: number) =>
   (cents / 100).toLocaleString("en-US", {
     style: "currency",
@@ -166,9 +175,7 @@ export function CertificateArt({
               maxWidth: 1080,
             }}
           >
-            {ligatureSafe(
-              "This certifies that the account below changed hands through Channel Adda, with a Channel Adda agent supervising the handover.",
-            )}
+            {ligatureSafe(RECORD_LINE)}
           </span>
         </div>
 
@@ -346,7 +353,7 @@ export function certificateText(c: Certificate, checkAt: string): string[] {
   return [
     "Channel Adda - Certificate of Transfer",
     `Certificate no. ${c.code}`,
-    "This certifies that the account below changed hands through Channel Adda, with a Channel Adda agent supervising the handover.",
+    RECORD_LINE,
     `${PLATFORM_NAME[c.platform]} account: ${c.handle}`,
     c.title,
     `From the seller: ${c.sellerName}`,

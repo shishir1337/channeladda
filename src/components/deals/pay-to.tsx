@@ -14,6 +14,7 @@ import { FormNotice } from "@/components/auth/fields";
 import { BusyLabel } from "@/components/deals/deal-timeline";
 import { Button } from "@/components/ui/button";
 import { iconText } from "@/components/ui/icon-hue";
+import { isTerminal } from "@/lib/deal-machine";
 import { MAX_PAY_TO } from "@/lib/pay-to";
 import { cn } from "@/lib/utils";
 import { savePayTo } from "@/server/actions/deals";
@@ -41,6 +42,23 @@ function when(date: Date) {
  */
 export function PayToCard({ deal }: { deal: DealView }) {
   if (deal.mode !== "SAFEST") return null;
+  // A deal that ended without going through has nothing left to pay: the
+  // seller of a cancelled deal was still offered the box and Save (QA,
+  // CA-20129). A completed one keeps what was said, as its record.
+  if (isTerminal(deal.status)) {
+    if (deal.status !== "COMPLETED" || !deal.sellerPayTo) return null;
+    return (
+      <Frame
+        title={
+          deal.viewerRole === "seller"
+            ? `Where ${deal.buyerName} paid you`
+            : "Where the buyer paid the seller"
+        }
+      >
+        <Details text={deal.sellerPayTo} />
+      </Frame>
+    );
+  }
   if (deal.viewerRole === "seller") return <SellerEditor deal={deal} />;
   if (deal.viewerRole === "buyer") return <BuyerView deal={deal} />;
   // The agent and staff see what the seller said, to settle a disagreement.

@@ -23,6 +23,7 @@ import { AgentInvite } from "@/components/deals/agent-invite";
 import { DealComplete } from "@/components/deals/deal-complete";
 import {
   dealHeadline,
+  heldLine,
   STATUS_LABELS,
   STATUS_TONE,
   wordsFor,
@@ -102,17 +103,10 @@ export default async function DealPage({
     new Date(deal.holdUntil).getTime() > Date.now();
   // When an unpaid deal lapses: the payment window's clock.
   const payBy = unpaid && deal.wait ? deal.wait.until : null;
-  // Safest: the buyer's turn to pay the seller, and the seller has not
-  // said where. Adding it is the seller's move.
-  const payToOwed =
-    safest &&
-    viewer === "seller" &&
-    deal.nextStep?.label === "Pay the seller" &&
-    !deal.sellerPayTo &&
-    !disputed;
   // By whose step is open as well as by status: one status can cover the
   // seller's step and then the agent's, and the headline has to move on
-  // the moment the first is done.
+  // the moment the first is done. A Safest seller who has not said where
+  // to be paid owes the next move, not the buyer (`dealTurn`).
   const headline = dealHeadline(
     deal.status,
     deal.mode,
@@ -121,6 +115,8 @@ export default async function DealPage({
     deal.platform,
     deal.awaitingAgent,
     held,
+    deal.payToMissing,
+    deal.buyerName,
   );
   // A deal that stopped short says why: who cancelled it and their reason,
   // or that another buyer paid first — not only "Cancelled".
@@ -137,10 +133,17 @@ export default async function DealPage({
   // sitting beside it. It is the only payment Channel Adda takes.
   const paying = viewer === "buyer" && unpaid;
   const yourMove =
-    paying ||
-    payToOwed ||
-    (deal.nextStep?.actor === viewer && !held && !deal.awaitingAgent);
+    paying || (deal.turn.kind === "move" && deal.turn.actor === viewer);
   const wallet = paying ? await getWallet(user.id) : null;
+
+  // What Channel Adda holds now, for the money card's last line.
+  const holding = heldLine({
+    mode: deal.mode,
+    platform: deal.platform,
+    idle: terminal || unpaid,
+    inCustody: deal.custodyAt !== null,
+    checking: deal.nextStep?.label === "Verify the channel",
+  });
 
   const ModeIcon = safest ? ShieldCheckIcon : ZapIcon;
   // Only a deal that went through has one; null otherwise.
@@ -218,6 +221,7 @@ export default async function DealPage({
               reference={deal.reference}
               viewerRole={viewer}
               mode={deal.mode}
+              platform={deal.platform}
               completedAt={certificate.completedAt}
               code={
                 viewer === "buyer" || viewer === "seller"
@@ -242,6 +246,11 @@ export default async function DealPage({
               </h2>
               <Callout tone="danger" title={STATUS_LABELS[deal.status]}>
                 {sentence}
+                {/* What it is about: "paused" alone told the seller
+                    nothing (QA, CA-75190). */}
+                {deal.disputeLine ? (
+                  <span className="mt-1.5 block">{deal.disputeLine}</span>
+                ) : null}
               </Callout>
             </section>
           ) : null}
@@ -391,29 +400,22 @@ export default async function DealPage({
                 ) : null}
                 {/* Only while the deal is live and paid: once it has ended,
                     nothing is being held and a present-tense claim here
-                    would be false — and before payment, nothing is yet. */}
-                {terminal || unpaid ? null : (
+                    would be false — and before payment, nothing is yet.
+                    Safest holds the account only once our agent has it. */}
+                {holding ? (
                   <Line
-                    label={
-                      safest || sellerPaid
-                        ? "Channel Adda holds"
-                        : "Channel Adda is holding"
-                    }
+                    label={holding.label}
                     value={
-                      safest || sellerPaid ? (
-                        `The ${words.asset}`
-                      ) : (
+                      holding.value.kind === "total" ? (
                         <Price usd={deal.totalUsd / 100} />
+                      ) : (
+                        holding.value.text
                       )
                     }
                     money
-                    note={
-                      safest || sellerPaid
-                        ? `our agent holds it until it is handed to the buyer`
-                        : "the price and our fee together"
-                    }
+                    note={holding.note}
                   />
-                )}
+                ) : null}
               </dl>
             </section>
           </Card>

@@ -689,6 +689,8 @@ export default async function AdminUserPage({
             holds={person.holds}
             maxHolds={person.maxHolds}
             agentEmail={person.agentEmail}
+            agentTelegram={person.agentTelegram}
+            agentFacebook={person.agentFacebook}
             agentBrand={person.agentBrand}
             dealLevel={person.dealLevel}
           />

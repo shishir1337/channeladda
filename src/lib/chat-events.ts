@@ -70,6 +70,15 @@ export function money(cents: number): string {
   });
 }
 
+/**
+ * A member's reason in quotes, ending its sentence once: "Their reason:
+ * “…safely.”" and not "“…safely.”." (QA, CA-50979).
+ */
+export function quoteReason(reason: string): string {
+  const text = reason.trim();
+  return /[.!?…]$/.test(text) ? `“${text}”` : `“${text}”.`;
+}
+
 /** A blank name reads as a hole in the sentence. */
 function who(name: string): string {
   return name.trim() || "Someone";
@@ -129,7 +138,7 @@ export function eventText(event: ChatEvent): string {
         : "Our agent is primary owner, so the seller has been paid. Our agent makes the buyer primary owner next";
     case "dispute-raised":
       return event.reason
-        ? `${who(event.name)} raised a dispute: “${event.reason}”. The deal is paused while Channel Adda looks at it`
+        ? `${who(event.name)} raised a dispute: ${quoteReason(event.reason)} The deal is paused while Channel Adda looks at it`
         : `${who(event.name)} raised a dispute. The deal is paused while Channel Adda looks at it`;
     case "deal-ended":
       return event.outcome;
@@ -145,7 +154,8 @@ export function eventText(event: ChatEvent): string {
  * read it — so on Bilal's own screen it said "Bilal Ahmed opened a Safest
  * deal" (QA, 2026-10-26). The person who did it reads "You": the name that
  * starts the line is theirs, or the one in brackets on a line written
- * before lines led with it. Nothing else in the line changes.
+ * before lines led with it — and "Their reason" on their own cancellation
+ * is theirs too. Nothing else in the line changes.
  */
 export function eventForReader(
   body: string,
@@ -153,7 +163,12 @@ export function eventForReader(
 ): string {
   const name = reader.senderName.trim();
   if (!reader.mine || !name) return body;
-  if (body.startsWith(`${name} `)) return `You ${body.slice(name.length + 1)}`;
+  if (body.startsWith(`${name} `)) {
+    return `You ${body.slice(name.length + 1)}`.replace(
+      /^(You cancelled this deal)\. Their reason: /,
+      "$1. Your reason: ",
+    );
+  }
   const older = ` (${name})`;
   if (body.startsWith("Done: ") && body.endsWith(older)) {
     return `${body.slice(0, -older.length)} (you)`;

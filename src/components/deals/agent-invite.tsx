@@ -1,7 +1,8 @@
-import { MailIcon } from "lucide-react";
+import { AtSignIcon, MailIcon, UserRoundIcon } from "lucide-react";
 import { Callout, Card } from "@/components/app/kit";
 import { wordsFor } from "@/components/deals/deal-status";
 import { iconText } from "@/components/ui/icon-hue";
+import { IDENTITY_FIELD, identityName } from "@/lib/transfer-identity";
 import type { DealView } from "@/server/deals";
 
 /**
@@ -24,15 +25,25 @@ export function AgentInvite({ deal }: { deal: DealView }) {
   const seller = deal.viewerRole === "seller";
   // What the seller does with it differs by platform: invite it as owner on
   // YouTube, add it to the Page on Facebook, make it an admin on Telegram.
-  const card = wordsFor(deal.platform).agentCard;
+  const words = wordsFor(deal.platform);
+  const card = words.agentCard;
+  // What the account is, in the platform's own terms: a Telegram username
+  // is not an email, and was shown as one (QA, CA-87042).
+  const field = IDENTITY_FIELD[deal.platform];
+  const Icon =
+    field === "telegram"
+      ? AtSignIcon
+      : field === "facebook"
+        ? UserRoundIcon
+        : MailIcon;
 
   return (
     <Card>
       <section aria-labelledby="invite-heading">
         <div className="flex items-center gap-2 border-b border-line px-4 py-3 sm:px-5">
-          <MailIcon
+          <Icon
             aria-hidden="true"
-            className={`size-4 shrink-0 ${iconText(MailIcon)}`}
+            className={`size-4 shrink-0 ${iconText(Icon)}`}
           />
           <h2
             id="invite-heading"
@@ -42,9 +53,14 @@ export function AgentInvite({ deal }: { deal: DealView }) {
           </h2>
         </div>
         <div className="flex flex-col gap-3 p-4 sm:p-5">
-          <p className="rounded-lg border border-line bg-surface-2/60 px-3 py-2.5 font-mono text-[0.8125rem] leading-relaxed break-all text-fg select-all">
-            {deal.agentEmail}
-          </p>
+          <div>
+            <p className="text-xs text-subtle first-letter:uppercase">
+              Our agent's {identityName(deal.platform)}
+            </p>
+            <p className="mt-1 rounded-lg border border-line bg-surface-2/60 px-3 py-2.5 font-mono text-[0.8125rem] leading-relaxed break-all text-fg select-all">
+              {deal.agentEmail}
+            </p>
+          </div>
           {deal.agentBrand && seller ? (
             <Callout
               tone="warning"
@@ -56,7 +72,7 @@ export function AgentInvite({ deal }: { deal: DealView }) {
               }
             >
               If the name does not match, stop and contact support — nobody else
-              should be asking for access to your channel.
+              should be asking for access to your {words.asset}.
             </Callout>
           ) : deal.agentBrand ? (
             // Our agent and staff check the same name; the warning is the

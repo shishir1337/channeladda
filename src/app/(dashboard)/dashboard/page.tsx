@@ -180,16 +180,19 @@ export default async function DashboardPage() {
         what:
           deal.status === "AWAITING_PAYMENT" && deal.side === "buyer"
             ? "Pay to start the deal"
-            : deal.openLabel
-              ? stepTitle(deal.openLabel, deal.side, deal.platform, deal.mode)
-              : dealHeadline(
-                  deal.status,
-                  deal.mode,
-                  deal.side,
-                  deal.openStep,
-                  deal.platform,
-                  deal.awaitingAgent,
-                ).label,
+            : // The seller's move while the buyer has nothing to pay to.
+              deal.payToMissing
+              ? `Say where ${deal.otherSideName} should pay you`
+              : deal.openLabel
+                ? stepTitle(deal.openLabel, deal.side, deal.platform, deal.mode)
+                : dealHeadline(
+                    deal.status,
+                    deal.mode,
+                    deal.side,
+                    deal.openStep,
+                    deal.platform,
+                    deal.awaitingAgent,
+                  ).label,
         detail: `${deal.reference} · ${deal.listingTitle}`,
         cta: "Open the deal",
         since: deal.createdAt,

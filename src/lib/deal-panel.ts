@@ -42,8 +42,10 @@ export type PanelDeal = {
   awaitingAgent: boolean;
   /**
    * Safest: the buyer's turn to pay the seller, and the seller has not said
-   * where. That makes it the seller's move as well: their panel collapsed
-   * to "The deal is under way" with the box to fill in hidden inside it.
+   * where (`payToMissingOn`). That makes it the seller's move and not the
+   * buyer's: the seller's panel collapsed to "The deal is under way" with
+   * the box to fill in hidden inside it, and the buyer's said "Your move"
+   * with nothing to pay to (QA, CA-27058).
    */
   payToMissing?: boolean;
 };
@@ -107,12 +109,12 @@ export function dealPanelState(input: PanelInput): PanelState {
     // is not available yet.
     const holdRunning =
       deal.holdUntil !== null && deal.holdUntil.getTime() > input.now.getTime();
+    const mover = deal.payToMissing ? "seller" : deal.nextStep?.actor;
     const yourMove =
       deal.status !== "DISPUTED" &&
       !holdRunning &&
       !deal.awaitingAgent &&
-      (deal.nextStep?.actor === viewer ||
-        (viewer === "seller" && deal.payToMissing === true));
+      mover === viewer;
     return { kind: "step", dealId: deal.id, yourMove };
   }
 

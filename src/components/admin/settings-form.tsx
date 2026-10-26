@@ -25,6 +25,7 @@ import {
 } from "@/components/app/kit";
 import { FormNotice } from "@/components/auth/fields";
 import { Button } from "@/components/ui/button";
+import { capWarning } from "@/lib/custody-roles";
 import { formatRate, quote } from "@/lib/fees";
 import { parseAmount, parseCount, parsePercent } from "@/lib/typed-number";
 import { cn } from "@/lib/utils";
@@ -95,6 +96,7 @@ function SettingRow({
   hint,
   tip,
   error,
+  warning,
   ...props
 }: {
   id: string;
@@ -106,6 +108,8 @@ function SettingRow({
   /** The reasoning, behind an (i) beside the label. */
   tip?: string;
   error?: string;
+  /** Worth knowing before saving, and not a refusal. */
+  warning?: string | null;
   name: string;
   value: string;
   inputMode: HTMLAttributes<HTMLInputElement>["inputMode"];
@@ -118,6 +122,7 @@ function SettingRow({
     hint ? `${id}-hint` : null,
     tip ? `${id}-tip` : null,
     error ? `${id}-error` : null,
+    warning ? `${id}-warning` : null,
   ].filter(Boolean);
   return (
     <div className="grid gap-x-8 gap-y-2 px-4 py-4 sm:grid-cols-[minmax(0,1fr)_12rem] sm:items-start sm:px-5">
@@ -166,6 +171,19 @@ function SettingRow({
             </span>
           ) : null}
         </div>
+        {warning && !error ? (
+          <p
+            id={`${id}-warning`}
+            role="status"
+            className="mt-1.5 flex items-start gap-1.5 text-xs leading-relaxed text-primary-text"
+          >
+            <TriangleAlertIcon
+              aria-hidden="true"
+              className="mt-0.5 size-3.5 shrink-0"
+            />
+            <span>{warning}</span>
+          </p>
+        ) : null}
         {error ? (
           <p
             id={`${id}-error`}
@@ -182,7 +200,13 @@ function SettingRow({
 
 export function SettingsForm({
   current,
+  holdsByAgent = [],
 }: {
+  /**
+   * Channels each active agent holds right now, so lowering the cap below
+   * them is said before saving. It is allowed: they keep what they hold.
+   */
+  holdsByAgent?: readonly number[];
   current: {
     buyerFeeBpSafest: number;
     buyerFeeBpFastest: number;
@@ -436,6 +460,7 @@ export function SettingsForm({
           value={holds}
           onChange={setHolds}
           error={errors.maxHoldsPerAgent}
+          warning={capWarning(parseCount(holds), holdsByAgent)}
         />
         <SettingRow
           id={ids.approval}

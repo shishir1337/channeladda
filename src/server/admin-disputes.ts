@@ -1,6 +1,11 @@
 import "server-only";
 
-import type { DealMode, OrderStatus, UserRole } from "@/generated/prisma/enums";
+import type {
+  DealMode,
+  OrderStatus,
+  Platform,
+  UserRole,
+} from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
 import { recordAudit } from "@/server/audit";
 import { noteFrom } from "@/server/deal-feed";
@@ -80,6 +85,8 @@ export type DisputeCase = {
   orderId: string;
   reference: string;
   mode: DealMode;
+  /** The listing's platform, for the deal's own words on the desk. */
+  platform: Platform;
   status: OrderStatus;
   openedAt: Date;
   /** Cents, as stored. */
@@ -299,6 +306,7 @@ export async function listDisputes(
       orderId: order.id,
       reference: order.reference,
       mode: order.mode,
+      platform: order.listing.platform,
       status: order.status,
       openedAt: order.createdAt,
       priceUsd: order.priceUsd,

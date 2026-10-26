@@ -8,38 +8,55 @@ import { BusyLabel } from "@/components/messages/chat-parts";
 import { Button } from "@/components/ui/button";
 import type { DealLevel } from "@/generated/prisma/enums";
 import { levelLabel } from "@/lib/custody-roles";
+import { IDENTITY_FIELDS } from "@/lib/transfer-identity";
 import { cn } from "@/lib/utils";
 import { setMyAgentIdentity } from "@/server/actions/admin-users";
 
 /**
- * The address sellers invite when you run their deal, kept by you.
+ * The accounts sellers hand a deal to when you run it, kept by you: one
+ * email for YouTube, Instagram and websites, a Telegram username, and a
+ * Facebook account. A Telegram seller makes a username an admin, never an
+ * email (QA, CA-87042), so each platform gets its own.
  *
  * Copied onto each deal as you take it, so nobody types it per deal and a
  * seller never gets a typo. Changing it applies to the deals you take next;
- * one already running keeps the address its seller was given.
+ * one already running keeps the account its seller was given.
  */
 export function MyDeskIdentity({
   email: storedEmail,
+  telegram: storedTelegram,
+  facebook: storedFacebook,
   brand: storedBrand,
   level,
 }: {
   email: string | null;
+  telegram: string | null;
+  facebook: string | null;
   brand: string | null;
   level: DealLevel | null;
 }) {
-  const emailId = useId();
-  const brandId = useId();
-  const [email, setEmail] = useState(storedEmail ?? "");
-  const [brand, setBrand] = useState(storedBrand ?? "Channel Adda Transfers");
-  const [saved, setSaved] = useState({
+  const ids = {
+    email: useId(),
+    telegram: useId(),
+    facebook: useId(),
+    brand: useId(),
+  };
+  const stored = {
     email: storedEmail ?? "",
-    brand: storedBrand ?? "",
-  });
+    telegram: storedTelegram ?? "",
+    facebook: storedFacebook ?? "",
+  };
+  const [values, setValues] = useState(stored);
+  const [brand, setBrand] = useState(storedBrand ?? "Channel Adda Transfers");
+  const [saved, setSaved] = useState({ ...stored, brand: storedBrand ?? "" });
   const [note, setNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  const dirty = email.trim() !== saved.email || brand.trim() !== saved.brand;
+  const dirty =
+    IDENTITY_FIELDS.some(
+      ({ field }) => values[field].trim() !== saved[field],
+    ) || brand.trim() !== saved.brand;
 
   return (
     <Card>
@@ -47,7 +64,7 @@ export function MyDeskIdentity({
         as="h2"
         icon={ArrowLeftRightIcon}
         title="Your deal desk"
-        info="The account sellers invite when you run their deal, and the name they see it as. Copied onto each deal as you take it."
+        info="The accounts sellers hand a deal to when you run it, one for each kind of platform, and the name they see. Copied onto each deal as you take it. Leave a platform blank if you do not run its deals."
       />
       <CardBody>
         <p className="mb-4 text-[0.8125rem] text-muted">
@@ -63,11 +80,16 @@ export function MyDeskIdentity({
             setNote(null);
             setError(null);
             startTransition(async () => {
-              const result = await setMyAgentIdentity(email, brand);
+              const result = await setMyAgentIdentity(values.email, brand, {
+                telegram: values.telegram,
+                facebook: values.facebook,
+              });
               if (result.ok) {
                 setNote(result.message);
                 setSaved({
-                  email: email.trim().toLowerCase(),
+                  email: values.email.trim(),
+                  telegram: values.telegram.trim(),
+                  facebook: values.facebook.trim(),
                   brand: brand.trim(),
                 });
               } else {
@@ -76,21 +98,28 @@ export function MyDeskIdentity({
             });
           }}
         >
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4">
+            {IDENTITY_FIELDS.map((item) => (
+              <TextField
+                key={item.field}
+                id={ids[item.field]}
+                name={`agent-${item.field}`}
+                type={item.field === "email" ? "email" : "text"}
+                label={item.label}
+                hint={item.hint}
+                value={values[item.field]}
+                onChange={(event) =>
+                  setValues((current) => ({
+                    ...current,
+                    [item.field]: event.target.value,
+                  }))
+                }
+                placeholder={item.placeholder}
+                autoComplete="off"
+              />
+            ))}
             <TextField
-              id={emailId}
-              name="agentEmail"
-              type="email"
-              label="Google account sellers invite"
-              hint="The account that will genuinely own the channels you hold."
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              placeholder="transfers@channeladda.com"
-              autoComplete="off"
-              required
-            />
-            <TextField
-              id={brandId}
+              id={ids.brand}
               name="agentBrand"
               label="Shown to the seller as"
               value={brand}

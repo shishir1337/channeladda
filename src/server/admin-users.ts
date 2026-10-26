@@ -13,6 +13,7 @@ import type {
 import { isCustodianRole } from "@/lib/custody-roles";
 import { db } from "@/lib/db";
 import { TERMINAL_STATUSES } from "@/lib/deal-machine";
+import { emailsIn, type TransferIds } from "@/lib/transfer-identity";
 import { HELD_CHANNEL } from "@/server/deals";
 import { getSettings } from "@/server/settings";
 
@@ -212,6 +213,8 @@ export type UserDetail = UserRow & {
   twoFactorEnabled: boolean;
   /** An agent's stored transfer identity, or null on anyone else. */
   agentEmail: string | null;
+  agentTelegram: string | null;
+  agentFacebook: string | null;
   agentBrand: string | null;
   dealLevel: DealLevel | null;
   /** Safest channels this person is holding right now, and the cap. */
@@ -236,6 +239,8 @@ export async function getUserDetail(id: string): Promise<UserDetail | null> {
       emailVerified: true,
       twoFactorEnabled: true,
       agentEmail: true,
+      agentTelegram: true,
+      agentFacebook: true,
       agentBrand: true,
       dealLevel: true,
       kycStatus: true,
@@ -292,6 +297,8 @@ export async function getUserDetail(id: string): Promise<UserDetail | null> {
     reports,
     twoFactorEnabled: row.twoFactorEnabled,
     agentEmail: row.agentEmail,
+    agentTelegram: row.agentTelegram,
+    agentFacebook: row.agentFacebook,
     agentBrand: row.agentBrand,
     dealLevel: row.dealLevel,
     holds,
@@ -328,6 +335,8 @@ export type TeamMember = {
   twoFactorEnabled: boolean;
   createdAt: Date;
   agentEmail: string | null;
+  agentTelegram: string | null;
+  agentFacebook: string | null;
   agentBrand: string | null;
   /** Which deals they may run, on anyone who runs deals. */
   dealLevel: DealLevel | null;
@@ -368,6 +377,8 @@ export async function listTeam(): Promise<Team> {
       twoFactorEnabled: true,
       createdAt: true,
       agentEmail: true,
+      agentTelegram: true,
+      agentFacebook: true,
       agentBrand: true,
       dealLevel: true,
     },
@@ -420,6 +431,8 @@ export async function listTeam(): Promise<Team> {
       twoFactorEnabled: member.twoFactorEnabled,
       createdAt: member.createdAt,
       agentEmail: member.agentEmail,
+      agentTelegram: member.agentTelegram,
+      agentFacebook: member.agentFacebook,
       agentBrand: member.agentBrand,
       dealLevel: member.dealLevel,
       holds: holdsBy.get(member.id) ?? 0,
@@ -435,6 +448,9 @@ export type GuardFailure =
   | "outranked"
   | "no-change"
   | "not-an-agent";
+
+/** Setting a transfer identity can also meet somebody's sign-in email. */
+export type IdentityFailure = GuardFailure | "login-email";
 
 export type AdminUserResult =
   | { ok: true; before: UserRole | boolean; after: UserRole | boolean }
@@ -494,7 +510,13 @@ export async function setUserRole(input: {
       // in front of the next seller who was told to invite it.
       ...(isCustodianRole(input.role)
         ? {}
-        : { agentEmail: null, agentBrand: null, dealLevel: null }),
+        : {
+            agentEmail: null,
+            agentTelegram: null,
+            agentFacebook: null,
+            agentBrand: null,
+            dealLevel: null,
+          }),
     },
   });
 
@@ -937,71 +959,135 @@ export async function endSessions(input: {
 
 // --------------------------------------------------------- agent identity
 
-export type AgentIdentity = { email: string; brand: string } | null;
+/**
+ * An agent's transfer identity: an account per kind of platform, and the
+ * name sellers see it as (`@/lib/transfer-identity`). Null when there is
+ * nothing a seller could hand a deal to.
+ */
+export type AgentIdentity =
+  | (TransferIds & {
+      brand: string;
+    })
+  | null;
+
+function identityOf(row: {
+  agentEmail: string | null;
+  agentTelegram: string | null;
+  agentFacebook: string | null;
+  agentBrand: string | null;
+}): AgentIdentity {
+  if (!row.agentBrand) return null;
+  if (!row.agentEmail && !row.agentTelegram && !row.agentFacebook) {
+    return null;
+  }
+  return {
+    email: row.agentEmail,
+    telegram: row.agentTelegram,
+    facebook: row.agentFacebook,
+    brand: row.agentBrand,
+  };
+}
 
 /**
  * An agent's stored transfer identity.
  *
- * The address a seller is told to invite as channel owner, and the name it is
- * shown under. Before this it was typed into a text box per deal, so one agent
- * reached three sellers as three different people, and a seller who invited a
- * mistyped address handed the channel to nobody and waited.
+ * The accounts a seller is told to hand a deal to, and the name they are
+ * shown under. Before this it was typed into a text box per deal, so one
+ * agent reached three sellers as three different people, and a seller who
+ * invited a mistyped address handed the channel to nobody and waited. It
+ * was one email, too, and a Telegram seller was told to make an email an
+ * admin (QA, CA-87042): now a Telegram username and a Facebook account sit
+ * beside it.
+ *
+ * Never anybody's Channel Adda sign-in email: QA saved demo-admin@… and a
+ * seller would have been told to hand a channel to a staff login.
  *
  * Only ever set on an AGENT: on anyone else it is a stale address waiting to
  * be put in front of somebody, so `setUserRole` clears it on the way out.
  */
 export async function setAgentIdentity(input: {
   userId: string;
-  email: string;
+  /** Already checked by `parseTransferIds`. */
+  ids: TransferIds;
   brand: string;
 }): Promise<
   | { ok: true; before: AgentIdentity; after: AgentIdentity }
-  | { ok: false; reason: GuardFailure }
+  | { ok: false; reason: IdentityFailure }
 > {
-  const email = input.email.trim().toLowerCase();
   const brand = input.brand.trim();
+  const ids = input.ids;
 
   const target = await db.user.findUnique({
     where: { id: input.userId },
-    select: { id: true, role: true, agentEmail: true, agentBrand: true },
+    select: {
+      id: true,
+      role: true,
+      agentEmail: true,
+      agentTelegram: true,
+      agentFacebook: true,
+      agentBrand: true,
+    },
   });
   if (!target) return { ok: false, reason: "not-found" };
   if (!isCustodianRole(target.role)) {
     return { ok: false, reason: "not-an-agent" };
   }
-  if (target.agentEmail === email && target.agentBrand === brand) {
+  if (
+    target.agentEmail === ids.email &&
+    target.agentTelegram === ids.telegram &&
+    target.agentFacebook === ids.facebook &&
+    target.agentBrand === brand
+  ) {
     return { ok: false, reason: "no-change" };
+  }
+
+  const emails = emailsIn(ids);
+  if (emails.length > 0) {
+    const login = await db.user.findFirst({
+      where: {
+        OR: emails.map((email) => ({
+          email: { equals: email, mode: "insensitive" as const },
+        })),
+      },
+      select: { id: true },
+    });
+    if (login) return { ok: false, reason: "login-email" };
   }
 
   await db.user.update({
     where: { id: target.id },
-    data: { agentEmail: email, agentBrand: brand },
+    data: {
+      agentEmail: ids.email,
+      agentTelegram: ids.telegram,
+      agentFacebook: ids.facebook,
+      agentBrand: brand,
+    },
   });
 
   return {
     ok: true,
-    before:
-      target.agentEmail && target.agentBrand
-        ? { email: target.agentEmail, brand: target.agentBrand }
-        : null,
-    after: { email, brand },
+    before: identityOf(target),
+    after: { ...ids, brand },
   };
 }
 
 /**
- * What a deal should be assigned under, for this agent.
- *
- * Here rather than in the deal desk so there is one answer to "what address
- * does this agent use", and so the deal desk can fall back to the sign-in
- * address for an agent nobody has set one on yet.
+ * What a deal should be assigned under, for this agent: every account they
+ * keep, for the caller to pick the deal's platform from (`identityFor`).
+ * One answer to "what address does this agent use", for the desk and the
+ * server alike.
  */
 export async function agentIdentity(userId: string): Promise<AgentIdentity> {
   const row = await db.user.findUnique({
     where: { id: userId },
-    select: { agentEmail: true, agentBrand: true },
+    select: {
+      agentEmail: true,
+      agentTelegram: true,
+      agentFacebook: true,
+      agentBrand: true,
+    },
   });
-  if (!row?.agentEmail || !row.agentBrand) return null;
-  return { email: row.agentEmail, brand: row.agentBrand };
+  return row ? identityOf(row) : null;
 }
 
 /** Which deals somebody who runs deals may take; null takes any size. */
@@ -1038,6 +1124,8 @@ export type AssignableAgent = {
   role: UserRole;
   dealLevel: DealLevel | null;
   agentEmail: string | null;
+  agentTelegram: string | null;
+  agentFacebook: string | null;
   agentBrand: string | null;
   holds: number;
   atCap: boolean;
@@ -1065,6 +1153,8 @@ export async function listAssignableAgents(): Promise<{
         role: member.role,
         dealLevel: member.dealLevel,
         agentEmail: member.agentEmail,
+        agentTelegram: member.agentTelegram,
+        agentFacebook: member.agentFacebook,
         agentBrand: member.agentBrand,
         holds: member.holds,
         atCap: member.holds >= maxHoldsPerAgent,

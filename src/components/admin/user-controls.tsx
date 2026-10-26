@@ -16,7 +16,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { iconText } from "@/components/ui/icon-hue";
 import type { DealLevel, KycStatus, UserRole } from "@/generated/prisma/enums";
-import { DEAL_LEVELS, isCustodianRole, levelLabel } from "@/lib/custody-roles";
+import {
+  capLoad,
+  DEAL_LEVELS,
+  isCustodianRole,
+  levelLabel,
+} from "@/lib/custody-roles";
+import { IDENTITY_FIELDS, type IdentityField } from "@/lib/transfer-identity";
 import { cn } from "@/lib/utils";
 import {
   resetUserTwoFactor,
@@ -302,6 +308,8 @@ export function UserControls({
   holds,
   maxHolds,
   agentEmail,
+  agentTelegram = null,
+  agentFacebook = null,
   agentBrand,
   dealLevel,
 }: {
@@ -326,6 +334,8 @@ export function UserControls({
   /** `PlatformSettings.maxHoldsPerAgent`. */
   maxHolds: number;
   agentEmail: string | null;
+  agentTelegram?: string | null;
+  agentFacebook?: string | null;
   agentBrand: string | null;
   /** Which deals they may run; only meaningful on someone who runs deals. */
   dealLevel: DealLevel | null;
@@ -536,6 +546,8 @@ export function UserControls({
         <AgentIdentity
           userId={userId}
           email={agentEmail}
+          telegram={agentTelegram}
+          facebook={agentFacebook}
           brand={agentBrand}
           holds={holds}
           maxHolds={maxHolds}
@@ -641,47 +653,75 @@ function DealLevelControl({
 }
 
 /**
- * The address a seller is told to invite as channel owner.
+ * The accounts a seller is told to hand a deal to: an email for YouTube,
+ * Instagram and websites, a Telegram username, and a Facebook account.
  *
  * Its own card because it is the agent's identity rather than their access,
  * and because it is the thing a seller sees: a typo here is a channel invited
  * to nobody and a deal that sits in "awaiting custody" while both sides wait
- * for each other.
+ * for each other. A Telegram seller was told to make an email an admin (QA,
+ * CA-87042), so each platform has its own field.
  */
+/** What is missing, in a list: "No Telegram username or Facebook account". */
+const UNSET_NAME: Readonly<Record<IdentityField, string>> = {
+  email: "email for YouTube, Instagram and websites",
+  telegram: "Telegram username",
+  facebook: "Facebook account",
+};
+
 function AgentIdentity({
   userId,
-  email: stored,
+  email: storedEmail,
+  telegram: storedTelegram,
+  facebook: storedFacebook,
   brand: storedBrand,
   holds,
   maxHolds,
 }: {
   userId: string;
   email: string | null;
+  telegram: string | null;
+  facebook: string | null;
   brand: string | null;
   holds: number;
   maxHolds: number;
 }) {
-  const emailId = useId();
-  const brandId = useId();
-  const [email, setEmail] = useState(stored ?? "");
+  const ids = {
+    email: useId(),
+    telegram: useId(),
+    facebook: useId(),
+    brand: useId(),
+  };
+  const stored = {
+    email: storedEmail ?? "",
+    telegram: storedTelegram ?? "",
+    facebook: storedFacebook ?? "",
+  };
+  const [values, setValues] = useState(stored);
   const [brand, setBrand] = useState(storedBrand ?? "Channel Adda Transfers");
   const [note, setNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  const ready = email.trim().length > 3 && brand.trim().length > 1;
-  const dirty = email.trim() !== (stored ?? "") || brand.trim() !== storedBrand;
-  const atCap = holds >= maxHolds;
+  const any = IDENTITY_FIELDS.some(({ field }) => values[field].trim() !== "");
+  const ready = any && brand.trim().length > 1;
+  const dirty =
+    IDENTITY_FIELDS.some(
+      ({ field }) => values[field].trim() !== stored[field],
+    ) || brand.trim() !== (storedBrand ?? "");
+  const load = capLoad(holds, maxHolds);
+  // Which platforms they cannot take a deal on yet.
+  const unset = IDENTITY_FIELDS.filter(({ field }) => stored[field] === "");
 
   return (
     <Card>
       <CardHeader
         as="h2"
         title="Transfer identity"
-        info="Copied onto every deal they take, so one agent reaches every seller as the same person."
+        info="Copied onto every deal they take, so one agent reaches every seller as the same person. Each platform hands over to its own kind of account."
       />
       <CardBody>
-        {stored === null ? (
+        {unset.length > 0 ? (
           <Well tone="warning" className="mb-4">
             <p className="flex items-start gap-2">
               <CircleAlertIcon
@@ -689,28 +729,36 @@ function AgentIdentity({
                 className="mt-1 size-3.5 shrink-0 text-primary-text"
               />
               <span>
-                Not set. Nothing will be filled in for them, so whoever assigns
-                the deal types an address from memory.
+                {unset.length === IDENTITY_FIELDS.length
+                  ? "Not set, so they cannot take or be given a deal."
+                  : `No ${unset.map(({ field }) => UNSET_NAME[field]).join(" or ")} yet, so those deals cannot go to them.`}
               </span>
             </p>
           </Well>
         ) : null}
 
         <div className="grid gap-4">
+          {IDENTITY_FIELDS.map((item) => (
+            <TextField
+              key={item.field}
+              id={ids[item.field]}
+              name={`agent-${item.field}`}
+              type={item.field === "email" ? "email" : "text"}
+              label={item.label}
+              hint={item.hint}
+              value={values[item.field]}
+              onChange={(event) =>
+                setValues((current) => ({
+                  ...current,
+                  [item.field]: event.target.value,
+                }))
+              }
+              placeholder={item.placeholder}
+              autoComplete="off"
+            />
+          ))}
           <TextField
-            id={emailId}
-            name="agentEmail"
-            type="email"
-            label="Google account sellers invite"
-            hint="The account that will genuinely own the channel."
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            placeholder="transfers@channeladda.com"
-            autoComplete="off"
-            required
-          />
-          <TextField
-            id={brandId}
+            id={ids.brand}
             name="agentBrand"
             label="Shown to the seller as"
             value={brand}
@@ -733,8 +781,12 @@ function AgentIdentity({
               startTransition(async () => {
                 const result = await setAgentIdentity(
                   userId,
-                  email.trim(),
+                  values.email.trim(),
                   brand.trim(),
+                  {
+                    telegram: values.telegram.trim(),
+                    facebook: values.facebook.trim(),
+                  },
                 );
                 if (result.ok) setNote(result.message);
                 else setError(result.error);
@@ -750,11 +802,12 @@ function AgentIdentity({
           <p
             className={cn(
               "text-xs tabular-nums",
-              atCap ? "font-medium text-danger" : "text-subtle",
+              load.state === "over" || load.state === "at"
+                ? "font-medium text-danger"
+                : "text-subtle",
             )}
           >
-            Holding {holds} of {maxHolds}
-            {atCap ? " — at the cap" : ""}
+            {load.line}
           </p>
         </div>
 

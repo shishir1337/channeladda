@@ -100,21 +100,25 @@ function stepState(deal: DealView, step: DealStepView) {
   // Adda, so it is nobody's move.
   const awaitingAgent = deal.awaitingAgent;
   // Safest: the buyer's turn to pay the seller, and the seller has not said
-  // where. That is the seller's move, and the buyer's Paid waits for it.
-  const payToMissing =
-    !frozen &&
-    deal.mode === "SAFEST" &&
-    step.label === "Pay the seller" &&
-    !deal.sellerPayTo;
+  // where. That is the seller's move, and the buyer's Paid waits for it —
+  // the one rule every view reads (`dealTurn`). The buyer was shown "Your
+  // move" with nothing to pay to (QA, CA-27058).
+  const payToMissing = deal.payToMissing && step.label === "Pay the seller";
   return {
     frozen,
     heldUntil,
     awaitingAgent,
     payToMissing,
     mine:
-      !frozen && !heldUntil && !awaitingAgent && step.actor === deal.viewerRole,
+      !frozen &&
+      !heldUntil &&
+      !awaitingAgent &&
+      !payToMissing &&
+      step.actor === deal.viewerRole,
     // The seller adding where to be paid, while the step is the buyer's.
     sellerOwesPayTo: payToMissing && deal.viewerRole === "seller",
+    // The buyer, whose step it is, waiting for those details.
+    buyerAwaitsPayTo: payToMissing && deal.viewerRole === "buyer",
     help: stepHelp(
       deal.mode,
       step.label,
@@ -309,7 +313,14 @@ export function DealNextStep({
     <Card className="@container">
       <section aria-labelledby="next-step-heading" className="p-4 sm:p-5">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <Whose state={state} who={ACTOR_LABELS[step.actor]} />
+          <Whose
+            state={state}
+            who={
+              state.payToMissing
+                ? ACTOR_LABELS.seller
+                : ACTOR_LABELS[step.actor]
+            }
+          />
           <span className="ml-auto text-xs text-subtle tabular-nums">
             Step {step.position} of {deal.steps.length}
           </span>
@@ -414,18 +425,20 @@ function StepDetail({
         </Note>
       ) : null}
 
+      {state.buyerAwaitsPayTo ? (
+        <Note>
+          {deal.sellerName} has not said where to pay them yet. We have asked
+          them. Once their details show on this page, pay them and press Paid —
+          do not send money to details given anywhere else.
+        </Note>
+      ) : null}
+
       {state.mine ? (
         state.paymentPending ? (
           <Note>
             This step ticks itself off the moment your payment clears. There is
             no button for it, so nobody can record a payment that has not
             arrived.
-          </Note>
-        ) : state.payToMissing ? (
-          <Note>
-            {deal.sellerName} has not said where to pay them yet. We have asked
-            them. Once their details show on this page, pay them and press Paid
-            — do not send money to details given anywhere else.
           </Note>
         ) : (
           // Keyed by the step, so the next step never opens already armed:
@@ -851,7 +864,10 @@ function Step({
             <div className="mt-1.5">
               <Whose
                 state={current}
-                who={actorLabel(step.actor, deal.viewerRole)}
+                who={actorLabel(
+                  current.payToMissing ? "seller" : step.actor,
+                  deal.viewerRole,
+                )}
               />
             </div>
             {payment ? (
@@ -932,7 +948,7 @@ function Marker({ done, current }: { done: boolean; current?: StepState }) {
           className={cn(
             "size-2 rounded-full",
             current.frozen ? "bg-danger" : "bg-primary",
-            current.mine && "animate-pulse-dot",
+            (current.mine || current.sellerOwesPayTo) && "animate-pulse-dot",
           )}
         />
       </span>

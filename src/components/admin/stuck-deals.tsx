@@ -14,7 +14,11 @@ import {
   Section,
   Sep,
 } from "@/components/app/kit";
+import { ACTOR_LABELS, stepTitle } from "@/components/deals/deal-status";
+import type { DealMode, OrderStatus } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
+import type { DealActor } from "@/lib/deal-machine";
+import { dealTurn } from "@/lib/deal-turn";
 
 /**
  * Every deal still in flight, with the lever to end it.
@@ -41,6 +45,37 @@ const LIVE_STATUSES = [
   "DISPUTED",
 ] as const;
 
+/** Whose move the open step is, as the row says it. */
+function waitingOn(
+  order: {
+    mode: DealMode;
+    status: OrderStatus;
+    agentId: string | null;
+    holdUntil: Date | null;
+    sellerPayTo: string | null;
+  },
+  next: { position: number; label: string; actor: string },
+): string {
+  const turn = dealTurn({
+    ...order,
+    next: { ...next, actor: next.actor as DealActor },
+  });
+  switch (turn.kind) {
+    case "paused":
+      return "paused for a moderator";
+    case "assigning":
+      return "waiting for an agent";
+    case "held":
+      return "in the waiting period";
+    case "move":
+      return turn.payTo
+        ? "waiting on the seller's payment details"
+        : `waiting on ${ACTOR_LABELS[turn.actor]}`;
+    default:
+      return "nothing outstanding";
+  }
+}
+
 /** Days a deal may sit before the row is flagged. */
 const STALE_DAYS = 7;
 const AGEING_DAYS = 3;
@@ -65,8 +100,11 @@ export async function StuckDeals({
       paymentRef: true,
       custodyAt: true,
       buyerPaidAt: true,
+      agentId: true,
+      holdUntil: true,
+      sellerPayTo: true,
       agent: { select: { name: true } },
-      listing: { select: { title: true } },
+      listing: { select: { title: true, platform: true } },
       steps: {
         where: { completedAt: null },
         orderBy: { position: "asc" },
@@ -166,11 +204,22 @@ export async function StuckDeals({
                     </dd>
                   </div>
                   {next ? (
+                    // In the platform's words, and the turn as every view
+                    // reads it (`dealTurn`): a Facebook deal said "Make the
+                    // agent primary owner", and a paused one "waiting on
+                    // seller" (QA, CA-75190, CA-71352).
                     <div className="flex min-w-0 gap-1.5">
                       <dt className="shrink-0 text-subtle">
-                        Step {next.position}, waiting on {next.actor}
+                        Step {next.position}, {waitingOn(order, next)}
                       </dt>
-                      <dd className="min-w-0 truncate text-fg">{next.label}</dd>
+                      <dd className="min-w-0 truncate text-fg">
+                        {stepTitle(
+                          next.label,
+                          "staff",
+                          order.listing.platform,
+                          order.mode,
+                        )}
+                      </dd>
                     </div>
                   ) : (
                     <div className="flex gap-1.5">
@@ -185,6 +234,7 @@ export async function StuckDeals({
                   orderId={order.id}
                   mode={order.mode}
                   status={order.status}
+                  platform={order.listing.platform}
                   canMoveMoney={canMoveMoney}
                   paid={order.paymentRef !== null}
                   inCustody={order.custodyAt !== null}

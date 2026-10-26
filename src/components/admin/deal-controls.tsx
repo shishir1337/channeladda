@@ -13,18 +13,26 @@ import { custodyFacts } from "@/components/admin/vocab";
 import { InfoTip } from "@/components/app/info-tip";
 import { inputClass, labelClass } from "@/components/app/kit";
 import { TextArea, TextField } from "@/components/auth/fields";
+import { staffWords } from "@/components/deals/deal-status";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import type { DealMode, OrderStatus } from "@/generated/prisma/enums";
+import type { DealMode, OrderStatus, Platform } from "@/generated/prisma/enums";
 import { levelLabel } from "@/lib/custody-roles";
 import {
   ENDINGS,
   type Ending,
   type EndingTo,
+  endingLabel,
+  endingWeight,
   MAX_DEAL_NOTE,
+  needsFinance,
   undoLine,
 } from "@/lib/deal-endings";
-import { movesHeldMoney } from "@/lib/outcomes";
+import {
+  identityFor,
+  identityName,
+  identityUse,
+} from "@/lib/transfer-identity";
 import { cn } from "@/lib/utils";
 import {
   assignDealAgent,
@@ -33,7 +41,16 @@ import {
   markOpeningPaymentReceived,
 } from "@/server/actions/deals";
 import { checkInvoiceNow } from "@/server/actions/money";
-import type { AssignableAgent } from "@/server/admin-users";
+import type { AgentIdentity, AssignableAgent } from "@/server/admin-users";
+
+/** "a Telegram deal", for a line about why an account is missing. */
+const A_DEAL: Readonly<Record<Platform, string>> = {
+  YOUTUBE: "a YouTube deal",
+  INSTAGRAM: "an Instagram deal",
+  FACEBOOK: "a Facebook deal",
+  TELEGRAM: "a Telegram deal",
+  WEBSITE: "a website deal",
+};
 
 /**
  * The staff controls on a deal row.
@@ -142,31 +159,40 @@ function ControlBox({
 /** An agent taking the next unheld deal. */
 export function ClaimDeal({
   orderId,
+  platform,
   identity,
 }: {
   orderId: string;
+  /** The deal's platform: it decides which of their accounts sellers use. */
+  platform: Platform;
   /**
-   * The agent's transfer identity: the account sellers hand the deal to,
-   * and the name it shows up as. Without one there is nothing to claim
-   * with — a sign-in email is never shown to a seller in its place.
+   * The agent's transfer identity: the accounts sellers hand deals to, and
+   * the name they show up as. Without the one for this platform there is
+   * nothing to claim with — a sign-in email is never shown to a seller in
+   * its place.
    */
-  identity: { email: string; brand: string } | null;
+  identity: AgentIdentity;
 }) {
   const router = useRouter();
   const [message, setMessage] = useState<string | null>(null);
   const [ok, setOk] = useState(false);
   const [pending, startTransition] = useTransition();
+  const address = identityFor(platform, identity);
 
-  if (!identity) {
+  if (!identity || !address) {
     return (
       <ControlBox
         title="Take this deal"
-        hint="Sellers hand the deal to your transfer identity — the account they invite, and the name it shows as. You have not set one yet."
+        hint={
+          identity
+            ? `This is ${A_DEAL[platform]}: the seller hands it to your ${identityName(platform)}, and you have not set one yet.`
+            : "Sellers hand the deal to your transfer identity — the account they invite, and the name it shows as. You have not set one yet."
+        }
       >
         <p className="mt-2 text-[0.8125rem] leading-relaxed text-muted">
           Set it under Your deal desk on your{" "}
           <Link
-            href="/dashboard/security"
+            href="/dashboard/security#deal-desk"
             className="font-medium text-fg underline underline-offset-4"
           >
             Security page
@@ -182,7 +208,11 @@ export function ClaimDeal({
       title="Take this deal"
       hint="You become the agent of record. The seller hands the deal to your transfer identity, and you hold it until you hand it on to the buyer."
     >
-      <IdentityLines identity={identity} />
+      <IdentityLines
+        platform={platform}
+        address={address}
+        brand={identity.brand}
+      />
       <Button
         type="button"
         size="md"
@@ -205,23 +235,25 @@ export function ClaimDeal({
   );
 }
 
-/** Who sellers hand the deal to, and the name it shows as. */
+/** Who sellers hand the deal to, in the platform's words, and its name. */
 function IdentityLines({
-  identity,
+  platform,
+  address,
+  brand,
 }: {
-  identity: { email: string; brand: string };
+  platform: Platform;
+  address: string;
+  brand: string;
 }) {
   return (
     <dl className="mt-3 grid gap-x-6 gap-y-1.5 text-xs leading-relaxed sm:grid-cols-2">
-      <div className="flex min-w-0 gap-2">
-        <dt className="shrink-0 text-subtle">Sellers hand it to</dt>
-        <dd className="min-w-0 font-mono break-all text-fg">
-          {identity.email}
-        </dd>
+      <div className="flex min-w-0 flex-col gap-0.5">
+        <dt className="text-subtle">{identityUse(platform)}</dt>
+        <dd className="min-w-0 font-mono break-all text-fg">{address}</dd>
       </div>
-      <div className="flex min-w-0 gap-2">
-        <dt className="shrink-0 text-subtle">Shown as</dt>
-        <dd className="min-w-0 text-fg">{identity.brand}</dd>
+      <div className="flex min-w-0 flex-col gap-0.5">
+        <dt className="text-subtle">Shown as</dt>
+        <dd className="min-w-0 text-fg">{brand}</dd>
       </div>
     </dl>
   );
@@ -346,10 +378,13 @@ export function CheckInvoice({ reference }: { reference: string }) {
  */
 export function AssignAgent({
   orderId,
+  platform,
   agents,
   currentAgentId,
 }: {
   orderId: string;
+  /** The deal's platform: it decides which of their accounts sellers use. */
+  platform: Platform;
   agents: readonly AssignableAgent[];
   currentAgentId?: string | null;
 }) {
@@ -358,11 +393,16 @@ export function AssignAgent({
   const [agentId, setAgentId] = useState("");
   const chosen = agents.find((agent) => agent.id === agentId);
   // A deal goes only to someone sellers can hand it to: their stored
-  // transfer identity. Nobody's sign-in email stands in for one.
-  const identity =
-    chosen?.agentEmail && chosen.agentBrand
-      ? { email: chosen.agentEmail, brand: chosen.agentBrand }
+  // transfer identity for this platform. Nobody's sign-in email stands in.
+  const addressOf = (agent: AssignableAgent) =>
+    agent.agentBrand
+      ? identityFor(platform, {
+          email: agent.agentEmail,
+          telegram: agent.agentTelegram,
+          facebook: agent.agentFacebook,
+        })
       : null;
+  const address = chosen ? addressOf(chosen) : null;
   const choices = agents.filter((agent) => agent.id !== currentAgentId);
   const [message, setMessage] = useState<string | null>(null);
   const [ok, setOk] = useState(false);
@@ -370,6 +410,7 @@ export function AssignAgent({
   // The same control hands out a deal nobody holds and moves one somebody
   // can no longer act on; only the words differ.
   const fresh = currentAgentId === null || currentAgentId === undefined;
+  const missing = identityName(platform);
 
   return (
     <ControlBox
@@ -413,9 +454,7 @@ export function AssignAgent({
                 {agent.name} · {levelLabel(agent.dealLevel)} — holding{" "}
                 {agent.holds}
                 {agent.atCap ? " (at their limit)" : ""}
-                {agent.agentEmail && agent.agentBrand
-                  ? ""
-                  : " (no transfer identity)"}
+                {addressOf(agent) ? "" : ` (no ${missing})`}
               </option>
             ))}
           </select>
@@ -425,12 +464,16 @@ export function AssignAgent({
           />
         </div>
       </div>
-      {chosen && identity ? (
-        <IdentityLines identity={identity} />
+      {chosen && address && chosen.agentBrand ? (
+        <IdentityLines
+          platform={platform}
+          address={address}
+          brand={chosen.agentBrand}
+        />
       ) : chosen ? (
         <p className="mt-3 text-[0.8125rem] leading-relaxed text-danger">
-          {chosen.name} has no transfer identity yet — the account sellers hand
-          deals to. Set it on{" "}
+          {chosen.name} has no {missing} yet, and this is {A_DEAL[platform]}.
+          Set it on{" "}
           <Link
             href={`/admin/users/${chosen.id}`}
             className="font-medium underline underline-offset-4"
@@ -444,7 +487,7 @@ export function AssignAgent({
         type="button"
         size="sm"
         className="mt-3"
-        disabled={pending || !chosen || !identity}
+        disabled={pending || !chosen || !address}
         onClick={() => {
           setMessage(null);
           startTransition(async () => {
@@ -494,12 +537,18 @@ export function EndDeal({
   orderId,
   mode,
   status,
+  platform,
   canMoveMoney = false,
   paid,
   inCustody,
   pricePaid,
 }: {
   orderId: string;
+  /**
+   * The deal's platform, so the outcomes speak its words: "Refused once
+   * our agent holds the channel" on a Facebook Page (QA, CA-75190).
+   */
+  platform?: Platform;
   /** Whether the opening payment cleared. Needed to describe a dispute. */
   paid?: boolean;
   /**
@@ -538,8 +587,15 @@ export function EndDeal({
           paid === undefined && inCustody === undefined
             ? undefined
             : { paid, inCustody },
+          platform,
         )
       : null;
+  // The words every outcome is said in, and whether a Fastest seller has
+  // been paid already: then finishing it moves no money.
+  const ctx = {
+    words: platform ? staffWords(platform, mode ?? "FASTEST") : undefined,
+    sellerPaid: mode === "FASTEST" && inCustody === true,
+  };
   const selected = ENDINGS.find((e) => e.to === choice) ?? null;
   // A disputed deal is already paused; offering it again only produced a
   // refusal.
@@ -633,8 +689,8 @@ export function EndDeal({
       {facts ? (
         <dl className="mt-3 grid gap-x-6 gap-y-1.5 rounded-lg border border-line bg-surface-2/50 px-3 py-2.5 text-xs leading-relaxed sm:grid-cols-2">
           <div className="flex gap-2">
-            <dt className="w-[4.75rem] shrink-0 text-subtle sm:w-auto">
-              Channel
+            <dt className="w-[4.75rem] shrink-0 text-subtle first-letter:uppercase sm:w-auto">
+              {ctx.words?.asset ?? "channel"}
             </dt>
             <dd className="min-w-0 text-fg">{facts.asset}</dd>
           </div>
@@ -665,13 +721,12 @@ export function EndDeal({
               mode === "SAFEST" &&
               pricePaid === false;
             const reachable = (ending.applies?.(mode) ?? true) && !priceMissing;
-            // The server's rule: handing held money back is a refund
+            // The tag says what the consequence says; who may choose it is
+            // the server's rule — handing held money back is a refund
             // whatever it is called, in either mode.
-            const movesMoney = movesHeldMoney(ending.to, paid === true);
             const tag =
-              movesMoney && ending.weight === "final"
-                ? WEIGHT_TAG.money
-                : WEIGHT_TAG[ending.weight];
+              WEIGHT_TAG[endingWeight(ending, paid === true, ctx.sellerPaid)];
+            const financeOnly = needsFinance(ending, paid === true);
             return (
               <label
                 key={ending.to}
@@ -704,7 +759,7 @@ export function EndDeal({
                 <span className="min-w-0">
                   <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
                     <span className="text-[0.8125rem] leading-5 font-medium text-fg">
-                      {ending.label}
+                      {endingLabel(ending, ctx)}
                     </span>
                     <Badge variant={tag.variant}>{tag.label}</Badge>
                     {!reachable ? (
@@ -712,13 +767,12 @@ export function EndDeal({
                         {priceMissing ? "Price not paid yet" : "Not this mode"}
                       </Badge>
                     ) : null}
-                    {!canMoveMoney &&
-                    (ending.weight === "money" || movesMoney) ? (
+                    {!canMoveMoney && financeOnly ? (
                       <Badge variant="neutral">Finance only</Badge>
                     ) : null}
                   </span>
                   <span className="mt-0.5 block text-xs leading-relaxed text-muted">
-                    {ending.consequence(mode)}
+                    {ending.consequence(mode, ctx)}
                   </span>
                 </span>
               </label>
@@ -767,7 +821,8 @@ export function EndDeal({
               className="mt-px size-4 shrink-0 text-danger"
             />
             <span>
-              {selected.label}. {selected.consequence(mode)} There is no undo.
+              {endingLabel(selected, ctx)}. {selected.consequence(mode, ctx)}{" "}
+              There is no undo.
             </span>
           </p>
           <div className="mt-3 flex flex-wrap gap-2 pl-6">
@@ -780,7 +835,7 @@ export function EndDeal({
             >
               <SteadyLabel
                 pending={pending}
-                idle={`Yes — ${selected.label.toLowerCase()}`}
+                idle={`Yes — ${endingLabel(selected, ctx).toLowerCase()}`}
                 busy="Working…"
               />
             </Button>

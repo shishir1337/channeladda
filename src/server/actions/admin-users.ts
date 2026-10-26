@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import type { DealLevel, KycStatus, UserRole } from "@/generated/prisma/enums";
 import { DEAL_LEVELS, levelLabel } from "@/lib/custody-roles";
+import { parseTransferIds, type TransferIds } from "@/lib/transfer-identity";
 import * as repo from "@/server/admin-users";
 import { recordAudit } from "@/server/audit";
 import { requireRole, requireStaff, requireSuperadmin } from "@/server/session";
@@ -32,6 +33,12 @@ const FAILURES: Record<repo.GuardFailure, string> = {
   "no-change": "That is already the case.",
   "not-an-agent":
     "Only somebody who runs deals — an agent, a moderator or the superadmin — has a transfer identity or a deal level.",
+};
+
+const IDENTITY_FAILURES: Record<repo.IdentityFailure, string> = {
+  ...FAILURES,
+  "login-email":
+    "That is somebody's Channel Adda sign-in email. Use the separate account that will hold the channels, never a login.",
 };
 
 export async function setUserRole(
@@ -329,8 +336,39 @@ export async function signOutEverywhere(
 
 // --------------------------------------------------------- agent identity
 
+/** The Telegram and Facebook accounts, when the form sends them. */
+type MoreIds = { telegram?: string | null; facebook?: string | null };
+
 /**
- * The address a seller is told to invite as channel owner.
+ * The identity as typed, checked. A caller that sends only the email (an
+ * older form) leaves the other two as they are.
+ */
+async function typedIds(
+  userId: string,
+  email: string,
+  more: MoreIds | undefined,
+) {
+  const stored = more ? null : await repo.agentIdentity(userId);
+  return parseTransferIds({
+    email,
+    telegram: more ? more.telegram : stored?.telegram,
+    facebook: more ? more.facebook : stored?.facebook,
+  });
+}
+
+/** Where a saved identity sends sellers, in a line. */
+function savedLine(ids: TransferIds): string {
+  const parts = [
+    ids.email ? `${ids.email} on YouTube, Instagram and websites` : null,
+    ids.telegram ? `${ids.telegram} on Telegram` : null,
+    ids.facebook ? `${ids.facebook} on Facebook` : null,
+  ].filter(Boolean);
+  return parts.join("; ");
+}
+
+/**
+ * The accounts a seller is told to hand a deal to, one per kind of
+ * platform (`@/lib/transfer-identity`).
  *
  * Superadmin-only, like a role change and for the same reason: it decides who
  * a seller hands a channel to. Getting it wrong does not fail loudly — the
@@ -341,27 +379,28 @@ export async function setAgentIdentity(
   userId: string,
   email: string,
   brand: string,
+  more?: MoreIds,
 ): Promise<AdminUserActionResult> {
   const actor = await requireSuperadmin();
 
-  const trimmedEmail = email.trim().toLowerCase();
   const trimmedBrand = brand.trim();
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
-    return { ok: false, error: "That is not an email address." };
-  }
+  const ids = await typedIds(userId, email, more);
+  if (!ids.ok) return { ok: false, error: ids.error };
   if (trimmedBrand.length < 2) {
     return {
       ok: false,
-      error: "Give the name the seller sees beside the address.",
+      error: "Give the name the seller sees beside the account.",
     };
   }
 
   const result = await repo.setAgentIdentity({
     userId,
-    email: trimmedEmail,
+    ids: ids.value,
     brand: trimmedBrand,
   });
-  if (!result.ok) return { ok: false, error: FAILURES[result.reason] };
+  if (!result.ok) {
+    return { ok: false, error: IDENTITY_FAILURES[result.reason] };
+  }
 
   await recordAudit({
     actorId: actor.id,
@@ -377,42 +416,43 @@ export async function setAgentIdentity(
   revalidatePath(`/admin/users/${userId}`);
   return {
     ok: true,
-    message: `New deals will tell sellers to invite ${trimmedEmail}.`,
+    message: `Saved. New deals hand over to ${savedLine(ids.value)}.`,
   };
 }
 
 /**
  * The same, set by the person themselves: an agent or moderator changing the
- * address they take channels on, without asking the superadmin to.
+ * accounts they take deals on, without asking the superadmin to.
  *
  * Applies to deals they take from now on. A deal already running keeps the
- * address its seller was given, who may have sent the invite already.
+ * account its seller was given, who may have sent the invite already.
  */
 export async function setMyAgentIdentity(
   email: string,
   brand: string,
+  more?: MoreIds,
 ): Promise<AdminUserActionResult> {
   // The superadmin passes every requireRole too.
   const me = await requireRole("AGENT", "MODERATOR");
 
-  const trimmedEmail = email.trim().toLowerCase();
   const trimmedBrand = brand.trim();
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
-    return { ok: false, error: "That is not an email address." };
-  }
+  const ids = await typedIds(me.id, email, more);
+  if (!ids.ok) return { ok: false, error: ids.error };
   if (trimmedBrand.length < 2) {
     return {
       ok: false,
-      error: "Give the name the seller sees beside the address.",
+      error: "Give the name the seller sees beside the account.",
     };
   }
 
   const result = await repo.setAgentIdentity({
     userId: me.id,
-    email: trimmedEmail,
+    ids: ids.value,
     brand: trimmedBrand,
   });
-  if (!result.ok) return { ok: false, error: FAILURES[result.reason] };
+  if (!result.ok) {
+    return { ok: false, error: IDENTITY_FAILURES[result.reason] };
+  }
 
   await recordAudit({
     actorId: me.id,
@@ -427,7 +467,7 @@ export async function setMyAgentIdentity(
   revalidatePath("/admin/team");
   return {
     ok: true,
-    message: `Saved. Sellers on deals you take from now on invite ${trimmedEmail}.`,
+    message: `Saved. Deals you take from now on hand over to ${savedLine(ids.value)}.`,
   };
 }
 

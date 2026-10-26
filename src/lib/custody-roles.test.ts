@@ -1,5 +1,7 @@
 import { expect, test } from "vitest";
 import {
+  capLoad,
+  capWarning,
   isCustodianRole,
   levelFor,
   levelLabel,
@@ -47,4 +49,27 @@ test("each level reads as its band", () => {
   expect(levelLabel("UNDER_100K")).toBe("Level 2 · $100 to $1,000");
   expect(levelLabel("FROM_100K")).toBe("Level 3 · $1,000 and up");
   expect(levelLabel(null)).toBe("Any size");
+});
+
+test("an agent over the hold cap reads as over the limit, not at it", () => {
+  // QA: Team said "11 of 10 · At cap".
+  expect(capLoad(11, 10)).toEqual({
+    state: "over",
+    line: "Over the limit (11 of 10)",
+  });
+  expect(capLoad(10, 10).state).toBe("at");
+  expect(capLoad(9, 10).state).toBe("near");
+  expect(capLoad(2, 10)).toEqual({ state: "free", line: "2 of 10" });
+});
+
+test("lowering the cap below what agents hold warns, and does not refuse", () => {
+  // QA: Settings took a cap under what agents already held, silently.
+  expect(capWarning(10, [3, 10])).toBeNull();
+  expect(capWarning(8, [3, 10])).toBe(
+    "One agent already holds 10. They keep what they hold, but cannot take another deal until they are under 8.",
+  );
+  expect(capWarning(2, [3, 10, 1])).toMatch(
+    /^2 agents already hold more — up to 10/,
+  );
+  expect(capWarning(Number.NaN, [3])).toBeNull();
 });

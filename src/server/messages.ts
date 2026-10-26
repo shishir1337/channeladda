@@ -1,5 +1,6 @@
 import "server-only";
 
+import { readDealLine } from "@/components/deals/deal-status";
 import type { Prisma } from "@/generated/prisma/client";
 import type {
   DealMode,
@@ -392,7 +393,13 @@ export async function getThread(
     db.order.findMany({
       where: { conversationId, ...only },
       orderBy: { createdAt: "desc" },
-      select: { listingId: true, reference: true, status: true },
+      select: {
+        id: true,
+        mode: true,
+        listingId: true,
+        reference: true,
+        status: true,
+      },
     }),
   ]);
   // Media in a conversation with a deal still running is kept until every
@@ -445,6 +452,23 @@ export async function getThread(
   const now = new Date();
   // A deal's first line is the one that opened it.
   const opened = new Set<string>();
+  // A deal's lines, read by this reader in the deal's own words: "made
+  // you an admin" to the buyer, and a line from before each platform had
+  // its words in this one's (`readDealLine`).
+  const dealOf = new Map(deals.map((deal) => [deal.id, deal]));
+  const lineFor = (message: (typeof messages)[number]): string => {
+    const deal =
+      message.kind === "EVENT" && message.orderId
+        ? dealOf.get(message.orderId)
+        : undefined;
+    const platform = deal ? byId.get(deal.listingId)?.platform : undefined;
+    if (!deal || !platform) return message.body;
+    return readDealLine(message.body, {
+      reader: viewerRole,
+      platform,
+      mode: deal.mode,
+    });
+  };
 
   return {
     id: row.id,
@@ -469,7 +493,7 @@ export async function getThread(
         kind: message.kind,
         listingId: message.listingId,
         opensDeal,
-        body: message.body,
+        body: lineFor(message),
         createdAt: message.createdAt,
         mine: message.senderId === viewer.id,
         fromStaff: message.fromStaff,

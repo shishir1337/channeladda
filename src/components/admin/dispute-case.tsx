@@ -21,6 +21,7 @@ import {
 } from "@/components/admin/vocab";
 import { InfoTip } from "@/components/app/info-tip";
 import { Amount, Callout, Facts, Reference, Ring } from "@/components/app/kit";
+import { staffWords, stepTitle } from "@/components/deals/deal-status";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { threadHref } from "@/lib/thread-href";
@@ -65,6 +66,11 @@ function unwritten(action: string): string | null {
   }
   if (action === "deal.disputed") return "No reason was given.";
   return null;
+}
+
+/** "Page", for a heading: the asset's word with a capital. */
+function cap(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
 /** "26 Oct, 3:53 AM", in the reader's own zone. */
@@ -233,10 +239,13 @@ export function DisputeCase({
   zone: ViewerZone;
 }) {
   const headingId = `dispute-${dispute.orderId}`;
-  const facts = custodyFacts(dispute.mode, dispute.status, {
-    paid: dispute.paid,
-    inCustody: dispute.inCustody,
-  });
+  const facts = custodyFacts(
+    dispute.mode,
+    dispute.status,
+    { paid: dispute.paid, inCustody: dispute.inCustody },
+    dispute.platform,
+  );
+  const say = staffWords(dispute.platform, dispute.mode);
   const decideBy = new Date(
     dispute.waitingSince.getTime() + DECISION_HOURS * 60 * 60 * 1000,
   );
@@ -410,7 +419,7 @@ export function DisputeCase({
           <section aria-labelledby={`${headingId}-position`}>
             <Heading id={`${headingId}-position`}>Where things stand</Heading>
             <Facts className="mt-1">
-              <Line term="Channel">{facts.asset}</Line>
+              <Line term={cap(say.asset)}>{facts.asset}</Line>
               <Line term="Money">{facts.money}</Line>
               <Line term="On our books">
                 <span className="flex flex-wrap items-baseline gap-x-1.5">
@@ -487,12 +496,20 @@ export function DisputeCase({
                     ) : null}
                   </span>
                   <span className="min-w-0 text-[0.8125rem] leading-5">
+                    {/* In the platform's words, as the members read it:
+                        a Facebook deal listed "Make the agent primary
+                        owner" here (QA, CA-75190). */}
                     <span
                       className={step.completedAt ? "text-fg" : "text-subtle"}
                     >
-                      {step.position}. {step.label}
+                      {step.position}.{" "}
+                      {stepTitle(
+                        step.label,
+                        "staff",
+                        dispute.platform,
+                        dispute.mode,
+                      )}
                     </span>
-                    <span className="text-xs text-subtle"> · {step.actor}</span>
                     <span className="sr-only">
                       {step.completedAt ? ", done" : ", not done"}
                     </span>
@@ -529,7 +546,7 @@ export function DisputeCase({
                 The buyer pressed Paid on{" "}
                 {when(new Date(dispute.buyerPaidAt), zone)}
                 {dispute.sellerConfirmedAt
-                  ? `, and the seller pressed Received on ${when(new Date(dispute.sellerConfirmedAt), zone)}. The channel cannot go back to the seller: they have said they were paid.`
+                  ? `, and the seller pressed Received on ${when(new Date(dispute.sellerConfirmedAt), zone)}. The ${say.asset} cannot go back to the seller: they have said they were paid.`
                   : ", and the seller has not pressed Received. The price went to the seller directly, never through us — the chat is where the proof is."}
               </p>
             ) : null}
@@ -591,8 +608,8 @@ export function DisputeCase({
         {/* Where the money goes is never behind the (i). */}
         <p className="mt-0.5 max-w-[72ch] text-xs leading-relaxed text-muted">
           {dispute.mode === "SAFEST"
-            ? "Safest: we hold only the admin fee — the price went from the buyer to the seller directly. Returning the channel gives it back to the seller (refused once they pressed Received); finishing the deal hands it to the buyer. The admin fee is kept once our agent has taken custody."
-            : "Fastest: until our agent is primary owner we hold the money, so deciding it either way moves money — the buyer back, or the seller paid. After that the seller has been paid, and the only outcome is finishing it."}
+            ? `Safest: we hold only the admin fee — the price went from the buyer to the seller directly. Returning the ${say.asset} gives it back to the seller (refused once they pressed Received); finishing the deal hands it to the buyer. The admin fee is kept once our agent has taken custody.`
+            : `Fastest: until our agent has the ${say.asset} we hold the money, so deciding it either way moves money — the buyer back, or the seller paid. After that the seller has been paid, and the only outcome is finishing it.`}
         </p>
         {financesCall && !canMoveMoney ? (
           <Callout
@@ -609,6 +626,7 @@ export function DisputeCase({
           orderId={dispute.orderId}
           mode={dispute.mode}
           status={dispute.status}
+          platform={dispute.platform}
           canMoveMoney={canMoveMoney}
           paid={dispute.paid}
           inCustody={dispute.inCustody}

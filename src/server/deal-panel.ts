@@ -5,6 +5,7 @@ import type { DealActor } from "@/lib/deal-machine";
 import { isTerminal } from "@/lib/deal-machine";
 import type { PanelInput, PanelViewer } from "@/lib/deal-panel";
 import { awaitsAgent } from "@/lib/deal-templates";
+import { payToMissingOn } from "@/lib/deal-turn";
 import { heldByAcceptedOffer, offerTurn } from "@/server/offers";
 
 /**
@@ -107,11 +108,21 @@ export async function loadPanelInput(
           awaitingAgent:
             !isTerminal(order.status) &&
             awaitsAgent(order.mode, next?.position ?? null, order.agentId),
-          payToMissing:
-            order.mode === "SAFEST" &&
-            !isTerminal(order.status) &&
-            next?.label === "Pay the seller" &&
-            !order.sellerPayTo?.trim(),
+          // The one rule (`dealTurn`): the seller's move, not the buyer's.
+          payToMissing: payToMissingOn({
+            mode: order.mode,
+            status: order.status,
+            next: next
+              ? {
+                  position: next.position,
+                  label: next.label,
+                  actor: next.actor as DealActor,
+                }
+              : null,
+            holdUntil: order.holdUntil,
+            agentId: order.agentId,
+            sellerPayTo: order.sellerPayTo,
+          }),
         }
       : null,
     now,

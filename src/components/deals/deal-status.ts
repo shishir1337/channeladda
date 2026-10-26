@@ -258,7 +258,7 @@ type Act = {
   /** The button. */
   button: string;
   /** A name that reads better for one reader than the made one. */
-  titles?: Partial<Record<"buyer" | "seller" | "agent", string>>;
+  titles?: Partial<Record<"buyer" | "seller" | "agent" | "staff", string>>;
   /** Asked once more before the press counts. */
   caution?: string;
 };
@@ -281,7 +281,11 @@ function moneyActs(w: Words): Record<string, Act> {
       what: () =>
         `The buyer pays the price and our fee to Channel Adda, which holds it until our agent has the ${w.asset}.`,
       button: "Mark this done",
-      titles: { seller: "The buyer pays us", agent: "The buyer pays us" },
+      titles: {
+        seller: "The buyer pays us",
+        agent: "The buyer pays us",
+        staff: "The buyer pays us",
+      },
     },
     "Pay the seller": {
       to: (o) => `pay ${o.seller}`,
@@ -822,8 +826,10 @@ function lowerFirst(text: string): string {
  * matched on them, and `deals:in-flight` treats a changed one as old steps —
  * so they stay, and this is what is shown instead. Each name says who does
  * it, from the reader's side ("You pay", "The seller invites our agent as
- * owner"), so the list needs no "Then the seller" under every line. Staff,
- * and a step from an earlier template, see the stored label.
+ * owner"), so the list needs no "Then the seller" under every line. Staff
+ * read it in the third person, in the platform's words too: the dispute
+ * desk listed "Make the agent primary owner" on a Facebook deal (QA,
+ * CA-75190). A step from an earlier template keeps its stored label.
  */
 export function stepTitle(
   label: string,
@@ -831,16 +837,107 @@ export function stepTitle(
   platform: Platform,
   mode: DealMode,
 ): string {
-  if (viewer !== "buyer" && viewer !== "seller" && viewer !== "agent") {
-    return label;
-  }
   const act = actFor(mode, label, platform);
   const actor = actorOf(mode, label);
   if (!act || !actor) return label;
-  const own = act.titles?.[viewer];
+  const reader = viewer === "system" ? "staff" : viewer;
+  const own = act.titles?.[reader];
   if (own) return own;
-  if (actor === viewer) return `You ${act.to(them(viewer))}`;
-  return `${SUBJECT[actor]} ${third(act.to(them(viewer)))}`;
+  if (actor === reader) return `You ${act.to(them(reader))}`;
+  return `${SUBJECT[actor]} ${third(act.to(them(reader)))}`;
+}
+
+/**
+ * A step, done, in words for whoever reads it: "made the buyer an admin"
+ * reads "made you an admin" to the buyer. The stored line names everybody
+ * in the third person, and the buyer read "Imran Hossain made the buyer an
+ * admin" about themselves (QA, CA-87042).
+ */
+export function didFor(did: string, reader: DealActor): string {
+  if (reader === "buyer") {
+    return did
+      .replace(/\bthe buyer's\b/g, "your")
+      .replace(/\bthe buyer\b/g, "you");
+  }
+  if (reader === "agent") {
+    return did
+      .replace(/\bour agent's\b/g, "your")
+      .replace(/\bour agent\b/g, "you");
+  }
+  if (reader === "seller") {
+    return did
+      .replace(/\bthe seller's\b/g, "your")
+      .replace(/\bthe seller\b/g, "you");
+  }
+  return did;
+}
+
+/** Every step a deal of this mode and platform has, and the older ones. */
+function actsOf(mode: DealMode, platform: Platform): Act[] {
+  return [
+    ...Object.values(PLATFORM_ACTS[platform](mode)),
+    ...Object.values(moneyActs(wordsFor(platform))),
+  ];
+}
+
+/**
+ * A line the deal chat stored, read by this reader on this deal.
+ *
+ * Lines are written once, in the third person, and read by both sides and
+ * our agent. Two kinds are rewritten for the reader: a step done ("Imran
+ * Hossain made the buyer an admin" reads "…made you an admin" to the
+ * buyer) and the line that says the seller has been paid ("…so you have
+ * been paid", to the seller). A line stored before steps had each
+ * platform's words — "Done: Invite the agent as owner (Imran Khan)" on an
+ * Instagram deal — is said in this platform's words now (QA, CA-17139).
+ * Anything else, a member's reason among it, is left exactly as written.
+ */
+export function readDealLine(
+  body: string,
+  ctx: { reader: DealActor; platform: Platform; mode: DealMode },
+): string {
+  const { reader, platform, mode } = ctx;
+
+  // Before lines led with the name: "Done: <stored label> (<name>)".
+  const old = /^Done: (.+) \(([^()]+)\)$/.exec(body);
+  if (old) {
+    const act = actFor(mode, old[1], platform);
+    return act ? `${old[2]} ${didFor(act.did, reader)}` : body;
+  }
+
+  // "<name> <did>": the longest step that ends the line, so "confirmed
+  // ownership" is never taken for part of a longer one.
+  const did = actsOf(mode, platform)
+    .map((act) => act.did)
+    .filter((text) => body.endsWith(` ${text}`))
+    .sort((a, b) => b.length - a.length)[0];
+  if (did) return `${body.slice(0, -did.length)}${didFor(did, reader)}`;
+
+  // Fastest: the seller has been paid. Either wording, the earlier one
+  // YouTube's even on a Page.
+  if (
+    /^Our agent (?:has the .+ now|is primary owner), so the seller has been paid\. Our agent (?:hands it to the buyer|makes the buyer primary owner) next$/.test(
+      body,
+    )
+  ) {
+    return sellerPaidLine(reader, platform);
+  }
+  return body;
+}
+
+/** Fastest's "the seller has been paid" line, for this reader. */
+function sellerPaidLine(reader: DealActor, platform: Platform): string {
+  const asset = wordsFor(platform).asset;
+  if (reader === "seller") {
+    return `Our agent has the ${asset} now, so you have been paid. Our agent hands it to the buyer next`;
+  }
+  if (reader === "buyer") {
+    return `Our agent has the ${asset} now, so the seller has been paid. Our agent hands it to you next`;
+  }
+  if (reader === "agent") {
+    return `You have the ${asset} now, so the seller has been paid. You hand it to the buyer next`;
+  }
+  return `Our agent has the ${asset} now, so the seller has been paid. Our agent hands it to the buyer next`;
 }
 
 function otherMode(mode: DealMode): DealMode {
@@ -1027,6 +1124,10 @@ type Ctx = {
   mode: DealMode;
   /** The deal's hold is still running. */
   held: boolean;
+  /** Safest: the buyer's turn to pay, and the seller has not said where. */
+  payToMissing: boolean;
+  /** The buyer's name, where a line is better with it. */
+  buyerName?: string;
   /** This deal's step, in this platform's words. */
   act: (label: string) => Act;
 };
@@ -1078,13 +1179,18 @@ const BY_OPEN_STEP: Partial<Record<string, Override>> = {
   "SAFEST:AWAITING_CUSTODY:3": (c, r) => {
     const step = "Accept the owner invite";
     const wait = c.w.googleWait;
+    const gave = c.act("Invite the agent as owner").did;
+    const later = c.act("Make the agent primary owner").to(them("seller"));
     return {
       label: stepLabel(c, step, r),
       short: "Agent taking over",
+      // The seller still has a step to come — making our agent primary
+      // owner, transferring ownership, leaving the Page — so they are
+      // never told their part is done here (QA, CA-82257).
       sentence: {
-        buyer: `The seller has handed the ${c.w.asset} to our agent. ${said(c, step, "buyer")} next${wait ? ", and then Google's 7-day wait starts" : ""}.`,
-        seller: `You have handed the ${c.w.asset} to our agent, so your part is done for now. ${said(c, step, "seller")} next${wait ? ", and then Google's 7-day wait starts" : ""}.`,
-        agent: `The seller has handed the ${c.w.asset} to you. ${said(c, step, "agent")}, then confirm here${wait ? " — that starts Google's 7-day wait" : ""}.`,
+        buyer: `The seller ${didFor(gave, "buyer")}. ${said(c, step, "buyer")} next${wait ? ", and then Google's 7-day wait starts" : ""}.`,
+        seller: `Next, ${lowerFirst(said(c, step, "seller"))}${wait ? ", and then Google's 7-day wait starts" : ""}. After that it is your turn again: ${later}.`,
+        agent: `The seller ${didFor(gave, "agent")}. ${said(c, step, "agent")}, then confirm here${wait ? " — that starts Google's 7-day wait" : ""}.`,
       }[r],
     };
   },
@@ -1126,19 +1232,36 @@ const BY_OPEN_STEP: Partial<Record<string, Override>> = {
       }[r],
     };
   },
-  "SAFEST:IN_CUSTODY:6": (c, r) => ({
-    label: {
-      buyer: "Pay the seller now",
-      seller: "Waiting for the buyer to pay you",
-      agent: "Waiting for the buyer to pay the seller",
-    }[r],
-    short: "Buyer paying",
-    sentence: {
-      buyer: `Our agent holds the ${c.w.asset} now, not the seller. Pay the seller the price directly, to the details they gave on this page, then press Paid.`,
-      seller: `Our agent holds the ${c.w.asset}. The buyer pays you directly next, to the details you gave on this page.`,
-      agent: `You hold the ${c.w.asset}. The buyer is paying the seller directly.`,
-    }[r],
-  }),
+  "SAFEST:IN_CUSTODY:6": (c, r) =>
+    c.payToMissing
+      ? {
+          // The buyer's step, and nothing for them to pay to: until the
+          // seller says where, it is the seller's move (QA, CA-27058).
+          label: {
+            buyer: "Waiting for the seller's payment details",
+            seller: `Say where ${c.buyerName ?? "the buyer"} should pay you`,
+            agent: "Waiting for the seller's payment details",
+          }[r],
+          short: "Seller adding details",
+          sentence: {
+            buyer: `Our agent holds the ${c.w.asset} now, not the seller. The seller has not said where to pay them yet — we have asked them. Once their details show on this page, pay them and press Paid.`,
+            seller: `Our agent holds the ${c.w.asset}. Say where ${c.buyerName ?? "the buyer"} should pay you, in the box on this page — they cannot pay you until you do.`,
+            agent: `You hold the ${c.w.asset}. The seller has not said where the buyer should pay them yet.`,
+          }[r],
+        }
+      : {
+          label: {
+            buyer: "Pay the seller now",
+            seller: "Waiting for the buyer to pay you",
+            agent: "Waiting for the buyer to pay the seller",
+          }[r],
+          short: "Buyer paying",
+          sentence: {
+            buyer: `Our agent holds the ${c.w.asset} now, not the seller. Pay the seller the price directly, to the details they gave on this page, then press Paid.`,
+            seller: `Our agent holds the ${c.w.asset}. The buyer pays you directly next, to the details you gave on this page.`,
+            agent: `You hold the ${c.w.asset}. The buyer is paying the seller directly.`,
+          }[r],
+        },
   "SAFEST:IN_CUSTODY:7": (c, r) => ({
     label: {
       buyer: "Waiting for the seller to confirm your payment",
@@ -1211,13 +1334,18 @@ const BY_OPEN_STEP: Partial<Record<string, Override>> = {
   },
   "FASTEST:AGENT_VERIFYING:3": (c, r) => {
     const step = "Invite the buyer as owner";
+    const gave = c.act("Invite the agent as owner").did;
+    const later = c.act("Make the agent primary owner").to(them("seller"));
     return {
       label: stepLabel(c, step, r),
       short: "Agent taking over",
+      // Not "your part is done": when the holding period ends the seller
+      // still hands it over fully, and that is when they are paid (QA,
+      // CA-82257).
       sentence: {
-        buyer: `The seller has handed the ${c.w.asset} to our agent. ${said(c, step, "buyer")} next — that starts the holding period.`,
-        seller: `You have handed the ${c.w.asset} to our agent, so your part is done for now. ${said(c, step, "seller")} next, and then the holding period starts.`,
-        agent: `The seller has handed the ${c.w.asset} to you. ${c.act(step).how}`,
+        buyer: `The seller ${didFor(gave, "buyer")}. ${said(c, step, "buyer")} next — that starts the holding period.`,
+        seller: `Next, ${lowerFirst(said(c, step, "seller"))}, and the holding period starts. When it ends it is your turn again: ${later} — that is when you are paid.`,
+        agent: `The seller ${didFor(gave, "agent")}. ${c.act(step).how}`,
       }[r],
     };
   },
@@ -1330,6 +1458,13 @@ export function dealHeadline(
   awaitingAgent = false,
   /** The deal's hold — Google's wait, or the holding period — is running. */
   held = false,
+  /**
+   * Safest: the buyer's turn to pay the seller, and the seller has not said
+   * where (`dealTurn`). Then it is the seller's move.
+   */
+  payToMissing = false,
+  /** The buyer's name, for the seller's "Say where … should pay you". */
+  buyerName?: string,
 ): DealHeadline {
   const w = wordsFor(platform);
   if (awaitingAgent) {
@@ -1358,6 +1493,8 @@ export function dealHeadline(
         w,
         mode,
         held,
+        payToMissing,
+        buyerName,
         act: (label) => acts[label] ?? money[label],
       },
       reader,
@@ -1371,6 +1508,121 @@ export function dealHeadline(
     ),
     short: inWords(STATUS_SHORT[status], w),
     sentence: statusSentence(status, mode, viewer, platform),
+  };
+}
+
+/**
+ * The congratulations at the end of a deal that went through, for this
+ * reader, in the platform's word: an Instagram buyer was told "The channel
+ * is yours" (QA, CA-27058).
+ */
+export function completeWords(
+  viewer: DealActor,
+  mode: DealMode,
+  platform: Platform,
+): { title: string; body: string } {
+  const asset = wordsFor(platform).asset;
+  if (viewer === "buyer") {
+    return {
+      title: `Congratulations! The ${asset} is yours.`,
+      body: `Keep your certificate. It shows this ${asset} came to you through Channel Adda.`,
+    };
+  }
+  if (viewer === "seller") {
+    return {
+      title: "Congratulations! Your sale is complete.",
+      body:
+        mode === "FASTEST"
+          ? "Your money is in your wallet. Keep the certificate as a record of the sale."
+          : `The buyer has paid you and the ${asset} is theirs. Keep the certificate as a record of the sale.`,
+    };
+  }
+  return {
+    title: "This deal is complete.",
+    body:
+      mode === "FASTEST"
+        ? `The ${asset} has changed hands and the seller has been paid.`
+        : `The ${asset} has changed hands, and the buyer paid the seller directly.`,
+  };
+}
+
+/**
+ * The money card's last line: what Channel Adda is holding right now.
+ *
+ * Fastest holds the money until our agent has the account, then the
+ * account. Safest never holds the price: it holds the account, but only
+ * once our agent has it — "Channel Adda holds: The account" sat on a deal
+ * whose seller had handed nothing over (QA, CA-27058) — so before that it
+ * says what happens next. Nothing on a deal that has ended or is unpaid.
+ */
+export function heldLine(input: {
+  mode: DealMode;
+  platform: Platform;
+  /** Ended, or not paid yet: nothing is held. */
+  idle: boolean;
+  /** Our agent holds it (`custodyAt`). */
+  inCustody: boolean;
+  /** Safest: our agent is checking it (the verify step is open). */
+  checking?: boolean;
+}): {
+  label: string;
+  value: { kind: "total" } | { kind: "text"; text: string };
+  note: string;
+} | null {
+  if (input.idle) return null;
+  const asset = wordsFor(input.platform).asset;
+  if (input.inCustody) {
+    return {
+      label: "Channel Adda holds",
+      value: { kind: "text", text: `The ${asset}` },
+      note: "our agent holds it until it is handed to the buyer",
+    };
+  }
+  if (input.mode === "FASTEST") {
+    return {
+      label: "Channel Adda is holding",
+      value: { kind: "total" },
+      note: "the price and our fee together",
+    };
+  }
+  return {
+    label: "Next",
+    value: {
+      kind: "text",
+      text: input.checking
+        ? `Our agent checks the ${asset}`
+        : `Our agent takes the ${asset}`,
+    },
+    note: `The seller hands the ${asset} to our agent first. Only once our agent holds it does the buyer pay the seller.`,
+  };
+}
+
+/**
+ * The staff desk's words for where a deal's account is and what finishing
+ * it does, in the platform's terms: the dispute desk said "The seller is
+ * still primary owner" and "our agent makes the buyer primary owner" on a
+ * Facebook Page (QA, CA-75190).
+ */
+export function staffWords(platform: Platform, mode: DealMode = "FASTEST") {
+  const w = wordsFor(platform);
+  const asset = w.asset;
+  const last = actFor(mode, "Make the buyer primary owner", platform);
+  const youtube = platform === "YOUTUBE";
+  return {
+    asset,
+    /** "our agent gives the buyer full control". */
+    handToBuyer: last
+      ? `our agent ${third(last.to(them("staff")))}`
+      : `our agent hands the ${asset} to the buyer`,
+    /** Fastest: when the seller was paid. */
+    agentTook: youtube
+      ? "when our agent became primary owner"
+      : `when our agent took the ${asset}`,
+    sellerStillHas: youtube
+      ? "The seller is still primary owner; our agent takes the channel from them first."
+      : `The seller still has the ${asset}; our agent takes it from them first.`,
+    sellerOwns: `The seller still owns the ${asset}.`,
+    agentHolds: `The agent owns the ${asset}.`,
   };
 }
 

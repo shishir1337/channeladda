@@ -75,3 +75,42 @@ export const DEAL_LEVELS: readonly DealLevel[] = [
   "UNDER_100K",
   "FROM_100K",
 ];
+
+/**
+ * One agent's load against the hold cap, in words.
+ *
+ * Team said "11 of 10 · At cap" for an agent over it (QA): over the limit
+ * is its own state, and says so first, with the figures after.
+ */
+export function capLoad(
+  holds: number,
+  cap: number,
+): { state: "over" | "at" | "near" | "free"; line: string } {
+  if (holds > cap) {
+    return { state: "over", line: `Over the limit (${holds} of ${cap})` };
+  }
+  if (holds === cap)
+    return { state: "at", line: `At the limit (${holds} of ${cap})` };
+  if (holds >= cap - 1) return { state: "near", line: `${holds} of ${cap}` };
+  return { state: "free", line: `${holds} of ${cap}` };
+}
+
+/**
+ * The warning beside a hold cap being lowered below what agents already
+ * hold. Not a refusal: they keep what they hold, and take nothing more
+ * until they are back under it. Null when nobody would be over it.
+ */
+export function capWarning(
+  cap: number,
+  holdsByAgent: readonly number[],
+): string | null {
+  if (!Number.isInteger(cap) || cap < 0) return null;
+  const over = holdsByAgent.filter((holds) => holds > cap);
+  if (over.length === 0) return null;
+  const most = Math.max(...over);
+  const who =
+    over.length === 1
+      ? `One agent already holds ${most}`
+      : `${over.length} agents already hold more — up to ${most}`;
+  return `${who}. They keep what they hold, but cannot take another deal until they are under ${cap}.`;
+}

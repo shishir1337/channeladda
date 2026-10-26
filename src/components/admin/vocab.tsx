@@ -8,11 +8,13 @@ import type { ComponentProps, ReactNode } from "react";
 import { InfoTip } from "@/components/app/info-tip";
 import { Reference } from "@/components/app/kit";
 import { ZonedTime } from "@/components/app/time-zone";
+import { staffWords } from "@/components/deals/deal-status";
 import { Badge } from "@/components/ui/badge";
 import type {
   DealMode,
   ListingStatus,
   OrderStatus,
+  Platform,
   UserRole,
 } from "@/generated/prisma/enums";
 import { AGENT_HOLDS, isTerminal, PLATFORM_HOLDS } from "@/lib/deal-machine";
@@ -265,7 +267,13 @@ export function custodyFacts(
   mode: DealMode,
   status: OrderStatus,
   facts?: { paid?: boolean; inCustody?: boolean },
+  /**
+   * The deal's platform, for its words: the dispute desk said "The seller
+   * is still primary owner" about a Facebook Page (QA, CA-75190).
+   */
+  platform: Platform = "YOUTUBE",
 ) {
+  const say = staffWords(platform, mode);
   const finished = isTerminal(status);
   const disputed = status === "DISPUTED";
   const fastest = mode === "FASTEST";
@@ -286,12 +294,12 @@ export function custodyFacts(
   const beforeAnything = status === "AWAITING_PAYMENT";
 
   const asset = unknown
-    ? "Paused. Check the step list for who holds the channel."
+    ? `Paused. Check the step list for who holds the ${say.asset}.`
     : agentHolds
-      ? "The agent owns the channel."
+      ? say.agentHolds
       : mode === "SAFEST"
-        ? "The seller still owns the channel."
-        : "The seller is still primary owner; our agent takes the channel from them first.";
+        ? say.sellerOwns
+        : say.sellerStillHas;
 
   const money = unknown
     ? "Paused. Check whether the opening payment cleared."
@@ -312,11 +320,9 @@ export function custodyFacts(
   } else if (beforeAnything) {
     recoverable = "Nothing has moved. Cancelling costs nobody anything.";
   } else if (sellerPaid) {
-    recoverable =
-      "The seller has been paid, so there is no refund. The only outcome left is finishing it: our agent makes the buyer primary owner.";
+    recoverable = `The seller has been paid, so there is no refund. The only outcome left is finishing it: ${say.handToBuyer}.`;
   } else if (agentHolds) {
-    recoverable =
-      "The channel has to go back to the seller, or on to the buyer — only on, once the seller has pressed Received. Returning it refunds the admin fee unless our agent has taken custody; finance decides.";
+    recoverable = `The ${say.asset} has to go back to the seller, or on to the buyer — only on, once the seller has pressed Received. Returning it refunds the admin fee unless our agent has taken custody; finance decides.`;
   } else if (platformHolds) {
     recoverable =
       "We hold the full amount. Refunding or cancelling returns all of it to the buyer; finance decides which.";

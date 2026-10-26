@@ -1,5 +1,10 @@
 import { expect, test } from "vitest";
-import { type ChatEvent, eventForReader, eventText } from "@/lib/chat-events";
+import {
+  type ChatEvent,
+  eventForReader,
+  eventText,
+  quoteReason,
+} from "@/lib/chat-events";
 
 // One of each, so a variant added later without words fails here.
 const EXAMPLES: ChatEvent[] = [
@@ -104,4 +109,28 @@ test("a dispute line says what it is about", () => {
   expect(
     eventText({ type: "dispute-raised", name: "Rafi", reason: "No reply." }),
   ).toMatch(/^Rafi raised a dispute: “No reply\.”/);
+});
+
+test("a reason in quotes ends its sentence once", () => {
+  // QA, CA-50979: "Your reason: “…safely.”."
+  expect(quoteReason("I cannot hand it over safely.")).toBe(
+    "“I cannot hand it over safely.”",
+  );
+  expect(quoteReason("changed my mind")).toBe("“changed my mind”.");
+  expect(
+    eventText({ type: "dispute-raised", name: "Rafi", reason: "No reply." }),
+  ).toBe(
+    "Rafi raised a dispute: “No reply.” The deal is paused while Channel Adda looks at it",
+  );
+});
+
+test("whoever cancelled reads their own reason as theirs", () => {
+  const line =
+    "Nadia Rahman cancelled this deal. Their reason: “sold elsewhere”";
+  expect(eventForReader(line, { mine: true, senderName: "Nadia Rahman" })).toBe(
+    "You cancelled this deal. Your reason: “sold elsewhere”",
+  );
+  expect(
+    eventForReader(line, { mine: false, senderName: "Nadia Rahman" }),
+  ).toBe(line);
 });

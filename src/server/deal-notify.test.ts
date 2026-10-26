@@ -151,7 +151,9 @@ test(
     }
 
     const told = await db.notification.findMany({
-      where: { title: { startsWith: "Deal completed" } },
+      // "Deal complete", as success: it said "…has closed", word for word
+      // what a cancelled deal says (QA, round 2).
+      where: { title: { startsWith: "Deal complete — " } },
       select: { userId: true, href: true },
     });
     expect(told.map((n) => n.userId).sort()).toEqual(

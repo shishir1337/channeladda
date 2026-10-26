@@ -160,9 +160,14 @@ test(
 test("one-line certificate text keeps its spaces from being stretched", async () => {
   // The renderer widened the space after "Certificate" and "certifies":
   // no-break spaces are measured right, and the paragraph still wraps.
-  const { tight, ligatureSafe } = await import(
+  const { tight, ligatureSafe, RECORD_LINE } = await import(
     "@/components/deals/certificate-art"
   );
+  // QA, cert-SA: "This certifies that  the account" kept a double space
+  // after every no-break fix. The paragraph has no "fi", "fl" or "ff" for
+  // the renderer to draw as one glyph and leave a gap after.
+  expect(RECORD_LINE).not.toMatch(/f[ifl]/i);
+  expect(ligatureSafe(RECORD_LINE)).not.toMatch(/ {2}/);
   expect(tight("Certificate of Transfer")).toBe("Certificate of Transfer");
   expect(ligatureSafe("This certifies that the account")).toBe(
     "This certifies that the account",

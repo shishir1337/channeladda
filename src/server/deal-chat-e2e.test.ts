@@ -15,6 +15,7 @@ import {
   createOffer,
   proposePrice,
 } from "@/server/offers";
+import { saveSellerPayTo } from "@/server/pay-to";
 import type { CurrentUser } from "@/server/session";
 import { creditDeposit, payFromWallet } from "@/server/wallet";
 import { passHold, seedListing, seedUser, withCleanDb } from "@/test/db";
@@ -201,8 +202,20 @@ test(
     expect((await kinds(id)).seller).toBe("step:mine");
     await step(4, "seller");
     await step(5, "agent");
-    // Our agent holds the channel and has verified it: the buyer pays the
-    // seller directly, to the details the seller gave on the deal, and
+    // Our agent holds the channel and has verified it. Until the seller
+    // says where to be paid it is their move, not the buyer's: there is
+    // nothing to pay to (QA, CA-27058).
+    expect(await kinds(id)).toMatchObject({
+      buyer: "step:theirs",
+      seller: "step:mine",
+    });
+    const saved = await saveSellerPayTo({
+      orderId: order.id,
+      userId: seller.id,
+      text: "bKash 01700000000",
+    });
+    if (!saved.ok) throw new Error(saved.reason);
+    // Then the buyer pays the seller directly, to those details, and
     // presses Paid.
     expect((await kinds(id)).buyer).toBe("step:mine");
     await step(6, "buyer");

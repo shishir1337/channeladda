@@ -182,9 +182,15 @@ model User {
   // assigned it, so the same agent reached different sellers under different
   // names and a seller inviting the wrong address hands a channel to nobody.
   // These are the agent's stored default, copied onto the deal at assignment.
-  /// The Google account a seller is told to invite as channel owner.
+  /// The Google account a seller is told to invite as channel owner, and the
+  /// email an Instagram account, a domain or a hosting account moves to.
   agentEmail String?
-  /// Display name shown beside agentEmail, e.g. "Channel Adda Transfers".
+  /// The Telegram username a seller makes an admin, then owner: "@name".
+  agentTelegram String?
+  /// The Facebook account a seller adds to their Page: an email or a
+  /// profile link.
+  agentFacebook String?
+  /// Display name shown beside the identity, e.g. "Channel Adda Transfers".
   agentBrand String?
   /// The deals they may take as agent (`@/lib/custody-roles`). Null takes any
   /// size, which is how agents worked before levels existed.
@@ -569,7 +575,9 @@ model Order {
   /// The staff member who takes custody (Safest) or supervises (Fastest).
   agentId    String?
   agent      User?   @relation("OrderAgent", fields: [agentId], references: [id])
-  /// The Google account the seller invites, shown to them with agentBrand.
+  /// The agent's transfer identity for this deal's platform, copied at
+  /// assignment: a Google account or an email, a Telegram username, or a
+  /// Facebook account (`@/lib/transfer-identity`). Shown with agentBrand.
   agentEmail String?
   /// Display name beside agentEmail, e.g. "Channel Adda Transfers".
   agentBrand String?

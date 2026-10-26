@@ -1,5 +1,11 @@
 import { expect, test } from "vitest";
-import { ENDINGS, undoLine } from "@/lib/deal-endings";
+import {
+  ENDINGS,
+  endingLabel,
+  endingWeight,
+  needsFinance,
+  undoLine,
+} from "@/lib/deal-endings";
 
 // The staff desk spells out what each ending does before finance picks one.
 // On Safest we never hold the price, and the desk used to say we did — so a
@@ -31,4 +37,46 @@ test("the desk's line about what cannot be undone counts what it shows", () => {
   expect(undoLine(ENDINGS)).toBe("Four of these five cannot be undone.");
   const paused = ENDINGS.filter((ending) => ending.to !== "DISPUTED");
   expect(undoLine(paused)).toBe("None of these can be undone.");
+});
+
+test("finishing a Fastest deal whose seller was paid is not tagged as moving money", () => {
+  // QA, CA-75190: "Finish the deal" was tagged "moves money" beside text
+  // saying nothing more is paid out. The tag and the words agree now, and
+  // finance still decides it.
+  const completed = ENDINGS.find((ending) => ending.to === "COMPLETED");
+  if (!completed) throw new Error("no COMPLETED ending");
+  const words = {
+    asset: "Page",
+    handToBuyer: "our agent gives the buyer full control",
+    agentTook: "when our agent took the Page",
+  };
+  expect(endingWeight(completed, true, true)).toBe("final");
+  expect(completed.consequence("FASTEST", { words, sellerPaid: true })).toMatch(
+    /no money moves here/,
+  );
+  expect(endingWeight(completed, true, false)).toBe("money");
+  expect(
+    completed.consequence("FASTEST", { words, sellerPaid: false }),
+  ).toMatch(/pays the seller the price we are holding/);
+  expect(needsFinance(completed, true)).toBe(true);
+});
+
+test("the endings speak the deal's platform", () => {
+  const words = {
+    asset: "Page",
+    handToBuyer: "our agent gives the buyer full control",
+    agentTook: "when our agent took the Page",
+  };
+  for (const ending of ENDINGS) {
+    for (const mode of ["SAFEST", "FASTEST"] as const) {
+      const text = `${endingLabel(ending, { words })} ${ending.consequence(mode, { words })}`;
+      expect(text, `${mode} ${ending.to}`).not.toMatch(
+        /primary owner|\bchannel\b/,
+      );
+    }
+  }
+  const back = ENDINGS.find((ending) => ending.to === "RETURNED_TO_SELLER");
+  if (!back) throw new Error("no RETURNED_TO_SELLER ending");
+  expect(endingLabel(back, { words })).toBe("Return the Page to the seller");
+  expect(endingLabel(back)).toBe("Return the channel to the seller");
 });

@@ -7,10 +7,12 @@ import {
   wordsFor,
 } from "@/components/deals/deal-status";
 import type { DealMode, Platform } from "@/generated/prisma/enums";
+import { quoteReason } from "@/lib/chat-events";
 import { CUSTODIAN_ROLES, withinLevel } from "@/lib/custody-roles";
 import { db } from "@/lib/db";
 import type { DealActor } from "@/lib/deal-machine";
 import { awaitsAgent, templateFor } from "@/lib/deal-templates";
+import { payToMissingOn } from "@/lib/deal-turn";
 import { threadHref } from "@/lib/thread-href";
 import { canSendMail, sendMail } from "@/server/mailer";
 import { notify } from "@/server/notifications";
@@ -145,6 +147,7 @@ export async function notifyNextActor(orderId: string): Promise<void> {
         handoverTo: true,
         holdUntil: true,
         priceUsd: true,
+        sellerPayTo: true,
         listing: { select: { title: true, platform: true } },
         steps: {
           where: { completedAt: null },
@@ -177,6 +180,37 @@ export async function notifyNextActor(orderId: string): Promise<void> {
       // an agent is assigned. This is the moment just after the payment:
       // nothing else asks for an agent on this step.
       await notifyBuyerPaid(order.id);
+      return;
+    }
+
+    // Safest: the buyer's turn to pay the seller, and nothing to pay to.
+    // It is the seller's move (`dealTurn`): the buyer was told "Pay the
+    // seller" with no details on the deal (QA, CA-27058). They hear when
+    // the details arrive (`saveSellerPayTo`).
+    if (
+      payToMissingOn({
+        mode,
+        status: order.status,
+        next: {
+          position: next.position,
+          label: next.label,
+          actor: next.actor as DealActor,
+        },
+        holdUntil: order.holdUntil,
+        agentId: order.agentId,
+        sellerPayTo: order.sellerPayTo,
+      })
+    ) {
+      const title = "The buyer is ready to pay you — add where to be paid";
+      const body = `Our agent has checked the ${wordsFor(platform).asset} and the buyer pays you next. Say where they should send the money, on the deal.`;
+      await notify({
+        userId: order.sellerId,
+        kind: "ORDER",
+        title,
+        body,
+        href: dealHref(order),
+        email: { subject: title, body },
+      });
       return;
     }
 
@@ -386,7 +420,10 @@ export async function notifyBuyerWaitOver(orderId: string): Promise<void> {
  *
  * `detail` says who ended it and why, to everybody but them: a buyer whose
  * deal the seller cancelled was told only "Deal cancelled", and the reason
- * the seller had to give went nowhere (QA, CA-17288).
+ * the seller had to give went nowhere (QA, CA-17288). `byRole` is said to
+ * the buyer, the seller or our agent in their own words: the buyer read
+ * "Everything the buyer paid is back in their balance" about themselves
+ * (QA, CA-50979).
  */
 export async function notifyDealEnded(
   orderId: string,
@@ -396,6 +433,7 @@ export async function notifyDealEnded(
     byUserId?: string | null;
     own?: string;
     others?: string;
+    byRole?: Partial<Record<"buyer" | "seller" | "agent", string>>;
   },
 ): Promise<void> {
   try {
@@ -425,7 +463,15 @@ export async function notifyDealEnded(
         kind: "ORDER" as const,
         title: `${outcome} — ${order.reference}`,
         body:
-          (userId === detail?.byUserId ? detail?.own : detail?.others) ??
+          (userId === detail?.byUserId ? detail?.own : undefined) ??
+          detail?.byRole?.[
+            userId === order.buyerId
+              ? "buyer"
+              : userId === order.sellerId
+                ? "seller"
+                : "agent"
+          ] ??
+          (userId === detail?.byUserId ? undefined : detail?.others) ??
           closed,
         // The agent's access to the conversation ends with the deal, so a
         // link there would be a 404 for them; the deal page is theirs.
@@ -473,7 +519,7 @@ export async function notifyDealPaused(
       const body =
         userId === input.byUserId
           ? `You raised a dispute on ${order.listing.title}. A moderator is looking at it, and nothing moves until they decide.`
-          : `${input.byName} raised a dispute on ${order.listing.title}${input.reason ? `: “${input.reason}”` : ""}. The deal is paused while a moderator looks at it — nothing moves until they decide.`;
+          : `${input.byName} raised a dispute on ${order.listing.title}${input.reason ? `: ${quoteReason(input.reason)}` : "."} The deal is paused while a moderator looks at it — nothing moves until they decide.`;
       await notify({
         userId,
         kind: "ORDER",

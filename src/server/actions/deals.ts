@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { MAX_DEAL_NOTE } from "@/lib/deal-endings";
 import { needsEmailVerification } from "@/lib/email-verification";
 import { parseHandoverTo } from "@/lib/handover-target";
+import { identityFor, missingIdentity } from "@/lib/transfer-identity";
 import { agentIdentity } from "@/server/admin-users";
 import * as repo from "@/server/deals";
 import { type PayToFailure, saveSellerPayTo } from "@/server/pay-to";
@@ -236,6 +237,15 @@ export async function completeStep(
   return { ok: true, message: "Done." };
 }
 
+/** The platform a deal's listing is on, or null for no such deal. */
+async function platformOf(orderId: string) {
+  const order = await db.order.findUnique({
+    where: { id: orderId },
+    select: { listing: { select: { platform: true } } },
+  });
+  return order?.listing.platform ?? null;
+}
+
 /**
  * Somebody who runs deals taking the next job off the queue: an agent, a
  * moderator, or the superadmin (who passes every `requireRole`). The deal's
@@ -252,19 +262,25 @@ export async function claimDeal(
   // deal, so one agent reached different sellers under different names —
   // and the desk prefilled a staff member's sign-in email when they had no
   // identity, so a seller was told to invite demo-admin@… as owner (QA,
-  // 2026-10-26). A login email is never shown to a member.
+  // 2026-10-26). A login email is never shown to a member. And it is the
+  // one for this deal's platform: a Telegram seller makes a username an
+  // admin, never an email (QA, CA-87042).
+  const platform = await platformOf(orderId);
+  if (!platform) return fail("not-found");
   const stored = await agentIdentity(user.id);
-  if (!stored) {
+  const address = identityFor(platform, stored);
+  if (!stored || !address) {
     return {
       ok: false,
-      error:
-        "Set your transfer identity first — the account sellers hand deals to. It is under Your deal desk, on your Security page.",
+      error: stored
+        ? missingIdentity(platform, { self: true })
+        : "Set your transfer identity first — the account sellers hand deals to. It is under Your deal desk, on your Security page.",
     };
   }
   const result = await repo.assignAgent({
     orderId,
     agentId: user.id,
-    agentEmail: stored.email,
+    agentEmail: address,
     agentBrand: stored.brand,
     byUserId: user.id,
   });
@@ -284,20 +300,31 @@ export async function assignDealAgent(
   _agentBrand?: string,
 ): Promise<DealResult> {
   const user = await requireRole("MODERATOR", "FINANCE");
-  // As for claiming: only a stored transfer identity, never a login email
-  // and never what was typed.
+  // As for claiming: only a stored transfer identity, the one for this
+  // deal's platform — never a login email and never what was typed.
+  const platform = await platformOf(orderId);
+  if (!platform) return fail("not-found");
   const stored = await agentIdentity(agentId);
-  if (!stored) {
+  const address = identityFor(platform, stored);
+  if (!stored || !address) {
+    const person = await db.user.findUnique({
+      where: { id: agentId },
+      select: { name: true },
+    });
     return {
       ok: false,
-      error:
-        "This person has no transfer identity yet — the account sellers hand deals to. Set it on their Team page first.",
+      error: stored
+        ? missingIdentity(platform, {
+            self: false,
+            name: person?.name || "This person",
+          })
+        : "This person has no transfer identity yet — the account sellers hand deals to. Set it on their Team page first.",
     };
   }
   const result = await repo.assignAgent({
     orderId,
     agentId,
-    agentEmail: stored.email,
+    agentEmail: address,
     agentBrand: stored.brand,
     byUserId: user.id,
   });

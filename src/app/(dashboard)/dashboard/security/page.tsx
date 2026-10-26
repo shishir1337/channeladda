@@ -72,6 +72,8 @@ export default async function SecurityPage() {
         email: true,
         twoFactorEnabled: true,
         agentEmail: true,
+        agentTelegram: true,
+        agentFacebook: true,
         agentBrand: true,
         dealLevel: true,
       },
@@ -206,6 +208,8 @@ export default async function SecurityPage() {
           <div id="deal-desk" className="scroll-mt-24">
             <MyDeskIdentity
               email={me?.agentEmail ?? null}
+              telegram={me?.agentTelegram ?? null}
+              facebook={me?.agentFacebook ?? null}
               brand={me?.agentBrand ?? null}
               level={me?.dealLevel ?? null}
             />

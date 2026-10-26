@@ -8,6 +8,7 @@ import {
   type DealActor,
   FASTEST_AGENT_HOLDS,
 } from "@/lib/deal-machine";
+import { awaitingOf, dealTurn } from "@/lib/deal-turn";
 
 /**
  * Everything that has happened to every deal, newest first.
@@ -143,6 +144,9 @@ export async function listDealsForAgent(agentId: string, limit = 50) {
       // Where the agent talks to both sides and can work the steps.
       conversationId: true,
       listingId: true,
+      agentId: true,
+      holdUntil: true,
+      sellerPayTo: true,
       listing: { select: { title: true, slug: true } },
       // Whose move it is comes from the first open step, not the status:
       // one status can cover the seller's step and then the agent's.
@@ -150,14 +154,31 @@ export async function listDealsForAgent(agentId: string, limit = 50) {
         where: { completedAt: null },
         orderBy: { position: "asc" },
         take: 1,
-        select: { actor: true },
+        select: { actor: true, position: true, label: true },
       },
     },
   });
-  return orders.map(({ steps, ...order }) => ({
-    ...order,
-    awaiting: (steps[0]?.actor as DealActor | undefined) ?? null,
-  }));
+  return orders.map(({ steps, holdUntil, sellerPayTo, agentId, ...order }) => {
+    // The rule every view reads (`dealTurn`): a disputed deal is with a
+    // moderator, not "with the seller" (QA, CA-75190); a running hold is
+    // nobody's move; a Safest seller who has not said where to be paid
+    // owes the next move.
+    const turn = dealTurn({
+      mode: order.mode,
+      status: order.status,
+      next: steps[0]
+        ? {
+            position: steps[0].position,
+            label: steps[0].label,
+            actor: steps[0].actor as DealActor,
+          }
+        : null,
+      holdUntil,
+      agentId,
+      sellerPayTo,
+    });
+    return { ...order, turn, awaiting: awaitingOf(turn) };
+  });
 }
 
 /** Deals with nobody holding them, oldest first. */
@@ -189,7 +210,7 @@ export async function listDealsNeedingAgent(limit = 50) {
       paymentRef: true,
       custodyAt: true,
       buyerPaidAt: true,
-      listing: { select: { title: true, slug: true } },
+      listing: { select: { title: true, slug: true, platform: true } },
     },
   });
 }
@@ -234,7 +255,7 @@ export async function listDealsNeedingReassignment(limit = 50) {
       // Who may take it over depends on its size (deal levels).
       priceUsd: true,
       agent: { select: { id: true, name: true, email: true } },
-      listing: { select: { title: true } },
+      listing: { select: { title: true, platform: true } },
     },
   });
 }

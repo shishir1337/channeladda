@@ -13,8 +13,10 @@ import {
   Th,
   Tr,
 } from "@/components/app/kit";
+import { isCustodianRole } from "@/lib/custody-roles";
 import { settingsDiff } from "@/lib/settings-history";
 import { dayAndTime, shortDate } from "@/lib/time";
+import { listTeam } from "@/server/admin-users";
 import { getAuditTrail } from "@/server/audit";
 import { requireSuperadmin } from "@/server/session";
 import { getSettings } from "@/server/settings";
@@ -29,6 +31,11 @@ export default async function AdminSettingsPage() {
   await requireSuperadmin();
   const zone = await viewerZone();
   const settings = await getSettings();
+  // What agents hold now, so a cap set below it is warned about first.
+  const { members } = await listTeam();
+  const holdsByAgent = members
+    .filter((member) => isCustodianRole(member.role) && !member.banned)
+    .map((member) => member.holds);
   const trail = await getAuditTrail(
     { entity: "user", entityId: "platform-settings" },
     10,
@@ -58,6 +65,7 @@ export default async function AdminSettingsPage() {
       </Callout>
 
       <SettingsForm
+        holdsByAgent={holdsByAgent}
         current={{
           buyerFeeBpSafest: settings.buyerFeeBpSafest,
           googleReviewUrl: settings.googleReviewUrl,

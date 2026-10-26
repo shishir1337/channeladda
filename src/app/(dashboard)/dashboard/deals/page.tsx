@@ -213,6 +213,7 @@ async function DealRows({ deals }: { deals: DealListRow[] }) {
                         deal.platform,
                         deal.awaitingAgent,
                         deal.waitingUntil !== null && !frozen,
+                        deal.payToMissing,
                       ).short
                     }
                   </Badge>

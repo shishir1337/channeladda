@@ -317,6 +317,8 @@ export default async function ThreadPage({
                     deal.status !== "DISPUTED" &&
                       deal.holdUntil !== null &&
                       new Date(deal.holdUntil).getTime() > Date.now(),
+                    deal.payToMissing,
+                    deal.buyerName,
                   ).label
                 }
               </Badge>
@@ -373,6 +375,7 @@ export default async function ThreadPage({
                 reference={deal.reference}
                 viewerRole={deal.viewerRole}
                 mode={deal.mode}
+                platform={deal.platform}
                 completedAt={certificate.completedAt}
                 code={
                   deal.viewerRole === "buyer" || deal.viewerRole === "seller"

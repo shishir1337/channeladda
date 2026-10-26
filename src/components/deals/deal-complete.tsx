@@ -1,7 +1,8 @@
 import { DownloadIcon, ImageIcon, PartyPopperIcon } from "lucide-react";
 import Link from "next/link";
+import { completeWords } from "@/components/deals/deal-status";
 import { Button } from "@/components/ui/button";
-import type { DealMode } from "@/generated/prisma/enums";
+import type { DealMode, Platform } from "@/generated/prisma/enums";
 import type { DealActor } from "@/lib/deal-machine";
 import { siteDate } from "@/lib/site-time";
 import { cn } from "@/lib/utils";
@@ -23,6 +24,7 @@ export function DealComplete({
   reference,
   viewerRole,
   mode,
+  platform,
   completedAt,
   code,
   className,
@@ -31,6 +33,8 @@ export function DealComplete({
   reference: string;
   viewerRole: DealActor;
   mode: DealMode;
+  /** Names what changed hands: "The Page is yours", not "The channel". */
+  platform: Platform;
   completedAt: Date;
   /** The certificate's code, for the buyer and the seller. */
   code: string | null;
@@ -38,18 +42,7 @@ export function DealComplete({
 }) {
   const buyer = viewerRole === "buyer";
   const seller = viewerRole === "seller";
-  const title = buyer
-    ? "Congratulations! The channel is yours."
-    : seller
-      ? "Congratulations! Your sale is complete."
-      : "This deal is complete.";
-  const body = buyer
-    ? "Keep your certificate. It shows this account came to you through Channel Adda."
-    : seller
-      ? mode === "FASTEST"
-        ? "Your money is in your wallet. Keep the certificate as a record of the sale."
-        : "The buyer has paid you and the channel is theirs. Keep the certificate as a record of the sale."
-      : "The channel has changed hands and the seller has been paid.";
+  const { title, body } = completeWords(viewerRole, mode, platform);
   const certificate = (buyer || seller) && code;
   const href = `/dashboard/deals/${dealId}/certificate`;
 
