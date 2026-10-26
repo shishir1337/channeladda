@@ -37,6 +37,7 @@ import { iconText } from "@/components/ui/icon-hue";
 import type { UserRole } from "@/generated/prisma/enums";
 import { capLoad, isCustodianRole, levelLabel } from "@/lib/custody-roles";
 import { emailVerificationRequired } from "@/lib/email-verification";
+import { dayAndTime, longDate } from "@/lib/time";
 import {
   IDENTITY_FIELDS,
   type IdentityField,
@@ -52,6 +53,7 @@ import {
   ROLE_LABELS,
 } from "@/server/admin-users";
 import { requireSuperadmin } from "@/server/session";
+import { viewerZone } from "@/server/viewer-zone";
 
 export const metadata: Metadata = {
   title: "Team",
@@ -70,19 +72,6 @@ export const metadata: Metadata = {
  * Superadmin-only, gated the same way `/admin/settings` is: it appoints staff
  * and hands out invitation links, which is the same power as setting fees.
  */
-
-const DATE: Intl.DateTimeFormatOptions = {
-  day: "numeric",
-  month: "short",
-  year: "numeric",
-};
-
-const EXPIRES: Intl.DateTimeFormatOptions = {
-  day: "numeric",
-  month: "short",
-  hour: "2-digit",
-  minute: "2-digit",
-};
 
 /** On a staff account, "two-factor off" is a finding rather than a preference. */
 function TwoFactor({ on }: { on: boolean }) {
@@ -212,8 +201,8 @@ function Load({
 
 export default async function AdminTeamPage() {
   const staff = await requireSuperadmin();
-  const [{ members, maxHoldsPerAgent, activeSuperadmins }, invites] =
-    await Promise.all([listTeam(), listPendingInvites()]);
+  const [{ members, maxHoldsPerAgent, activeSuperadmins }, invites, zone] =
+    await Promise.all([listTeam(), listPendingInvites(), viewerZone()]);
 
   // Everyone who runs deals: agents, moderators and the superadmin.
   const agents = members.filter((member) => isCustodianRole(member.role));
@@ -498,7 +487,7 @@ export default async function AdminTeamPage() {
                         dateTime={member.createdAt.toISOString()}
                         className="text-[0.8125rem] whitespace-nowrap text-subtle tabular-nums"
                       >
-                        {member.createdAt.toLocaleDateString("en-GB", DATE)}
+                        {longDate(member.createdAt, zone)}
                       </time>
                     </Td>
                     <Td>
@@ -562,11 +551,7 @@ export default async function AdminTeamPage() {
                               "The link no longer works"
                             ) : (
                               <time dateTime={invite.expiresAt.toISOString()}>
-                                Expires{" "}
-                                {invite.expiresAt.toLocaleString(
-                                  "en-GB",
-                                  EXPIRES,
-                                )}
+                                Expires {dayAndTime(invite.expiresAt, zone)}
                               </time>
                             )}
                           </span>

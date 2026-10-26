@@ -69,6 +69,7 @@ import {
 } from "@/lib/custody-roles";
 import { db } from "@/lib/db";
 import { threadHref } from "@/lib/thread-href";
+import { dayAndTime, longDate } from "@/lib/time";
 import { cn } from "@/lib/utils";
 import {
   type DealLookupRow,
@@ -89,19 +90,12 @@ import {
   listDealsNeedingReassignment,
 } from "@/server/deal-feed";
 import { requireAdminArea } from "@/server/session";
+import { viewerZone } from "@/server/viewer-zone";
 
 export const metadata: Metadata = {
   title: "Deals",
   robots: { index: false, follow: false },
 };
-
-function day(date: Date) {
-  return date.toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-}
 
 /**
  * One deal in a lookup list — search results and the finished view.
@@ -110,7 +104,8 @@ function day(date: Date) {
  * writing in quotes, and links to the deal page, which staff can open for
  * any deal in any status.
  */
-function LookupRow({ deal }: { deal: DealLookupRow }) {
+async function LookupRow({ deal }: { deal: DealLookupRow }) {
+  const zone = await viewerZone();
   return (
     <ListItem href={`/dashboard/deals/${deal.id}`}>
       <DealHead
@@ -140,7 +135,7 @@ function LookupRow({ deal }: { deal: DealLookupRow }) {
         <span>
           Opened{" "}
           <time dateTime={deal.createdAt.toISOString()} className="tnum">
-            {day(deal.createdAt)}
+            {longDate(deal.createdAt, zone)}
           </time>
         </span>
         {deal.endedAt ? (
@@ -149,7 +144,7 @@ function LookupRow({ deal }: { deal: DealLookupRow }) {
             <span>
               ended{" "}
               <time dateTime={deal.endedAt.toISOString()} className="tnum">
-                {day(deal.endedAt)}
+                {longDate(deal.endedAt, zone)}
               </time>
             </span>
           </>
@@ -190,6 +185,7 @@ export default async function AdminDealsPage({
   // arriving at the bare path from a bookmark or from a link in the activity
   // feed must not get a 404 for a page that is theirs.
   const viewer = await requireAdminArea();
+  const zone = await viewerZone();
   // Agents, moderators and the superadmin all run deals; levels decide which.
   const isAgent = isCustodianRole(viewer.role);
   const isFinance = viewer.role === "FINANCE" || viewer.role === "SUPERADMIN";
@@ -789,7 +785,7 @@ export default async function AdminDealsPage({
                       <Td className="whitespace-nowrap">
                         <time
                           dateTime={row.createdAt.toISOString()}
-                          title={row.createdAt.toLocaleString("en-GB")}
+                          title={dayAndTime(row.createdAt, zone)}
                           className="tnum text-xs text-subtle"
                         >
                           {elapsed(row.createdAt).label}

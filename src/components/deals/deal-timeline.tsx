@@ -30,6 +30,7 @@ import {
   Ring,
   TurnFlag,
 } from "@/components/app/kit";
+import { useViewerZone } from "@/components/app/time-zone";
 import { TextArea, TextField } from "@/components/auth/fields";
 import {
   ACTOR_LABELS,
@@ -49,7 +50,7 @@ import type { DealMode, Platform } from "@/generated/prisma/enums";
 import { memberMayCancel } from "@/lib/deal-cancel";
 import { MAX_DEAL_NOTE } from "@/lib/deal-endings";
 import { isTerminal } from "@/lib/deal-machine";
-import { siteDayMonth, siteMoment } from "@/lib/site-time";
+import { dayAndTime, dayMonth } from "@/lib/time";
 import { cn } from "@/lib/utils";
 import { completeStep, endDeal, endWaitNow } from "@/server/actions/deals";
 import type { DealStepView, DealView } from "@/server/deals";
@@ -364,6 +365,8 @@ function StepDetail({
   staffIds?: StaffList;
   canEndWait?: boolean;
 }) {
+  // The reader's own clock, the one the server drew the page in.
+  const zone = useViewerZone();
   return (
     <>
       {state.mine && state.help ? (
@@ -398,7 +401,7 @@ function StepDetail({
       {state.heldUntil ? (
         <Note icon={ClockIcon}>
           <span className="font-medium text-fg tabular-nums">
-            Opens on {siteMoment(state.heldUntil)}.
+            Opens on {dayAndTime(state.heldUntil, zone)}.
           </span>{" "}
           {holdNote(deal.mode, deal.platform)}
         </Note>
@@ -824,6 +827,7 @@ function Step({
   payment?: ReactNode;
   canEndWait?: boolean;
 }) {
+  const zone = useViewerZone();
   const done = step.completedAt !== null;
   const title = stepTitle(
     step.label,
@@ -898,7 +902,7 @@ function Step({
                 own render give it. */}
             {done && step.completedAt ? (
               <p className="text-xs text-subtle">
-                Done {siteDayMonth(new Date(step.completedAt), "short")}
+                Done {dayMonth(new Date(step.completedAt), zone)}
               </p>
             ) : null}
           </div>

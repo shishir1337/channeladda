@@ -10,24 +10,17 @@ import {
 import { useRouter } from "next/navigation";
 import { type ReactNode, useId, useState, useTransition } from "react";
 import { Callout, Card, textareaClass } from "@/components/app/kit";
+import { useViewerZone } from "@/components/app/time-zone";
 import { FormNotice } from "@/components/auth/fields";
 import { BusyLabel } from "@/components/deals/deal-timeline";
 import { Button } from "@/components/ui/button";
 import { iconText } from "@/components/ui/icon-hue";
 import { isTerminal } from "@/lib/deal-machine";
 import { MAX_PAY_TO } from "@/lib/pay-to";
+import { dayAndTime } from "@/lib/time";
 import { cn } from "@/lib/utils";
 import { savePayTo } from "@/server/actions/deals";
 import type { DealView } from "@/server/deals";
-
-function when(date: Date) {
-  return date.toLocaleString("en-GB", {
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
 
 /**
  * Where a Safest buyer pays the seller.
@@ -133,6 +126,9 @@ function Details({ text }: { text: string }) {
 }
 
 function BuyerView({ deal }: { deal: DealView }) {
+  // The reader's zone, the one the server drew in: the title it drew in
+  // the server's own clock did not match the browser's.
+  const zone = useViewerZone();
   // Before their turn there is nothing to show, and nothing to say.
   if (!deal.buyerPayStepReached) return null;
 
@@ -153,7 +149,7 @@ function BuyerView({ deal }: { deal: DealView }) {
         <Callout
           tone="danger"
           icon={ShieldAlertIcon}
-          title={`Changed ${when(new Date(deal.sellerPayToAt))}.`}
+          title={`Changed ${dayAndTime(new Date(deal.sellerPayToAt), zone)}.`}
         >
           Check it with {deal.sellerName} here in the conversation before you
           pay.
