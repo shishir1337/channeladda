@@ -20,6 +20,8 @@ const ALLOWED_HOSTS = [
   /^yt3\.googleusercontent\.com$/,
   /^yt3\.ggpht\.com$/,
   /^cdn\d+\.telesco\.pe$/,
+  // A member's Google account photo, copied at Google sign-in.
+  /^lh\d\.googleusercontent\.com$/,
 ];
 
 export function isAllowedRemoteImage(url: string): boolean {

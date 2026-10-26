@@ -245,8 +245,18 @@ export async function collectOrphanUploads(): Promise<number> {
             select: { id: true },
           })
         : null;
+    // A member's profile photo. Saving a profile did not mark it before, so
+    // the members pointing at it are the only record of those.
+    const member =
+      !(proof || message || listing || step || kyc) &&
+      orphan.key.startsWith("avatar/")
+        ? await db.user.findFirst({
+            where: { image: url },
+            select: { id: true },
+          })
+        : null;
 
-    if (proof || message || listing || step || kyc || supportLine) {
+    if (proof || message || listing || step || kyc || supportLine || member) {
       await db.upload.update({
         where: { id: orphan.id },
         data: { attachedAt: new Date() },

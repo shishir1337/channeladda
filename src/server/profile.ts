@@ -3,6 +3,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import type { ProfileErrors, ProfileValues } from "@/lib/profile";
 import { keyFromUrl } from "@/lib/upload-keys";
+import { markUploadsAttached } from "@/server/upload-access";
 
 /**
  * Saves what a member says about themselves, already checked by
@@ -45,5 +46,7 @@ export async function saveProfile(
       bio: values.bio,
     },
   });
+  // Without the mark the sweep of unused uploads took the photo a day later.
+  await markUploadsAttached([values.image]);
   return { ok: true };
 }

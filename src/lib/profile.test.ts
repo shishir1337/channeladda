@@ -112,6 +112,15 @@ describe("parseProfile", () => {
       expect(result.ok, image).toBe(false);
     }
   });
+
+  it("keeps a photo from Google sign-in that is already on the profile", () => {
+    // Whether it is the member's current photo is the save's to check.
+    const image = "https://lh3.googleusercontent.com/a/ACg8ocK=s256-c";
+    expect(parseProfile({ name: "Ravi", country: "", image })).toMatchObject({
+      ok: true,
+      value: { image },
+    });
+  });
 });
 
 describe("a bio", () => {

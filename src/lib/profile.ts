@@ -4,6 +4,7 @@ import {
   hasContactDetails,
   hasSpelledEmail,
 } from "@/lib/contact-details";
+import { isGooglePhotoUrl } from "@/lib/google-photo";
 import { keyFromUrl } from "@/lib/upload-keys";
 
 /**
@@ -85,8 +86,14 @@ export function parseProfile(input: ProfileFields): ParsedProfile {
     errors.country = "Enter a country, like India.";
   }
 
+  // A Google sign-in photo still on Google's host is kept as it is; the save
+  // allows it only when it is the member's current photo.
   const image = input.image.trim();
-  if (image && !keyFromUrl(image)?.startsWith("avatar/")) {
+  if (
+    image &&
+    !keyFromUrl(image)?.startsWith("avatar/") &&
+    !isGooglePhotoUrl(image)
+  ) {
     errors.image = "Choose your photo again.";
   }
 

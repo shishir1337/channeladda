@@ -8,6 +8,7 @@ import { MIN_PASSWORD_LENGTH } from "@/lib/account-security";
 import { CLIENT_IP_HEADERS } from "@/lib/client-ip";
 import { db } from "@/lib/db";
 import { emailVerificationRequired } from "@/lib/email-verification";
+import { adoptGooglePhoto } from "@/server/google-photo";
 import { sendMail } from "@/server/mailer";
 
 const baseURL = process.env.BETTER_AUTH_URL ?? "http://localhost:3000";
@@ -265,6 +266,29 @@ export const auth = betterAuth({
       // addresses, and mapProfileToUser still refuses to assume a
       // verification Google did not actually assert.
       trustedProviders: ["google"],
+    },
+  },
+
+  // The Google photo, for a member who has none of their own: on the
+  // account Google sign-in creates or joins, and again on each sign-in after
+  // (Better Auth writes Google's fresh token to the account every time), so
+  // accounts joined before this existed get it at their next sign-in.
+  databaseHooks: {
+    account: {
+      create: {
+        after: async (account) => {
+          if (account.providerId === "google") {
+            await adoptGooglePhoto(account.userId, account.idToken);
+          }
+        },
+      },
+      update: {
+        after: async (account) => {
+          if (account.providerId === "google") {
+            await adoptGooglePhoto(account.userId, account.idToken);
+          }
+        },
+      },
     },
   },
 

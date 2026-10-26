@@ -132,3 +132,55 @@ test(
     expect((await getSeller(seller.slug ?? ""))?.bio).toBeNull();
   }),
 );
+
+test(
+  "a saved profile photo is kept by the sweep of unused uploads",
+  withCleanDb(async () => {
+    // The sweep deletes uploads nothing points at a day after they were
+    // sent. A profile photo is pointed at by the member, so saving it marks
+    // it as in use.
+    const member = await seedUser();
+    const photo = await uploadAs(member.id, "avatar");
+    const key = photo.replace("/uploads/", "");
+    await db.upload.update({
+      where: { key },
+      data: { createdAt: new Date(Date.now() - 30 * 60 * 60 * 1000) },
+    });
+
+    await saveProfile(member.id, {
+      name: "Nadia Rahman",
+      country: null,
+      image: photo,
+      bio: null,
+    });
+    expect(
+      (await db.upload.findUniqueOrThrow({ where: { key } })).attachedAt,
+    ).not.toBeNull();
+
+    const { collectOrphanUploads } = await import("@/server/upload-access");
+    await collectOrphanUploads();
+    expect(await db.upload.findUnique({ where: { key } })).not.toBeNull();
+  }),
+);
+
+test(
+  "a profile photo saved before it was marked in use still survives",
+  withCleanDb(async () => {
+    // Photos saved before the mark existed are only known by the member
+    // pointing at them, so the sweep checks that too before deleting.
+    const member = await seedUser();
+    const photo = await uploadAs(member.id, "avatar");
+    const key = photo.replace("/uploads/", "");
+    await db.upload.update({
+      where: { key },
+      data: { createdAt: new Date(Date.now() - 30 * 60 * 60 * 1000) },
+    });
+    await db.user.update({ where: { id: member.id }, data: { image: photo } });
+
+    const { collectOrphanUploads } = await import("@/server/upload-access");
+    expect(await collectOrphanUploads()).toBe(0);
+    expect(
+      (await db.upload.findUniqueOrThrow({ where: { key } })).attachedAt,
+    ).not.toBeNull();
+  }),
+);
