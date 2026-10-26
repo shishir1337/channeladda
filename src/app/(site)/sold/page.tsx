@@ -11,7 +11,7 @@ import { databaseGate } from "@/lib/db-gate";
 import { countOf } from "@/lib/plural";
 import { pageMetadata } from "@/lib/seo";
 import { formatCompact } from "@/lib/utils";
-import { getRecentlySold } from "@/server/listings";
+import { getRecentlySold, getSoldTotals } from "@/server/listings";
 
 /** Marketplace data changes constantly; Prisma queries are invisible to Next's
  *  cache detection, so revalidation is declared explicitly. */
@@ -35,22 +35,14 @@ export default async function SoldPage() {
   const gate = await databaseGate();
   if (gate) return gate;
 
-  const sorted = await getRecentlySold();
-  const totalValue = sorted.reduce((n, s) => n + s.price, 0);
-  // Dividing by nothing rendered “Median close NaN days” on the public page
-  // of a deployment that had not sold anything yet. And it was a mean, not
-  // a median, which on a handful of deals is the more misleading of the two.
-  const closeDays = sorted.map((s) => s.daysToClose).sort((a, b) => a - b);
-  const medianDays =
-    closeDays.length === 0
-      ? null
-      : closeDays.length % 2 === 1
-        ? closeDays[(closeDays.length - 1) / 2]
-        : Math.round(
-            (closeDays[closeDays.length / 2 - 1] +
-              closeDays[closeDays.length / 2]) /
-              2,
-          );
+  // The figures are every completed sale; the list is the newest of them.
+  // Totalling only the list read as a count that disagreed with /sellers.
+  // (A median, not a mean, and none rather than "NaN days" before the
+  // first sale.)
+  const [sorted, totals] = await Promise.all([
+    getRecentlySold(),
+    getSoldTotals(),
+  ]);
 
   return (
     <>
@@ -60,16 +52,29 @@ export default async function SoldPage() {
         description="Asking prices are easy to find. These are settled prices — what a buyer really paid after negotiation, on a deal that completed and a seller who was paid."
       >
         <dl className="mt-7 grid grid-cols-3 gap-6 border-y border-line py-5">
-          <Stat label="Deals shown" value={String(sorted.length)} />
+          <Stat
+            label="Completed sales"
+            value={totals.sales.toLocaleString("en-US")}
+          />
           <Stat
             label="Settled value"
-            value={<Price usd={totalValue} compact />}
+            value={<Price usd={totals.valueUsd} compact />}
           />
           <Stat
             label="Median close"
-            value={medianDays === null ? "—" : countOf(medianDays, "day")}
+            value={
+              totals.medianDays === null
+                ? "—"
+                : countOf(totals.medianDays, "day")
+            }
           />
         </dl>
+        {totals.sales > sorted.length ? (
+          <p className="mt-3 text-[0.8125rem] text-subtle">
+            Every sale on Channel Adda. The newest {sorted.length} are listed
+            below.
+          </p>
+        ) : null}
       </PageHeader>
 
       <Section>

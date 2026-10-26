@@ -73,13 +73,15 @@ export default async function SellersPage() {
         description="Every verified seller, ranked by rating points. Points come only from deals that completed: half of what each deal was worth, in dollars."
       >
         <dl className="mt-7 grid grid-cols-3 gap-6 border-y border-line py-5">
+          {/* Totals for the sellers listed, and only them: a sale by a
+              seller who is not verified is on /sold but not here. */}
           <Stat label="Verified sellers" value={String(sellers.length)} />
           <Stat
-            label="Completed sales"
+            label="Their completed sales"
             value={totalSales.toLocaleString("en-US")}
           />
           <Stat
-            label="Settled volume"
+            label="Their settled value"
             value={<Price usd={totalVolume} compact />}
           />
         </dl>

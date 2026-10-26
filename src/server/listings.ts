@@ -537,6 +537,53 @@ export async function getPlatformFloors(): Promise<
   return out;
 }
 
+/** Days from a deal opening to completing, at least one. */
+function daysToClose(order: { createdAt: Date; completedAt: Date | null }) {
+  return Math.max(
+    1,
+    Math.round(
+      ((order.completedAt ?? order.createdAt).getTime() -
+        order.createdAt.getTime()) /
+        DAY,
+    ),
+  );
+}
+
+/** The middle value, the two middle ones averaged; null for none. */
+export function median(values: number[]): number | null {
+  if (values.length === 0) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 1
+    ? sorted[mid]
+    : Math.round((sorted[mid - 1] + sorted[mid]) / 2);
+}
+
+/**
+ * Every completed sale, not only the newest that /sold lists: how many, what
+ * they settled for, and the median days from opening to completing.
+ *
+ * The page used to total the 24 it showed and call it "Deals shown 24 ·
+ * Settled value $261.1K", beside /sellers totalling every sale by a
+ * verified seller, "Completed sales 24 · Settled volume $415.8K" — two
+ * different sets that looked like one count disagreeing with itself.
+ */
+export async function getSoldTotals(): Promise<{
+  sales: number;
+  valueUsd: number;
+  medianDays: number | null;
+}> {
+  const orders = await db.order.findMany({
+    where: { status: "COMPLETED" },
+    select: { createdAt: true, completedAt: true, priceUsd: true },
+  });
+  return {
+    sales: orders.length,
+    valueUsd: toUsd(orders.reduce((n, o) => n + o.priceUsd, 0)),
+    medianDays: median(orders.map(daysToClose)),
+  };
+}
+
 export async function getRecentlySold(take = 24): Promise<SoldItem[]> {
   const orders = await db.order.findMany({
     where: { status: "COMPLETED" },
@@ -556,12 +603,6 @@ export async function getRecentlySold(take = 24): Promise<SoldItem[]> {
       0,
       (Date.now() - (o.completedAt ?? o.createdAt).getTime()) / 3_600_000,
     ),
-    daysToClose: Math.max(
-      1,
-      Math.round(
-        ((o.completedAt ?? o.createdAt).getTime() - o.createdAt.getTime()) /
-          DAY,
-      ),
-    ),
+    daysToClose: daysToClose(o),
   }));
 }
