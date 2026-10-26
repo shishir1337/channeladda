@@ -133,7 +133,7 @@ export const legalDocs: Record<string, LegalDoc> = {
     title: "Refund policy",
     summary:
       "When you get your money back, when you do not, and how quickly it happens.",
-    updated: "20 October 2026",
+    updated: "26 October 2026",
     sections: [
       {
         heading: "The short version",
@@ -189,7 +189,7 @@ export const legalDocs: Record<string, LegalDoc> = {
       {
         heading: "Timings",
         paragraphs: [
-          "Disputes get a first response within 48 hours and a decision within seven days. Once decided, a refund reaches your balance the same day.",
+          "Disputes get a first response within 24 hours and a decision within seven days. Once decided, a refund reaches your balance the same day.",
         ],
       },
     ],

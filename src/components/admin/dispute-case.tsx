@@ -43,8 +43,8 @@ import type {
  * frozen and nothing about why.
  */
 
-/** The Terms: a first response within 48 hours, a decision within seven days. */
-export const FIRST_RESPONSE_HOURS = 48;
+/** The Terms: a first response within 24 hours, a decision within seven days. */
+export const FIRST_RESPONSE_HOURS = 24;
 export const DECISION_HOURS = 7 * 24;
 
 const SIDE: Record<

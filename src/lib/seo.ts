@@ -23,10 +23,10 @@ export const SITE_ALTERNATE_NAMES = ["ChannelAdda", "channeladda.com"];
  * The home page's title: what people search for first, then the name.
  * "Buy & sell social media accounts" was true, but nobody types it. The
  * owner's first search is "YouTube channel buy sell", in that order, as it
- * is typed in India; "buy YouTube channel" is the platform page's.
+ * is typed in India, and with "and" rather than "&", as the owner asked; "buy YouTube channel" is the platform page's.
  */
 export const SITE_TITLE =
-  "YouTube Channel Buy & Sell Marketplace | Channel Adda";
+  "YouTube Channel Buy and Sell Marketplace | Channel Adda";
 
 /** The site in one search-result line: the home page's, and the fallback. */
 export const SITE_DESCRIPTION =

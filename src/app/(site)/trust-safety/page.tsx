@@ -26,7 +26,7 @@ const disputeSteps = [
   },
   {
     title: "A decision within seven days",
-    body: "The deal completes, or everything goes back. We reply within 48 hours.",
+    body: "The deal completes, or everything goes back. We reply within 24 hours.",
   },
 ];
 

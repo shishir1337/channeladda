@@ -90,7 +90,7 @@ export default async function DisputesPage() {
         {/* Each deadline figure carries a bar of how much of the desk it
             is, so a bad day reads before the number does. */}
         <Stat
-          label="Over 48 hours"
+          label={`Over ${FIRST_RESPONSE_HOURS} hours`}
           value={unanswered}
           icon={HourglassIcon}
           tone={unanswered > 0 ? "primary" : "neutral"}
@@ -100,11 +100,11 @@ export default async function DisputesPage() {
                 value={unanswered}
                 max={disputes.length}
                 tone="primary"
-                label={`${unanswered} of ${disputes.length} frozen deals over 48 hours`}
+                label={`${unanswered} of ${disputes.length} frozen deals over ${FIRST_RESPONSE_HOURS} hours`}
               />
             ) : null
           }
-          note="The Terms promise a first response within 48 hours."
+          note={`The Terms promise a first response within ${FIRST_RESPONSE_HOURS} hours.`}
         />
         <Stat
           label="Past seven days"

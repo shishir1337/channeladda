@@ -226,7 +226,7 @@ export const howToSellAYoutubeChannel: Guide = {
     {
       question: "What if the buyer says something is wrong with the channel?",
       answer:
-        "Either side can open a dispute from the deal page while the deal is running. The deal freezes, and nothing moves until a moderator has read the whole order record and decided. We aim to respond within 48 hours and decide within seven days.",
+        "Either side can open a dispute from the deal page while the deal is running. The deal freezes, and nothing moves until a moderator has read the whole order record and decided. A moderator reviews it within 24 hours and decides within seven days.",
     },
   ],
   links: [

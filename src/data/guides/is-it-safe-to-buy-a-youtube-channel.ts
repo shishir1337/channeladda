@@ -165,7 +165,7 @@ export const isItSafeToBuyAYoutubeChannel: Guide = {
         },
         {
           kind: "p",
-          text: "If something goes wrong, you open a dispute from the deal page. The deal freezes where it stands, and a moderator reviews the whole record: the chat, the proof and every step with its time. We aim to respond within 48 hours and decide within seven days. Read more about [opening a dispute](/help/opening-a-dispute).",
+          text: "If something goes wrong, you open a dispute from the deal page. The deal freezes where it stands, and a moderator reviews the whole record: the chat, the proof and every step with its time. A moderator reviews it within 24 hours and decides within seven days. Read more about [opening a dispute](/help/opening-a-dispute).",
         },
         {
           kind: "p",

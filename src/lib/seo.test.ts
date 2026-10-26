@@ -92,7 +92,7 @@ describe("pageMetadata", () => {
 describe("the home page in search", () => {
   it("leads with what people search for, and the name", () => {
     // The owner's first search: "YouTube channel buy sell", in that order.
-    expect(SITE_TITLE).toMatch(/^YouTube Channel Buy & Sell/);
+    expect(SITE_TITLE).toMatch(/^YouTube Channel Buy and Sell /);
     expect(SITE_TITLE).toContain("Channel Adda");
     expect(SITE_TITLE.length).toBeLessThanOrEqual(60);
     expect(SITE_DESCRIPTION).toMatch(/^YouTube channel buy and sell/);

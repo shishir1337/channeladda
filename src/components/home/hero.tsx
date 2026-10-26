@@ -23,7 +23,7 @@ export function Hero({ stats }: { stats: Stats }) {
               <span className="relative inline-flex size-1.5 rounded-full bg-verified" />
             </span>
             <span className="font-medium text-fg">
-              YouTube channel buy &amp; sell
+              YouTube channel buy and sell
             </span>
             <span aria-hidden="true" className="text-subtle">
               ·

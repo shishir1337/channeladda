@@ -130,7 +130,7 @@ export const helpArticles: HelpArticle[] = [
     body: [
       "Open a dispute from the deal page the moment something looks wrong — the seller goes quiet, the transfer stalls, a payment you made is not confirmed, or the account is recovered after handover. The deal freezes where it stands, the account stays with our agent if it is there, and any money we still hold for it stays with us, where nobody can withdraw it while the dispute is open.",
       "A moderator reviews the whole order record: every message, every proof upload, the transfer checklist with timestamps, and a live check of who controls the account now. Nobody has to take anyone's word for anything.",
-      "We aim to respond within 48 hours and decide within seven days. A dispute has two outcomes: the deal completes, or it is reversed — the account goes on to the buyer, or back to the seller with the money we hold returned to the buyer. We do not split a deal down the middle, because half an account is not a thing anybody can own.",
+      "A moderator reviews it within 24 hours and decides within seven days. A dispute has two outcomes: the deal completes, or it is reversed — the account goes on to the buyer, or back to the seller with the money we hold returned to the buyer. We do not split a deal down the middle, because half an account is not a thing anybody can own.",
     ],
   },
   {
