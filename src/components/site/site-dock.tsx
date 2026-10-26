@@ -52,14 +52,19 @@ const TINT: Record<SiteTabIcon, string> = {
  * as the header's account menu and balance do. Until the session is known
  * it shows the signed-out tabs, as the header does, rather than an empty bar.
  */
-export function SiteDock() {
+export function SiteDock({ lost = false }: { lost?: boolean }) {
   const pathname = usePathname();
+  // On the 404 no tab is lit and Sign in goes to plain /signin, the same on
+  // the server and in the browser (`SiteChrome`'s `lost`). Signing in from a
+  // page that is not there has nowhere to come back to anyway; it used to
+  // come back to "/_not-found".
+  const here = lost ? null : pathname;
   const menu = useSiteMenu();
   const { data: session } = useSession();
   const signedIn = Boolean(session?.user);
   const counts = useMemberCounts();
 
-  const tabs = siteTabs(pathname, signedIn ? { counts } : null);
+  const tabs = siteTabs(here ?? "/", signedIn ? { counts } : null);
 
   return (
     <Dock>
@@ -70,7 +75,7 @@ export function SiteDock() {
           label={tab.label}
           icon={ICONS[tab.icon]}
           tint={TINT[tab.icon]}
-          active={isTabActive(pathname, tab.href)}
+          active={here !== null && isTabActive(here, tab.href)}
           waiting={tab.waiting}
         />
       ))}

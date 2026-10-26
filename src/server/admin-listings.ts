@@ -150,6 +150,11 @@ export type ListingForReview = {
   coverUrl: string;
   avatarUrl: string;
   transferProfile: string | null;
+  /**
+   * "About this account", in the seller's words: what buyers read under the
+   * figures. The moderator approved listings without ever seeing it.
+   */
+  description: string | null;
   ownershipCode: string | null;
   ownershipVerifiedAt: Date | null;
   rejectionReason: string | null;
@@ -199,6 +204,7 @@ export async function getListingForReview(
       coverUrl: true,
       avatarUrl: true,
       transferProfile: true,
+      description: true,
       ownershipCode: true,
       ownershipVerifiedAt: true,
       rejectionReason: true,
@@ -277,6 +283,7 @@ export async function getListingForReview(
     coverUrl: row.coverUrl,
     avatarUrl: row.avatarUrl,
     transferProfile: row.transferProfile,
+    description: row.description,
     ownershipCode: row.ownershipCode,
     ownershipVerifiedAt: row.ownershipVerifiedAt,
     rejectionReason: row.rejectionReason,

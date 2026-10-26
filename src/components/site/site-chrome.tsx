@@ -16,7 +16,21 @@ import { SiteMenuProvider } from "@/components/site/site-menu";
  * The room the tab bar needs is left at the foot of the footer, the last
  * thing on every page, so nothing ends up behind it.
  */
-export function SiteChrome({ children }: { children: ReactNode }) {
+export function SiteChrome({
+  children,
+  lost = false,
+}: {
+  children: ReactNode;
+  /**
+   * The root 404. It is drawn once, at build, for "/_not-found", and served
+   * for whatever address was asked for — and /browse/<anything else> is sent
+   * to it by `src/proxy.ts` — so the address in the browser is not the one
+   * the page was drawn for. Nothing in the chrome may depend on it, or the
+   * browser draws something else and React throws (#418): the tab bar lit
+   * Browse on /browse/myspace, a tab the server had not lit.
+   */
+  lost?: boolean;
+}) {
   return (
     <MemberCountsProvider>
       <SiteMenuProvider>
@@ -35,7 +49,7 @@ export function SiteChrome({ children }: { children: ReactNode }) {
         </main>
 
         <SiteFooter />
-        <SiteDock />
+        <SiteDock lost={lost} />
         <MessagesButton />
         {/* The chime for a signed-in member, heard from another tab too. */}
         <SiteNotificationSound />

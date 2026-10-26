@@ -243,6 +243,19 @@ export default async function ReviewListingPage({
                 ))}
               </Facts>
             </CardBody>
+            {/* What buyers read under the figures, as they read it. It was
+                never on this page, so a listing went on sale with words no
+                moderator had seen. */}
+            {listing.description ? (
+              <div className="border-t border-line px-4 py-4 sm:px-5">
+                <p className="text-xs font-medium text-muted">
+                  About this account
+                </p>
+                <p className="mt-1.5 max-w-[72ch] text-sm leading-[1.6] break-words whitespace-pre-line text-fg">
+                  {listing.description}
+                </p>
+              </div>
+            ) : null}
             {listing.transferProfile ? (
               <div className="border-t border-line px-4 py-4 sm:px-5">
                 <p className="text-xs font-medium text-muted">Handover notes</p>

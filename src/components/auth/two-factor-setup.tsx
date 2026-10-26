@@ -232,6 +232,25 @@ export function TwoFactorSetup({
   const [pendingCodes, setPendingCodes] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const [cancelling, startCancel] = useTransition();
+
+  /**
+   * Backing out of setup: two-step stays off, and the secret issued for this
+   * attempt is cleared from the account, so nothing half set up is left
+   * behind. There was no way back but leaving the page.
+   */
+  function cancelSetup() {
+    setError(null);
+    startCancel(async () => {
+      // Best effort: an unconfirmed secret never asks for a code, and a new
+      // setup replaces it, so a failure here leaves nothing to fix.
+      await authClient.twoFactor.disable({ password }).catch(() => null);
+      setUri(null);
+      setPendingCodes([]);
+      setCode("");
+      setPassword("");
+    });
+  }
 
   if (enabled && !codes) {
     return (
@@ -439,7 +458,7 @@ export function TwoFactorSetup({
                   <Button
                     type="button"
                     size="md"
-                    disabled={pending || code.trim().length < 6}
+                    disabled={pending || cancelling || code.trim().length < 6}
                     onClick={() => {
                       setError(null);
                       startTransition(async () => {
@@ -467,7 +486,23 @@ export function TwoFactorSetup({
                       busy="Checking…"
                     />
                   </Button>
+                  <Button
+                    type="button"
+                    size="md"
+                    variant="ghost"
+                    disabled={pending || cancelling}
+                    onClick={cancelSetup}
+                  >
+                    <BusyLabel
+                      pending={cancelling}
+                      idle="Cancel"
+                      busy="Cancelling…"
+                    />
+                  </Button>
                 </div>
+                <p className="mt-2 text-xs leading-relaxed text-subtle">
+                  Two-step stays off until you confirm a code.
+                </p>
               </div>
             </li>
           </ol>

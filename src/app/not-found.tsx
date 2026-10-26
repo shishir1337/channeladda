@@ -8,11 +8,12 @@ export const metadata: Metadata = {
 
 /**
  * Catches every unmatched URL. It sits outside the (site) route group, so it
- * renders the chrome itself.
+ * renders the chrome itself — `lost`, since the page is drawn once and served
+ * at whatever address was not found.
  */
 export default function NotFound() {
   return (
-    <SiteChrome>
+    <SiteChrome lost>
       <NotFoundContent />
     </SiteChrome>
   );
