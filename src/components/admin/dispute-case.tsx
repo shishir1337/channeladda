@@ -24,6 +24,7 @@ import { Amount, Callout, Facts, Reference, Ring } from "@/components/app/kit";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { threadHref } from "@/lib/thread-href";
+import { dayAndTime, type ViewerZone } from "@/lib/time";
 import { cn } from "@/lib/utils";
 import type {
   DisputeCase as Case,
@@ -66,15 +67,8 @@ function unwritten(action: string): string | null {
   return null;
 }
 
-function when(date: Date) {
-  return date.toLocaleString("en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
+/** "26 Oct, 3:53 AM", in the reader's own zone. */
+const when = dayAndTime;
 
 /**
  * One stop on the record's rail: a dot, and a hairline down to the next.
@@ -106,7 +100,15 @@ function RecordItem({
   );
 }
 
-function Entry({ entry, raising }: { entry: RecordEntry; raising?: boolean }) {
+function Entry({
+  entry,
+  raising,
+  zone,
+}: {
+  entry: RecordEntry;
+  raising?: boolean;
+  zone: ViewerZone;
+}) {
   const side = SIDE[entry.side];
   const fallback = entry.note ? null : unwritten(entry.action);
   return (
@@ -122,7 +124,7 @@ function Entry({ entry, raising }: { entry: RecordEntry; raising?: boolean }) {
           className="tnum text-xs text-subtle"
           suppressHydrationWarning
         >
-          {when(entry.at)}
+          {when(entry.at, zone)}
         </time>
       </p>
       {entry.note ? (
@@ -222,10 +224,13 @@ function Person({
 export function DisputeCase({
   dispute,
   canMoveMoney,
+  zone,
 }: {
   dispute: Case;
   /** FINANCE or SUPERADMIN: the two outcomes that pay somebody out. */
   canMoveMoney: boolean;
+  /** The reader's time zone, for every time on the record. */
+  zone: ViewerZone;
 }) {
   const headingId = `dispute-${dispute.orderId}`;
   const facts = custodyFacts(dispute.mode, dispute.status, {
@@ -291,7 +296,7 @@ export function DisputeCase({
               className="tnum"
               suppressHydrationWarning
             >
-              {when(decideBy)}
+              {when(decideBy, zone)}
             </time>
           </p>
         </div>
@@ -312,7 +317,7 @@ export function DisputeCase({
           <ol className="mt-3">
             {dispute.raised ? (
               <RecordItem tone="danger">
-                <Entry entry={dispute.raised} raising />
+                <Entry entry={dispute.raised} raising zone={zone} />
               </RecordItem>
             ) : (
               <RecordItem tone="danger">
@@ -328,7 +333,7 @@ export function DisputeCase({
             )}
             {dispute.since.map((entry) => (
               <RecordItem key={entry.id}>
-                <Entry entry={entry} />
+                <Entry entry={entry} zone={zone} />
               </RecordItem>
             ))}
           </ol>
@@ -430,7 +435,7 @@ export function DisputeCase({
                     className="tnum"
                     suppressHydrationWarning
                   >
-                    {when(dispute.lapsesAt)}
+                    {when(dispute.lapsesAt, zone)}
                   </time>
                   , the payment-window sweep lapses it and frees the listing.
                 </Line>
@@ -497,7 +502,7 @@ export function DisputeCase({
                         className="tnum block text-xs text-subtle"
                         suppressHydrationWarning
                       >
-                        {when(step.completedAt)}
+                        {when(step.completedAt, zone)}
                       </time>
                     ) : null}
                     {step.proofUrl ? (
@@ -521,9 +526,10 @@ export function DisputeCase({
             </ol>
             {dispute.mode === "SAFEST" && dispute.buyerPaidAt ? (
               <p className="mt-3 rounded-lg border border-line bg-surface-2/50 px-3 py-2 text-xs leading-relaxed text-muted">
-                The buyer pressed Paid on {when(new Date(dispute.buyerPaidAt))}
+                The buyer pressed Paid on{" "}
+                {when(new Date(dispute.buyerPaidAt), zone)}
                 {dispute.sellerConfirmedAt
-                  ? `, and the seller pressed Received on ${when(new Date(dispute.sellerConfirmedAt))}. The channel cannot go back to the seller: they have said they were paid.`
+                  ? `, and the seller pressed Received on ${when(new Date(dispute.sellerConfirmedAt), zone)}. The channel cannot go back to the seller: they have said they were paid.`
                   : ", and the seller has not pressed Received. The price went to the seller directly, never through us — the chat is where the proof is."}
               </p>
             ) : null}

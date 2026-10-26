@@ -11,12 +11,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { Card, TurnFlag } from "@/components/app/kit";
+import { useViewerZone } from "@/components/app/time-zone";
 import { BusyLabel } from "@/components/deals/deal-timeline";
 import { Button } from "@/components/ui/button";
 import { Price } from "@/components/ui/price";
 import { balanceRoute } from "@/lib/pay-options";
-import { siteMoment } from "@/lib/site-time";
 import { supportHref } from "@/lib/support";
+import { dayAndTime } from "@/lib/time";
 import { cn } from "@/lib/utils";
 import { payFromBalance } from "@/server/actions/deals";
 import { startPayment } from "@/server/actions/payments";
@@ -94,6 +95,8 @@ export function PayNow({
   // Which button started the payment, so only that one shows it working.
   const [via, setVia] = useState<"balance" | "crypto" | "top-up" | null>(null);
   const [pending, startTransition] = useTransition();
+  // The reader's own clock, the one the server drew the page in.
+  const zone = useViewerZone();
 
   useEffect(() => {
     if (armed) {
@@ -107,7 +110,7 @@ export function PayNow({
   const route = balanceRoute(availableUsd, amountUsd);
   const canUseBalance = route.kind === "balance";
   const due = usd(amountUsd);
-  const deadline = payBy ? siteMoment(new Date(payBy)) : null;
+  const deadline = payBy ? dayAndTime(new Date(payBy), zone) : null;
   const askHref = `${supportHref("A live order")}&message=${encodeURIComponent(
     `Please send me payment details for deal ${reference ?? ""} (${due}).`,
   )}`;

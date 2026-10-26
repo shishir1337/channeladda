@@ -4,7 +4,8 @@ import { List, ListItem, Section } from "@/components/app/kit";
 import { EndWaitNow } from "@/components/deals/deal-timeline";
 import { db } from "@/lib/db";
 import { TERMINAL_STATUSES } from "@/lib/deal-machine";
-import { siteDayMonth } from "@/lib/site-time";
+import { dayMonth } from "@/lib/time";
+import { viewerZone } from "@/server/viewer-zone";
 
 /**
  * Deals in their waiting period — Google's wait on Safest, the holding
@@ -17,6 +18,7 @@ import { siteDayMonth } from "@/lib/site-time";
  */
 export async function WaitingDeals() {
   const now = new Date();
+  const zone = await viewerZone();
   const deals = await db.order.findMany({
     where: {
       holdUntil: { gt: now },
@@ -39,7 +41,7 @@ export async function WaitingDeals() {
       id="waiting"
       title="In the waiting period"
       count={deals.length}
-      info="Each one opens its next step on the date shown (India time). On YouTube, end a wait early only when Google already lets the transfer go ahead; elsewhere, only when the holding period can safely end early."
+      info="Each one opens its next step on the date shown. On YouTube, end a wait early only when Google already lets the transfer go ahead; elsewhere, only when the holding period can safely end early."
     >
       <List>
         {deals.map((order) => (
@@ -60,9 +62,7 @@ export async function WaitingDeals() {
                   <DealModeBadge mode={order.mode} />
                   <span className="text-xs text-muted tabular-nums">
                     opens{" "}
-                    {order.holdUntil
-                      ? siteDayMonth(order.holdUntil, "short")
-                      : null}
+                    {order.holdUntil ? dayMonth(order.holdUntil, zone) : null}
                   </span>
                 </>
               }

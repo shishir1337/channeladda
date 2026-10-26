@@ -20,8 +20,10 @@ import {
   StatGrid,
 } from "@/components/app/kit";
 import { Price } from "@/components/ui/price";
+import { dayAndTime } from "@/lib/time";
 import { listDisputes } from "@/server/admin-disputes";
 import { requireStaff } from "@/server/session";
+import { viewerZone } from "@/server/viewer-zone";
 
 export const metadata: Metadata = {
   title: "Disputes",
@@ -45,6 +47,7 @@ export const metadata: Metadata = {
 export default async function DisputesPage() {
   const staff = await requireStaff();
   const canMoveMoney = staff.role === "FINANCE" || staff.role === "SUPERADMIN";
+  const zone = await viewerZone();
 
   // Never null past the guard above; the fallback only satisfies the type.
   const disputes = (await listDisputes(staff)) ?? [];
@@ -63,9 +66,7 @@ export default async function DisputesPage() {
         info="Every frozen deal, longest wait first. The decision and its reason go on the record under your name."
         // Only the read time: the two deadline figures below are counted
         // against it, so a tab left open says how old they are.
-        meta={
-          <MetaItem label="Read">{new Date().toLocaleString("en-GB")}</MetaItem>
-        }
+        meta={<MetaItem label="Read">{dayAndTime(new Date(), zone)}</MetaItem>}
       />
 
       <StatGrid columns={canMoveMoney ? 4 : 3}>
@@ -157,7 +158,11 @@ export default async function DisputesPage() {
           >
             {disputes.map((dispute) => (
               <li key={dispute.orderId}>
-                <DisputeCase dispute={dispute} canMoveMoney={canMoveMoney} />
+                <DisputeCase
+                  dispute={dispute}
+                  canMoveMoney={canMoveMoney}
+                  zone={zone}
+                />
               </li>
             ))}
           </ol>
