@@ -1,6 +1,14 @@
-import { cachingFor, isServableKey } from "@/lib/upload-keys";
+import { imagekitUrl } from "@/lib/media";
+import {
+  cachingFor,
+  contentTypeOf,
+  isKycKey,
+  isPublicKey,
+  isServableKey,
+} from "@/lib/upload-keys";
+import { fetchFromImageKit, onImageKit } from "@/server/imagekit";
 import { getCurrentUser } from "@/server/session";
-import { readUpload, UploadError } from "@/server/storage";
+import { hasLocalCopy, readUpload, UploadError } from "@/server/storage";
 import { canReadUpload } from "@/server/upload-access";
 
 /**
@@ -16,6 +24,11 @@ import { canReadUpload } from "@/server/upload-access";
  *
  * An unguessable name is not a permission. A URL ends up in support tickets,
  * referrer headers and browser history, and none of those should be a way in.
+ *
+ * Once uploads live on ImageKit this is still the address of every file. A
+ * cover or a photo is sent on to ImageKit's CDN; a private file is fetched
+ * from ImageKit on a short-lived signed link, after the check, and passed on
+ * as ours — so no address that opens it ever reaches the browser.
  */
 export async function GET(
   request: Request,
@@ -39,6 +52,11 @@ export async function GET(
     return new Response("Not found", { status: 404 });
   }
 
+  // A file written before the move to ImageKit is still read from disk.
+  if (onImageKit() && !(await hasLocalCopy(key))) {
+    return fromImageKit(key, request);
+  }
+
   let file: Awaited<ReturnType<typeof readUpload>>;
   try {
     file = await readUpload(key);
@@ -50,9 +68,13 @@ export async function GET(
     return new Response("Not found", { status: 404 });
   }
 
-  const size = file.bytes.byteLength;
-  const headers: Record<string, string> = {
-    "Content-Type": file.contentType,
+  return fromBytes(file.bytes, headersFor(key, file.contentType), request);
+}
+
+/** What every file is sent with, whichever store it came from. */
+function headersFor(key: string, contentType: string): Record<string, string> {
+  return {
+    "Content-Type": contentType,
     // The type was decided by reading the file, not by trusting the upload.
     // Tell the browser not to second-guess it.
     "X-Content-Type-Options": "nosniff",
@@ -61,6 +83,57 @@ export async function GET(
     ...cachingFor(key),
     "Accept-Ranges": "bytes",
   };
+}
+
+/**
+ * A file from ImageKit: a public one by its CDN address, a private one
+ * fetched here and passed on.
+ */
+async function fromImageKit(key: string, request: Request): Promise<Response> {
+  const cdn = isPublicKey(key) ? imagekitUrl(key) : null;
+  if (cdn) {
+    // A day, not a year: the address is ImageKit's, and could move.
+    return new Response(null, {
+      status: 302,
+      headers: { Location: cdn, "Cache-Control": "public, max-age=86400" },
+    });
+  }
+
+  const range = request.headers.get("range");
+  let upstream: Response | null;
+  try {
+    upstream = await fetchFromImageKit(key, range);
+  } catch (error) {
+    // An ID check's file is not named in a log, even by its key.
+    console.error(
+      `[uploads] ImageKit could not send ${isKycKey(key) ? "an ID check file" : key}`,
+      error,
+    );
+    return new Response("Could not load the file", { status: 502 });
+  }
+  if (!upstream) return new Response("Not found", { status: 404 });
+
+  const headers = headersFor(key, contentTypeOf(key));
+  // ImageKit sent the whole file to a range request: cut the range here,
+  // or Safari will not play the clip.
+  if (range && upstream.status === 200) {
+    const bytes = Buffer.from(await upstream.arrayBuffer());
+    return fromBytes(bytes, headers, request);
+  }
+  for (const name of ["Content-Length", "Content-Range"]) {
+    const value = upstream.headers.get(name);
+    if (value) headers[name] = value;
+  }
+  return new Response(upstream.body, { status: upstream.status, headers });
+}
+
+/** A whole file in memory, or the one range of it a video player asked for. */
+function fromBytes(
+  bytes: Buffer,
+  headers: Record<string, string>,
+  request: Request,
+): Response {
+  const size = bytes.byteLength;
 
   // Safari will not play a video from a server that ignores Range, so a clip
   // in a chat or an ID check's selfie video did not play on an iPhone. One
@@ -73,7 +146,7 @@ export async function GET(
     });
   }
   if (range) {
-    const part = file.bytes.subarray(range.start, range.end + 1);
+    const part = bytes.subarray(range.start, range.end + 1);
     return new Response(new Uint8Array(part), {
       status: 206,
       headers: {
@@ -84,7 +157,7 @@ export async function GET(
     });
   }
 
-  return new Response(new Uint8Array(file.bytes), {
+  return new Response(new Uint8Array(bytes), {
     headers: { ...headers, "Content-Length": String(size) },
   });
 }

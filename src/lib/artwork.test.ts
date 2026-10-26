@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { artworkProps, resizable } from "@/lib/artwork";
 
 const hex = "c".repeat(32);
@@ -50,6 +50,71 @@ describe("artworkProps", () => {
         decoding: "async",
       });
       expect(resizable(src)).toBe(false);
+    }
+  });
+});
+
+describe("artworkProps with files on ImageKit", () => {
+  const ik = "https://ik.imagekit.io/channeladda/uploads";
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  function onImageKit() {
+    vi.stubEnv(
+      "NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT",
+      "https://ik.imagekit.io/channeladda",
+    );
+    vi.stubEnv("NEXT_PUBLIC_IMAGEKIT_FOLDER", "");
+  }
+
+  it("draws a cover from ImageKit, resized for each screen", () => {
+    onImageKit();
+    const props = artworkProps({
+      src: `/uploads/cover/${hex}.jpg`,
+      width: 480,
+      height: 240,
+      sizes: "(min-width: 640px) 50vw, 85vw",
+    });
+    expect(props.src).toBe(`${ik}/cover/${hex}.jpg?tr=w-1080,q-75`);
+    expect(props.srcSet).toContain(`${ik}/cover/${hex}.jpg?tr=w-640,q-75 640w`);
+    expect(props.sizes).toBe("(min-width: 640px) 50vw, 85vw");
+    expect(props.width).toBe(480);
+  });
+
+  it("picks a 1× and a 2× copy for a photo drawn at a fixed size", () => {
+    onImageKit();
+    const props = artworkProps({
+      src: `/uploads/avatar/${hex}.png`,
+      width: 48,
+      height: 48,
+      eager: true,
+    });
+    expect(props.srcSet).toBe(
+      `${ik}/avatar/${hex}.png?tr=w-48,q-75 1x, ${ik}/avatar/${hex}.png?tr=w-96,q-75 2x`,
+    );
+    expect(props.src).toBe(`${ik}/avatar/${hex}.png?tr=w-96,q-75`);
+    expect(props.loading).toBe("eager");
+  });
+
+  it("draws a GIF from ImageKit as it is, so it keeps moving", () => {
+    onImageKit();
+    expect(
+      artworkProps({ src: `/uploads/cover/${hex}.gif`, width: 64, height: 64 })
+        .src,
+    ).toBe(`${ik}/cover/${hex}.gif`);
+  });
+
+  it("never sends a private file's address anywhere but the app's route", () => {
+    onImageKit();
+    for (const src of [
+      `/uploads/proof/${hex}.png`,
+      `/uploads/message/${hex}.jpg`,
+      `/uploads/kyc/${hex}.jpg`,
+      "/media/covers/yt-7192.svg",
+    ]) {
+      expect(artworkProps({ src, width: 64, height: 64 }).src).toBe(src);
     }
   });
 });

@@ -1,5 +1,6 @@
 import { getImageProps } from "next/image";
 import type { ImgHTMLAttributes } from "react";
+import { imagekitEndpoint, imagekitUrl } from "@/lib/media";
 import { isPublicKey, keyFromUrl } from "@/lib/upload-keys";
 
 /**
@@ -11,7 +12,8 @@ import { isPublicKey, keyFromUrl } from "@/lib/upload-keys";
  * public upload — a cover or an avatar — goes through Next's image
  * optimiser, which resizes it, re-encodes it as WebP and caches the result,
  * with a `srcset` so a phone takes the small copy and a retina screen the
- * sharp one.
+ * sharp one. Once uploads live on ImageKit, its CDN makes those copies
+ * instead (`imageKitProps`).
  *
  * Everything else is left exactly as it was, on purpose:
  * - the sample artwork is SVG, which has nothing to resize;
@@ -42,6 +44,8 @@ export function artworkProps({
   eager?: boolean;
 }): ImgHTMLAttributes<HTMLImageElement> {
   const loading = eager ? "eager" : "lazy";
+  const fromImageKit = imageKitProps(src, width, height, sizes);
+  if (fromImageKit) return { ...fromImageKit, loading, decoding: "async" };
   if (!resizable(src)) {
     return { src, width, height, loading, decoding: "async" };
   }
@@ -64,4 +68,46 @@ export function artworkProps({
 export function resizable(src: string): boolean {
   const key = keyFromUrl(src);
   return key !== null && isPublicKey(key) && !key.endsWith(".gif");
+}
+
+/**
+ * Widths offered to a browser for a picture whose width follows the
+ * layout: a phone takes 384 or 640, a laptop 1080, a large screen 1920.
+ */
+const LADDER = [256, 384, 640, 828, 1080, 1200, 1920];
+
+/**
+ * The same, once uploads live on ImageKit: its own resized copies, from its
+ * CDN, rather than Next's optimiser on our server. A GIF is sent as it is,
+ * so it keeps moving. Null for anything that is not a public upload — a
+ * private file never gets an address outside the app's own route.
+ */
+function imageKitProps(
+  src: string,
+  width: number,
+  height: number,
+  sizes: string | undefined,
+): ImgHTMLAttributes<HTMLImageElement> | null {
+  if (!imagekitEndpoint()) return null;
+  const key = keyFromUrl(src);
+  if (!key || !isPublicKey(key)) return null;
+  const at = (w: number) => imagekitUrl(key, { width: w, quality: 75 }) ?? src;
+  if (key.endsWith(".gif")) {
+    return { src: imagekitUrl(key) ?? src, width, height };
+  }
+  if (sizes) {
+    return {
+      src: at(1080),
+      srcSet: LADDER.map((w) => `${at(w)} ${w}w`).join(", "),
+      sizes,
+      width,
+      height,
+    };
+  }
+  return {
+    src: at(width * 2),
+    srcSet: `${at(width)} 1x, ${at(width * 2)} 2x`,
+    width,
+    height,
+  };
 }

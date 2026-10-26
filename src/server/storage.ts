@@ -3,13 +3,21 @@ import "server-only";
 import { createHash, randomBytes } from "node:crypto";
 import { mkdir, readFile, stat, unlink, writeFile } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
+import { db } from "@/lib/db";
+import {
+  deleteFromImageKit,
+  onImageKit,
+  uploadToImageKit,
+} from "@/server/imagekit";
 
 /**
  * Where uploaded files go.
  *
  * This is the seam. Everything else in the app deals in the `StoredFile` that
- * `putUpload` hands back, so moving to ImageKit later means rewriting this file
- * and nothing else.
+ * `putUpload` hands back. Once ImageKit is set up (`server/imagekit.ts`) the
+ * bytes go there instead of to disk; the key, the URL and every check before
+ * them stay exactly as they were. A file written to disk before the move is
+ * still read from disk, and copied across by `pnpm media:to-imagekit`.
  *
  * Files are written outside `public/` on purpose. Anything under `public/` is
  * served straight off disk with no code in front of it, which is fine for
@@ -259,10 +267,12 @@ export async function putUpload(
     );
   }
   const key = newKey(kind, ext);
-  const target = pathFor(key);
-
-  await mkdir(join(ROOT, kind), { recursive: true });
-  await writeFile(target, bytes);
+  if (onImageKit()) {
+    await uploadToImageKit(key, bytes, contentType);
+  } else {
+    await mkdir(join(ROOT, kind), { recursive: true });
+    await writeFile(pathFor(key), bytes);
+  }
 
   return {
     url: `/uploads/${key}`,
@@ -273,6 +283,20 @@ export async function putUpload(
   };
 }
 
+/**
+ * Whether this file is on the server's own disk: every upload before the
+ * move to ImageKit, and every upload while ImageKit is not set up.
+ */
+export async function hasLocalCopy(key: string): Promise<boolean> {
+  try {
+    await stat(pathFor(key));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** A file from the server's own disk. */
 export async function readUpload(key: string) {
   const bytes = await readFile(pathFor(key));
   // Keys are written as `kind/hash.ext`, so the kind this file was stored
@@ -283,10 +307,16 @@ export async function readUpload(key: string) {
   return { bytes, contentType: identify(bytes, kind).contentType };
 }
 
+/**
+ * Removes a file wherever it is: from disk, and from ImageKit when that is
+ * set up. Throws if ImageKit cannot be reached, so a sweep keeps its row and
+ * tries again rather than forgetting a file that is still there.
+ */
 export async function deleteUpload(key: string) {
   await unlink(pathFor(key)).catch(() => {
     // Already gone is the outcome we wanted.
   });
+  if (onImageKit()) await deleteFromImageKit(key);
 }
 
 /**
@@ -294,14 +324,21 @@ export async function deleteUpload(key: string) {
  *
  * Read from disk rather than taken from the client: the uploader used to send
  * its own byte count, which made the 25MB ceiling advisory and the column
- * useless for accounting. Returns null when the file has gone, which is not
- * an error — the row is still worth writing.
+ * useless for accounting. A file on ImageKit is sized from its upload
+ * record, which the upload route wrote from the bytes it counted. Returns
+ * null when the file has gone, which is not an error — the row is still
+ * worth writing.
  */
 export async function sizeOfUpload(key: string): Promise<number | null> {
   try {
     const { size } = await stat(pathFor(key));
     return size;
   } catch {
-    return null;
+    if (!onImageKit()) return null;
+    const upload = await db.upload.findUnique({
+      where: { key },
+      select: { bytes: true },
+    });
+    return upload?.bytes ?? null;
   }
 }

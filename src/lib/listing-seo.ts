@@ -1,7 +1,9 @@
 import type { Listing } from "@/data/listings";
 import type { Platform } from "@/data/platforms";
 import { money } from "@/lib/chat-events";
+import { imagekitUrl } from "@/lib/media";
 import { breadcrumbLd, clampDescription, SITE_NAME } from "@/lib/seo";
+import { isPublicKey, keyFromUrl } from "@/lib/upload-keys";
 import { formatCompact } from "@/lib/utils";
 
 /**
@@ -43,9 +45,15 @@ function capitalise(text: string): string {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
-/** A picture a link preview can show: the sample SVG artwork is not one. */
+/**
+ * A picture a link preview can show: the sample SVG artwork is not one.
+ * A cover on ImageKit is offered at its CDN address, at the width a preview
+ * draws, so WhatsApp and Google need not follow our route there.
+ */
 export function previewImage(url: string): string | null {
-  return /\.(?:png|jpe?g|webp|gif)$/i.test(url) ? url : null;
+  if (!/\.(?:png|jpe?g|webp|gif)$/i.test(url)) return null;
+  const key = keyFromUrl(url);
+  return (key && isPublicKey(key) && imagekitUrl(key, { width: 1200 })) || url;
 }
 
 /**

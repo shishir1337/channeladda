@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { Listing } from "@/data/listings";
 import { platformMap } from "@/data/platforms";
 import { listingDescription, listingLd, previewImage } from "@/lib/listing-seo";
@@ -124,5 +124,15 @@ describe("previewImage", () => {
   it("only offers a picture a link preview can show", () => {
     expect(previewImage("/media/covers/x.svg")).toBeNull();
     expect(previewImage("/uploads/cover/a.png")).toBe("/uploads/cover/a.png");
+  });
+
+  it("offers ImageKit's copy, at preview size, once covers live there", () => {
+    vi.stubEnv("NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT", "https://ik.imagekit.io/x");
+    vi.stubEnv("NEXT_PUBLIC_IMAGEKIT_FOLDER", "");
+    const key = `cover/${"d".repeat(32)}.jpg`;
+    expect(previewImage(`/uploads/${key}`)).toBe(
+      `https://ik.imagekit.io/x/uploads/${key}?tr=w-1200`,
+    );
+    vi.unstubAllEnvs();
   });
 });

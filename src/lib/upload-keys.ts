@@ -131,6 +131,27 @@ export function keyFromUrl(url: string): string | null {
  * except an ID check's, which is not written to the disk of whatever
  * computer staff reviewed it on.
  */
+const TYPES: Record<string, string> = {
+  png: "image/png",
+  jpg: "image/jpeg",
+  webp: "image/webp",
+  gif: "image/gif",
+  mp4: "video/mp4",
+  mov: "video/quicktime",
+  webm: "video/webm",
+};
+
+/**
+ * A stored file's type, from its key. `putUpload` named the file from its
+ * own bytes, so the extension is as good as reading them again — which a
+ * file on ImageKit, passed on as it streams, cannot be.
+ */
+export function contentTypeOf(key: string): string {
+  return (
+    TYPES[key.slice(key.lastIndexOf(".") + 1)] ?? "application/octet-stream"
+  );
+}
+
 export function cachingFor(key: string): Record<string, string> {
   if (isPublicKey(key)) {
     return { "Cache-Control": "public, max-age=31536000, immutable" };
