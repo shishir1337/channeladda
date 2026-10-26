@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { orderAmounts } from "@/lib/fees";
+import { DEFAULT_FEES, orderAmounts } from "@/lib/fees";
 
 const FEES = { buyerFeeBpSafest: 300, buyerFeeBpFastest: 300, sellerFeeBp: 0 };
 
@@ -33,4 +33,14 @@ test("the seller fee applies only to fastest sales", () => {
   expect(safest.payoutUsd).toBe(10_000);
   expect(safest.totalUsd).toBe(300);
   expect(orderAmounts(10_000, withSellerFee, "FASTEST").sellerFeeUsd).toBe(500);
+});
+
+test("a fresh site charges the buyer 5% on either deal, and the seller nothing", () => {
+  // The owner, 2026-10-26: 3% became 5%.
+  expect(DEFAULT_FEES).toEqual({
+    buyerFeeBpSafest: 500,
+    buyerFeeBpFastest: 500,
+    sellerFeeBp: 0,
+  });
+  expect(orderAmounts(10_000, DEFAULT_FEES, "SAFEST").totalUsd).toBe(500);
 });

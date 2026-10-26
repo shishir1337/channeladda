@@ -32,10 +32,11 @@ export type FeeSettings = {
   sellerFeeBp: number;
 };
 
-/** What the code shipped with, and what a fresh database starts at. */
+/** What the code ships with, and what a fresh database starts at: 5% from
+ *  the buyer on either deal (the owner, 2026-10-26; it was 3%). */
 export const DEFAULT_FEES: FeeSettings = {
-  buyerFeeBpSafest: 300,
-  buyerFeeBpFastest: 300,
+  buyerFeeBpSafest: 500,
+  buyerFeeBpFastest: 500,
   sellerFeeBp: 0,
 };
 

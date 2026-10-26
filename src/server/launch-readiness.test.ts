@@ -200,8 +200,9 @@ test(
 test(
   "with email confirmation turned off, an unconfirmed email can open a deal",
   withCleanDb(async () => {
-    // The owner, 2026-10-24: "temporary disable needs otp email
-    // verification". Off unless NEXT_PUBLIC_REQUIRE_EMAIL_VERIFICATION=true.
+    // NEXT_PUBLIC_REQUIRE_EMAIL_VERIFICATION=false, as it was for testing
+    // from 2026-10-24 to 2026-10-26.
+    vi.stubEnv("NEXT_PUBLIC_REQUIRE_EMAIL_VERIFICATION", "false");
     const { listing, buyer } = await seedListing();
     fake.userId = buyer.id;
     fake.emailVerified = false;

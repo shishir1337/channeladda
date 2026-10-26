@@ -286,7 +286,7 @@ test(
 test(
   "with confirmation off, the email changes at once, the rest of the account stays, and the old address is told",
   withCleanDb(async () => {
-    vi.stubEnv("NEXT_PUBLIC_REQUIRE_EMAIL_VERIFICATION", "");
+    vi.stubEnv("NEXT_PUBLIC_REQUIRE_EMAIL_VERIFICATION", "false");
     const { user, email, headers } = await signUp();
     await db.user.update({
       where: { id: user.id },
@@ -428,6 +428,9 @@ test(
 test(
   "a Google-only member has no password to change, and needs a recent sign-in to change their email",
   withCleanDb(async () => {
+    // With confirmation off, so a change that is let through is finished at
+    // once; with it on, the code step is the test above.
+    vi.stubEnv("NEXT_PUBLIC_REQUIRE_EMAIL_VERIFICATION", "false");
     const { user, email, headers } = await signUp();
     await makeGoogleOnly(user.id);
 

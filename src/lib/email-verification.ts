@@ -1,16 +1,16 @@
 /**
  * Whether a confirmed email address is needed before buying or selling.
  *
- * Off for now — the owner, 2026-10-24: "temporary disable needs otp email
- * verification". While it is off, sign-up sends no code, nothing waits on
- * one, and nobody is asked to confirm; /verify-email still works for anyone
- * who wants to. Set NEXT_PUBLIC_REQUIRE_EMAIL_VERIFICATION=true and rebuild
- * to turn it back on.
+ * On — the owner, 2026-10-26: "turn it on", after it was switched off for
+ * testing on 2026-10-24. Sign-up sends a code and buying and selling wait
+ * for it. Set NEXT_PUBLIC_REQUIRE_EMAIL_VERIFICATION=false and rebuild to
+ * switch it off again; while off, sign-up sends no code and nobody is asked
+ * to confirm, and /verify-email still works for anyone who wants to.
  *
- * Read when asked rather than once, so a test can turn it on.
+ * Read when asked rather than once, so a test can switch it.
  */
 export function emailVerificationRequired(): boolean {
-  return process.env.NEXT_PUBLIC_REQUIRE_EMAIL_VERIFICATION === "true";
+  return process.env.NEXT_PUBLIC_REQUIRE_EMAIL_VERIFICATION !== "false";
 }
 
 /** True when this person must confirm their address before going on. */

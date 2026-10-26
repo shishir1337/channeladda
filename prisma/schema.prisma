@@ -1111,8 +1111,8 @@ model PlatformSettings {
 
   /// Added on top of the listing price, paid by the buyer. Per mode: Fastest
   /// is more work and carries the funds, so it may be priced higher.
-  buyerFeeBpSafest  Int @default(300)
-  buyerFeeBpFastest Int @default(300)
+  buyerFeeBpSafest  Int @default(500)
+  buyerFeeBpFastest Int @default(500)
   /// Deducted from the price before a Fastest seller is credited. A Safest
   /// price goes to the seller directly, so it carries none.
   sellerFeeBp       Int @default(0)
