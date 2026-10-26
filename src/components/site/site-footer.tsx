@@ -134,9 +134,22 @@ export function SiteFooter() {
         </div>
 
         <div className="mt-10 flex flex-col gap-5 border-t border-line pt-8 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-[0.8125rem] text-subtle">
-            © {new Date().getFullYear()} Channel Adda. All rights reserved.
-          </p>
+          <div className="flex flex-col gap-1 text-[0.8125rem] text-subtle">
+            <p>
+              © {new Date().getFullYear()} Channel Adda. All rights reserved.
+            </p>
+            <p>
+              Designed &amp; built by{" "}
+              <a
+                href="https://arrowbin.com/"
+                target="_blank"
+                rel="noopener"
+                className="font-medium text-muted underline decoration-line-strong underline-offset-4 transition-colors duration-150 hover:text-fg hover:decoration-fg"
+              >
+                Arrowbin
+              </a>
+            </p>
+          </div>
           <ul className="flex flex-wrap items-center gap-x-5 gap-y-2">
             {[
               { label: "Terms of service", href: "/terms" },
