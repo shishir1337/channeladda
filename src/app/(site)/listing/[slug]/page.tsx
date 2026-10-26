@@ -154,6 +154,8 @@ export default async function ListingPage({
       ? await heldByAcceptedOffer(listing.id, viewer.id)
       : null;
   const heldOfferUsd = heldOffer ? heldOffer.amountUsd / 100 : null;
+  // Whose number it was: the buyer may have accepted the seller's price.
+  const heldBySeller = heldOffer?.bySeller ?? false;
   // The offer this buyer already has open here, shown in place of the form.
   const mine =
     viewer && !isOwnListing && !listing.reserved
@@ -291,6 +293,7 @@ export default async function ListingPage({
                 fees={fees}
                 isOwnListing={isOwnListing}
                 heldOfferUsd={heldOfferUsd}
+                heldBySeller={heldBySeller}
               />
             </div>
 
@@ -334,6 +337,7 @@ export default async function ListingPage({
                 fees={fees}
                 isOwnListing={isOwnListing}
                 heldOfferUsd={heldOfferUsd}
+                heldBySeller={heldBySeller}
               />
             </div>
           </aside>
@@ -344,7 +348,13 @@ export default async function ListingPage({
           has a deal to start, so neither gets the bar. */}
       {isOwnListing || (listing.reserved && !heldOfferUsd) ? null : (
         <ListingBuyBar
-          label={heldOfferUsd ? "Your accepted offer" : "Asking price"}
+          label={
+            heldOfferUsd
+              ? heldBySeller
+                ? "The price you accepted"
+                : "Your accepted offer"
+              : "Asking price"
+          }
           price={heldOfferUsd ?? listing.price}
           wasPrice={heldOfferUsd ? undefined : listing.wasPrice}
           targetId="buy"

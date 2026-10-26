@@ -3,6 +3,7 @@
 import { EyeIcon, MessageSquareIcon, ShieldCheckIcon } from "lucide-react";
 import Link from "next/link";
 import { FavoriteButton } from "@/components/home/favorite-button";
+import { useWatching } from "@/components/home/saved-store";
 import { AskSeller } from "@/components/listing/ask-seller";
 import { ReportListing } from "@/components/listing/report-listing";
 import { StartDeal } from "@/components/listing/start-deal";
@@ -22,6 +23,7 @@ export function BuyPanel({
   fees,
   isOwnListing,
   heldOfferUsd = null,
+  heldBySeller = false,
 }: {
   listing: Listing;
   /** Set by an admin, so it is read on the server and handed down. */
@@ -33,11 +35,19 @@ export function BuyPanel({
    * listing: the deal opens at this price, not the asking price.
    */
   heldOfferUsd?: number | null;
+  /**
+   * The accepted number was the seller's — a price or a counter the buyer
+   * accepted — so it is the buyer who agreed, not the seller.
+   */
+  heldBySeller?: boolean;
 }) {
   // Reserved for somebody else: the buy and offer controls used to render
   // here anyway, and both were refused server-side with nothing on the
   // page saying the listing was held.
   const heldForSomeoneElse = listing.reserved === true && !heldOfferUsd;
+  // Moves with the heart above it, as it is pressed: it stayed at "0
+  // watching" until the page was reloaded.
+  const watching = useWatching(listing.id, listing.watching);
   return (
     <div className="rounded-panel border border-line bg-surface p-5 sm:p-6">
       <div className="flex items-start justify-between gap-3">
@@ -65,10 +75,21 @@ export function BuyPanel({
 
       {heldOfferUsd ? (
         <p className="mt-4 rounded-card border border-verified/30 bg-verified-soft p-3.5 text-sm leading-relaxed text-fg">
-          The seller accepted your offer of{" "}
-          <Price usd={heldOfferUsd} className="font-semibold" />. The deal below
-          opens at that price, and the listing is held for you while you start
-          it — not for ever.
+          {/* Whoever agreed, said the right way round: a buyer who accepted
+              the seller's counter read "The seller accepted your offer". */}
+          {heldBySeller ? (
+            <>
+              You accepted {listing.sellerName}&rsquo;s price of{" "}
+              <Price usd={heldOfferUsd} className="font-semibold" />.
+            </>
+          ) : (
+            <>
+              The seller accepted your offer of{" "}
+              <Price usd={heldOfferUsd} className="font-semibold" />.
+            </>
+          )}{" "}
+          The deal below opens at that price, and the listing is held for you
+          while you start it — not for ever.
         </p>
       ) : null}
 
@@ -122,7 +143,7 @@ export function BuyPanel({
       <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-4">
         <span className="inline-flex items-center gap-1.5 text-[0.8125rem] text-subtle">
           <EyeIcon aria-hidden="true" className="size-3.5" />
-          <span className="tnum">{listing.watching}</span> watching
+          <span className="tnum">{watching}</span> watching
         </span>
         <ReportListing listingId={listing.id} listingSlug={listing.slug} />
       </div>

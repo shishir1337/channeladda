@@ -39,8 +39,9 @@ import type { ListingStatus } from "@/generated/prisma/enums";
 import { LOCK_TEXT, removedBySeller } from "@/lib/listing-lock";
 import { countOf } from "@/lib/plural";
 import { revenueLine } from "@/lib/revenue-line";
-import { longDate } from "@/lib/time";
+import { dayAndTime, longDate } from "@/lib/time";
 import { cn } from "@/lib/utils";
+import { heldOfferOn } from "@/server/offers";
 import {
   EDITABLE,
   getListingLocks,
@@ -138,14 +139,28 @@ export default async function SellerListingPage({
   if (!listing || !locks) notFound();
 
   const meta = statusMeta(listing.status);
+  // Reserved by an accepted offer, with no deal opened yet: who it is held
+  // for and until when. It said "A deal is running for this listing", and
+  // none was.
+  const held =
+    listing.status === "RESERVED" ? await heldOfferOn(listing.id) : null;
+  const heldNote = held
+    ? `Held for ${held.buyerName} until ${dayAndTime(held.heldUntil, zone)} — ${held.bySeller ? "they accepted your price" : "you accepted their offer"}. If they don't start the deal by then, it goes back on sale.`
+    : null;
   const sellerRemoved = removedBySeller(listing);
   // Back from Save on the edit page, or here from Remove on the list.
   const saved = query.saved === "1" && locks.canEdit;
   const askToRemove = query.remove === "1" && locks.canRemove;
   // A lock worth explaining: a deal holds it, or it has sold. A removed
   // listing says so in its header instead.
-  const lockText =
-    locks.lock && locks.lock !== "removed" ? LOCK_TEXT[locks.lock] : null;
+  const lockText = held
+    ? {
+        title: "Locked while it is held",
+        body: `If ${held.buyerName} starts the deal, it stays locked until the deal ends. If they don't, you can edit or remove it again.`,
+      }
+    : locks.lock && locks.lock !== "removed"
+      ? LOCK_TEXT[locks.lock]
+      : null;
   const hasControls =
     locks.canRemove ||
     (locks.lock === null &&
@@ -174,7 +189,7 @@ export default async function SellerListingPage({
             ? undefined
             : sellerRemoved
               ? "You removed this listing. Buyers cannot see it."
-              : meta.note
+              : (heldNote ?? meta.note)
         }
         meta={
           <>

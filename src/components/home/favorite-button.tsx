@@ -2,75 +2,10 @@
 
 import { HeartIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { useCallback, useState } from "react";
+import { setSaved, useSavedIds } from "@/components/home/saved-store";
 import { useSession } from "@/lib/auth-client";
-import { withSaved } from "@/lib/saved-ids";
 import { cn } from "@/lib/utils";
-
-/**
- * Which listings the person looking has saved.
- *
- * One fetch per page load, shared by every heart on it, rather than one
- * request per card. Kept in a module-level store so a browse page with
- * twenty-four cards asks once.
- */
-const store = {
-  ids: null as Set<string> | null,
-  loading: null as Promise<void> | null,
-  listeners: new Set<() => void>(),
-
-  emit() {
-    for (const listener of this.listeners) listener();
-  },
-
-  subscribe(listener: () => void) {
-    store.listeners.add(listener);
-    return () => {
-      store.listeners.delete(listener);
-    };
-  },
-
-  snapshot() {
-    return store.ids;
-  },
-
-  async load() {
-    if (store.ids || store.loading) return store.loading ?? undefined;
-    store.loading = (async () => {
-      try {
-        const res = await fetch("/api/favourites");
-        const data = (await res.json()) as { ids?: string[] };
-        store.ids = new Set(data.ids ?? []);
-      } catch {
-        // Offline or blocked: treat as nothing saved rather than breaking the
-        // page. The button still works and will correct itself on reload.
-        store.ids = new Set();
-      }
-      store.loading = null;
-      store.emit();
-    })();
-    return store.loading;
-  },
-
-  set(listingId: string, favourited: boolean) {
-    store.ids = withSaved(store.ids, listingId, favourited);
-    store.emit();
-  },
-};
-
-function useSaved(listingId: string) {
-  const ids = useSyncExternalStore(
-    store.subscribe,
-    store.snapshot,
-    () => null, // the server has no opinion; the heart starts empty
-  );
-
-  useEffect(() => {
-    void store.load();
-  }, []);
-
-  return ids?.has(listingId) ?? false;
-}
 
 /**
  * Save a listing for later.
@@ -88,7 +23,7 @@ export function FavoriteButton({
   /** Over cover art it needs a scrim; on a panel it is a quiet control. */
   on?: "cover" | "surface";
 }) {
-  const saved = useSaved(listingId);
+  const saved = useSavedIds()?.has(listingId) ?? false;
   const { data: session } = useSession();
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -104,7 +39,7 @@ export function FavoriteButton({
     if (busy) return;
 
     const next = !saved;
-    store.set(listingId, next); // optimistic
+    setSaved(listingId, next); // optimistic
     setBusy(true);
     try {
       const res = await fetch("/api/favourites", {
@@ -114,9 +49,9 @@ export function FavoriteButton({
       });
       if (!res.ok) throw new Error("save failed");
       const data = (await res.json()) as { favourited?: boolean };
-      store.set(listingId, data.favourited ?? next);
+      setSaved(listingId, data.favourited ?? next);
     } catch {
-      store.set(listingId, !next); // put it back
+      setSaved(listingId, !next); // put it back
     } finally {
       setBusy(false);
     }

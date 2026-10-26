@@ -782,11 +782,26 @@ export async function declineOffer(
     throw error;
   }
 
-  await tellTheOtherSide(row, responderId, conversationId, {
-    title: `Your offer of ${asMoney(row.amountUsd)} was turned down`,
-    body: "Nothing is lost. You can make another one, or look at something else.",
-    email: true,
-  });
+  // Each side in its own words, as accepting is. A buyer turning down the
+  // seller's price used to send the seller the buyer's text: "Your offer of
+  // $2,400.00 was turned down".
+  const amount = asMoney(row.amountUsd);
+  await tellTheOtherSide(
+    row,
+    responderId,
+    conversationId,
+    as === "seller"
+      ? {
+          title: `Your offer of ${amount} was turned down`,
+          body: "Nothing is lost. You can make another one, or look at something else.",
+          email: true,
+        }
+      : {
+          title: `${row.buyer.name || "The buyer"} turned down your price of ${amount}`,
+          body: "The listing stays on sale. They can still make you an offer.",
+          email: true,
+        },
+  );
 
   return { ok: true };
 }
@@ -1076,7 +1091,11 @@ export async function withdrawOffer(
   await notify({
     userId: otherId,
     kind: "OFFER",
-    title: `${name || "Someone"} withdrew their offer of ${asMoney(row.amountUsd)}`,
+    // A seller takes back a price, a buyer an offer: "withdrew their offer"
+    // was said of both.
+    title: row.bySeller
+      ? `${name || "The seller"} withdrew their price of ${asMoney(row.amountUsd)}`
+      : `${name || "The buyer"} withdrew their offer of ${asMoney(row.amountUsd)}`,
     body: "There is nothing to answer now.",
     href: threadHref(conversationId, row.listingId),
   });
@@ -1095,26 +1114,68 @@ export async function withdrawOffer(
 export async function heldByAcceptedOffer(
   listingId: string,
   buyerId: string,
-): Promise<{ id: string; amountUsd: number; heldUntil: Date } | null> {
+): Promise<HeldOffer | null> {
+  return holdingOffer(listingId, buyerId);
+}
+
+/**
+ * An accepted offer holding a listing before any deal is opened.
+ *
+ * `bySeller` says who agreed to whom: the buyer accepting the seller's
+ * price, or the seller accepting the buyer's offer. Each side is told it the
+ * right way round — a buyer who had accepted the seller's counter read "The
+ * seller accepted your offer".
+ */
+export type HeldOffer = {
+  id: string;
+  amountUsd: number;
+  bySeller: boolean;
+  buyerName: string;
+  heldUntil: Date;
+};
+
+/**
+ * Who a reserved listing is held for, when an accepted offer holds it and no
+ * deal has been opened: the seller's own page said "A deal is running for
+ * this listing", and none was.
+ */
+export async function heldOfferOn(
+  listingId: string,
+): Promise<HeldOffer | null> {
+  return holdingOffer(listingId, null);
+}
+
+async function holdingOffer(
+  listingId: string,
+  buyerId: string | null,
+): Promise<HeldOffer | null> {
   const { paymentWindowHours } = await getSettings();
   const windowMs = paymentWindowHours * 3_600_000;
   const since = new Date(Date.now() - windowMs);
   const held = await db.offer.findFirst({
     where: {
       listingId,
-      buyerId,
+      ...(buyerId ? { buyerId } : {}),
       status: "ACCEPTED",
       respondedAt: { gte: since },
       order: null,
     },
     orderBy: { respondedAt: "desc" },
-    select: { id: true, amountUsd: true, respondedAt: true },
+    select: {
+      id: true,
+      amountUsd: true,
+      respondedAt: true,
+      bySeller: true,
+      buyer: { select: { name: true } },
+    },
   });
   if (!held?.respondedAt) return null;
   // When the hold lapses, so the people waiting on it can be told.
   return {
     id: held.id,
     amountUsd: held.amountUsd,
+    bySeller: held.bySeller,
+    buyerName: held.buyer.name,
     heldUntil: new Date(held.respondedAt.getTime() + windowMs),
   };
 }

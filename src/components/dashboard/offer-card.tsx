@@ -176,11 +176,13 @@ export function OfferCard({
             </p>
           ) : null}
 
+          {/* The chip above already says "Accepted", so the note says what
+              it means instead of saying it a second time. */}
           {offer.effectiveStatus === "ACCEPTED" ? (
             viewingAs === "buyer" ? (
               <Callout
                 tone="success"
-                title="Accepted."
+                title="Held for you"
                 className="mt-3"
                 action={
                   <Button asChild size="sm">
@@ -190,13 +192,17 @@ export function OfferCard({
                   </Button>
                 }
               >
-                The listing is held for you at {usd(offer.amount)} while you
-                open the deal — it lapses if you do not.
+                Open the deal at {usd(offer.amount)} before the hold runs out,
+                or the listing goes back on sale.
               </Callout>
             ) : (
-              <Callout tone="success" title="Accepted." className="mt-3">
-                The listing is reserved for this buyer while they open the deal.
-                If they do not, it comes back on sale on its own.
+              <Callout
+                tone="success"
+                title="Held for this buyer"
+                className="mt-3"
+              >
+                Nothing to do while they open the deal. If they do not, it comes
+                back on sale on its own.
               </Callout>
             )
           ) : null}
