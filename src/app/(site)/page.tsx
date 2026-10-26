@@ -9,7 +9,7 @@ import { Testimonials } from "@/components/home/testimonials";
 import { TopSellers } from "@/components/home/top-sellers";
 import { JsonLd } from "@/components/site/json-ld";
 import { databaseGate } from "@/lib/db-gate";
-import { pageMetadata, SITE_DESCRIPTION, siteLd } from "@/lib/seo";
+import { pageMetadata, SITE_DESCRIPTION, SITE_TITLE, siteLd } from "@/lib/seo";
 import { siteUrl } from "@/lib/site-url";
 import {
   getFeaturedListings,
@@ -24,9 +24,7 @@ import { getSellers, getSiteStats } from "@/server/sellers";
 export const revalidate = 60;
 
 export const metadata: Metadata = pageMetadata({
-  title: {
-    absolute: "Channel Adda — Buy & sell social media accounts, safely",
-  },
+  title: { absolute: SITE_TITLE },
   description: SITE_DESCRIPTION,
   path: "/",
 });

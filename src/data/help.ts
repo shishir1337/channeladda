@@ -85,7 +85,7 @@ export const helpArticles: HelpArticle[] = [
     body: [
       "Listing is free and takes about ten minutes. You add the handle, the audience figures, your asking price, and screenshots of the analytics and any revenue.",
       "We also ask how your account is set up — for example, whether a YouTube channel sits on a Brand Account or a personal Google account. That single answer decides whether the transfer is a two-hour job or something we may not be able to support at all, so it is worth getting right.",
-      "Once submitted, a moderator reviews the listing. Most are approved within a few hours. A rejection always comes with a specific reason and a link straight back to fix it.",
+      "A YouTube listing goes live as soon as our system finds your ownership code on the channel. On every other platform a moderator reviews the listing first; most are approved within a few hours. A rejection always comes with a specific reason and a link straight back to fix it.",
     ],
   },
   {
@@ -96,8 +96,8 @@ export const helpArticles: HelpArticle[] = [
       "The one-time code you place in your bio or description, and why we check it more than once.",
     body: [
       "We generate a one-time code and ask you to paste it into your channel description or profile bio. On YouTube our system reads the live channel and checks the code is there; on every other platform a moderator opens the live account and looks. A screenshot can be edited; the live account cannot.",
-      "A moderator checks the live account before the listing goes public, even where the code was read automatically. Leave the code up until it is approved: a code that was there three weeks ago proves nothing about today.",
-      "You can remove the code once the listing is approved.",
+      "On YouTube the listing goes live as soon as the code is found. Elsewhere a moderator checks the live account before the listing goes public, so leave the code up until it is approved: a code that was there three weeks ago proves nothing about today.",
+      "You can remove the code once the listing is live.",
     ],
   },
   {

@@ -52,8 +52,13 @@ export function AccordionContent({
   ...props
 }: ComponentProps<typeof AccordionPrimitive.Content>) {
   return (
+    // Mounted while closed, and hidden by its state. Radix leaves a closed
+    // answer out of the page altogether, so the questions a search engine
+    // read had no answers — and the answers are what people search for.
+    // Kept mounted, Radix stops hiding it, so the class does.
     <AccordionPrimitive.Content
-      className="overflow-hidden data-[state=closed]:animate-[acc-up_240ms_var(--ease-out-soft)] data-[state=open]:animate-[acc-down_280ms_var(--ease-out-soft)]"
+      forceMount
+      className="overflow-hidden data-[state=closed]:hidden data-[state=open]:animate-[acc-down_280ms_var(--ease-out-soft)]"
       {...props}
     >
       <div

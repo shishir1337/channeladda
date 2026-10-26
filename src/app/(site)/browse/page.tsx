@@ -14,7 +14,10 @@ export async function generateMetadata({
   const description =
     "Verified YouTube channels, Instagram and Facebook pages, Telegram channels and websites for sale. Filter by price, audience, revenue and country.";
   return pageMetadata({
-    title: pagedTitle("Browse accounts for sale", page),
+    title: pagedTitle(
+      "Social Media Accounts & YouTube Channels for Sale",
+      page,
+    ),
     description: page > 1 ? `Page ${page}. ${description}` : description,
     // Each page of the list is its own page to a search engine; the
     // filters are not, so they are left out of the address.
@@ -39,7 +42,7 @@ export default async function BrowsePage({
     <>
       <PageHeader
         crumbs={[{ label: "Home", href: "/" }, { label: "Browse" }]}
-        title="Every account on the block"
+        title="Accounts for sale"
         description={`${countOf(total, "listing")} across five platforms. Ownership is verified before anything reaches this page.`}
       />
       <BrowseView filters={filters} result={result} basePath="/browse" />

@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next";
+import { guides } from "@/data/guides";
 import { helpArticles } from "@/data/help";
 import { legalDocs } from "@/data/legal";
 import { platforms } from "@/data/platforms";
@@ -11,13 +12,15 @@ import { platforms } from "@/data/platforms";
  * for months, and nothing noticed.
  */
 
-/** Public pages that are not a listing, a seller, a platform or an article. */
+/** Public pages that are not a listing, a seller, a platform, a guide or an
+ *  article. */
 export const STATIC_PAGES = [
   "/",
   "/browse",
   "/sold",
   "/sellers",
   "/sell",
+  "/guides",
   "/how-it-works",
   "/fees",
   "/trust-safety",
@@ -85,6 +88,10 @@ export function sitemapEntries(input: {
   return [
     ...STATIC_PAGES.map((path) => at(path, policies.get(path))),
     ...platforms.map((p) => at(`/browse/${p.id}`)),
+    ...platforms.map((p) => at(`/sell/${p.id}`)),
+    ...guides.map((guide) =>
+      at(`/guides/${guide.slug}`, parseLongDate(guide.updated) ?? undefined),
+    ),
     ...helpArticles.map((article) => at(`/help/${article.slug}`)),
     ...input.listings.map((l) => at(`/listing/${l.slug}`, l.updatedAt)),
     ...input.sellers.map((s) => at(`/seller/${s.slug}`, s.updatedAt)),

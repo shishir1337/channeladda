@@ -9,7 +9,7 @@ import { ImageResponse } from "next/og";
  * Built once at deploy: nothing in it changes per request.
  */
 export const alt =
-  "Channel Adda — the supervised marketplace for social media accounts";
+  "Channel Adda — buy and sell YouTube channels and social media accounts safely";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -72,7 +72,7 @@ export default function OpenGraphImage() {
             maxWidth: 980,
           }}
         >
-          Buy and sell social media accounts, safely
+          Buy and sell YouTube channels, safely
         </div>
         <div
           style={{

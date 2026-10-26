@@ -141,7 +141,7 @@ export const faqs = [
   },
   {
     q: "How do you verify that a seller really owns the account?",
-    a: "Sellers place a one-time Channel Adda verification code in the account description or bio, and we check it on the live account: automatically on YouTube, by a moderator on every other platform. On top of that we require proof screenshots of the analytics and monetization dashboards, and manual admin approval before a listing goes public. Sellers can also send us their ID for the Verified badge; that part is optional.",
+    a: "Sellers place a one-time Channel Adda verification code in the account description or bio, and we check it on the live account: automatically on YouTube, by a moderator on every other platform. On top of that we ask for proof screenshots of the analytics and monetization dashboards. A YouTube listing goes live once its code is found; on every other platform a moderator approves the listing before it goes public. Sellers can also send us their ID for the Verified badge; that part is optional.",
   },
   {
     q: "What fees does Channel Adda charge?",
@@ -165,7 +165,7 @@ export const footerNav: {
     title: "Marketplace",
     links: [
       { label: "Browse all accounts", href: "/browse" },
-      { label: "YouTube channels", href: "/browse/youtube" },
+      { label: "Buy YouTube channels", href: "/browse/youtube" },
       { label: "Instagram pages", href: "/browse/instagram" },
       { label: "Facebook pages", href: "/browse/facebook" },
       { label: "Telegram channels", href: "/browse/telegram" },
@@ -177,6 +177,7 @@ export const footerNav: {
     title: "Sell",
     links: [
       { label: "Create a listing", href: "/sell" },
+      { label: "Sell a YouTube channel", href: "/sell/youtube" },
       { label: "Pricing & fees", href: "/fees" },
       { label: "Listing rules", href: "/listing-rules" },
       { label: "Verified sellers", href: "/sellers" },
@@ -200,6 +201,7 @@ export const footerNav: {
     title: "Company",
     links: [
       { label: "About Channel Adda", href: "/about" },
+      { label: "Guides", href: "/guides" },
       { label: "Help centre", href: "/help" },
       { label: "Contact support", href: "/support" },
       { label: "Sign in", href: "/signin" },

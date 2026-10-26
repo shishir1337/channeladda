@@ -3,13 +3,17 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { BrowseView } from "@/components/browse/browse-view";
+import { FaqList } from "@/components/site/faq-list";
+import { JsonLd } from "@/components/site/json-ld";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/ui/page-header";
 import { Price } from "@/components/ui/price";
 import { type PlatformId, platformMap, platforms } from "@/data/platforms";
 import { databaseGate } from "@/lib/db-gate";
 import { parseFilters } from "@/lib/listing-query";
-import { pagedPath, pagedTitle, pageMetadata } from "@/lib/seo";
+import { buyFaqs, buyTitle } from "@/lib/platform-seo";
+import { breadcrumbLd, pagedPath, pagedTitle, pageMetadata } from "@/lib/seo";
+import { siteUrl } from "@/lib/site-url";
 import {
   getPlatformCounts,
   getPlatformFloors,
@@ -32,14 +36,11 @@ export async function generateMetadata({
   const p = platformMap[platform as PlatformId];
   if (!p) return { title: "Platform not found" };
 
-  const [counts, { page }] = await Promise.all([
-    getPlatformCounts(),
-    searchParams.then(parseFilters),
-  ]);
-  // "Websites for sale · 5 listed", not "Buy Website sites — 5 for sale".
-  const title = `${p.label} for sale · ${counts[p.id].toLocaleString("en-US")} listed`;
+  const { page } = parseFilters(await searchParams);
+  // The words people search for — "Buy YouTube channels" — rather than
+  // "YouTube channels for sale · 3 listed", whose count read as small.
   return pageMetadata({
-    title: pagedTitle(title, page),
+    title: pagedTitle(buyTitle(p), page),
     description: page > 1 ? `Page ${page}. ${p.summary}` : p.summary,
     // Each page of the list is its own page to a search engine; the
     // filters are not, so they are left out of the address.
@@ -69,6 +70,13 @@ export default async function PlatformBrowsePage({
 
   return (
     <>
+      <JsonLd
+        data={breadcrumbLd(siteUrl(), [
+          { name: "Home", path: "/" },
+          { name: "Browse", path: "/browse" },
+          { name: p.label, path: `/browse/${p.id}` },
+        ])}
+      />
       <PageHeader
         crumbs={[
           { label: "Home", href: "/" },
@@ -165,6 +173,58 @@ export default async function PlatformBrowsePage({
                 ))}
             </ul>
           </div>
+        </div>
+      </section>
+
+      {/* What a buyer asks before a first deal on this platform, folded so
+          the list stays the page. */}
+      <section className="border-t border-line">
+        <div className="mx-auto grid w-full max-w-[81rem] gap-6 px-4 py-12 sm:px-6 sm:py-16 lg:grid-cols-[22rem_1fr] lg:gap-16 lg:px-8">
+          <div className="max-lg:contents">
+            <div>
+              <h2 className="text-[1.5rem] leading-[1.2] font-semibold tracking-[-0.02em] sm:text-[1.75rem]">
+                Buying {p.id === "website" ? "a website" : `a ${p.labelOne}`}
+              </h2>
+              <p className="mt-2 text-sm leading-relaxed text-muted">
+                Selling one instead?{" "}
+                <Link
+                  href={`/sell/${p.id}`}
+                  className="font-medium text-fg underline decoration-line-strong underline-offset-4 hover:decoration-fg"
+                >
+                  Sell your {p.id === "website" ? "website" : p.labelOne}
+                </Link>
+              </p>
+            </div>
+            {/* After the questions on a phone, beside them on a computer. */}
+            {p.id === "youtube" ? (
+              <ul className="flex flex-col gap-1 max-lg:order-last lg:mt-5">
+                {[
+                  {
+                    label: "How to buy a YouTube channel",
+                    href: "/guides/how-to-buy-a-youtube-channel",
+                  },
+                  {
+                    label: "Is it safe to buy a YouTube channel?",
+                    href: "/guides/is-it-safe-to-buy-a-youtube-channel",
+                  },
+                ].map((link) => (
+                  <li key={link.href}>
+                    <Link
+                      href={link.href}
+                      className="flex min-h-11 items-center gap-2 rounded-lg px-2 text-sm text-muted transition-colors hover:bg-surface-2 hover:text-fg"
+                    >
+                      {link.label}
+                      <ArrowRightIcon
+                        aria-hidden="true"
+                        className="ml-auto size-3.5 shrink-0 opacity-40"
+                      />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+          <FaqList items={buyFaqs(p)} />
         </div>
       </section>
     </>

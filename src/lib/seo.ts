@@ -12,9 +12,33 @@ import type { Metadata } from "next";
 
 export const SITE_NAME = "Channel Adda";
 
+/**
+ * The other ways people write the name into a search box. Given to search
+ * engines with the name, so "channeladda" finds the site as "Channel Adda"
+ * does.
+ */
+export const SITE_ALTERNATE_NAMES = ["ChannelAdda", "channeladda.com"];
+
+/**
+ * The home page's title: what people search for first, then the name.
+ * "Buy & sell social media accounts" was true, but nobody types it. The
+ * owner's first search is "YouTube channel buy sell", in that order, as it
+ * is typed in India; "buy YouTube channel" is the platform page's.
+ */
+export const SITE_TITLE =
+  "YouTube Channel Buy & Sell Marketplace | Channel Adda";
+
 /** The site in one search-result line: the home page's, and the fallback. */
 export const SITE_DESCRIPTION =
-  "Buy and sell YouTube channels, Instagram and Facebook pages, Telegram channels and websites. Our agent holds the account or the money until handover.";
+  "YouTube channel buy and sell, made safe: buy or sell monetized YouTube channels, plus Instagram, Facebook and Telegram accounts. An agent holds the money.";
+
+/**
+ * Channel Adda's own profiles elsewhere — a YouTube channel, an Instagram
+ * page, a Telegram channel — once there are some. Search engines read them
+ * as the same company, which is most of what makes a name searchable. None
+ * yet: the footer says so too.
+ */
+export const SOCIAL_PROFILES: string[] = [];
 
 /** What a search result shows before it cuts the snippet off. */
 export const DESCRIPTION_MAX = 160;
@@ -90,7 +114,7 @@ export const DEFAULT_OG_IMAGE = {
   url: "/opengraph-image",
   width: 1200,
   height: 630,
-  alt: "Channel Adda — the supervised marketplace for social media accounts",
+  alt: "Channel Adda — buy and sell YouTube channels and social media accounts safely",
 };
 
 export function pageMetadata({
@@ -159,16 +183,21 @@ export function siteLd(base: string, description: string) {
       "@type": "Organization",
       "@id": `${base}/#organization`,
       name: SITE_NAME,
+      alternateName: SITE_ALTERNATE_NAMES,
       url: `${base}/`,
       logo: `${base}/email/mark.png`,
       description,
+      email: "support@channeladda.com",
+      ...(SOCIAL_PROFILES.length ? { sameAs: SOCIAL_PROFILES } : {}),
     },
     {
       "@context": "https://schema.org",
       "@type": "WebSite",
       "@id": `${base}/#website`,
       name: SITE_NAME,
+      alternateName: SITE_ALTERNATE_NAMES,
       url: `${base}/`,
+      inLanguage: "en",
       publisher: { "@id": `${base}/#organization` },
       // The browse page reads ?q= (see listing-query), so this is a search
       // the site really answers.

@@ -22,21 +22,25 @@ export function Hero({ stats }: { stats: Stats }) {
               <span className="absolute inline-flex size-1.5 animate-pulse-dot rounded-full bg-verified" />
               <span className="relative inline-flex size-1.5 rounded-full bg-verified" />
             </span>
-            <span className="font-medium text-fg">Live marketplace</span>
+            <span className="font-medium text-fg">
+              YouTube channel buy &amp; sell
+            </span>
             <span aria-hidden="true" className="text-subtle">
               ·
             </span>
             new listings daily
           </p>
 
+          {/* YouTube by name: it is what people search for, and the page's
+              one heading is the strongest thing a search engine reads. */}
           <h1 className="mt-6 text-[2.5rem] leading-[1.05] font-semibold tracking-[-0.035em] sm:text-[3.5rem]">
-            Buy and sell social accounts{" "}
+            Buy and sell YouTube channels{" "}
             <span className="text-muted">without the risk</span>
           </h1>
 
           <p className="mx-auto mt-5 max-w-xl text-base leading-relaxed text-muted sm:mt-6 sm:text-lg">
-            Our agent holds your money or the account until the handover is
-            done.{" "}
+            Plus Instagram, Facebook and Telegram. Our agent holds the money or
+            the account until the handover is done.{" "}
             <span className="tnum font-medium text-fg">
               {stats.transfers.toLocaleString("en-US")}
             </span>{" "}

@@ -18,9 +18,9 @@ import { pageMetadata } from "@/lib/seo";
 import { getFeeSettings } from "@/server/settings";
 
 export const metadata: Metadata = pageMetadata({
-  title: "Sell your account",
+  title: "Sell Your YouTube Channel or Social Media Account",
   description:
-    "List a YouTube channel, Instagram or Facebook page, Telegram channel or website for free. Our agent supervises the handover, and you are paid once it is done.",
+    "Sell your YouTube channel, Instagram account, Facebook page, Telegram channel or website. Free to list; our agent supervises the handover and you get paid.",
   path: "/sell",
 });
 
@@ -180,7 +180,7 @@ export default async function SellPage() {
             {platforms.map((platform) => (
               <li key={platform.id}>
                 <Link
-                  href={`/browse/${platform.id}`}
+                  href={`/sell/${platform.id}`}
                   className="lift-card group flex h-full flex-col gap-3 rounded-card border border-line bg-surface p-4 hover:border-line-strong sm:p-5"
                 >
                   <span

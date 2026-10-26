@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { guides } from "@/data/guides";
 import { helpArticles } from "@/data/help";
 import { parseLongDate, sitemapEntries } from "@/lib/sitemap";
 
@@ -27,6 +28,29 @@ describe("the sitemap", () => {
       "website",
     ]) {
       expect(urls).toContain(`${base}/browse/${id}`);
+    }
+  });
+
+  it("lists each platform's page for sellers", () => {
+    for (const id of [
+      "youtube",
+      "instagram",
+      "facebook",
+      "telegram",
+      "website",
+    ]) {
+      expect(urls).toContain(`${base}/sell/${id}`);
+    }
+  });
+
+  it("lists the guides, dated by when each was last updated", () => {
+    expect(urls).toContain(`${base}/guides`);
+    expect(guides.length).toBeGreaterThan(0);
+    for (const guide of guides) {
+      const entry = entries.find(
+        (e) => e.url === `${base}/guides/${guide.slug}`,
+      );
+      expect(entry?.lastModified).toEqual(parseLongDate(guide.updated));
     }
   });
 

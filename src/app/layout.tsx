@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import { TimeZoneCookie } from "@/components/app/time-zone";
 import { AppProviders } from "@/components/theme-provider";
-import { SITE_DESCRIPTION } from "@/lib/seo";
+import { SITE_DESCRIPTION, SITE_NAME, SITE_TITLE } from "@/lib/seo";
 import "./globals.css";
 
 const inter = Inter({
@@ -24,25 +24,42 @@ export const metadata: Metadata = {
     process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
   ),
   title: {
-    default: "Channel Adda — Buy & sell social media accounts, safely",
-    template: "%s | Channel Adda",
+    default: SITE_TITLE,
+    template: `%s | ${SITE_NAME}`,
   },
+  applicationName: SITE_NAME,
   // Under 160 characters, the most a search result shows. Every page that
   // has none of its own falls back to this one.
   description: SITE_DESCRIPTION,
   keywords: [
     "buy youtube channel",
+    "sell youtube channel",
+    "youtube channel buy sell",
+    "monetized youtube channel for sale",
+    "youtube channel marketplace",
+    "buy instagram account",
     "sell instagram account",
-    "social media marketplace",
-    "monetized channel for sale",
-    "telegram channel marketplace",
-    "supervised account transfer",
+    "buy telegram channel",
+    "facebook page for sale",
+    "Channel Adda",
   ],
   openGraph: {
-    title: "Channel Adda — Buy & sell social media accounts, safely",
+    title: SITE_TITLE,
     description: SITE_DESCRIPTION,
-    siteName: "Channel Adda",
+    siteName: SITE_NAME,
     type: "website",
+    locale: "en_US",
+  },
+  // Search Console and Bing Webmaster Tools each ask for a tag to prove the
+  // site is ours. Set at deploy, so a new code needs no commit: a DNS record
+  // in Cloudflare does the same job for Google and is the better way.
+  verification: {
+    ...(process.env.GOOGLE_SITE_VERIFICATION
+      ? { google: process.env.GOOGLE_SITE_VERIFICATION }
+      : {}),
+    ...(process.env.BING_SITE_VERIFICATION
+      ? { other: { "msvalidate.01": process.env.BING_SITE_VERIFICATION } }
+      : {}),
   },
   twitter: { card: "summary_large_image" },
   other: {
