@@ -23,20 +23,14 @@ import {
 import { Badge } from "@/components/ui/badge";
 import type { KycStatus, UserRole } from "@/generated/prisma/enums";
 import { documentLabel, documentOption, sameName } from "@/lib/kyc";
+import { dayAndTime, longDate } from "@/lib/time";
 import { getKycReview } from "@/server/kyc";
 import { requireRole } from "@/server/session";
+import { viewerZone } from "@/server/viewer-zone";
 
 export const metadata: Metadata = {
   title: "ID check",
   robots: { index: false, follow: false },
-};
-
-const DATE: Intl.DateTimeFormatOptions = {
-  day: "numeric",
-  month: "short",
-  year: "numeric",
-  hour: "numeric",
-  minute: "2-digit",
 };
 
 const STATUS: Record<
@@ -67,6 +61,7 @@ export default async function VerificationReviewPage({
 }: PageProps<"/admin/verification/[id]">) {
   const staff = await requireRole("MODERATOR");
   const { id } = await params;
+  const zone = await viewerZone();
 
   const review = await getKycReview(id);
   if (!review) notFound();
@@ -223,7 +218,7 @@ export default async function VerificationReviewPage({
                     ) : null}
                     {review.reviewedAt ? (
                       <Fact label="On">
-                        {review.reviewedAt.toLocaleString("en-GB", DATE)}
+                        {dayAndTime(review.reviewedAt, zone)}
                       </Fact>
                     ) : null}
                   </Facts>
@@ -260,14 +255,10 @@ export default async function VerificationReviewPage({
                   </Fact>
                   <Fact label="ID">{documentLabel(review.documentType)}</Fact>
                   <Fact label="Sent">
-                    {review.submittedAt.toLocaleString("en-GB", DATE)}
+                    {dayAndTime(review.submittedAt, zone)}
                   </Fact>
                   <Fact label="Joined">
-                    {review.member.joinedAt.toLocaleDateString("en-GB", {
-                      day: "numeric",
-                      month: "short",
-                      year: "numeric",
-                    })}
+                    {longDate(review.member.joinedAt, zone)}
                   </Fact>
                 </Facts>
               </CardBody>

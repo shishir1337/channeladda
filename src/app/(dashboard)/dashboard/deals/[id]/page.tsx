@@ -42,8 +42,8 @@ import { iconText } from "@/components/ui/icon-hue";
 import { Price } from "@/components/ui/price";
 import { mayEndHolds } from "@/lib/custody-roles";
 import { isTerminal } from "@/lib/deal-machine";
-import { siteMoment } from "@/lib/site-time";
 import { threadHref } from "@/lib/thread-href";
+import { dayAndTime } from "@/lib/time";
 import { cn } from "@/lib/utils";
 import { certificateFor } from "@/server/certificate";
 import { isConfigured as checkoutConfigured } from "@/server/cryptomus";
@@ -51,6 +51,7 @@ import { getDealFor, secondApproversFor } from "@/server/deals";
 import { reviewPromptFor } from "@/server/reviews";
 import { requireUser } from "@/server/session";
 import { getSettings } from "@/server/settings";
+import { viewerZone } from "@/server/viewer-zone";
 import { getWallet } from "@/server/wallet";
 
 export const metadata: Metadata = {
@@ -78,6 +79,7 @@ export default async function DealPage({
   // it ends with the deal.
   const { chat } = await searchParams;
   const user = await requireUser(`/dashboard/deals/${id}`);
+  const zone = await viewerZone();
   const deal = await getDealFor(user.id, id);
 
   // `getDealFor` returns null both for a deal that does not exist and for one
@@ -263,7 +265,8 @@ export default async function DealPage({
                     the buyer pays against. */}
                 {payBy && viewer !== "buyer" ? (
                   <p className="mt-1.5 text-[0.8125rem] text-muted tabular-nums">
-                    The buyer has until {siteMoment(new Date(payBy))} to pay.
+                    The buyer has until {dayAndTime(new Date(payBy), zone)} to
+                    pay.
                   </p>
                 ) : null}
               </section>

@@ -7,6 +7,7 @@ import {
 import type { ComponentProps, ReactNode } from "react";
 import { InfoTip } from "@/components/app/info-tip";
 import { Reference } from "@/components/app/kit";
+import { ZonedTime } from "@/components/app/time-zone";
 import { Badge } from "@/components/ui/badge";
 import type {
   DealMode,
@@ -645,12 +646,11 @@ export function Waited({
   const { label, hours } = elapsed(since);
   const tone = ageTone(hours, warnAfter, lateAfter);
   return (
-    <time
-      dateTime={since.toISOString()}
-      title={since.toLocaleString("en-GB")}
+    <ZonedTime
+      at={since}
       // Rendered on the server and again on the client in the few client
-      // components that use it; a minute of drift, or a different timezone
-      // in the title, must not warn.
+      // components that use it; a minute of drift must not warn. The title
+      // is in the reader's zone on both.
       suppressHydrationWarning
       className={cn(
         "tnum inline-flex h-5 shrink-0 items-center gap-1 rounded-md px-1.5 text-xs leading-none font-medium whitespace-nowrap ring-1 ring-inset",
@@ -664,6 +664,6 @@ export function Waited({
       {prefix ? `${prefix} ` : null}
       {label}
       {tone === "late" ? <span className="sr-only"> — overdue</span> : null}
-    </time>
+    </ZonedTime>
   );
 }

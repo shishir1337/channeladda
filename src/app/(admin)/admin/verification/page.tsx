@@ -16,12 +16,14 @@ import {
 } from "@/components/app/kit";
 import { Badge } from "@/components/ui/badge";
 import { documentLabel, KYC_REVIEW_HOURS } from "@/lib/kyc";
+import { shortDate } from "@/lib/time";
 import {
   countKycByStatus,
   type KycQueueStatus,
   listKycQueue,
 } from "@/server/kyc";
 import { requireRole } from "@/server/session";
+import { viewerZone } from "@/server/viewer-zone";
 
 export const metadata: Metadata = {
   title: "ID checks",
@@ -50,6 +52,7 @@ export default async function VerificationQueuePage({
 }: PageProps<"/admin/verification">) {
   await requireRole("MODERATOR");
   const params = await searchParams;
+  const zone = await viewerZone();
 
   const requested = typeof params.status === "string" ? params.status : "";
   const active = TABS.find((t) => t.status === requested)?.status ?? "PENDING";
@@ -182,10 +185,7 @@ export default async function VerificationQueuePage({
                       />
                     ) : item.reviewedAt ? (
                       <span className="text-xs text-subtle">
-                        {item.reviewedAt.toLocaleDateString("en-GB", {
-                          day: "numeric",
-                          month: "short",
-                        })}
+                        {shortDate(item.reviewedAt, zone)}
                       </span>
                     ) : null}
                   </div>

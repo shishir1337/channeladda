@@ -19,9 +19,11 @@ import { Button } from "@/components/ui/button";
 import { Pagination } from "@/components/ui/pagination";
 import type { UserRole } from "@/generated/prisma/enums";
 import { emailVerificationRequired } from "@/lib/email-verification";
+import { longDate } from "@/lib/time";
 import { cn } from "@/lib/utils";
 import { listUsers, ROLE_LABELS } from "@/server/admin-users";
 import { requireStaff } from "@/server/session";
+import { viewerZone } from "@/server/viewer-zone";
 
 export const metadata: Metadata = {
   title: "People",
@@ -40,12 +42,6 @@ const FILTERS = [
   { label: "Agents", role: "AGENT", status: undefined },
   { label: "Suspended", role: undefined, status: "banned" },
 ] as const;
-
-const DATE: Intl.DateTimeFormatOptions = {
-  day: "numeric",
-  month: "short",
-  year: "numeric",
-};
 
 /**
  * Members are the default, so only a staff role is worth a tag; a member's
@@ -72,6 +68,7 @@ export default async function AdminUsersPage({
 }: PageProps<"/admin/users">) {
   const staff = await requireStaff();
   const params = await searchParams;
+  const zone = await viewerZone();
   const confirmationOn = emailVerificationRequired();
 
   const query = typeof params.q === "string" ? params.q : "";
@@ -247,7 +244,7 @@ export default async function AdminUsersPage({
                         dateTime={row.createdAt.toISOString()}
                         className="text-[0.8125rem] whitespace-nowrap text-subtle tabular-nums"
                       >
-                        {row.createdAt.toLocaleDateString("en-GB", DATE)}
+                        {longDate(row.createdAt, zone)}
                       </time>
                     </Td>
                   </Tr>

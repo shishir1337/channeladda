@@ -5,10 +5,12 @@ import Link from "next/link";
 import { useParams, usePathname } from "next/navigation";
 import { useId, useMemo, useState } from "react";
 import { inputClass, SeeAll } from "@/components/app/kit";
+import { useViewerZone } from "@/components/app/time-zone";
 import { EscrowAgentAvatar, Initials } from "@/components/messages/chat-parts";
 import { Badge } from "@/components/ui/badge";
 import { ESCROW_AGENT_HREF, ESCROW_AGENT_NAME } from "@/lib/support-chat";
 import { threadHref } from "@/lib/thread-href";
+import { listTime } from "@/lib/time";
 import { cn } from "@/lib/utils";
 
 /**
@@ -57,21 +59,6 @@ export type RailEscrowAgent = {
   lastMessageAt: string | null;
   unread: boolean;
 };
-
-function when(iso: string) {
-  const date = new Date(iso);
-  const now = new Date();
-  const sameDay = date.toDateString() === now.toDateString();
-  if (sameDay) {
-    return date.toLocaleTimeString("en-US", {
-      hour: "numeric",
-      minute: "2-digit",
-    });
-  }
-  const days = Math.floor((now.getTime() - date.getTime()) / 86_400_000);
-  if (days < 7) return date.toLocaleDateString("en-US", { weekday: "short" });
-  return date.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
-}
 
 export function ThreadRail({
   threads,
@@ -262,6 +249,7 @@ function EscrowAgentRow({
   agent: RailEscrowAgent;
   active: boolean;
 }) {
+  const zone = useViewerZone();
   return (
     <Link
       href={ESCROW_AGENT_HREF}
@@ -287,7 +275,7 @@ function EscrowAgentRow({
                 agent.unread ? "text-fg" : "text-subtle",
               )}
             >
-              {when(agent.lastMessageAt)}
+              {listTime(agent.lastMessageAt, zone)}
             </time>
           ) : null}
         </span>
@@ -326,6 +314,7 @@ function ThreadRow({
   /** There is a second row with this person, the other way round. */
   twoWay: boolean;
 }) {
+  const zone = useViewerZone();
   const deal = thread.deals[0];
   const DealIcon = deal?.mode === "FASTEST" ? ZapIcon : ShieldCheckIcon;
   const more = thread.listingTitles.length - 1;
@@ -367,7 +356,7 @@ function ThreadRow({
               thread.unread ? "text-fg" : "text-subtle",
             )}
           >
-            {when(thread.lastMessageAt)}
+            {listTime(thread.lastMessageAt, zone)}
           </time>
         </span>
         <span className="flex items-center gap-1.5">

@@ -21,12 +21,12 @@ import {
   inputClass,
   labelClass,
 } from "@/components/app/kit";
+import { useViewerZone } from "@/components/app/time-zone";
 import { TextField } from "@/components/auth/fields";
 import { Button } from "@/components/ui/button";
 import { checkPayoutAddress, PAYOUT_NETWORKS } from "@/lib/payout-address";
-import { useHydrated } from "@/lib/use-hydrated";
+import { dayAndTime } from "@/lib/time";
 import { cn } from "@/lib/utils";
-import { dayAndTime } from "@/lib/when";
 import {
   requestPayout,
   savePayoutAddress,
@@ -167,15 +167,14 @@ function Notice({
 }
 
 /**
- * "26 Oct, 3:53 AM", in the reader's own clock. Drawn after hydration: the
- * server does not know the reader's time zone, and a time that changed as
- * the page woke up would be worse than one that appears.
+ * "26 Oct, 3:53 AM", in the reader's own clock — the zone the server drew
+ * the page in, so the browser draws the same thing.
  */
-function LocalTime({ iso, fallback }: { iso: string; fallback: string }) {
-  const hydrated = useHydrated();
+function LocalTime({ iso }: { iso: string }) {
+  const zone = useViewerZone();
   return (
     <time dateTime={iso} className="font-medium text-fg">
-      {hydrated ? dayAndTime(new Date(iso)) : fallback}
+      {dayAndTime(new Date(iso), zone)}
     </time>
   );
 }
@@ -502,8 +501,7 @@ export function PayoutAddressForm({
             <p className="mt-2 flex items-center gap-1.5 text-[0.8125rem] text-muted">
               <TimerIcon aria-hidden="true" className="size-3.5 shrink-0" />
               <span>
-                Withdrawals open at{" "}
-                <LocalTime iso={until} fallback="24 hours from now" />.
+                Withdrawals open at <LocalTime iso={until} />.
               </span>
             </p>
           ) : null}
@@ -561,9 +559,7 @@ export function RequestPayout({
       {locked ? (
         <Note icon={TimerIcon} className="mb-4">
           <p>
-            Withdrawals open at{" "}
-            <LocalTime iso={lockedUntil} fallback="24 hours after the change" />
-            .
+            Withdrawals open at <LocalTime iso={lockedUntil} />.
           </p>
           <p className="mt-0.5">
             Every new payout address waits 24 hours, so nobody who gets into

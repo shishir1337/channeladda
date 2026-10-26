@@ -2,17 +2,11 @@
 
 import { HourglassIcon } from "lucide-react";
 import { Fragment, useEffect, useState } from "react";
+import { useViewerZone } from "@/components/app/time-zone";
 import { iconText } from "@/components/ui/icon-hue";
 import { countdownParts, formatCountdown } from "@/lib/deal-waits";
+import { dayAndTime } from "@/lib/time";
 import { cn } from "@/lib/utils";
-
-const exactDate = new Intl.DateTimeFormat("en-GB", {
-  weekday: "short",
-  day: "numeric",
-  month: "short",
-  hour: "2-digit",
-  minute: "2-digit",
-});
 
 /**
  * The clock a deal is waiting on, as a flip clock both sides can see.
@@ -22,7 +16,9 @@ const exactDate = new Intl.DateTimeFormat("en-GB", {
  * and each unit is a split-flap card (styles in globals.css). The server
  * renders the figures from its own clock; the first tick in the browser
  * corrects any drift, which is why the digits are exempt from the
- * hydration check. Screen readers get one quiet line instead of the cards.
+ * hydration check. The moment it ends on is in the reader's own zone, the
+ * one the server drew in too. Screen readers get one quiet line instead of
+ * the cards.
  */
 export function WaitCountdown({
   label,
@@ -33,6 +29,7 @@ export function WaitCountdown({
   until: Date | string;
   className?: string;
 }) {
+  const zone = useViewerZone();
   const end = new Date(until).getTime();
   const [now, setNow] = useState(() => Date.now());
   const left = end - now;
@@ -67,9 +64,8 @@ export function WaitCountdown({
         <time
           dateTime={new Date(end).toISOString()}
           className="shrink-0 text-xs text-subtle tabular-nums"
-          suppressHydrationWarning
         >
-          {exactDate.format(end)}
+          {dayAndTime(new Date(end), zone)}
         </time>
       </div>
 

@@ -1,6 +1,9 @@
+"use client";
+
 import Link from "next/link";
+import { useViewerZone } from "@/components/app/time-zone";
 import { eventForReader } from "@/lib/chat-events";
-import { chatTime } from "@/lib/chat-time";
+import { chatTime } from "@/lib/time";
 import { cn } from "@/lib/utils";
 
 /**
@@ -28,6 +31,7 @@ export function EventLine({
   /** Where the line takes the reader, e.g. to the deal it opened. */
   action?: { href: string; label: string } | null;
 }) {
+  const zone = useViewerZone();
   return (
     <li className={cn("flex items-center gap-3", className)}>
       <span aria-hidden="true" className="h-px min-w-4 flex-1 bg-line" />
@@ -42,7 +46,7 @@ export function EventLine({
           ·
         </span>
         <span className="whitespace-nowrap text-subtle tabular-nums">
-          {chatTime(message.createdAt)}
+          {chatTime(message.createdAt, zone)}
         </span>
         {action ? (
           <>

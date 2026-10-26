@@ -22,16 +22,13 @@ import type { Seller } from "@/data/sellers";
 import { artworkProps } from "@/lib/artwork";
 import { listingLd } from "@/lib/listing-seo";
 import { siteUrl } from "@/lib/site-url";
+import { longDate } from "@/lib/time";
 
-/** "24 October 2026": the same in every locale. */
-function longDay(date: Date) {
-  return date.toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-    timeZone: "UTC",
-  });
-}
+/**
+ * "24 October 2026", in India time like every date on the public pages: they
+ * are revalidated for everyone, so they cannot be drawn in one reader's zone.
+ */
+const longDay = (date: Date) => longDate(date);
 
 /**
  * A listing whose deal has completed, at its old address.

@@ -1,3 +1,4 @@
+import { TimeZoneProvider } from "@/components/app/time-zone";
 import type { NavGroup, NavItem } from "@/components/dashboard/app-shell";
 import { AppShell } from "@/components/dashboard/app-shell";
 import { NotificationBell } from "@/components/dashboard/notification-bell";
@@ -6,6 +7,7 @@ import { balanceOf, countDealsAwaiting } from "@/server/deals";
 import { countUnreadThreads } from "@/server/messages";
 import { listNotifications, unreadCount } from "@/server/notifications";
 import { type CurrentUser, getCurrentUser } from "@/server/session";
+import { viewerZone } from "@/server/viewer-zone";
 
 /**
  * The signed-in area.
@@ -64,8 +66,10 @@ export default async function DashboardLayout({ children }: LayoutProps<"/">) {
   // from here would send people to /signin with no way back to where they were
   // going. Each page calls `requireUser("/its/path")` and that redirect wins,
   // so this only has to avoid rendering a signed-out shell.
-  const user = await getCurrentUser();
-  if (!user) return <>{children}</>;
+  // Every time on these pages is drawn in the reader's own zone, on the
+  // server and again in the browser, so the two agree.
+  const [user, zone] = await Promise.all([getCurrentUser(), viewerZone()]);
+  if (!user) return <TimeZoneProvider zone={zone}>{children}</TimeZoneProvider>;
 
   const [waiting, unread, deals, bell, balanceCents] = await Promise.all([
     getWaitingOnYou(user.id),
@@ -193,14 +197,16 @@ export default async function DashboardLayout({ children }: LayoutProps<"/">) {
   ];
 
   return (
-    <AppShell
-      groups={groups}
-      tabs={tabs}
-      bell={bell}
-      balanceCents={balanceCents}
-      user={shellUser(user)}
-    >
-      {children}
-    </AppShell>
+    <TimeZoneProvider zone={zone}>
+      <AppShell
+        groups={groups}
+        tabs={tabs}
+        bell={bell}
+        balanceCents={balanceCents}
+        user={shellUser(user)}
+      >
+        {children}
+      </AppShell>
+    </TimeZoneProvider>
   );
 }

@@ -43,9 +43,11 @@ import { platforms } from "@/data/platforms";
 import { removedBySeller } from "@/lib/listing-lock";
 import { countOf } from "@/lib/plural";
 import { revenueLine } from "@/lib/revenue-line";
+import { dayAndTime, longDate } from "@/lib/time";
 import { getListingForReview } from "@/server/admin-listings";
 import { getAuditTrail } from "@/server/audit";
 import { requireStaff } from "@/server/session";
+import { viewerZone } from "@/server/viewer-zone";
 
 export const metadata: Metadata = {
   title: "Review listing",
@@ -67,6 +69,7 @@ export default async function ReviewListingPage({
 }: PageProps<"/admin/listings/[id]">) {
   const staff = await requireStaff();
   const { id } = await params;
+  const zone = await viewerZone();
 
   const listing = await getListingForReview(id);
   if (!listing) notFound();
@@ -146,7 +149,7 @@ export default async function ReviewListingPage({
             ) : null}
             <span className="text-muted">{listing.handle}</span>
             <MetaItem label="Submitted">
-              {listing.createdAt.toLocaleDateString("en-GB")}
+              {longDate(listing.createdAt, zone)}
             </MetaItem>
             {inReview ? (
               <Waited since={listing.updatedAt} warnAfter={12} lateAfter={24} />
@@ -216,8 +219,7 @@ export default async function ReviewListingPage({
               </code>
               {listing.ownershipVerifiedAt ? (
                 <Badge variant="verified" size="md">
-                  Confirmed{" "}
-                  {listing.ownershipVerifiedAt.toLocaleDateString("en-GB")}
+                  Confirmed {longDate(listing.ownershipVerifiedAt, zone)}
                 </Badge>
               ) : (
                 <Badge size="md">Not confirmed yet</Badge>
@@ -463,7 +465,7 @@ export default async function ReviewListingPage({
                   </Badge>
                 </Fact>
                 <Fact label="Member since">
-                  {listing.seller.joinedAt.toLocaleDateString("en-GB")}
+                  {longDate(listing.seller.joinedAt, zone)}
                 </Fact>
                 <Fact label="Track record">
                   {listing.seller.completedSales} sold ·{" "}
@@ -516,7 +518,7 @@ export default async function ReviewListingPage({
                           dateTime={row.createdAt.toISOString()}
                           className="tnum"
                         >
-                          {row.createdAt.toLocaleString("en-GB")}
+                          {dayAndTime(row.createdAt, zone)}
                         </time>
                       </p>
                     </li>

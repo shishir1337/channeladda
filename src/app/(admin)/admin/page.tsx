@@ -42,6 +42,7 @@ import {
   Tr,
 } from "@/components/app/kit";
 import { Button } from "@/components/ui/button";
+import { dayAndTime, type ViewerZone } from "@/lib/time";
 import {
   getQueueCounts,
   getReviewQueue,
@@ -53,6 +54,7 @@ import { getOpenReports } from "@/server/reports";
 import { requireStaff } from "@/server/session";
 import { getSettings } from "@/server/settings";
 import { countOpenTickets } from "@/server/support";
+import { viewerZone } from "@/server/viewer-zone";
 import { listPendingWithdrawals } from "@/server/wallet";
 
 export const metadata: Metadata = {
@@ -114,7 +116,9 @@ const SWEEP_JOBS: Record<
 function SweepHeartbeat({
   at,
   result,
+  zone,
 }: {
+  zone: ViewerZone;
   at: Date | null;
   result: Record<string, number | string> | null;
 }) {
@@ -127,7 +131,7 @@ function SweepHeartbeat({
   const when = at ? (
     <time
       dateTime={at.toISOString()}
-      title={at.toLocaleString("en-GB")}
+      title={dayAndTime(at, zone)}
       className="tnum"
     >
       {elapsed(at).label === "just now"
@@ -210,7 +214,7 @@ function SweepHeartbeat({
                   {" "}
                   Last run:{" "}
                   <time dateTime={at.toISOString()} className="tnum">
-                    {at.toLocaleString("en-GB")}
+                    {dayAndTime(at, zone)}
                   </time>
                   .
                 </>
@@ -288,6 +292,7 @@ function oldestOf(dates: readonly Date[]): Date | null {
 export default async function AdminOverviewPage() {
   const staff = await requireStaff();
   const isFinance = staff.role === "FINANCE" || staff.role === "SUPERADMIN";
+  const zone = await viewerZone();
 
   const [
     counts,
@@ -364,6 +369,7 @@ export default async function AdminOverviewPage() {
       <SweepHeartbeat
         at={settings.lastSweepAt}
         result={settings.lastSweepResult}
+        zone={zone}
       />
 
       <Section
@@ -595,7 +601,7 @@ export default async function AdminOverviewPage() {
                     <Td className="whitespace-nowrap">
                       <time
                         dateTime={row.createdAt.toISOString()}
-                        title={row.createdAt.toLocaleString("en-GB")}
+                        title={dayAndTime(row.createdAt, zone)}
                         className="tnum text-xs text-subtle"
                       >
                         {elapsed(row.createdAt).label}

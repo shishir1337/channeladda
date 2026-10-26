@@ -1,19 +1,4 @@
 /**
- * The time on an entry in a conversation: "3:41 PM" today, "Oct 12, 3:41 PM"
- * before. Shared by messages, offer cards and event lines so a thread reads
- * in one voice.
- */
-export function chatTime(iso: string): string {
-  const date = new Date(iso);
-  const today = new Date().toDateString() === date.toDateString();
-  return date.toLocaleString("en-US", {
-    ...(today ? {} : { month: "short", day: "numeric" }),
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
-
-/**
  * How long an open offer has left, coarsely: "2d left", "31h left", "40m left".
  *
  * Coarse on purpose. The page is drawn on the server and again in the

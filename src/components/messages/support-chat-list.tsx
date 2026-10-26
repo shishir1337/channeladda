@@ -3,6 +3,8 @@ import { Waited } from "@/components/admin/vocab";
 import { List, ListItem } from "@/components/app/kit";
 import { Initials } from "@/components/messages/chat-parts";
 import { SUPPORT_CHATS_HREF } from "@/lib/support-chat";
+import { listTime } from "@/lib/time";
+import { viewerZone } from "@/server/viewer-zone";
 
 /**
  * Escrow Agent chats, for the desk. Drawn like the conversation queue, so a
@@ -17,16 +19,12 @@ export type SupportChatRowView = {
   preview: string;
 };
 
-function when(date: Date) {
-  const days = Math.floor((Date.now() - date.getTime()) / 86_400_000);
-  if (days === 0) {
-    return date.toLocaleString("en-US", { hour: "numeric", minute: "2-digit" });
-  }
-  if (days < 7) return `${days}d ago`;
-  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-}
-
-export function SupportChatList({ chats }: { chats: SupportChatRowView[] }) {
+export async function SupportChatList({
+  chats,
+}: {
+  chats: SupportChatRowView[];
+}) {
+  const zone = await viewerZone();
   return (
     <List>
       {chats.map((chat) => (
@@ -50,7 +48,7 @@ export function SupportChatList({ chats }: { chats: SupportChatRowView[] }) {
                   dateTime={chat.lastMessageAt.toISOString()}
                   className="shrink-0 text-xs text-subtle tabular-nums"
                 >
-                  {when(chat.lastMessageAt)}
+                  {listTime(chat.lastMessageAt, zone)}
                 </time>
               </div>
               <p className="truncate text-xs leading-5 text-subtle">

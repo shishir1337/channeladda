@@ -29,10 +29,11 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DEAL_TABS, type DealTab, dealTabs, openTab } from "@/lib/deal-tabs";
-import { siteDayMonth } from "@/lib/site-time";
+import { dayMonth } from "@/lib/time";
 import type { DealListRow } from "@/server/deals";
 import { listDealsFor } from "@/server/deals";
 import { requireUser } from "@/server/session";
+import { viewerZone } from "@/server/viewer-zone";
 
 export const metadata: Metadata = {
   title: "Deals",
@@ -165,7 +166,8 @@ export default async function DealsPage({
   );
 }
 
-function DealRows({ deals }: { deals: DealListRow[] }) {
+async function DealRows({ deals }: { deals: DealListRow[] }) {
+  const zone = await viewerZone();
   return (
     <List>
       {deals.map((deal) => {
@@ -216,7 +218,7 @@ function DealRows({ deals }: { deals: DealListRow[] }) {
                   </Badge>
                   {deal.waitingUntil && !frozen ? (
                     <span className="text-xs whitespace-nowrap text-subtle tabular-nums">
-                      Opens {siteDayMonth(deal.waitingUntil, "short")}
+                      Opens {dayMonth(deal.waitingUntil, zone)}
                     </span>
                   ) : deal.awaiting && !frozen ? (
                     <TurnFlag

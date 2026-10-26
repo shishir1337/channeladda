@@ -17,6 +17,7 @@ import { platformMap } from "@/data/platforms";
 import { databaseGate } from "@/lib/db-gate";
 import { countOf } from "@/lib/plural";
 import { pageMetadata } from "@/lib/seo";
+import { longDate } from "@/lib/time";
 import { emptyRecord } from "@/lib/track-record";
 import { getSellerListings } from "@/server/listings";
 import { sellerReviewsBySlug } from "@/server/reviews";
@@ -266,12 +267,7 @@ export default async function SellerPage({
                     </p>
                   )}
                   <p className="mt-4 text-[0.8125rem] text-subtle">
-                    {review.author} ·{" "}
-                    {review.createdAt.toLocaleDateString("en-GB", {
-                      day: "numeric",
-                      month: "short",
-                      year: "numeric",
-                    })}
+                    {review.author} · {longDate(review.createdAt)}
                   </p>
                 </li>
               ))}

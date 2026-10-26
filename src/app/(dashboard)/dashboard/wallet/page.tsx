@@ -35,11 +35,13 @@ import { Badge } from "@/components/ui/badge";
 import { iconText } from "@/components/ui/icon-hue";
 import { Price } from "@/components/ui/price";
 import type { LedgerKind } from "@/generated/prisma/enums";
+import { shortDate } from "@/lib/time";
 import { cn } from "@/lib/utils";
 import { walletDetail } from "@/lib/wallet-lines";
 import { ratingFor } from "@/server/reseller-status";
 import { requireUser } from "@/server/session";
 import { getSettings } from "@/server/settings";
+import { viewerZone } from "@/server/viewer-zone";
 import { getWallet } from "@/server/wallet";
 
 export const metadata: Metadata = {
@@ -113,15 +115,6 @@ const KINDS: Record<string, KindWords> = {
   },
 } satisfies Record<LedgerKind, KindWords>;
 
-/** Unambiguous in every locale: "17 Oct 2026" rather than 17/10 or 10/17. */
-function longDate(date: Date) {
-  return date.toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-}
-
 /** The two headline figures share one size: neither is the small print. */
 const FIGURE =
   "mt-2 text-[2rem] leading-10 font-semibold tracking-[-0.025em] text-fg tabular-nums sm:text-[2.5rem] sm:leading-[3rem]";
@@ -141,6 +134,7 @@ export default async function WalletPage({
   searchParams,
 }: PageProps<"/dashboard/wallet">) {
   const user = await requireUser("/dashboard/wallet");
+  const zone = await viewerZone();
   const [wallet, settings, params, rating] = await Promise.all([
     getWallet(user.id),
     getSettings(),
@@ -339,7 +333,7 @@ export default async function WalletPage({
                     <p className="mt-0.5 text-xs leading-5 whitespace-nowrap text-subtle">
                       paid{" "}
                       <time dateTime={sale.paidAt.toISOString()}>
-                        {longDate(sale.paidAt)}
+                        {shortDate(sale.paidAt, zone)}
                       </time>
                     </p>
                   </div>
@@ -456,7 +450,7 @@ export default async function WalletPage({
                       </p>
                       <p className="mt-0.5 text-xs leading-5 whitespace-nowrap text-subtle">
                         <time dateTime={entry.createdAt.toISOString()}>
-                          {longDate(entry.createdAt)}
+                          {shortDate(entry.createdAt, zone)}
                         </time>
                       </p>
                     </div>

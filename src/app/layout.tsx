@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
+import { TimeZoneCookie } from "@/components/app/time-zone";
 import { AppProviders } from "@/components/theme-provider";
 import { SITE_DESCRIPTION } from "@/lib/seo";
 import "./globals.css";
@@ -80,6 +81,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         className="flex min-h-full flex-col bg-bg text-fg"
       >
         <AppProviders>{children}</AppProviders>
+        {/* The reader's time zone, for the signed-in pages to draw times in. */}
+        <TimeZoneCookie />
       </body>
     </html>
   );

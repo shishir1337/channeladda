@@ -53,6 +53,7 @@ import type {
 import { isCustodianRole, levelLabel } from "@/lib/custody-roles";
 import { emailVerificationRequired } from "@/lib/email-verification";
 import { isKycReviewer } from "@/lib/kyc";
+import { longDate, type ViewerZone } from "@/lib/time";
 import { cn } from "@/lib/utils";
 import {
   getUserDetail,
@@ -65,6 +66,7 @@ import {
 } from "@/server/admin-users";
 import { ratingFor } from "@/server/reseller-status";
 import { requireStaff } from "@/server/session";
+import { viewerZone } from "@/server/viewer-zone";
 import { getWallet } from "@/server/wallet";
 
 export const metadata: Metadata = {
@@ -81,12 +83,6 @@ const STAFF_ROLES: readonly UserRole[] = ["MODERATOR", "FINANCE", "SUPERADMIN"];
  * moderator's page never so much as carries the figures.
  */
 const MONEY_ROLES: readonly UserRole[] = ["FINANCE", "SUPERADMIN"];
-
-const DATE: Intl.DateTimeFormatOptions = {
-  day: "numeric",
-  month: "short",
-  year: "numeric",
-};
 
 /** Ledger rows in the staff voice — what moved and why, not the enum. */
 const LEDGER_KIND: Record<string, string> = {
@@ -178,13 +174,13 @@ function Figure({
   );
 }
 
-function When({ date }: { date: Date }) {
+function When({ date, zone }: { date: Date; zone: ViewerZone }) {
   return (
     <time
       dateTime={date.toISOString()}
       className="text-[0.8125rem] whitespace-nowrap text-muted tabular-nums"
     >
-      {date.toLocaleDateString("en-GB", DATE)}
+      {longDate(date, zone)}
     </time>
   );
 }
@@ -194,6 +190,7 @@ export default async function AdminUserPage({
 }: PageProps<"/admin/users/[id]">) {
   const { id } = await params;
   const staff = await requireStaff();
+  const zone = await viewerZone();
   const person = await getUserDetail(id);
   if (!person) notFound();
 
@@ -393,7 +390,7 @@ export default async function AdminUserPage({
                           {ledgerShown.map((entry) => (
                             <Tr key={entry.id}>
                               <Td>
-                                <When date={entry.createdAt} />
+                                <When date={entry.createdAt} zone={zone} />
                               </Td>
                               <Td className="whitespace-nowrap text-fg">
                                 {LEDGER_KIND[entry.kind] ?? entry.kind}
@@ -459,7 +456,7 @@ export default async function AdminUserPage({
                           return (
                             <Tr key={payout.id}>
                               <Td>
-                                <When date={payout.requestedAt} />
+                                <When date={payout.requestedAt} zone={zone} />
                               </Td>
                               <Td>
                                 <span className="block max-w-[16rem] font-mono text-xs leading-5 break-all text-fg">
@@ -572,7 +569,7 @@ export default async function AdminUserPage({
                           <OrderStatusBadge status={deal.status} />
                         </Td>
                         <Td>
-                          <When date={deal.createdAt} />
+                          <When date={deal.createdAt} zone={zone} />
                         </Td>
                         {canSeeMoney ? (
                           <Td numeric>
@@ -637,11 +634,7 @@ export default async function AdminUserPage({
               </Fact>
               <Fact label="Reseller badge">
                 {rating.reseller && rating.endsAt
-                  ? `Until ${rating.endsAt.toLocaleDateString("en-GB", {
-                      day: "numeric",
-                      month: "short",
-                      year: "numeric",
-                    })}`
+                  ? `Until ${longDate(rating.endsAt, zone)}`
                   : "No"}
               </Fact>
               {isCustodianRole(person.role) ? (
@@ -678,9 +671,7 @@ export default async function AdminUserPage({
                   </span>
                 </Fact>
               ) : null}
-              <Fact label="Joined">
-                {person.createdAt.toLocaleDateString("en-GB", DATE)}
-              </Fact>
+              <Fact label="Joined">{longDate(person.createdAt, zone)}</Fact>
             </Facts>
           </Card>
 

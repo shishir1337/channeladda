@@ -5,10 +5,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { SoundToggle } from "@/components/app/notification-sound";
+import { useViewerZone } from "@/components/app/time-zone";
 import { NotificationLink } from "@/components/dashboard/notification-link";
 import { notificationLook } from "@/components/dashboard/notification-look";
 import { iconTile } from "@/components/ui/icon-hue";
 import type { NotificationKind } from "@/generated/prisma/enums";
+import { dayAndTime, shortDate, type ViewerZone } from "@/lib/time";
 import { cn } from "@/lib/utils";
 import { readAll } from "@/server/actions/notifications";
 
@@ -34,7 +36,7 @@ export type BellItem = {
 };
 
 /** "3 days" beats a date: half these readers are not reading in English. */
-function ago(iso: string): string {
+function ago(iso: string, zone: ViewerZone): string {
   const seconds = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
   if (seconds < 60) return "just now";
   const minutes = Math.floor(seconds / 60);
@@ -43,10 +45,7 @@ function ago(iso: string): string {
   if (hours < 24) return `${hours}h ago`;
   const days = Math.floor(hours / 24);
   if (days < 30) return `${days}d ago`;
-  return new Date(iso).toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "short",
-  });
+  return shortDate(new Date(iso), zone);
 }
 
 export function NotificationBell({
@@ -57,6 +56,7 @@ export function NotificationBell({
   unread: number;
 }) {
   const router = useRouter();
+  const zone = useViewerZone();
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const panel = useRef<HTMLDivElement>(null);
@@ -193,12 +193,16 @@ export function NotificationBell({
                       <span className="mt-0.5 block line-clamp-2 text-xs leading-relaxed text-subtle">
                         {item.body}
                       </span>
-                      <span className="mt-1 block text-[0.6875rem] text-subtle tabular-nums">
-                        {ago(item.createdAt)}
+                      <time
+                        dateTime={item.createdAt}
+                        title={dayAndTime(new Date(item.createdAt), zone)}
+                        className="mt-1 block text-[0.6875rem] text-subtle tabular-nums"
+                      >
+                        {ago(item.createdAt, zone)}
                         {unreadRow ? (
                           <span className="sr-only"> · unread</span>
                         ) : null}
-                      </span>
+                      </time>
                     </span>
                   </>
                 );

@@ -5,7 +5,9 @@ import { useRouter } from "next/navigation";
 import { type ReactNode, useState, useTransition } from "react";
 import { Card, CardBody, CardHeader } from "@/components/app/kit";
 import { pointsLabel, ResellerBadge } from "@/components/app/reseller-badge";
+import { useViewerZone } from "@/components/app/time-zone";
 import { Button } from "@/components/ui/button";
+import { longDate } from "@/lib/time";
 import { cn } from "@/lib/utils";
 import {
   buyResellerFromBalance,
@@ -109,17 +111,12 @@ export function ResellerPanel({
   );
   const [via, setVia] = useState<"balance" | "crypto" | null>(null);
   /** Paying from the balance asks once more: it was one tap. */
+  const zone = useViewerZone();
   const [confirming, setConfirming] = useState(false);
   const [pending, startTransition] = useTransition();
   const price = dollars(priceUsd);
   const covered = availableUsd >= priceUsd;
-  const until = endsAt
-    ? new Date(endsAt).toLocaleDateString("en-GB", {
-        day: "numeric",
-        month: "long",
-        year: "numeric",
-      })
-    : null;
+  const until = endsAt ? longDate(new Date(endsAt), zone) : null;
 
   return (
     <Card className="flex flex-col">

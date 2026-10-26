@@ -2,11 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
+import { longDate } from "@/lib/time";
 import { createInvoice, isConfigured } from "@/server/cryptomus";
 import { newReference, recordInvoice } from "@/server/invoices";
 import { buyResellerPass, resellerStatus } from "@/server/reseller";
 import { requireUser } from "@/server/session";
 import { getSettings } from "@/server/settings";
+import { viewerZone } from "@/server/viewer-zone";
 
 /**
  * Buying the Reseller badge, from the wallet page.
@@ -29,12 +31,8 @@ function siteUrl(): string {
   return base.replace(/\/$/, "");
 }
 
-const until = (date: Date) =>
-  date.toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
+/** "26 October 2026", in the zone of the member reading the reply. */
+const until = async (date: Date) => longDate(date, await viewerZone());
 
 export async function buyResellerFromBalance(
   nonce: string,
@@ -54,7 +52,7 @@ export async function buyResellerFromBalance(
       ok: false,
       error:
         result.reason === "active"
-          ? `You already have the badge until ${until(result.endsAt)}. You can take it again once it ends.`
+          ? `You already have the badge until ${await until(result.endsAt)}. You can take it again once it ends.`
           : result.reason === "busy"
             ? "We could not finish that just now. Nothing was charged — try again."
             : "Your available balance does not cover it. Top up, or pay with crypto instead.",
@@ -63,7 +61,7 @@ export async function buyResellerFromBalance(
   revalidatePath("/dashboard/wallet");
   return {
     ok: true,
-    message: `Your Reseller badge is active until ${until(result.endsAt)}.`,
+    message: `Your Reseller badge is active until ${await until(result.endsAt)}.`,
   };
 }
 
@@ -75,7 +73,7 @@ export async function startResellerCheckout(): Promise<ResellerResult> {
   if (status.endsAt) {
     return {
       ok: false,
-      error: `You already have the badge until ${until(status.endsAt)}. You can take it again once it ends.`,
+      error: `You already have the badge until ${await until(status.endsAt)}. You can take it again once it ends.`,
     };
   }
   if (!isConfigured()) {

@@ -4,6 +4,7 @@ import type { PassPaidVia } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
 import { nextPassPeriod, RESELLER_DAYS } from "@/lib/reseller";
 import { isSerializationFailure } from "@/lib/serialization-failure";
+import { dayMonth, SITE_ZONE } from "@/lib/time";
 import { recordAudit } from "@/server/audit";
 import { canSendMail, sendMail } from "@/server/mailer";
 import { notifyStaff } from "@/server/notifications";
@@ -364,10 +365,9 @@ export async function remindEndingPasses(
     });
     if (took.count !== 1) continue;
 
-    const day = pass.endsAt.toLocaleDateString("en-GB", {
-      day: "numeric",
-      month: "long",
-    });
+    // India time: written once for someone whose zone the sweep does not
+    // know, and sent by email too.
+    const day = dayMonth(pass.endsAt, SITE_ZONE, "long");
     await db.notification.create({
       data: {
         userId: pass.userId,

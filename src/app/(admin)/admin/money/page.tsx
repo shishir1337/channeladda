@@ -55,6 +55,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Price } from "@/components/ui/price";
+import { dayAndTime } from "@/lib/time";
 import {
   holdMismatches,
   type InvoiceAttention,
@@ -67,6 +68,7 @@ import {
   shiftMonth,
 } from "@/server/admin-money";
 import { requireRole } from "@/server/session";
+import { viewerZone } from "@/server/viewer-zone";
 
 export const metadata: Metadata = {
   title: "Money",
@@ -139,6 +141,7 @@ export default async function AdminMoneyPage({
 }) {
   await requireRole("FINANCE");
   const params = await searchParams;
+  const zone = await viewerZone();
 
   const now = new Date();
   const month = parseMonth(
@@ -310,7 +313,7 @@ export default async function AdminMoneyPage({
             </Link>
           </Button>
         }
-        meta={<MetaItem label="Read">{now.toLocaleString("en-GB")}</MetaItem>}
+        meta={<MetaItem label="Read">{dayAndTime(now, zone)}</MetaItem>}
       />
 
       {/* --------------------------------------------- needs a person */}

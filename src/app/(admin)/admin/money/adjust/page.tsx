@@ -27,6 +27,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { LedgerKind } from "@/generated/prisma/enums";
+import { dayAndTime } from "@/lib/time";
 import { cn } from "@/lib/utils";
 import {
   CREDIT_WINDOW_HOURS,
@@ -38,6 +39,7 @@ import {
   MIN_REASON_LENGTH,
 } from "@/server/adjustments";
 import { requireRole } from "@/server/session";
+import { viewerZone } from "@/server/viewer-zone";
 
 export const metadata: Metadata = {
   title: "Correct a balance",
@@ -71,6 +73,7 @@ export default async function AdminAdjustPage({
 }) {
   const staff = await requireRole("FINANCE");
   const params = await searchParams;
+  const zone = await viewerZone();
   const query = typeof params.member === "string" ? params.member.trim() : "";
   const isSuperadmin = staff.role === "SUPERADMIN";
 
@@ -348,7 +351,7 @@ export default async function AdminAdjustPage({
                     <Td className="align-top whitespace-nowrap">
                       <time
                         dateTime={row.createdAt.toISOString()}
-                        title={row.createdAt.toLocaleString("en-GB")}
+                        title={dayAndTime(row.createdAt, zone)}
                         className="text-[0.8125rem] text-subtle tabular-nums"
                       >
                         {elapsed(row.createdAt).label}

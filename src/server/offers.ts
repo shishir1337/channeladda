@@ -8,6 +8,7 @@ import {
   amountProblem,
   MIN_OFFER_FRACTION,
 } from "@/lib/offer-rules";
+import { countOf } from "@/lib/plural";
 import {
   mentionsOffPlatform,
   type RedactionKind,
@@ -284,21 +285,14 @@ function asMoney(cents: number): string {
 }
 
 /**
- * When an accepted offer's hold ends, as a stored notification can say it.
- *
- * In UTC and saying so: the text is written once on the server and read in
- * Dhaka, Delhi and Karachi alike, so a bare "04:00" would be wrong for most.
+ * How long an accepted offer's hold lasts, as a stored notification can say
+ * it: "48 hours". A length rather than a clock time — the text is written
+ * once, here, for someone whose time zone the server does not know, and
+ * read in Dhaka, Delhi and Karachi alike. It said "until 28 Oct, 00:22 UTC",
+ * which nobody reads at a glance.
  */
-export function holdEnds(at: Date): string {
-  const when = at.toLocaleString("en-GB", {
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-    timeZone: "UTC",
-  });
-  return `${when} UTC`;
+export function holdFor(hours: number): string {
+  return countOf(hours, "hour");
 }
 
 type Note = { text: string | null; kinds: RedactionKind[]; flagged: boolean };
@@ -719,9 +713,7 @@ export async function acceptOffer(
   // side is told. A buyer accepting the seller's counter used to send the
   // seller the buyer's text — "the listing is held for you".
   const { paymentWindowHours } = await getSettings();
-  const until = holdEnds(
-    new Date(now.getTime() + paymentWindowHours * 3_600_000),
-  );
+  const hold = holdFor(paymentWindowHours);
   const amount = asMoney(row.amountUsd);
   const buyerName = row.buyer.name || "The buyer";
   await tellTheOtherSide(
@@ -731,12 +723,12 @@ export async function acceptOffer(
     as === "seller"
       ? {
           title: `Your offer of ${amount} was accepted`,
-          body: `The listing is held for you until ${until}. Open it and start the deal before then, or it goes back on sale.`,
+          body: `The listing is held for you for ${hold}. Open it and start the deal before then, or it goes back on sale.`,
           email: true,
         }
       : {
           title: `${buyerName} accepted your price of ${amount}`,
-          body: `The listing is held for ${buyerName} until ${until}. Nothing to do until they start the deal; if they don't, it goes back on sale.`,
+          body: `The listing is held for ${buyerName} for ${hold}. Nothing to do until they start the deal; if they don't, it goes back on sale.`,
           email: true,
         },
   );

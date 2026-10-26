@@ -29,6 +29,7 @@ import {
 } from "react";
 import { InfoTip } from "@/components/app/info-tip";
 import { EmptyState } from "@/components/app/kit";
+import { useViewerZone } from "@/components/app/time-zone";
 import {
   ChatOfferCard,
   type ThreadOfferView,
@@ -40,10 +41,10 @@ import { OfferActions } from "@/components/offers/offer-actions";
 import { Button } from "@/components/ui/button";
 import { iconText } from "@/components/ui/icon-hue";
 import { money } from "@/lib/chat-events";
-import { chatTime } from "@/lib/chat-time";
 import { fileSize } from "@/lib/file-size";
 import { MAX_MESSAGE } from "@/lib/messages";
 import { removedNote } from "@/lib/redact";
+import { chatTime } from "@/lib/time";
 import { cn } from "@/lib/utils";
 import {
   type MessageActionResult,
@@ -316,8 +317,6 @@ function Attachment({ message }: { message: ThreadMessageView }) {
   );
 }
 
-const when = chatTime;
-
 /** The deal's agent writes as themselves, and says whose agent they are. */
 function displayName(message: ThreadMessageView) {
   return message.senderRole === "agent"
@@ -466,6 +465,10 @@ function Bubble({
   /** Closes a turn: keeps its full corner on the sender's side. */
   last: boolean;
 }) {
+  // The reader's zone, the one the server drew in: the same string twice.
+  const zone = useViewerZone();
+  const when = (iso: string) => chatTime(iso, zone);
+
   if (message.fromStaff) {
     return (
       <li className="flex justify-center">

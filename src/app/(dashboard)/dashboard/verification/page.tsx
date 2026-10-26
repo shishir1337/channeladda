@@ -20,9 +20,10 @@ import { VerificationForm } from "@/components/dashboard/verification-form";
 import { Button } from "@/components/ui/button";
 import { db } from "@/lib/db";
 import { documentLabel, KYC_REVIEW_HOURS } from "@/lib/kyc";
-import { dayAndTime } from "@/lib/when";
+import { dayAndTime } from "@/lib/time";
 import { getMyVerification } from "@/server/kyc";
 import { requireUser } from "@/server/session";
+import { viewerZone } from "@/server/viewer-zone";
 
 export const metadata: Metadata = {
   title: "Verification",
@@ -41,6 +42,7 @@ export const metadata: Metadata = {
  */
 export default async function VerificationPage() {
   const user = await requireUser("/dashboard/verification");
+  const zone = await viewerZone();
   const [mine, me] = await Promise.all([
     getMyVerification(user.id),
     db.user.findUniqueOrThrow({
@@ -101,7 +103,7 @@ export default async function VerificationPage() {
               <Facts>
                 <Fact label="ID sent">{documentLabel(mine.documentType)}</Fact>
                 {mine.submittedAt ? (
-                  <Fact label="Sent">{dayAndTime(mine.submittedAt)}</Fact>
+                  <Fact label="Sent">{dayAndTime(mine.submittedAt, zone)}</Fact>
                 ) : null}
               </Facts>
             </CardBody>

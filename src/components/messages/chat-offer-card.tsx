@@ -4,12 +4,14 @@ import { TagIcon } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { TurnFlag } from "@/components/app/kit";
+import { useViewerZone } from "@/components/app/time-zone";
 import { OFFER_STATUS } from "@/components/deals/offer-status";
 import { Badge } from "@/components/ui/badge";
 import { iconText } from "@/components/ui/icon-hue";
 import { Price } from "@/components/ui/price";
 import type { OfferStatus } from "@/generated/prisma/enums";
-import { chatTime, timeLeft } from "@/lib/chat-time";
+import { timeLeft } from "@/lib/chat-time";
+import { chatTime } from "@/lib/time";
 import { cn } from "@/lib/utils";
 
 /** An offer card as the browser receives it: the server's, with ISO dates. */
@@ -53,6 +55,7 @@ export function ChatOfferCard({
   /** Accept, counter, decline or withdraw — supplied when they apply. */
   actions?: ReactNode;
 }) {
+  const zone = useViewerZone();
   const status = STATUS[offer.effectiveStatus];
   const open = offer.effectiveStatus === "OPEN";
   const yourMove = open && offer.awaiting === viewerRole;
@@ -104,7 +107,7 @@ export function ChatOfferCard({
             <span aria-hidden="true" className="mx-1.5 text-line-strong">
               ·
             </span>
-            <span className="tabular-nums">{chatTime(createdAt)}</span>
+            <span className="tabular-nums">{chatTime(createdAt, zone)}</span>
           </p>
 
           {offer.note ? (

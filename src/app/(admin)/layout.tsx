@@ -1,4 +1,5 @@
 import { headers } from "next/headers";
+import { TimeZoneProvider } from "@/components/app/time-zone";
 import type { NavGroup } from "@/components/dashboard/app-shell";
 import { AppShell } from "@/components/dashboard/app-shell";
 import { NotificationBell } from "@/components/dashboard/notification-bell";
@@ -12,6 +13,7 @@ import { listNotifications, unreadCount } from "@/server/notifications";
 import { type CurrentUser, requireAdminArea } from "@/server/session";
 import { countOpenTickets } from "@/server/support";
 import { countSupportChatsWaiting } from "@/server/support-chat";
+import { viewerZone } from "@/server/viewer-zone";
 
 /**
  * The staff area.
@@ -73,6 +75,8 @@ export default async function AdminLayout({ children }: LayoutProps<"/">) {
   const staff = await requireAdminArea(
     adminNext((await headers()).get(PATH_HEADER)),
   );
+  // Times on staff pages are in the reader's own zone, like everyone's.
+  const zone = await viewerZone();
 
   // Every live agent answers Escrow Agent chats, agents included, so this
   // one count is drawn on both navs. Started here, awaited with the rest;
@@ -93,38 +97,40 @@ export default async function AdminLayout({ children }: LayoutProps<"/">) {
       bellFor(staff.id),
     ]);
     return (
-      <AppShell
-        staff
-        user={shellUser(staff)}
-        bell={bell}
-        groups={[
-          {
-            label: null,
-            items: [
-              {
-                label: "Deal desk",
-                // The query is what filters the page to this agent, but the
-                // nav compares against the pathname, which has no query —
-                // so with it here the item never highlighted and the header
-                // fell back to "Your account" on every page of the staff
-                // area. The filter is applied by the page from the role.
-                href: "/admin/deals",
-                icon: "transfer",
-                section: true,
-              },
-              {
-                label: "Support chats",
-                href: "/admin/support-chats",
-                icon: "support-chat",
-                section: true,
-                waiting: supportChats,
-              },
-            ],
-          },
-        ]}
-      >
-        {children}
-      </AppShell>
+      <TimeZoneProvider zone={zone}>
+        <AppShell
+          staff
+          user={shellUser(staff)}
+          bell={bell}
+          groups={[
+            {
+              label: null,
+              items: [
+                {
+                  label: "Deal desk",
+                  // The query is what filters the page to this agent, but the
+                  // nav compares against the pathname, which has no query —
+                  // so with it here the item never highlighted and the header
+                  // fell back to "Your account" on every page of the staff
+                  // area. The filter is applied by the page from the role.
+                  href: "/admin/deals",
+                  icon: "transfer",
+                  section: true,
+                },
+                {
+                  label: "Support chats",
+                  href: "/admin/support-chats",
+                  icon: "support-chat",
+                  section: true,
+                  waiting: supportChats,
+                },
+              ],
+            },
+          ]}
+        >
+          {children}
+        </AppShell>
+      </TimeZoneProvider>
     );
   }
 
@@ -274,13 +280,15 @@ export default async function AdminLayout({ children }: LayoutProps<"/">) {
   ];
 
   return (
-    <AppShell
-      groups={groups}
-      staff
-      user={shellUser(staff)}
-      bell={await bellFor(staff.id)}
-    >
-      {children}
-    </AppShell>
+    <TimeZoneProvider zone={zone}>
+      <AppShell
+        groups={groups}
+        staff
+        user={shellUser(staff)}
+        bell={await bellFor(staff.id)}
+      >
+        {children}
+      </AppShell>
+    </TimeZoneProvider>
   );
 }

@@ -3,6 +3,8 @@ import { InfoTip } from "@/components/app/info-tip";
 import { EmptyState, List, ListItem } from "@/components/app/kit";
 import { Initials } from "@/components/messages/chat-parts";
 import { Badge } from "@/components/ui/badge";
+import { listTime } from "@/lib/time";
+import { viewerZone } from "@/server/viewer-zone";
 
 /**
  * A list of conversations, for the staff queue: one row per buyer and
@@ -25,17 +27,7 @@ export type ThreadRow = {
   flagReason?: string | null;
 };
 
-function when(iso: string) {
-  const date = new Date(iso);
-  const days = Math.floor((Date.now() - date.getTime()) / 86_400_000);
-  if (days === 0) {
-    return date.toLocaleString("en-US", { hour: "numeric", minute: "2-digit" });
-  }
-  if (days < 7) return `${days}d ago`;
-  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-}
-
-export function ThreadList({
+export async function ThreadList({
   threads,
   basePath,
   empty,
@@ -63,6 +55,7 @@ export function ThreadList({
     );
   }
 
+  const zone = await viewerZone();
   return (
     <List>
       {threads.map((thread) => (
@@ -88,7 +81,7 @@ export function ThreadList({
                   dateTime={thread.lastMessageAt}
                   className="shrink-0 text-xs text-subtle tabular-nums"
                 >
-                  {when(thread.lastMessageAt)}
+                  {listTime(thread.lastMessageAt, zone)}
                 </time>
               </div>
               <p className="flex min-w-0 gap-1.5 text-xs leading-5 text-subtle">

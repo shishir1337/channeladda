@@ -18,8 +18,9 @@ import {
 } from "@/components/app/kit";
 import { Badge } from "@/components/ui/badge";
 import { Price } from "@/components/ui/price";
-import { dayAndTime } from "@/lib/when";
+import { dayAndTime } from "@/lib/time";
 import { requireRole } from "@/server/session";
+import { viewerZone } from "@/server/viewer-zone";
 import { listPendingWithdrawals } from "@/server/wallet";
 
 export const metadata: Metadata = {
@@ -47,7 +48,10 @@ export const metadata: Metadata = {
  */
 export default async function AdminPayoutsPage() {
   await requireRole("FINANCE");
-  const pending = await listPendingWithdrawals();
+  const [pending, zone] = await Promise.all([
+    listPendingWithdrawals(),
+    viewerZone(),
+  ]);
 
   const total = pending.reduce((sum, payout) => sum + payout.amountUsd, 0);
   const oldest = pending.at(0)?.requestedAt;
@@ -62,7 +66,7 @@ export default async function AdminPayoutsPage() {
         title="Payouts"
         description="Every decision here is written to the audit trail under your name."
         info="Every decision here is written to the audit trail under your name, with the hash or the refusal reason attached. Amounts are stored as integer cents and shown in whichever currency the header is set to."
-        meta={<MetaItem label="Read">{dayAndTime(new Date())}</MetaItem>}
+        meta={<MetaItem label="Read">{dayAndTime(new Date(), zone)}</MetaItem>}
       />
 
       {/* The page's one warning, word for word and in sight: this is the

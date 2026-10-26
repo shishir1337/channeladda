@@ -27,16 +27,15 @@ import { Button } from "@/components/ui/button";
 import type { KycStatus } from "@/generated/prisma/enums";
 import { db } from "@/lib/db";
 import { KYC_REVIEW_HOURS } from "@/lib/kyc";
+import { longDate } from "@/lib/time";
 import { ratingFor } from "@/server/reseller-status";
 import { requireUser } from "@/server/session";
+import { viewerZone } from "@/server/viewer-zone";
 
 export const metadata: Metadata = {
   title: "Your profile",
   robots: { index: false, follow: false },
 };
-
-const until = (date: Date) =>
-  date.toLocaleDateString("en-GB", { day: "numeric", month: "long" });
 
 /** The Verification row, by where their ID check stands. */
 const VERIFY_ROW: Record<KycStatus, { title: string; meta: string }> = {
@@ -66,6 +65,7 @@ const VERIFY_ROW: Record<KycStatus, { title: string; meta: string }> = {
  */
 export default async function ProfilePage() {
   const user = await requireUser("/dashboard/profile");
+  const zone = await viewerZone();
   const [me, rating] = await Promise.all([
     db.user.findUniqueOrThrow({
       where: { id: user.id },
@@ -149,7 +149,7 @@ export default async function ProfilePage() {
               leading={<IconTile icon={GemIcon} />}
               title={
                 rating.reseller && rating.endsAt
-                  ? `Reseller badge until ${until(rating.endsAt)}`
+                  ? `Reseller badge until ${longDate(rating.endsAt, zone)}`
                   : "Get the Reseller badge"
               }
               meta="More points and lower fees"

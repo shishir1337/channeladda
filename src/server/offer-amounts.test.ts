@@ -134,7 +134,10 @@ test(
       where: { userId: buyer.id },
     });
     expect(told.title).toBe("Your offer of $80.00 was accepted");
-    expect(told.body).toMatch(/held for you until .+ UTC/);
+    // A length, not a clock time: the server does not know the buyer's
+    // zone, and "until 28 Oct, 00:22 UTC" read wrong everywhere but London.
+    expect(told.body).toMatch(/held for you for \d+ hours?\./);
+    expect(told.body).not.toMatch(/UTC|\d:\d\d/);
     // The seller pressed the button; nothing for them to be told.
     expect(await db.notification.count({ where: { userId: seller.id } })).toBe(
       0,
@@ -167,7 +170,7 @@ test(
       where: { userId: seller.id },
     });
     expect(told.title).toBe(`${buyer.name} accepted your price of $90.00`);
-    expect(told.body).toContain(`held for ${buyer.name} until`);
+    expect(told.body).toContain(`held for ${buyer.name} for `);
     expect(told.body).not.toMatch(/held for you/);
     expect(await db.notification.count({ where: { userId: buyer.id } })).toBe(
       0,

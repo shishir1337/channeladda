@@ -1,51 +1,35 @@
 /**
- * The one clock Channel Adda's dates are written in.
- *
- * Dates rendered on the server came out in the server's zone — UTC — so a
- * deal finished on the evening of 26 October in Kolkata got a certificate
- * saying 25 October (QA, 2026-10-26). Every date a page or a message writes
- * about a deal goes through here instead, in India time, where most of the
- * marketplace is. Wherever a time of day is given, the zone is named with
- * it, since a buyer elsewhere would otherwise read it as their own.
+ * The old names for `@/lib/time`, kept so the files that use them need not
+ * change at once. Without a zone they write India time and say so — right
+ * for an email or a certificate. A page passes the reader's zone:
+ * `await viewerZone()` on the server, `useViewerZone()` in a Client
+ * Component.
  */
-export const SITE_TIME_ZONE = "Asia/Kolkata";
+import {
+  dayAndTime,
+  dayMonth,
+  longDate,
+  SITE_ZONE,
+  type ViewerZone,
+} from "@/lib/time";
 
-/** Said after a time of day, so nobody reads it in their own zone. */
-export const SITE_TIME_LABEL = "India time";
+export { SITE_TIME_LABEL, SITE_TIME_ZONE } from "@/lib/time";
 
 /** "26 October 2026". */
-export function siteDate(date: Date): string {
-  return date.toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-    timeZone: SITE_TIME_ZONE,
-  });
+export function siteDate(date: Date, zone: ViewerZone = SITE_ZONE): string {
+  return longDate(date, zone);
 }
 
 /** "26 October", or "26 Oct" with `short`. */
-export function siteDayMonth(date: Date, month: "long" | "short" = "long") {
-  return date.toLocaleDateString("en-GB", {
-    day: "numeric",
-    month,
-    timeZone: SITE_TIME_ZONE,
-  });
+export function siteDayMonth(
+  date: Date,
+  month: "long" | "short" = "long",
+  zone: ViewerZone = SITE_ZONE,
+): string {
+  return dayMonth(date, zone, month);
 }
 
-/** "4:31 pm". */
-export function siteClock(date: Date): string {
-  return date
-    .toLocaleTimeString("en-GB", {
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true,
-      timeZone: SITE_TIME_ZONE,
-    })
-    .replace(/\s?([ap])\.?m\.?$/i, (_, half: string) => ` ${half}m`)
-    .toLowerCase();
-}
-
-/** "16 November, 4:31 pm India time": a moment somebody waits for. */
-export function siteMoment(date: Date): string {
-  return `${siteDayMonth(date)}, ${siteClock(date)} ${SITE_TIME_LABEL}`;
+/** "16 Nov, 4:31 PM", and "… India time" without the reader's zone. */
+export function siteMoment(date: Date, zone: ViewerZone = SITE_ZONE): string {
+  return dayAndTime(date, zone);
 }

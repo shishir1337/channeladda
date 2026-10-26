@@ -39,6 +39,7 @@ import type { ListingStatus } from "@/generated/prisma/enums";
 import { LOCK_TEXT, removedBySeller } from "@/lib/listing-lock";
 import { countOf } from "@/lib/plural";
 import { revenueLine } from "@/lib/revenue-line";
+import { longDate } from "@/lib/time";
 import { cn } from "@/lib/utils";
 import {
   EDITABLE,
@@ -47,6 +48,7 @@ import {
 } from "@/server/seller-listings";
 import { requireUser } from "@/server/session";
 import { getFeeSettings } from "@/server/settings";
+import { viewerZone } from "@/server/viewer-zone";
 
 export const metadata: Metadata = {
   title: "Listing",
@@ -69,14 +71,6 @@ function usd(value: number) {
     currency: "USD",
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  });
-}
-
-function fullDay(date: Date) {
-  return date.toLocaleDateString("en-US", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
   });
 }
 
@@ -130,6 +124,7 @@ export default async function SellerListingPage({
 }: PageProps<"/dashboard/listings/[id]">) {
   const { id } = await params;
   const user = await requireUser(`/dashboard/listings/${id}`);
+  const zone = await viewerZone();
 
   // Scoped to the owner, so somebody else's id is indistinguishable from one
   // that does not exist.
@@ -391,7 +386,7 @@ export default async function SellerListingPage({
                 {listing.ownershipVerifiedAt ? (
                   <span className="font-normal text-muted">
                     {" "}
-                    on {fullDay(listing.ownershipVerifiedAt)}
+                    on {longDate(listing.ownershipVerifiedAt, zone)}
                   </span>
                 ) : null}
               </>

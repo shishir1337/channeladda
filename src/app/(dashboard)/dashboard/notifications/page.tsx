@@ -16,6 +16,7 @@ import { MarkAllRead } from "@/components/dashboard/mark-all-read";
 import { NotificationLink } from "@/components/dashboard/notification-link";
 import { notificationLook } from "@/components/dashboard/notification-look";
 import { Button } from "@/components/ui/button";
+import { dayAndTime, type ViewerZone } from "@/lib/time";
 import { cn } from "@/lib/utils";
 import {
   listNotifications,
@@ -23,6 +24,7 @@ import {
   unreadCount,
 } from "@/server/notifications";
 import { requireUser } from "@/server/session";
+import { viewerZone } from "@/server/viewer-zone";
 
 export const metadata: Metadata = {
   title: "Notifications",
@@ -37,9 +39,10 @@ export const metadata: Metadata = {
  */
 export default async function NotificationsPage() {
   const user = await requireUser("/dashboard/notifications");
-  const [items, unread] = await Promise.all([
+  const [items, unread, zone] = await Promise.all([
     listNotifications(user.id, 100),
     unreadCount(user.id),
+    viewerZone(),
   ]);
 
   return (
@@ -94,12 +97,12 @@ export default async function NotificationsPage() {
                     unread={isUnread}
                     className="group block px-3.5 py-3 transition-colors duration-150 hover:bg-surface-2/60 focus-visible:-outline-offset-2 sm:px-5"
                   >
-                    <Row item={item} />
+                    <Row item={item} zone={zone} />
                   </NotificationLink>
                 </ListItem>
               ) : (
                 <ListItem key={item.id}>
-                  <Row item={item} />
+                  <Row item={item} zone={zone} />
                 </ListItem>
               );
             })}
@@ -111,7 +114,7 @@ export default async function NotificationsPage() {
 }
 
 /** One notification: what it is, when, and what it says. */
-function Row({ item }: { item: NotificationView }) {
+function Row({ item, zone }: { item: NotificationView; zone: ViewerZone }) {
   const look = notificationLook(item);
   const isUnread = item.readAt === null;
   return (
@@ -137,12 +140,7 @@ function Row({ item }: { item: NotificationView }) {
                 mark on the row that says it still wants you. */}
           <span className="flex shrink-0 items-center gap-2 pt-px text-xs leading-5 whitespace-nowrap text-subtle tabular-nums">
             <time dateTime={item.createdAt.toISOString()}>
-              {item.createdAt.toLocaleString("en-GB", {
-                day: "numeric",
-                month: "short",
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
+              {dayAndTime(item.createdAt, zone)}
             </time>
             <Dot tone="primary" className={cn(!isUnread && "invisible")} />
           </span>

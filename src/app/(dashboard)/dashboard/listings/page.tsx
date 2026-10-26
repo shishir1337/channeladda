@@ -35,6 +35,7 @@ import type { ListingStatus } from "@/generated/prisma/enums";
 import { artworkProps } from "@/lib/artwork";
 import { LIVE_EDITABLE, REMOVABLE, removedBySeller } from "@/lib/listing-lock";
 import { pickTab } from "@/lib/tabs";
+import { shortDate } from "@/lib/time";
 import { cn } from "@/lib/utils";
 import {
   getMyListings,
@@ -42,6 +43,7 @@ import {
   type SellerListing,
 } from "@/server/seller-listings";
 import { requireUser } from "@/server/session";
+import { viewerZone } from "@/server/viewer-zone";
 
 export const metadata: Metadata = {
   title: "Your listings",
@@ -58,9 +60,6 @@ function usd(value: number) {
 }
 
 /** "26 Oct", as the rest of the dashboard writes a day. */
-function day(date: Date) {
-  return date.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
-}
 
 /**
  * Listings are grouped by what stage they are at, not listed flat.
@@ -370,7 +369,7 @@ function removedNote(listing: SellerListing) {
     : "Taken down by a moderator. Open it to see why.";
 }
 
-function ListingRow({
+async function ListingRow({
   listing,
   needsYou,
   locked,
@@ -380,6 +379,7 @@ function ListingRow({
   /** A running deal holds it, so it cannot be edited or removed. */
   locked: boolean;
 }) {
+  const zone = await viewerZone();
   const move = NEXT_MOVE[listing.status];
   // The one status whose meaning no badge or section on this page says.
   const note =
@@ -479,7 +479,7 @@ function ListingRow({
               </p>
             ) : (
               <p className="mt-0.5 text-xs leading-5 whitespace-nowrap text-subtle">
-                Updated {day(listing.updatedAt)}
+                Updated {shortDate(listing.updatedAt, zone)}
               </p>
             )}
           </div>

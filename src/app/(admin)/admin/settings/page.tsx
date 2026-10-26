@@ -14,9 +14,11 @@ import {
   Tr,
 } from "@/components/app/kit";
 import { settingsDiff } from "@/lib/settings-history";
+import { dayAndTime, shortDate } from "@/lib/time";
 import { getAuditTrail } from "@/server/audit";
 import { requireSuperadmin } from "@/server/session";
 import { getSettings } from "@/server/settings";
+import { viewerZone } from "@/server/viewer-zone";
 
 export const metadata: Metadata = {
   title: "Platform settings",
@@ -25,6 +27,7 @@ export const metadata: Metadata = {
 
 export default async function AdminSettingsPage() {
   await requireSuperadmin();
+  const zone = await viewerZone();
   const settings = await getSettings();
   const trail = await getAuditTrail(
     { entity: "user", entityId: "platform-settings" },
@@ -104,10 +107,10 @@ export default async function AdminSettingsPage() {
                       <Td className="align-top whitespace-nowrap">
                         <time
                           dateTime={row.createdAt.toISOString()}
-                          title={row.createdAt.toLocaleString("en-GB")}
+                          title={dayAndTime(row.createdAt, zone)}
                           className="tnum text-[0.8125rem] text-muted"
                         >
-                          {row.createdAt.toLocaleDateString("en-GB")}
+                          {shortDate(row.createdAt, zone)}
                         </time>
                       </Td>
                       <Td className="align-top font-medium whitespace-nowrap text-fg">
