@@ -26,6 +26,7 @@ import { useRouter } from "next/navigation";
 import { useMemberCounts } from "@/components/site/member-counts";
 import { Button } from "@/components/ui/button";
 import { HUE_TEXT, iconText } from "@/components/ui/icon-hue";
+import { artworkProps } from "@/lib/artwork";
 import { authClient, useSession } from "@/lib/auth-client";
 import { needsEmailVerification } from "@/lib/email-verification";
 import type { MemberCounts } from "@/lib/site-dock";
@@ -36,6 +37,44 @@ const itemClass =
 
 const groupLabel =
   "px-3 pt-1 pb-1 text-[0.6875rem] font-medium tracking-wide text-subtle uppercase";
+
+/**
+ * The member's photo, or their initials on a tile when there is none. The
+ * same square in the header and at the top of the menu, at two sizes.
+ */
+function Face({
+  name,
+  image,
+  size,
+}: {
+  name: string;
+  image?: string | null;
+  size: 32 | 36;
+}) {
+  const box = size === 32 ? "size-8 rounded-md" : "size-9 rounded-lg";
+  if (image) {
+    return (
+      // biome-ignore lint/performance/noImgElement: sized by artworkProps, as on every card.
+      <img
+        {...artworkProps({ src: image, width: size, height: size })}
+        alt=""
+        aria-hidden="true"
+        className={cn(box, "shrink-0 object-cover ring-1 ring-line ring-inset")}
+      />
+    );
+  }
+  return (
+    <span
+      aria-hidden="true"
+      className={cn(
+        box,
+        "flex shrink-0 items-center justify-center bg-surface-2 text-xs font-semibold text-fg ring-1 ring-line ring-inset",
+      )}
+    >
+      {initialsOf(name)}
+    </span>
+  );
+}
 
 function initialsOf(name: string) {
   return name
@@ -162,12 +201,20 @@ export function AccountMenu({ className }: { className?: string }) {
 
   if (isPending || !session?.user) {
     return (
-      <Button asChild variant="ghost" size="sm" className={className}>
-        <Link href="/signin">
-          <UserRoundIcon aria-hidden="true" className="size-4" />
-          Sign in
-        </Link>
-      </Button>
+      <>
+        <VisitorMenu className={cn("lg:hidden", className)} />
+        <Button
+          asChild
+          variant="ghost"
+          size="sm"
+          className={cn("hidden lg:inline-flex", className)}
+        >
+          <Link href="/signin">
+            <UserRoundIcon aria-hidden="true" className="size-4" />
+            Sign in
+          </Link>
+        </Button>
+      </>
     );
   }
 
@@ -196,12 +243,7 @@ export function AccountMenu({ className }: { className?: string }) {
         )}
         aria-label={`Account menu for ${user.name}`}
       >
-        <span
-          aria-hidden="true"
-          className="flex size-8 shrink-0 items-center justify-center rounded-md bg-surface-2 text-xs font-semibold text-fg ring-1 ring-line ring-inset"
-        >
-          {initialsOf(user.name)}
-        </span>
+        <Face name={user.name} image={user.image} size={32} />
         {/* The initials alone until the bar has room for the name too, and
             a long name cut short once the links join it: in full it ran the bar
             past its edge. */}
@@ -218,12 +260,7 @@ export function AccountMenu({ className }: { className?: string }) {
           className="z-50 max-h-[var(--radix-dropdown-menu-content-available-height)] w-[16.5rem] overflow-y-auto rounded-xl border border-line bg-surface p-1 shadow-lift data-[state=closed]:animate-[fade-out_160ms_ease-in] data-[state=open]:animate-[fade-in_200ms_ease-out]"
         >
           <div className="flex items-center gap-3 px-3 py-2.5">
-            <span
-              aria-hidden="true"
-              className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-surface-2 text-xs font-semibold text-fg ring-1 ring-line ring-inset"
-            >
-              {initialsOf(user.name)}
-            </span>
+            <Face name={user.name} image={user.image} size={36} />
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold text-fg">
                 {user.name}
@@ -310,6 +347,80 @@ export function AccountMenu({ className }: { className?: string }) {
           >
             <LogOutIcon aria-hidden="true" className="size-4 shrink-0" />
             Sign out
+          </DropdownMenu.Item>
+        </DropdownMenu.Content>
+      </DropdownMenu.Portal>
+    </DropdownMenu.Root>
+  );
+}
+
+/**
+ * A visitor's account menu on a phone or a tablet: a profile icon where the
+ * menu button was, with signing in and joining behind it. The full menu is
+ * "More" on the tab bar below. Two buttons that opened the same sheet, one
+ * above the page and one below it, were one too many (the owner,
+ * 2026-10-26).
+ */
+function VisitorMenu({ className }: { className?: string }) {
+  return (
+    <DropdownMenu.Root>
+      <DropdownMenu.Trigger
+        className={cn(
+          "inline-flex size-11 cursor-pointer items-center justify-center rounded-[10px] text-muted transition-colors duration-150 hover:bg-surface-2 hover:text-fg data-[state=open]:bg-surface-2 data-[state=open]:text-fg",
+          className,
+        )}
+        aria-label="Account"
+      >
+        <span
+          aria-hidden="true"
+          className="flex size-8 items-center justify-center rounded-md bg-surface-2 ring-1 ring-line ring-inset"
+        >
+          <UserRoundIcon className="size-4" />
+        </span>
+      </DropdownMenu.Trigger>
+      <DropdownMenu.Portal>
+        <DropdownMenu.Content
+          align="end"
+          sideOffset={8}
+          collisionPadding={12}
+          className="z-50 w-[14rem] rounded-xl border border-line bg-surface p-1 shadow-lift data-[state=closed]:animate-[fade-out_160ms_ease-in] data-[state=open]:animate-[fade-in_200ms_ease-out]"
+        >
+          <DropdownMenu.Item asChild>
+            <Link href="/signin" className={itemClass}>
+              <UserRoundIcon
+                aria-hidden="true"
+                className={cn("size-4 shrink-0", iconText(UserRoundIcon))}
+              />
+              Sign in
+            </Link>
+          </DropdownMenu.Item>
+          <DropdownMenu.Item asChild>
+            <Link href="/signup" className={itemClass}>
+              <PlusIcon
+                aria-hidden="true"
+                className={cn("size-4 shrink-0", iconText(PlusIcon))}
+              />
+              Create an account
+            </Link>
+          </DropdownMenu.Item>
+          <DropdownMenu.Separator className="my-1.5 h-px bg-line" />
+          <DropdownMenu.Item asChild>
+            <Link href="/sell" className={itemClass}>
+              <StoreIcon
+                aria-hidden="true"
+                className={cn("size-4 shrink-0", iconText(StoreIcon))}
+              />
+              Sell an account
+            </Link>
+          </DropdownMenu.Item>
+          <DropdownMenu.Item asChild>
+            <Link href="/help" className={itemClass}>
+              <LifeBuoyIcon
+                aria-hidden="true"
+                className={cn("size-4 shrink-0", iconText(LifeBuoyIcon))}
+              />
+              Help centre
+            </Link>
           </DropdownMenu.Item>
         </DropdownMenu.Content>
       </DropdownMenu.Portal>

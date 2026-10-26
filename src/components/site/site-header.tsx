@@ -1,6 +1,6 @@
 "use client";
 
-import { MenuIcon, SearchIcon } from "lucide-react";
+import { SearchIcon } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
@@ -19,7 +19,6 @@ import {
   SheetContent,
   SheetDescription,
   SheetTitle,
-  SheetTrigger,
 } from "@/components/ui/sheet";
 import { platforms } from "@/data/platforms";
 import { useSession } from "@/lib/auth-client";
@@ -129,21 +128,15 @@ export function SiteHeader() {
           <CurrencySwitcher className="hidden lg:inline-flex" />
           <ThemeToggle className="hidden md:inline-flex" />
           <HeaderWallet className="px-2 sm:px-3" />
-          <AccountMenu className="hidden sm:inline-flex" />
+          {/* On a phone too: the profile icon is where the menu button was.
+              The menu itself is "More" on the tab bar. */}
+          <AccountMenu />
           <Button asChild size="sm" className="hidden md:inline-flex">
             <Link href="/sell">Sell an account</Link>
           </Button>
 
+          {/* Opened by "More" on the phone's tab bar, its only button now. */}
           <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
-            <SheetTrigger asChild>
-              <button
-                type="button"
-                aria-label="Open menu"
-                className="inline-flex size-11 cursor-pointer items-center justify-center rounded-[10px] text-fg transition-colors duration-150 hover:bg-surface-2 lg:hidden"
-              >
-                <MenuIcon aria-hidden="true" className="size-5" />
-              </button>
-            </SheetTrigger>
             <SheetContent onCloseAutoFocus={returnFocus}>
               <SheetTitle className="border-b border-line px-6 py-5 text-base font-semibold">
                 Menu
