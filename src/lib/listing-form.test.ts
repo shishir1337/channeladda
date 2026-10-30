@@ -403,3 +403,29 @@ test("a whole-number field says so for a fraction", () => {
     messages(listingDraftSchema.safeParse({ ...TYPED, audience: "30,500.5" })),
   ).toEqual({ audience: "Whole numbers only." });
 });
+
+test("a screenshot needs no caption, and a long one is still refused", () => {
+  // The owner, 2026-10-30: the note under each proof screenshot is optional.
+  const shot = {
+    url: "/uploads/proof/a.png",
+    label: "",
+    sha256: "a".repeat(64),
+  };
+  const sent: ListingDraftInput = {
+    ...TYPED,
+    platform: "website",
+    handle: "gadgetreview.example.com",
+    sourceUrl: "https://gadgetreview.example.com",
+    engagement: Number.NaN,
+    coverUrl: "/uploads/cover/a.png",
+    avatarUrl: "/uploads/avatar/a.png",
+    proofs: [shot],
+  };
+  expect(fields(listingSubmitSchema.safeParse(sent))).toEqual([]);
+  expect(fields(listingDraftSchema.safeParse(sent))).toEqual([]);
+
+  const long = { ...shot, label: "x".repeat(81) };
+  expect(
+    fields(listingSubmitSchema.safeParse({ ...sent, proofs: [long] })),
+  ).toEqual(["proofs"]);
+});

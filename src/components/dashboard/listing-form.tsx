@@ -569,8 +569,8 @@ export function ListingForm({
   // "Filled in", not "valid". The server decides what is valid; this only
   // says how much is left to type.
   const filled = (value: string) => value.trim() !== "";
-  const captionsDone =
-    draft.proofs.length > 0 && draft.proofs.every((p) => filled(p.label));
+  // A note under each screenshot is optional (the owner, 2026-10-30).
+  const proofDone = draft.proofs.length > 0;
 
   const errorKeys = Object.keys(errors).filter((key) => key !== "form");
   const hasErrorIn = (keys: string[], prefix?: string) =>
@@ -636,7 +636,7 @@ export function ListingForm({
       id: STEP.proof,
       label: "Proof",
       icon: CameraIcon,
-      done: [captionsDone],
+      done: [proofDone],
       error: hasErrorIn(["proofs"], "proofs."),
     },
     {
@@ -1439,11 +1439,6 @@ export function ListingForm({
               <span className="tabular-nums">{draft.proofs.length}</span> of{" "}
               <span className="tabular-nums">{MAX_PROOFS}</span>
             </p>
-            {draft.proofs.length > 0 && !captionsDone ? (
-              <Badge variant="primary" size="sm">
-                Each one needs a caption
-              </Badge>
-            ) : null}
           </div>
 
           {draft.proofs.length > 0 ? (
@@ -1496,14 +1491,10 @@ export function ListingForm({
                       htmlFor={captionId}
                       className={cn(labelClass, "mt-3")}
                     >
-                      What this shows
-                      <span aria-hidden="true" className="ml-0.5 text-danger">
-                        *
-                      </span>
+                      What this shows (optional)
                     </label>
                     <input
                       id={captionId}
-                      required
                       aria-invalid={captionError ? true : undefined}
                       aria-describedby={
                         captionError ? `${captionId}-error` : undefined
@@ -1520,11 +1511,9 @@ export function ListingForm({
                       placeholder="e.g. Last 28 days of revenue"
                       className={cn(inputClass, "mt-1.5")}
                     />
-                    {/* Without this the whole form died silently: the schema
-                        requires a caption, a screenshot arrives with an empty
-                        one, and the failure is keyed `proofs.0.label` — which
-                        nothing rendered and the scroll-to-first-error could not
-                        find either. Both buttons flickered and did nothing. */}
+                    {/* A caption can still fail (over 80 characters), keyed
+                        `proofs.0.label`. Unrendered, the whole form died
+                        silently: both buttons flickered and did nothing. */}
                     {captionError ? (
                       <p
                         id={`${captionId}-error`}
@@ -1565,7 +1554,7 @@ export function ListingForm({
               }
               hint={`Pick several at once. Up to eight in all — room for ${
                 MAX_PROOFS - draft.proofs.length
-              } more. Each one needs a caption once it is in.`}
+              } more.`}
               value={null}
               // Called once per file, several times from one pick, so it
               // updates from the current list rather than this render's.
@@ -1663,7 +1652,7 @@ export function ListingForm({
               value={draft.whatsapp}
               onChange={(e) => set("whatsapp", e.target.value)}
               error={errors.whatsapp}
-              placeholder="+8801712345678"
+              placeholder="+919876543210"
             />
           </FieldInfo>
         </FormSection>
@@ -1707,8 +1696,8 @@ export function ListingForm({
               target={STEP.images}
             />
             <Requirement
-              done={captionsDone}
-              label="At least one screenshot from inside the account, each with a caption"
+              done={proofDone}
+              label="At least one screenshot from inside the account"
               target={STEP.proof}
             />
           </ul>

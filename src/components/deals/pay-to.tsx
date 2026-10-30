@@ -205,16 +205,16 @@ function SellerEditor({ deal }: { deal: DealView }) {
             htmlFor={fieldId}
             className="block max-w-[62ch] text-[0.8125rem] leading-relaxed text-muted"
           >
-            A bKash or Nagad number, a wallet address and its network, or bank
-            details. {deal.buyerName} sees this only when it is their turn to
-            pay you, and is warned if it changes after that.
+            A UPI ID, bank details, or a wallet address and its network.{" "}
+            {deal.buyerName} sees this only when it is their turn to pay you,
+            and is warned if it changes after that.
           </label>
           <textarea
             id={fieldId}
             rows={3}
             value={text}
             onChange={(e) => setText(e.target.value)}
-            placeholder="bKash 01XXXXXXXXX (personal), or USDT (TRC20): T…"
+            placeholder="UPI: name@okaxis, or USDT (TRC20): T…"
             aria-invalid={over}
             className={cn(textareaClass, "mt-2 font-mono")}
           />

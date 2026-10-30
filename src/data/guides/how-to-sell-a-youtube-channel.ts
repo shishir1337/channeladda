@@ -61,7 +61,7 @@ export const howToSellAYoutubeChannel: Guide = {
         },
         {
           kind: "p",
-          text: "On Channel Adda you add up to eight screenshots, each with a caption, and a figure that does not match them is the most common reason a listing comes back. When we check your ownership code, the channel name and, unless it is hidden, the subscriber count are read from YouTube itself.",
+          text: "On Channel Adda you add up to eight screenshots, and a figure that does not match them is the most common reason a listing comes back. When we check your ownership code, the channel name and, unless it is hidden, the subscriber count are read from YouTube itself.",
         },
       ],
     },
@@ -92,7 +92,7 @@ export const howToSellAYoutubeChannel: Guide = {
             "Subscribers, engagement over the last 30 days and the channel's age",
             "Whether it is monetized, a recent month's revenue and the real 12-month total",
             "Your asking price in US dollars",
-            "A cover image, the profile picture and your captioned screenshots",
+            "A cover image, the profile picture and your screenshots",
             "Any active strikes, paid promotion or past sale of the channel, and whether it is on a Brand Account",
           ],
         },

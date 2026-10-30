@@ -610,9 +610,11 @@ function ReadOnlySummary({
                     height={104}
                     className="h-[6.5rem] w-full rounded-lg border border-line bg-surface-2 object-cover"
                   />
-                  <p className="mt-1.5 text-xs leading-relaxed text-muted">
-                    {proof.label}
-                  </p>
+                  {proof.label ? (
+                    <p className="mt-1.5 text-xs leading-relaxed text-muted">
+                      {proof.label}
+                    </p>
+                  ) : null}
                 </li>
               ))}
             </ul>

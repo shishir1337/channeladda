@@ -220,18 +220,16 @@ const listingFields = z.object({
     .or(z.literal(""))
     .refine(
       (value) => !value || /^\+?[0-9 ()-]{7,32}$/.test(value),
-      "Use the international form, e.g. +8801712345678.",
+      "Use the international form, e.g. +919876543210.",
     ),
 
   proofs: z
     .array(
       z.object({
         url: z.string().min(1),
-        label: z
-          .string()
-          .trim()
-          .min(1, "Say what this screenshot shows.")
-          .max(80),
+        // Optional (the owner, 2026-10-30): a note helps the moderator, but
+        // the screenshot is the proof.
+        label: z.string().trim().max(80, "Keep it under 80 characters."),
         sha256: z.string().regex(/^[0-9a-f]{64}$/, "Bad file reference."),
       }),
     )

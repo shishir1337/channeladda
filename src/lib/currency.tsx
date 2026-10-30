@@ -60,7 +60,7 @@ export const currencies: Currency[] = [
     code: "INR",
     symbol: "₹",
     label: "Indian Rupee",
-    rate: 87.4,
+    rate: 95,
     locale: "en-IN",
     iso: true,
   },

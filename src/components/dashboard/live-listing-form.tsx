@@ -452,7 +452,7 @@ export function LiveListingForm({
             value={values.whatsapp}
             onChange={(e) => set("whatsapp", e.target.value)}
             error={errors.whatsapp}
-            placeholder="+8801712345678"
+            placeholder="+919876543210"
           />
         </CardBody>
       </Card>
